@@ -1,0 +1,47 @@
+name: Code Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 🛎 Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: '${{ secrets.WORKFLOW_COMMIT }}'
+
+      - name: 📦 Install pnpm
+        uses: pnpm/action-setup@v6.0.9
+
+      - name: 📦 Install node
+        uses: actions/setup-node@v6
+        with:
+          cache: 'pnpm'
+
+      - name: 📦 Install dependencies
+        run: pnpm install
+
+      - name: 📝 Format Code
+        run: pnpm format
+
+      - name: 🔍 Lint Code
+        run: pnpm lint
+
+      - name: 🔍 Type Check
+        run: pnpm type-check
+
+      - name: ✅ Commit Code Format Changes
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Static analysis"
