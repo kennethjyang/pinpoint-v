@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import BabylonScene from '@/components/BabylonScene.vue'
-import {ref} from 'vue'
+import { ref } from 'vue'
 
 const fps = ref('0')
 
