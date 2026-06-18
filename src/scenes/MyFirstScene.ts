@@ -9,7 +9,7 @@ import {
   Vector3,
 } from '@babylonjs/core'
 
-const createScene = (canvas: HTMLCanvasElement) => {
+const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => void) => {
   const engine = new Engine(canvas)
   const scene = new Scene(engine)
 
@@ -19,13 +19,31 @@ const createScene = (canvas: HTMLCanvasElement) => {
 
   new HemisphericLight('light', Vector3.Up(), scene)
 
-  const box = MeshBuilder.CreateBox('box', { size: 2 }, scene)
-  const material = new StandardMaterial('box-material', scene)
-  material.diffuseColor = Color3.Blue()
-  box.material = material
+  const boxRed = MeshBuilder.CreateBox('box-red', { size: 1 }, scene)
+  const materialRed = new StandardMaterial('box-red-material', scene)
+  materialRed.diffuseColor = Color3.Red()
+  boxRed.material = materialRed
+  boxRed.position.x = -2
+
+  const boxBlue = MeshBuilder.CreateBox('box-yellow', { size: 1 }, scene)
+  const materialYellow = new StandardMaterial('box-blue-material', scene)
+  materialYellow.diffuseColor = Color3.Yellow()
+  boxBlue.material = materialYellow
+
+  const boxGreen = MeshBuilder.CreateBox('box-green', { size: 1 }, scene)
+  const materialGreen = new StandardMaterial('box-green-material', scene)
+  materialGreen.diffuseColor = Color3.Green()
+  boxGreen.material = materialGreen
+  boxGreen.position.x = 2
 
   engine.runRenderLoop(() => {
     scene.render()
+
+    boxGreen.rotation.y += 0.01
+
+    if (fpsCallback) {
+      fpsCallback(engine.getFps().toFixed())
+    }
   })
 }
 

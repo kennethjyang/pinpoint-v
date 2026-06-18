@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import BabylonScene from "@/components/BabylonScene.vue";
+import BabylonScene from '@/components/BabylonScene.vue'
+import {ref} from 'vue'
+
+const fps = ref('0')
+
+function updateFps(newFps: string) {
+  fps.value = newFps
+}
 </script>
 
 <template>
@@ -8,7 +15,8 @@ import BabylonScene from "@/components/BabylonScene.vue";
     Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
     documentation
   </p>
-  <BabylonScene/>
+  <p>{{ fps }}</p>
+  <BabylonScene @fps="updateFps" />
 </template>
 
 <style scoped></style>
