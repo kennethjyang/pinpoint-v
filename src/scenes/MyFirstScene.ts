@@ -19,18 +19,18 @@ const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => vo
 
   new HemisphericLight('light', Vector3.Up(), scene)
 
-  const boxRed = MeshBuilder.CreateBox('box-red', { size: 1 }, scene)
+  const boxRed = MeshBuilder.CreateBox('box-red', {size: 1}, scene)
   const materialRed = new StandardMaterial('box-red-material', scene)
   materialRed.diffuseColor = Color3.Red()
   boxRed.material = materialRed
   boxRed.position.x = -2
 
-  const boxBlue = MeshBuilder.CreateBox('box-yellow', { size: 1 }, scene)
+  const boxBlue = MeshBuilder.CreateBox('box-yellow', {size: 1}, scene)
   const materialYellow = new StandardMaterial('box-blue-material', scene)
   materialYellow.diffuseColor = Color3.Yellow()
   boxBlue.material = materialYellow
 
-  const boxGreen = MeshBuilder.CreateBox('box-green', { size: 1 }, scene)
+  const boxGreen = MeshBuilder.CreateBox('box-green', {size: 1}, scene)
   const materialGreen = new StandardMaterial('box-green-material', scene)
   materialGreen.diffuseColor = Color3.Green()
   boxGreen.material = materialGreen
@@ -47,4 +47,4 @@ const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => vo
   })
 }
 
-export { createScene }
+export {createScene}
