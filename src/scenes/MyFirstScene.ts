@@ -1,18 +1,82 @@
 import {
   ArcRotateCamera,
-  Engine,
   GizmoManager,
   HemisphericLight,
   MeshBuilder,
   Scene,
   TransformNode,
   Vector3,
+  WebGPUEngine,
 } from '@babylonjs/core'
 
-const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => void) => {
-  const engine = new Engine(canvas)
+interface AnnotationChunkInfo {
+  /**
+   * Number of entries in the AP dimension.
+   */
+  APDimension: number
+
+  /**
+   * Number of entries in the ML dimension.
+   */
+  MLDimension: number
+
+  /**
+   * Number of entries in the DV dimension.
+   */
+  DVDimension: number
+
+  /**
+   * Lowest APMLDV coordinate in the chunk.
+   */
+  startCoordinate: Vector3
+
+  /**
+   * Highest APMLDV coordinate in the chunk.
+   */
+  endCoordinate: Vector3
+
+  /**
+   * Flattened volume data in ML, AP, DV order (X, Y, Z). len(data) == AP * ML * DV Dimensions
+   */
+  data: Uint32Array
+}
+
+interface LutInfo {
+  /**
+   * Number of entries in the LUT.
+   */
+  entries: number
+
+  /**
+   * LUT data in RGB order. len(data) == entries * 3.
+   */
+  data: Uint8Array
+}
+
+interface SliceParams {
+  /**
+   * Center of the slice as APMLDV coordinate.
+   */
+  center: Vector3
+
+  /**
+   * Up vector along the axis of the probe.
+   */
+  up: Vector3
+
+  /**
+   * Right vector local to the probe.
+   */
+  right: Vector3
+}
+
+const createScene = async (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => void) => {
+  // Initialize Babylon engine and scene.
+  const engine = new WebGPUEngine(canvas)
+  await engine.initAsync()
   const scene = new Scene(engine)
 
+  // Init orbiting camera.
   const camera = new ArcRotateCamera(
     'MainCamera',
     -Math.PI / 2,
@@ -23,22 +87,28 @@ const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => vo
   )
   camera.attachControl(canvas, true)
 
+  // Init light.
   new HemisphericLight('MainLight', Vector3.Up(), scene)
 
+  // Init gizmo manager.
   const gizmoManager = new GizmoManager(scene)
   gizmoManager.positionGizmoEnabled = true
   gizmoManager.rotationGizmoEnabled = true
   gizmoManager.usePointerToAttachGizmos = false
 
+  // Add a "probe" and attach gizmo to tip.
   const probeMesh = MeshBuilder.CreateBox('ProbeMesh', { height: 2 }, scene)
   probeMesh.setAbsolutePosition(Vector3.Up())
-  const probeMover = new TransformNode('ProbeMover', scene)
+  const probeMover = new TransformNode('ProbeTip', scene)
   probeMover.addChild(probeMesh)
   gizmoManager.attachToNode(probeMover)
 
+  // Engine render loop.
   engine.runRenderLoop(() => {
+    // Render the scene.
     scene.render()
 
+    // Update the FPS.
     if (fpsCallback) {
       fpsCallback(engine.getFps().toFixed())
     }
