@@ -1,5 +1,6 @@
 import {
   ArcRotateCamera,
+  ComputeShader,
   Constants,
   Engine,
   GizmoManager,
@@ -11,78 +12,19 @@ import {
   StorageBuffer,
   Texture,
   TransformNode,
+  UniformBuffer,
   Vector3,
   WebGPUEngine,
 } from '@babylonjs/core'
-
-interface AnnotationChunkInfo {
-  /**
-   * Number of entries in the AP dimension.
-   */
-  APDimension: number
-
-  /**
-   * Number of entries in the ML dimension.
-   */
-  MLDimension: number
-
-  /**
-   * Number of entries in the DV dimension.
-   */
-  DVDimension: number
-
-  /**
-   * Lowest APMLDV coordinate in the chunk.
-   */
-  startCoordinate: Vector3
-
-  /**
-   * Highest APMLDV coordinate in the chunk.
-   */
-  endCoordinate: Vector3
-
-  /**
-   * Flattened volume data in ML, AP, DV order (X, Y, Z). len(data) == AP * ML * DV Dimensions
-   */
-  data: Uint32Array
-}
-
-interface LutInfo {
-  /**
-   * Number of entries in the LUT.
-   */
-  entries: number
-
-  /**
-   * LUT data in RGB order. len(data) == entries * 3.
-   */
-  data: Uint8Array
-}
-
-interface SliceParams {
-  /**
-   * Center of the slice as APMLDV coordinate.
-   */
-  center: Vector3
-
-  /**
-   * Up vector along the axis of the probe.
-   */
-  up: Vector3
-
-  /**
-   * Right vector local to the probe.
-   */
-  right: Vector3
-}
 
 const createScene = async (
   canvas: HTMLCanvasElement,
   sliceCanvas: HTMLCanvasElement,
   fpsCallback: (fps: string) => void,
 ) => {
-  // Initialize Babylon engine and scene.
+  // Initialize WebGPU Babylon engine and scene.
   const engine = new WebGPUEngine(canvas)
+  engine.compatibilityMode = false
   await engine.initAsync()
   const scene = new Scene(engine)
 
@@ -114,12 +56,15 @@ const createScene = async (
   gizmoManager.attachToNode(probeMover)
 
   // Build annotation chunk texture.
-  const annotationChunkData = new Uint32Array([0, 0, 1, 1, 1, 2, 1, 0, 2])
+  const annotationChunkData = new Uint32Array([
+    1, 2, 0, 0, 1, 2, 2, 0, 1, 1, 0, 2, 1, 0, 0, 2, 0, 1, 2, 2, 0, 1, 1, 0, 2, 2, 1, 1, 0, 0, 2, 1,
+    2, 0, 1, 2, 0, 0, 1, 2, 2, 1, 0, 0, 1, 2, 1, 0, 0, 2, 1, 1, 2, 0, 0, 1, 2, 2, 1, 0, 0, 2, 1, 2,
+  ])
   const annotationChunkTexture = new RawTexture3D(
     annotationChunkData,
-    2,
-    2,
-    2,
+    4,
+    4,
+    4,
     Engine.TEXTUREFORMAT_RED_INTEGER,
     scene,
     false,
@@ -144,9 +89,49 @@ const createScene = async (
     Engine.TEXTURETYPE_UNSIGNED_BYTE,
   )
 
+  // Build input parameter buffer.
+  const sliceParameterBuffer = new UniformBuffer(engine, undefined, true, 'parameters')
+  sliceParameterBuffer.addUniform('center', 3)
+  sliceParameterBuffer.addUniform('size', 1)
+  sliceParameterBuffer.addUniform('up', 3)
+  sliceParameterBuffer.addUniform('resolution', 1)
+  sliceParameterBuffer.addUniform('right', 3)
+  sliceParameterBuffer.addUniform('startCoordinate', 3)
+  sliceParameterBuffer.addUniform('endCoordinate', 3)
+
+  sliceParameterBuffer.updateFloat3('center', 1.5, 1.5, 1.5)
+  sliceParameterBuffer.updateUInt('size', 2)
+  sliceParameterBuffer.updateFloat3('up', 0, 0, 1)
+  sliceParameterBuffer.updateUInt('resolution', 100)
+  sliceParameterBuffer.updateFloat3('right', 1, 0, 0)
+  sliceParameterBuffer.updateFloat3('startCoordinate', 0, 0, 0)
+  sliceParameterBuffer.updateFloat3('endCoordinate', 400, 400, 400)
+
+  sliceParameterBuffer.update()
+
   // Declare output buffers.
-  const sliceColorBuffer = new StorageBuffer(engine, 8 * 4, Constants.BUFFER_CREATIONFLAG_READWRITE)
-  const sliceIdBuffer = new StorageBuffer(engine, 8 * 4, Constants.BUFFER_CREATIONFLAG_READWRITE)
+  const sliceColorBuffer = new StorageBuffer(
+    engine,
+    64 * 4,
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+  )
+  const sliceIdBuffer = new StorageBuffer(engine, 64 * 4, Constants.BUFFER_CREATIONFLAG_READWRITE)
+
+  // Declare compute shader and bind data.
+  const sliceComputeShader = new ComputeShader('sliceComputeShader', engine, 'slice', {
+    bindingsMapping: {
+      parameters: { group: 0, binding: 0 },
+      annotationChunk: { group: 0, binding: 1 },
+      lut: { group: 0, binding: 2 },
+      colorOut: { group: 0, binding: 3 },
+      idOut: { group: 0, binding: 4 },
+    },
+  })
+  sliceComputeShader.setUniformBuffer('parameters', sliceParameterBuffer)
+  sliceComputeShader.setTexture('annotationChunk', annotationChunkTexture, false)
+  sliceComputeShader.setTexture('lut', lutTexture, false)
+  sliceComputeShader.setStorageBuffer('colorOut', sliceColorBuffer)
+  sliceComputeShader.setStorageBuffer('idOut', sliceIdBuffer)
 
   // Configure render canvas.
   const sliceCanvasOffscreen = sliceCanvas.transferControlToOffscreen()
