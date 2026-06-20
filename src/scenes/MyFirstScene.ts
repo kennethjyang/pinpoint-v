@@ -1,9 +1,13 @@
 import {
   ArcRotateCamera,
+  Engine,
   GizmoManager,
   HemisphericLight,
   MeshBuilder,
+  RawTexture,
+  RawTexture3D,
   Scene,
+  Texture,
   TransformNode,
   Vector3,
   WebGPUEngine,
@@ -102,6 +106,37 @@ const createScene = async (canvas: HTMLCanvasElement, fpsCallback: (fps: string)
   const probeMover = new TransformNode('ProbeTip', scene)
   probeMover.addChild(probeMesh)
   gizmoManager.attachToNode(probeMover)
+
+  // Build annotation chunk texture.
+  const annotationChunkData = new Uint32Array([0, 0, 1, 1, 1, 2, 1, 0, 2])
+  const annotationChunkTexture = new RawTexture3D(
+    annotationChunkData,
+    2,
+    2,
+    2,
+    Engine.TEXTUREFORMAT_RED_INTEGER,
+    scene,
+    false,
+    false,
+    Texture.NEAREST_NEAREST,
+    Engine.TEXTURETYPE_UNSIGNED_INTEGER,
+  )
+
+  // Build LUT texture.
+  const lutData = new Uint8Array([
+    255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+  ])
+  const lutTexture = new RawTexture(
+    lutData,
+    3,
+    1,
+    Engine.TEXTUREFORMAT_RGBA,
+    scene,
+    false,
+    false,
+    Texture.NEAREST_NEAREST,
+    Engine.TEXTURETYPE_UNSIGNED_BYTE,
+  )
 
   // Engine render loop.
   engine.runRenderLoop(() => {
