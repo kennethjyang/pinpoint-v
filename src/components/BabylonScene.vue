@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { onMounted, useTemplateRef } from 'vue'
-import { createScene } from '@/scenes/MyFirstScene.ts'
+import {onMounted, useTemplateRef} from 'vue'
+import {createScene} from '@/scenes/MyFirstScene.ts'
 
 const emit = defineEmits<{
   fps: [fps: string]
 }>()
 
-const bjsCanvas = useTemplateRef<HTMLCanvasElement | null>('bjs-canvas')
+const bjsCanvas = useTemplateRef<HTMLCanvasElement>('bjs-canvas')
+const sliceCanvas = useTemplateRef<HTMLCanvasElement>('slice-canvas')
 onMounted(() => {
-  if (bjsCanvas.value) {
-    createScene(bjsCanvas.value, (fps: string) => {
+  if (bjsCanvas.value && sliceCanvas.value) {
+    createScene(bjsCanvas.value, sliceCanvas.value, (fps: string) => {
       emit('fps', fps)
     })
   }
@@ -18,4 +19,5 @@ onMounted(() => {
 
 <template>
   <canvas ref="bjs-canvas" height="500" width="500" />
+  <canvas ref="slice-canvas" height="500" width="500" />
 </template>

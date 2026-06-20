@@ -1,5 +1,6 @@
 import {
   ArcRotateCamera,
+  Constants,
   Engine,
   GizmoManager,
   HemisphericLight,
@@ -7,6 +8,7 @@ import {
   RawTexture,
   RawTexture3D,
   Scene,
+  StorageBuffer,
   Texture,
   TransformNode,
   Vector3,
@@ -74,7 +76,11 @@ interface SliceParams {
   right: Vector3
 }
 
-const createScene = async (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => void) => {
+const createScene = async (
+  canvas: HTMLCanvasElement,
+  sliceCanvas: HTMLCanvasElement,
+  fpsCallback: (fps: string) => void,
+) => {
   // Initialize Babylon engine and scene.
   const engine = new WebGPUEngine(canvas)
   await engine.initAsync()
@@ -137,6 +143,14 @@ const createScene = async (canvas: HTMLCanvasElement, fpsCallback: (fps: string)
     Texture.NEAREST_NEAREST,
     Engine.TEXTURETYPE_UNSIGNED_BYTE,
   )
+
+  // Declare output buffers.
+  const sliceColorBuffer = new StorageBuffer(engine, 8 * 4, Constants.BUFFER_CREATIONFLAG_READWRITE)
+  const sliceIdBuffer = new StorageBuffer(engine, 8 * 4, Constants.BUFFER_CREATIONFLAG_READWRITE)
+
+  // Configure render canvas.
+  const sliceCanvasOffscreen = sliceCanvas.transferControlToOffscreen()
+  // TODO: Spawn render worker.
 
   // Engine render loop.
   engine.runRenderLoop(() => {
