@@ -1,11 +1,11 @@
 import {
-  Color3,
+  ArcRotateCamera,
   Engine,
-  FreeCamera,
+  GizmoManager,
   HemisphericLight,
   MeshBuilder,
   Scene,
-  StandardMaterial,
+  TransformNode,
   Vector3,
 } from '@babylonjs/core'
 
@@ -13,33 +13,31 @@ const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => vo
   const engine = new Engine(canvas)
   const scene = new Scene(engine)
 
-  const camera = new FreeCamera('camera1', new Vector3(0, 5, -10), scene)
-  camera.setTarget(Vector3.Zero())
+  const camera = new ArcRotateCamera(
+    'MainCamera',
+    -Math.PI / 2,
+    Math.PI / 4,
+    10,
+    Vector3.Zero(),
+    scene,
+  )
   camera.attachControl(canvas, true)
 
-  new HemisphericLight('light', Vector3.Up(), scene)
+  new HemisphericLight('MainLight', Vector3.Up(), scene)
 
-  const boxRed = MeshBuilder.CreateBox('box-red', {size: 1}, scene)
-  const materialRed = new StandardMaterial('box-red-material', scene)
-  materialRed.diffuseColor = Color3.Red()
-  boxRed.material = materialRed
-  boxRed.position.x = -2
+  const gizmoManager = new GizmoManager(scene)
+  gizmoManager.positionGizmoEnabled = true
+  gizmoManager.rotationGizmoEnabled = true
+  gizmoManager.usePointerToAttachGizmos = false
 
-  const boxBlue = MeshBuilder.CreateBox('box-yellow', {size: 1}, scene)
-  const materialYellow = new StandardMaterial('box-blue-material', scene)
-  materialYellow.diffuseColor = Color3.Yellow()
-  boxBlue.material = materialYellow
-
-  const boxGreen = MeshBuilder.CreateBox('box-green', {size: 1}, scene)
-  const materialGreen = new StandardMaterial('box-green-material', scene)
-  materialGreen.diffuseColor = Color3.Green()
-  boxGreen.material = materialGreen
-  boxGreen.position.x = 2
+  const probeMesh = MeshBuilder.CreateBox('ProbeMesh', { height: 2 }, scene)
+  probeMesh.setAbsolutePosition(Vector3.Up())
+  const probeMover = new TransformNode('ProbeMover', scene)
+  probeMover.addChild(probeMesh)
+  gizmoManager.attachToNode(probeMover)
 
   engine.runRenderLoop(() => {
     scene.render()
-
-    boxGreen.rotation.y += 0.01
 
     if (fpsCallback) {
       fpsCallback(engine.getFps().toFixed())
@@ -47,4 +45,4 @@ const createScene = (canvas: HTMLCanvasElement, fpsCallback: (fps: string) => vo
   })
 }
 
-export {createScene}
+export { createScene }
