@@ -18,6 +18,6 @@ onMounted(() => {
 </script>
 
 <template>
-  <canvas ref="bjs-canvas" height="500" width="500" />
-  <canvas ref="slice-canvas" height="500" width="500" />
+  <canvas ref="bjs-canvas" height="500" style="border: 5px solid black;" width="500"/>
+  <canvas ref="slice-canvas" height="500" style="border: 5px solid black;" width="500" />
 </template>

@@ -76,10 +76,10 @@ const createScene = async (
 
   // Build LUT texture.
   const lutData = new Uint8Array([
+    0, 0, 0, 255,
     255, 0, 0, 255,
     0, 255, 0, 255,
     0, 0, 255, 255,
-    0, 0, 0, 255,
   ])
   const lutTexture = new RawTexture(
     lutData,
@@ -100,7 +100,7 @@ const createScene = async (
   sliceParameterBuffer.addUniform('up', 4)
   sliceParameterBuffer.addUniform('chunkStartCoordinate', 4)
 
-  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 0.15, 0.15, 0.15, 0.2)
+  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 0.15, 0.15, 0.15, 0.15)
   sliceParameterBuffer.updateFloat4('rightAndChunkResolution', 1, 0, 0, 0.1)
   sliceParameterBuffer.updateFloat4('up', 0, 0, 1, 0)
   sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 0, 0, 0, 0)
@@ -159,6 +159,7 @@ const createScene = async (
       let halfSize = parameters.centerAndHalfSize.w;
       let right = parameters.rightAndChunkResolution.xyz;
       let chunkResolution = parameters.rightAndChunkResolution.w;
+      let chunkHalfResolution = chunkResolution * 0.5;
       let up = parameters.up.xyz;
       let chunkStartCoordinate = parameters.chunkStartCoordinate.xyz;
 
@@ -169,10 +170,11 @@ const createScene = async (
 
       // Extract chunk dimensions (used later).
       let chunkDimensions = textureDimensions(annotationChunk);
-      let chunkEndCoordinate = chunkStartCoordinate + vec3f(chunkDimensions) * chunkResolution;
+      let chunkMinBounds = chunkStartCoordinate - chunkHalfResolution;
+      let chunkMaxBounds = chunkStartCoordinate + vec3f(chunkDimensions) * chunkResolution - chunkHalfResolution;
 
       // Exit if position out of chunk bounds.
-      if any(worldPosition < chunkStartCoordinate) || any(worldPosition >= chunkEndCoordinate) {
+      if any(worldPosition < chunkMinBounds) || any(worldPosition >= chunkMaxBounds) {
           idOut[pixelIndex] = 0u;
           colorOut[pixelIndex] = 0u;
           return;
@@ -180,7 +182,7 @@ const createScene = async (
 
       // Compute annotation index in chunk.
       let chunkLocalPosition = worldPosition - chunkStartCoordinate;
-      let annotationChunkIndex = vec3i(floor(chunkLocalPosition / chunkResolution));
+      let annotationChunkIndex = vec3i(round(chunkLocalPosition / chunkResolution));
 
       // Verify bounds and load ID (default to empty).
       var structureId: u32 = 0u;
