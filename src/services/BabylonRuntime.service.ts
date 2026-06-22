@@ -17,13 +17,13 @@ class BabylonRuntimeService {
    * Core engine of the runtime.
    * @private
    */
-  private engine: WebGPUEngine | null = null
+  private _engine: WebGPUEngine | null = null
 
-  /**
-   * 3D scene on this engine.
-   * @private
-   */
-  private scene: Scene | null = null
+  get engine() {
+    if (!this._engine)
+      throw new Error('Babylon runtime has not been initialized yet! No engine available.')
+    return this._engine
+  }
 
   /**
    * Camera in the scene.
@@ -38,17 +38,29 @@ class BabylonRuntimeService {
   private gizmoManager: GizmoManager | null = null
 
   /**
+   * 3D scene on this engine.
+   * @private
+   */
+  private _scene: Scene | null = null
+
+  get scene() {
+    if (!this._scene)
+      throw new Error('Babylon runtime has not been initialized yet! No scene available.')
+    return this._scene
+  }
+
+  /**
    * Attach a main canvas and initialize BabylonJS engine and scene.
    * @param canvas Main canvas element to display 3D graphics.
    */
   async init(canvas: HTMLCanvasElement) {
     // Initialize engine.
-    this.engine = new WebGPUEngine(canvas)
-    this.engine.compatibilityMode = false
-    await this.engine.initAsync()
+    this._engine = new WebGPUEngine(canvas)
+    this._engine.compatibilityMode = false
+    await this._engine.initAsync()
 
     // Attach to scene.
-    this.scene = new Scene(this.engine)
+    this._scene = new Scene(this._engine)
 
     // Attach camera.
     this.camera = new ArcRotateCamera(
@@ -57,28 +69,28 @@ class BabylonRuntimeService {
       Math.PI / 4,
       10,
       Vector3.Zero(),
-      this.scene,
+      this._scene,
     )
     this.camera.attachControl(canvas, true)
 
     // Attach gizmo manager.
-    this.gizmoManager = new GizmoManager(this.scene)
+    this.gizmoManager = new GizmoManager(this._scene)
     this.gizmoManager.positionGizmoEnabled = true
     this.gizmoManager.rotationGizmoEnabled = true
 
     // Add lights.
-    new HemisphericLight('MainLight', Vector3.Up(), this.scene)
+    new HemisphericLight('MainLight', Vector3.Up(), this._scene)
 
     // Build a demo scene.
-    const probeMesh = MeshBuilder.CreateBox('ProbeMesh', { height: 2 }, this.scene)
+    const probeMesh = MeshBuilder.CreateBox('ProbeMesh', { height: 2 }, this._scene)
     probeMesh.setAbsolutePosition(Vector3.Up())
-    const probeMover = new TransformNode('ProbeTip', this.scene)
+    const probeMover = new TransformNode('ProbeTip', this._scene)
     probeMover.addChild(probeMesh)
     this.gizmoManager.attachToNode(probeMover)
 
     // Begin render loop.
-    this.engine.runRenderLoop(() => {
-      this.scene!.render()
+    this._engine.runRenderLoop(() => {
+      this._scene!.render()
     })
   }
 }
