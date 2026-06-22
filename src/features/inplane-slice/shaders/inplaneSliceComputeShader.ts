@@ -1,4 +1,4 @@
-import {ShaderStore} from '@babylonjs/core'
+import { ShaderStore } from '@babylonjs/core'
 
 export const INPLANE_SLICE_SHADER_PATH = 'inplaneSlice'
 export const INPLANE_SLICE_COMPUTE_SHADER_NAME = `${INPLANE_SLICE_SHADER_PATH}ComputeShader`

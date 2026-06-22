@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {InplaneSliceCanvas} from '@/features/inplane-slice'
-import {SceneCanvas} from '@/features/scene'
+import { InplaneSliceCanvas } from '@/features/inplane-slice'
+import { SceneCanvas } from '@/features/scene'
 </script>
 
 <template>

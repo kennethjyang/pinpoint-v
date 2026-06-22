@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import {onMounted, useTemplateRef} from 'vue'
-import {babylonRuntimeService} from '@/services/BabylonRuntimeService.js'
+import { onMounted, useTemplateRef } from 'vue'
+import { babylonRuntimeService } from '@/services/BabylonRuntimeService.js'
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
 

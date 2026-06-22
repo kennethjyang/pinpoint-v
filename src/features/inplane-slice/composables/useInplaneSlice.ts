@@ -1,4 +1,4 @@
-import {onMounted, useTemplateRef} from 'vue'
+import { onMounted, useTemplateRef } from 'vue'
 import {
   ComputeShader,
   Constants,
@@ -9,11 +9,11 @@ import {
   Texture,
   UniformBuffer,
 } from '@babylonjs/core'
-import {babylonRuntimeService} from '@/services/BabylonRuntimeService.ts'
+import { babylonRuntimeService } from '@/services/BabylonRuntimeService.ts'
 import {
   INPLANE_SLICE_COMPUTE_SHADER_NAME,
-  INPLANE_SLICE_SHADER_PATH
-} from '@/features/inplane-slice/shaders/inplaneSliceComputeShader.ts'
+  INPLANE_SLICE_SHADER_PATH,
+} from '../shaders/inplaneSliceComputeShader'
 
 export function useInplaneSlice() {
   const canvas = useTemplateRef<HTMLCanvasElement>('canvas')

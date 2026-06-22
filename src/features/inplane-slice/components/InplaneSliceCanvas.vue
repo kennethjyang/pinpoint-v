@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import {useInplaneSlice} from '@/features/inplane-slice/composables/useInplaneSlice'
+import { useInplaneSlice } from '../composables/useInplaneSlice'
 
 useInplaneSlice()
 </script>
