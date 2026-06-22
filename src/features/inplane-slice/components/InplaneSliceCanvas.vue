@@ -123,13 +123,14 @@ onMounted(async () => {
 
   let theta = 0
 
+  const offscreenCanvas = canvas.value.transferControlToOffscreen()
+  worker.postMessage({type: 'init', offscreenCanvas: offscreenCanvas}, [offscreenCanvas])
+
   renderObservable = babylonRuntimeService.scene.onBeforeRenderObservable.add(() => {
     computeShader.dispatchWhenReady(WORKGROUPS, WORKGROUPS, 1).then(() => {
       colorBuffer?.read().then((colorData) => {
-        const pixels = new Uint8ClampedArray(colorData.buffer as ArrayBuffer)
-        canvas
-          .value!.getContext('2d')
-          ?.putImageData(new ImageData(pixels, OUTPUT_SIZE, OUTPUT_SIZE), 0, 0)
+        const buffer = colorData.buffer as ArrayBuffer
+        worker.postMessage({ type: 'frame', buffer, size: OUTPUT_SIZE }, [buffer])
       })
     })
 
@@ -138,7 +139,7 @@ onMounted(async () => {
       'centerAndHalfSize',
       0.15 + Math.sin(theta) / 10,
       0.15,
-      0.15 + Math.sin(theta)/ 10,
+      0.15 + Math.sin(theta) / 10,
       0.15,
     )
     sliceParameterBuffer?.update()
