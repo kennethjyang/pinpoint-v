@@ -6,7 +6,7 @@ const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
 
 onMounted(() => {
   // Exit if no canvas.
-  if (!canvas.value) return
+  if (!canvas.value) throw new Error('BabylonJS canvas not found in DOM!')
 
   // Initialize Babylon Runtime.
   babylonRuntimeService.init(canvas.value)

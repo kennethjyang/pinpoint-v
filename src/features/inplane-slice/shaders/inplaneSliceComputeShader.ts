@@ -13,22 +13,22 @@ if (!ShaderStore.ShadersStoreWGSL[INPLANE_SLICE_COMPUTE_SHADER_NAME]) {
         chunkStartCoordinate: vec4f,
     }
 
-      // Input parameters.
-      @group(0) @binding(0) var<uniform> parameters: Parameters;
+    // Input parameters.
+    @group(0) @binding(0) var<uniform> parameters: Parameters;
 
-      // Atlas annotation volume chunk.
-      @group(0) @binding(1) var annotationChunk: texture_3d<u32>;
+    // Atlas annotation volume chunk.
+    @group(0) @binding(1) var annotationChunk: texture_3d<u32>;
 
-      // Annotation IDs to color LUT.
-      @group(0) @binding(2) var lut: texture_2d<u32>;
+    // Annotation IDs to color LUT.
+    @group(0) @binding(2) var lut: texture_2d<u32>;
 
-      // Slice IDs.
-      @group(0) @binding(3) var<storage, read_write> idOut: array<u32>;
+    // Slice IDs.
+    @group(0) @binding(3) var<storage, read_write> idOut: array<u32>;
 
-      // Slice colors (8-bit RGBA).
-      @group(0) @binding(4) var<storage, read_write> colorOut: array<u32>;
+    // Slice colors (8-bit RGBA).
+    @group(0) @binding(4) var<storage, read_write> colorOut: array<u32>;
 
-      @compute @workgroup_size(8, 8, 1)
+    @compute @workgroup_size(8, 8, 1)
     fn main(@builtin(global_invocation_id) globalThreadId: vec3u) {
         // Extract output pixel coordinate.
         let outputSideLength = u32(sqrt(f32(arrayLength(&colorOut))));
