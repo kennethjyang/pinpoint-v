@@ -19,11 +19,6 @@ class BabylonRuntimeService {
    */
   private _engine: WebGPUEngine | null = null
 
-  get engine() {
-    if (!this._engine)
-      throw new Error('Babylon runtime has not been initialized yet! No engine available.')
-    return this._engine
-  }
 
   /**
    * Camera in the scene.
@@ -42,6 +37,23 @@ class BabylonRuntimeService {
    * @private
    */
   private _scene: Scene | null = null
+
+  /**
+   * Initialization promise handler.
+   * @private
+   */
+  private _initDeferred = Promise.withResolvers<void>()
+
+  /**
+   * Initialized promise.
+   */
+  public readonly whenReady = this._initDeferred.promise
+
+  get engine() {
+    if (!this._engine)
+      throw new Error('Babylon runtime has not been initialized yet! No engine available.')
+    return this._engine
+  }
 
   get scene() {
     if (!this._scene)
@@ -92,7 +104,11 @@ class BabylonRuntimeService {
     this._engine.runRenderLoop(() => {
       this._scene!.render()
     })
+
+    // Mark runtime as ready.
+    this._initDeferred.resolve()
   }
+
 }
 
 // Singleton instance of runtime.
