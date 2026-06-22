@@ -1,9 +1,10 @@
 import {ShaderStore} from '@babylonjs/core'
 
-export const INPLANE_SLICE_COMPUTE_SHADER = 'inplaneSliceComputeShader'
+export const INPLANE_SLICE_SHADER_PATH = 'inplaneSlice'
+export const INPLANE_SLICE_COMPUTE_SHADER_NAME = `${INPLANE_SLICE_SHADER_PATH}ComputeShader`
 
-if (!ShaderStore.ShadersStoreWGSL[INPLANE_SLICE_COMPUTE_SHADER]) {
-  ShaderStore.ShadersStoreWGSL[INPLANE_SLICE_COMPUTE_SHADER] = `
+if (!ShaderStore.ShadersStoreWGSL[INPLANE_SLICE_COMPUTE_SHADER_NAME]) {
+  ShaderStore.ShadersStoreWGSL[INPLANE_SLICE_COMPUTE_SHADER_NAME] = `
     // Input parameters. In world space mm.
     struct Parameters {
         centerAndHalfSize: vec4f,

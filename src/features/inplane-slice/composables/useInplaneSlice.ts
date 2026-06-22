@@ -9,7 +9,11 @@ import {
   Texture,
   UniformBuffer,
 } from '@babylonjs/core'
-import {babylonRuntimeService} from '@/services/BabylonRuntime.service.ts'
+import {babylonRuntimeService} from '@/services/BabylonRuntimeService.ts'
+import {
+  INPLANE_SLICE_COMPUTE_SHADER_NAME,
+  INPLANE_SLICE_SHADER_PATH
+} from '@/features/inplane-slice/shaders/inplaneSliceComputeShader.ts'
 
 export function useInplaneSlice() {
   const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
@@ -17,6 +21,8 @@ export function useInplaneSlice() {
   onMounted(async () => {
     // Exit if no canvas.
     if (!canvas.value) return
+
+    await babylonRuntimeService.whenReady
 
     // Build annotation chunk texture.
     const annotationChunkData = new Uint32Array([
@@ -85,9 +91,9 @@ export function useInplaneSlice() {
 
     // Declare compute shader and bind data.
     const sliceComputeShader = new ComputeShader(
-      'sliceComputeShader',
+      INPLANE_SLICE_COMPUTE_SHADER_NAME,
       babylonRuntimeService.engine,
-      'slice',
+      INPLANE_SLICE_SHADER_PATH,
       {
         bindingsMapping: {
           parameters: { group: 0, binding: 0 },

@@ -19,7 +19,6 @@ class BabylonRuntimeService {
    */
   private _engine: WebGPUEngine | null = null
 
-
   /**
    * Camera in the scene.
    * @private
@@ -108,7 +107,6 @@ class BabylonRuntimeService {
     // Mark runtime as ready.
     this._initDeferred.resolve()
   }
-
 }
 
 // Singleton instance of runtime.

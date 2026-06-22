@@ -1,7 +1,16 @@
 <script lang="ts" setup>
-import {useSceneCanvas} from '../composable/useSceneCanvas'
+import {onMounted, useTemplateRef} from 'vue'
+import {babylonRuntimeService} from '@/services/BabylonRuntimeService.js'
 
-useSceneCanvas()
+const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
+
+onMounted(() => {
+  // Exit if no canvas.
+  if (!canvas.value) return
+
+  // Initialize Babylon Runtime.
+  babylonRuntimeService.init(canvas.value)
+})
 </script>
 
 <template>
