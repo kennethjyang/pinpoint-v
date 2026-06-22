@@ -1,5 +1,5 @@
-import { globalIgnores } from 'eslint/config'
-import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
+import {globalIgnores} from 'eslint/config'
+import {defineConfigWithVueTs, vueTsConfigs} from '@vue/eslint-config-typescript'
 import pluginVue from 'eslint-plugin-vue'
 import pluginPlaywright from 'eslint-plugin-playwright'
 import pluginVitest from '@vitest/eslint-plugin'
@@ -33,6 +33,21 @@ export default defineConfigWithVueTs(
   },
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
+
+  {
+    name: 'app/feature-boundaries',
+    files: ['**/*.{vue,ts,mts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            group: ['@/features/*/*'],
+            message: 'Import from the feature index instead: @/features/feature-name',
+          }
+        ]
+      }],
+    },
+  },
 
   skipFormatting,
 )
