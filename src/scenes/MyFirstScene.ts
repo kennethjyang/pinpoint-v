@@ -75,12 +75,7 @@ const createScene = async (
   )
 
   // Build LUT texture.
-  const lutData = new Uint8Array([
-    0, 0, 0, 255,
-    255, 0, 0, 255,
-    0, 255, 0, 255,
-    0, 0, 255, 255,
-  ])
+  const lutData = new Uint8Array([0, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255])
   const lutTexture = new RawTexture(
     lutData,
     4,
@@ -101,8 +96,8 @@ const createScene = async (
   sliceParameterBuffer.addUniform('chunkStartCoordinate', 4)
 
   sliceParameterBuffer.updateFloat4('centerAndHalfSize', 0.15, 0.15, 0.15, 0.15)
-  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', 1, 0, 0, 0.1)
-  sliceParameterBuffer.updateFloat4('up', 0, 0, 1, 0)
+  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', Math.sqrt(3) / 2, 0, -1 / 2, 0.1)
+  sliceParameterBuffer.updateFloat4('up', 1 / 2, 0, Math.sqrt(3) / 2, 0)
   sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 0, 0, 0, 0)
 
   sliceParameterBuffer.update()
