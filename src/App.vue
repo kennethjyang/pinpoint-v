@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import BabylonScene from '@/components/BabylonScene.vue'
-import { ref } from 'vue'
+import {ref} from 'vue'
+import SceneCanvas from '@/components/SceneCanvas.vue'
 
 const fps = ref('0')
 
@@ -16,7 +16,7 @@ function updateFps(newFps: string) {
     documentation
   </p>
   <p>{{ fps }}</p>
-  <BabylonScene @fps="updateFps" />
+  <SceneCanvas @fps="updateFps" />
 </template>
 
 <style scoped></style>
