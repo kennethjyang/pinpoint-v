@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {onMounted, useTemplateRef} from 'vue'
-import {createScene} from '@/scenes/MyFirstScene.ts'
+import { onMounted, useTemplateRef } from 'vue'
+import { createScene } from '@/scenes/MyFirstScene.ts'
 
 const emit = defineEmits<{
   fps: [fps: string]
