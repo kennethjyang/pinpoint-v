@@ -17,6 +17,7 @@ import {
   INPLANE_SLICE_COMPUTE_SHADER_NAME,
   INPLANE_SLICE_SHADER_PATH,
 } from '../shaders/inplane-slice-compute.shader'
+import { FetchStore, open, get, slice } from 'zarrita'
 
 // Components.
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
@@ -26,12 +27,8 @@ const worker = new Worker(new URL('../workers/inplane-slice-render.worker.ts', i
 let computeShader: ComputeShader
 let renderObservable: Observer<Scene> | null = null
 
-// Sample atlas data.
-const annotationChunkData = new Uint32Array([
-  1, 2, 0, 0, 1, 2, 2, 0, 1, 1, 0, 2, 1, 0, 0, 2, 0, 1, 2, 2, 0, 1, 1, 0, 2, 2, 1, 1, 0, 0, 2, 1, 2,
-  0, 1, 2, 0, 0, 1, 2, 2, 1, 0, 0, 1, 2, 1, 0, 0, 2, 1, 1, 2, 0, 0, 1, 2, 2, 1, 0, 0, 2, 1, 2,
-])
-const lutData = new Uint8Array([0, 0, 0, 255, 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255])
+// Atlas data setup.
+const store = new FetchStore('http://localhost:3000/allen_mouse/10.0.zarr')
 const OUTPUT_SIZE = 500
 const WORKGROUPS = Math.ceil(OUTPUT_SIZE / 8)
 
@@ -44,6 +41,17 @@ let colorBuffer: StorageBuffer | null = null
 
 onMounted(async () => {
   if (!canvas.value) throw new Error('Inplane slice canvas not found in DOM!')
+
+  // Load atlas data. APDVML
+  const array = await open(store, { kind: 'array' })
+  if (!array.is('uint32')) throw new Error('Annotation volume is not the expected type!')
+  const region = await get(array, [slice(540, 541), slice(0, 350), slice(323, 800)])
+  console.log(region.shape)
+
+  const lutResponse = await fetch('http://localhost:3000/allen_mouse/lut.bin')
+  const lutBuffer = await lutResponse.arrayBuffer()
+  const lutData = new Uint8Array(lutBuffer)
+  console.log(lutData.length)
 
   await babylonRuntimeService.whenReady
 
@@ -58,18 +66,18 @@ onMounted(async () => {
   sliceParameterBuffer.addUniform('up', 4)
   sliceParameterBuffer.addUniform('chunkStartCoordinate', 4)
 
-  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 0.15, 0.15, 0.15, 0.15)
-  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', Math.sqrt(3) / 2, 0, -1 / 2, 0.1)
-  sliceParameterBuffer.updateFloat4('up', 1 / 2, 0, Math.sqrt(3) / 2, 0)
-  sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 0, 0, 0, 0)
+  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 5.4, 1, 5.739, 2.5)
+  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', 0, 0, 1, 0.01)
+  sliceParameterBuffer.updateFloat4('up', 0, -1, 0, 0)
+  sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 5.4, 0, 3.239, 0)
 
   sliceParameterBuffer.update()
 
   annotationChunkTexture = new RawTexture3D(
-    annotationChunkData,
-    4,
-    4,
-    4,
+    region.data,
+    1,
+    350,
+    477,
     Engine.TEXTUREFORMAT_RED_INTEGER,
     babylonRuntimeService.scene,
     false,
@@ -80,7 +88,7 @@ onMounted(async () => {
 
   lutTexture = new RawTexture(
     lutData,
-    4,
+    lutData.length,
     1,
     Engine.TEXTUREFORMAT_RGBA_INTEGER,
     babylonRuntimeService.scene,
@@ -121,7 +129,7 @@ onMounted(async () => {
   computeShader.setStorageBuffer('idOut', idBuffer)
   computeShader.setStorageBuffer('colorOut', colorBuffer)
 
-  let theta = 0
+  // let theta = 0
 
   const offscreenCanvas = canvas.value.transferControlToOffscreen()
   worker.postMessage({ type: 'init', offscreenCanvas: offscreenCanvas }, [offscreenCanvas])
@@ -134,15 +142,15 @@ onMounted(async () => {
       })
     })
 
-    theta += 0.05
-    sliceParameterBuffer?.updateFloat4(
-      'centerAndHalfSize',
-      0.15 + Math.sin(theta) / 10,
-      0.15,
-      0.15 + Math.sin(theta) / 10,
-      0.15,
-    )
-    sliceParameterBuffer?.update()
+    // theta += 0.05
+    // sliceParameterBuffer?.updateFloat4(
+    //   'centerAndHalfSize',
+    //   0.15 + Math.sin(theta) / 10,
+    //   0.15,
+    //   0.15 + Math.sin(theta) / 10,
+    //   0.15,
+    // )
+    // sliceParameterBuffer?.update()
   })
 })
 
