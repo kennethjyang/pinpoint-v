@@ -3,7 +3,7 @@
 Next generation in vivo electrophysiology planning and automation tool.
 
 > [!WARNING]
-> Under active and early development. Feel free to poke around and contribute but this is not a finished product yet.
+> Under active and early development. Feel free to poke around and contribute, but this is not a finished product yet.
 
 ## Install for development.
 
