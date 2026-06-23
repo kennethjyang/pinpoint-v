@@ -55,6 +55,9 @@ onMounted(async () => {
 
   await babylonRuntimeService.whenReady
 
+  const caps = babylonRuntimeService.engine.getCaps()
+  console.log(caps.maxCubemapTextureSize)
+
   sliceParameterBuffer = new UniformBuffer(
     babylonRuntimeService.engine,
     undefined,
@@ -88,7 +91,7 @@ onMounted(async () => {
 
   lutTexture = new RawTexture(
     lutData,
-    lutData.length,
+    lutData.length / 4,
     1,
     Engine.TEXTUREFORMAT_RGBA_INTEGER,
     babylonRuntimeService.scene,
