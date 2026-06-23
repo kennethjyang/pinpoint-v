@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, useTemplateRef } from 'vue'
-import { babylonRuntimeService } from '@/services/BabylonRuntimeService.ts'
+import { babylonRuntimeService } from '@/services/babylon-runtime.service.js'
 import {
   ComputeShader,
   Constants,
@@ -16,11 +16,11 @@ import {
 import {
   INPLANE_SLICE_COMPUTE_SHADER_NAME,
   INPLANE_SLICE_SHADER_PATH,
-} from '../shaders/inplaneSliceComputeShader'
+} from '../shaders/inplane-slice-compute.shader'
 
 // Components.
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
-const worker = new Worker(new URL('../worker/inplaneSliceRenderWorker.ts', import.meta.url), {
+const worker = new Worker(new URL('../workers/inplane-slice-render.worker.ts', import.meta.url), {
   type: 'module',
 })
 let computeShader: ComputeShader
