@@ -15,6 +15,7 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "oxfmt src/",
+    "oxfmt": "oxfmt",
     "local-atlas": "serve -C ~/pinpoint_atlases"
   },
   "dependencies": {
