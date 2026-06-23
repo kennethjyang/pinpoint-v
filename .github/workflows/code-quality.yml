@@ -9,25 +9,21 @@ on:
 jobs:
   static-analysis:
     name: Static Analysis
-    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: 🛎 Checkout
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
-          token: '${{ secrets.WORKFLOW_COMMIT }}'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: 📦 Install pnpm
-        uses: pnpm/action-setup@v6.0.9
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
           version: 11
 
       - name: 📦 Install node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           cache: 'pnpm'
 
@@ -35,15 +31,10 @@ jobs:
         run: pnpm install
 
       - name: 📝 Format Code
-        run: pnpm format
+        run: pnpm format --check
 
       - name: 🔍 Lint Code
         run: pnpm lint
 
       - name: 🔍 Type Check
         run: pnpm type-check
-
-      - name: ✅ Commit Code Format Changes
-        uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          commit_message: "Static analysis"
