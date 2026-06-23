@@ -1,6 +1,7 @@
 pre-commit:
   jobs:
     - name: format
+      glob: "src/*"
       run: npm run oxfmt {staged_files}
       stage_fixed: true
     - name: lint
