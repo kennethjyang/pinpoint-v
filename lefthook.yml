@@ -2,13 +2,10 @@ pre-commit:
   jobs:
     - name: format
       run: npm run format
-      glob: "src/*"
       stage_fixed: true
     - name: lint
       run: npm run lint
-      glob: "src/*"
       stage_fixed: true
     - name: type-check
       run: npm run type-check
-      glob: "src/*"
       stage_fixed: true

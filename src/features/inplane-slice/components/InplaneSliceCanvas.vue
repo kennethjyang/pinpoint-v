@@ -124,7 +124,7 @@ onMounted(async () => {
   let theta = 0
 
   const offscreenCanvas = canvas.value.transferControlToOffscreen()
-  worker.postMessage({type: 'init', offscreenCanvas: offscreenCanvas}, [offscreenCanvas])
+  worker.postMessage({ type: 'init', offscreenCanvas: offscreenCanvas }, [offscreenCanvas])
 
   renderObservable = babylonRuntimeService.scene.onBeforeRenderObservable.add(() => {
     computeShader.dispatchWhenReady(WORKGROUPS, WORKGROUPS, 1).then(() => {
