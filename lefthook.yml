@@ -1,0 +1,11 @@
+pre-commit:
+  jobs:
+    - name: format
+      run: npx run format
+      stage_fixed: true
+    - name: lint
+      run: npx run lint
+      stage_fixed: true
+    - name: type-check
+      run: npx run type-check
+      stage_fixed: true
