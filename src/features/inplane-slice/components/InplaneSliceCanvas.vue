@@ -42,10 +42,10 @@ let colorBuffer: StorageBuffer | null = null
 onMounted(async () => {
   if (!canvas.value) throw new Error('Inplane slice canvas not found in DOM!')
 
-  // Load atlas data. APDVML
+  // Load atlas data. APMLDV
   const array = await open(store, { kind: 'array' })
   if (!array.is('uint32')) throw new Error('Annotation volume is not the expected type!')
-  const region = await get(array, [slice(540, 541), slice(0, 350), slice(323, 800)])
+  const region = await get(array, [slice(540, 541), slice(320, 800), slice(0, 800)])
   console.log(region.shape)
 
   const lutResponse = await fetch('http://localhost:3000/allen_mouse/lut.bin')
@@ -56,7 +56,7 @@ onMounted(async () => {
   await babylonRuntimeService.whenReady
 
   const caps = babylonRuntimeService.engine.getCaps()
-  console.log(caps.maxCubemapTextureSize)
+  console.log(caps.maxTextureSize)
 
   sliceParameterBuffer = new UniformBuffer(
     babylonRuntimeService.engine,
@@ -69,18 +69,18 @@ onMounted(async () => {
   sliceParameterBuffer.addUniform('up', 4)
   sliceParameterBuffer.addUniform('chunkStartCoordinate', 4)
 
-  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 5.4, 1, 5.739, 2.5)
-  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', 0, 0, 1, 0.01)
-  sliceParameterBuffer.updateFloat4('up', 0, -1, 0, 0)
-  sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 5.4, 0, 3.239, 0)
+  sliceParameterBuffer.updateFloat4('centerAndHalfSize', 5.4, 5.7, 0, 5)
+  sliceParameterBuffer.updateFloat4('rightAndChunkResolution', 0, 1, 0, 0.01)
+  sliceParameterBuffer.updateFloat4('up', 0, 0, 1, 0)
+  sliceParameterBuffer.updateFloat4('chunkStartCoordinate', 5.4, 3.239, 0, 0)
 
   sliceParameterBuffer.update()
 
   annotationChunkTexture = new RawTexture3D(
     region.data,
-    1,
-    350,
-    477,
+    region.shape[0]!,
+    region.shape[2]!,
+    region.shape[1]!,
     Engine.TEXTUREFORMAT_RED_INTEGER,
     babylonRuntimeService.scene,
     false,
