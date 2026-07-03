@@ -44,7 +44,7 @@ onMounted(async () => {
 
   // Load atlas data. ASR format.
   const array = await open(store, { kind: 'array' })
-  if (!array.is('uint32')) throw new Error('Annotation volume is not the expected type!')
+  if (!array.is('uint16')) throw new Error('Annotation volume is not the expected type!')
   const region = await get(array, [slice(540, 541), slice(0, 800), slice(70, 1070)])
   console.log(region.shape)
 
@@ -86,7 +86,7 @@ onMounted(async () => {
     false,
     false,
     Texture.NEAREST_NEAREST,
-    Engine.TEXTURETYPE_UNSIGNED_INTEGER,
+    Engine.TEXTURETYPE_UNSIGNED_SHORT,
   )
 
   lutTexture = new RawTexture(
