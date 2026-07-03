@@ -1,4 +1,5 @@
-name: deploy.yml
+name: Deploy
+
 on:
   pull_request:
     branches:
