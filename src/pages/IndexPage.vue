@@ -43,7 +43,7 @@ function fixedQPageHeight(offset: number) {
 
         <q-toolbar-title shrink> Pinpoint V</q-toolbar-title>
 
-        <i class="text-weight-light">{{ appVersion }}</i>
+        <i class="text-weight-light q-pr-sm">{{ appVersion }}</i>
 
         <q-btn flat label="File">
           <q-menu auto-close>
@@ -54,6 +54,7 @@ function fixedQPageHeight(offset: number) {
             </q-list>
           </q-menu>
         </q-btn>
+
         <q-btn flat label="Edit">
           <q-menu auto-close>
             <q-list>
