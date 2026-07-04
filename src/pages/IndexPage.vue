@@ -6,6 +6,7 @@
  */
 
 import { ref } from "vue";
+import { SceneCanvas } from "@/features/scene";
 
 const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
@@ -74,6 +75,8 @@ function toggleRightDrawer() {
       <!-- drawer content -->
     </q-drawer>
 
-    <q-page-container> Hello World </q-page-container>
+    <q-page-container>
+      <SceneCanvas />
+    </q-page-container>
   </q-layout>
 </template>
