@@ -50,7 +50,7 @@ export default defineConfig(ctx => {
       // vueRouterBase,
       // vueDevtools,
 
-      // publicPath: '/',
+      publicPath: "/pinpoint-v/",
       // define: {},
       // defineEnv: {}
       // ignorePublicFolder: true,
