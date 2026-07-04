@@ -23,6 +23,7 @@
     "postinstall": "quasar prepare --silent"
   },
   "dependencies": {
+    "@babylonjs/core": "^9.15.0",
     "@quasar/extras": "^2.0.0",
     "pinia": "^3.0.1",
     "quasar": "^2.20.0",

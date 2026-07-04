@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@babylonjs/core':
+        specifier: ^9.15.0
+        version: 9.15.0
       '@quasar/extras':
         specifier: ^2.0.0
         version: 2.0.2
@@ -100,6 +103,9 @@ packages:
   '@babel/types@8.0.0':
     resolution: {integrity: sha512-K8ponJDxBwDHigkeFqaqT5wLGl4bTlwMafR8k7b5CPxr6Ww+UG9ls8Yx6Tcpboxu97eeGVEEyKcHmEyOwN1vSw==}
     engines: {node: ^22.18.0 || >=24.11.0}
+
+  '@babylonjs/core@9.15.0':
+    resolution: {integrity: sha512-HoLq2evNXQNqJFDIC3gngDGlEgQd/mmpbwwaKMJ0zW13tMc5jSf4Qxc4oUaBKdKMGHrJ8ylTObr36mdUFvLhfw==}
 
   '@bufbuild/protobuf@2.12.1':
     resolution: {integrity: sha512-BvAMfS6LrgZiryOAZ4pBYucu4wG/Ei/9o9DZ9akbREnMLbPJiom2i8b9C8IsKErQoiKqVhrerzt3kOT/RrzLHg==}
@@ -2761,6 +2767,8 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 8.0.0
       '@babel/helper-validator-identifier': 8.0.2
+
+  '@babylonjs/core@9.15.0': {}
 
   '@bufbuild/protobuf@2.12.1': {}
 

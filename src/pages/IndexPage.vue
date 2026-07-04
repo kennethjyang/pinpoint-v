@@ -4,6 +4,7 @@ import { ref } from "vue";
 const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const tab = ref("scene");
+const appVersion = import.meta.env.APP_VERSION;
 
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value;
@@ -22,7 +23,7 @@ function toggleRightDrawer() {
 
         <q-toolbar-title shrink> Pinpoint V</q-toolbar-title>
 
-        5.0.0-dev1
+        <i class="text-weight-light">{{ appVersion }}</i>
 
         <q-btn flat label="File">
           <q-menu auto-close>
