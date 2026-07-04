@@ -1,11 +1,22 @@
+/**
+ * @file Babylon runtime service that hosts the engine and scene.
+ */
+
 import { InjectionKey, readonly, shallowRef } from "vue";
 import { Scene, WebGPUEngine } from "@babylonjs/core";
 
+/**
+ * Service creator. Hosts the references to the engine and scene.
+ */
 export function createBabylonRuntime() {
   const engine = shallowRef<WebGPUEngine | null>(null);
   const scene = shallowRef<Scene | null>(null);
 
-  async function init(canvas: HTMLCanvasElement): Promise<void> {
+  /**
+   * Create the runtime from a canvas.
+   * @param canvas HTML canvas to attach the runtime to.
+   */
+  async function init(canvas: HTMLCanvasElement) {
     // Cancel if already initialized.
     if (engine.value) return;
 
@@ -27,7 +38,10 @@ export function createBabylonRuntime() {
     scene.value = s;
   }
 
-  function dispose(): void {
+  /**
+   * Cleanup this runtime.
+   */
+  function dispose() {
     scene.value?.dispose();
     engine.value?.dispose();
 

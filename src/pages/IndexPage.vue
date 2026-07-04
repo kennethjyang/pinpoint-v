@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/**
+ * @file Build the base layout of the app.
+ *
+ * Handles sidebar functionality locally.
+ */
+
 import { ref } from "vue";
 
 const leftDrawerOpen = ref(false);
