@@ -20,6 +20,19 @@ function toggleLeftDrawer() {
 function toggleRightDrawer() {
   rightDrawerOpen.value = !rightDrawerOpen.value;
 }
+
+/**
+ * Force minHeight and height of QPage to be the same.
+ * @param offset Height offset caused by the header and footer.
+ */
+function fixedQPageHeight(offset: number) {
+  const height = offset ? `calc(100vh - ${offset}px)` : "100vh";
+
+  return {
+    minHeight: height,
+    height
+  };
+}
 </script>
 
 <template>
@@ -76,7 +89,7 @@ function toggleRightDrawer() {
     </q-drawer>
 
     <q-page-container>
-      <q-page>
+      <q-page :style-fn="fixedQPageHeight">
         <SceneCanvas />
       </q-page>
     </q-page-container>

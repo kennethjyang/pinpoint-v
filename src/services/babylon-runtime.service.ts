@@ -2,7 +2,7 @@
  * @file Babylon runtime service that hosts the engine and scene.
  */
 
-import { InjectionKey, readonly, shallowRef } from "vue";
+import { InjectionKey, markRaw, readonly, shallowRef } from "vue";
 import {
   ArcRotateCamera,
   GizmoManager,
@@ -30,12 +30,12 @@ export function createBabylonRuntime() {
     if (engine.value) return;
 
     // Initialize engine.
-    const e = new WebGPUEngine(canvas);
+    const e = markRaw(new WebGPUEngine(canvas));
     e.compatibilityMode = false;
     await e.initAsync();
 
     // Attach scene.
-    const s = new Scene(e);
+    const s = markRaw(new Scene(e));
 
     // Attach camera.
     const camera = new ArcRotateCamera(
