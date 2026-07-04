@@ -1,12 +1,8 @@
 pre-commit:
   jobs:
-    - name: format
-      glob: "src/*"
-      run: npm run oxfmt {staged_files}
-      stage_fixed: true
     - name: lint
-      run: npm run lint
+      run: pnpm lint
       stage_fixed: true
-    - name: type-check
-      run: npm run type-check
+    - name: typecheck
+      run: pnpm typecheck
       stage_fixed: true
