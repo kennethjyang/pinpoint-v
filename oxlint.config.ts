@@ -34,5 +34,24 @@ export default defineConfig({
 
   env: {
     builtin: true
-  }
+  },
+  overrides: [
+    {
+      files: ["**/*.{vue,ts,mts,tsx}"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["@/features/*/*"],
+                message:
+                  "Import from the feature index instead: @/features/feature-name"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 });
