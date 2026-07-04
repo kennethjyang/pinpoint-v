@@ -1,8 +1,8 @@
 pre-commit:
   jobs:
     - name: lint
-      run: pnpm lint
+      run: npm run lint
       stage_fixed: true
     - name: typecheck
-      run: pnpm typecheck
+      run: npm run typecheck
       stage_fixed: true
