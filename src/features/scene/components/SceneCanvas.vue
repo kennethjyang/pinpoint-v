@@ -5,6 +5,7 @@
 
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
 import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
+import { vResizeObserver } from "@vueuse/components";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntime();
@@ -22,10 +23,48 @@ onMounted(() => {
 onUnmounted(() => {
   runtime.dispose();
 });
+
+/**
+ * Handle canvas wrapper resizing by resizing the canvas and triggering an engine resize.
+ * @param entries Resized items from observer (first one is the wrapper).
+ */
+function onResize(entries: ResizeObserverEntry[]) {
+  // Extract the wrapper element.
+  const [entry] = entries;
+
+  // Exit if no info.
+  if (!entry || !canvas.value) return;
+
+  // Extract info.
+  const { width, height } = entry.contentRect;
+  const dpr = window.devicePixelRatio || 1;
+
+  // Resize canvas.
+  canvas.value.width = Math.round(width * dpr);
+  canvas.value.height = Math.round(height * dpr);
+
+  console.log(`${canvas.value.width} x ${canvas.value.height}`);
+
+  // Trigger Babylon resize.
+  runtime.engine.value?.resize();
+}
 </script>
 
 <template>
-  <canvas ref="canvas" height="500" width="500" />
+  <div v-resize-observer="onResize">
+    <canvas ref="canvas" />
+  </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+div {
+  width: 100%;
+  height: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+</style>
