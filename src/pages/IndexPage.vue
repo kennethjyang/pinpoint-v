@@ -20,7 +20,30 @@ function toggleRightDrawer() {
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
 
-        <q-toolbar-title> Pinpoint V</q-toolbar-title>
+        <q-toolbar-title shrink> Pinpoint V</q-toolbar-title>
+
+        5.0.0-dev1
+
+        <q-btn flat label="File">
+          <q-menu auto-close>
+            <q-list>
+              <q-item clickable>
+                <q-item-section>Save</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+        <q-btn flat label="Edit">
+          <q-menu auto-close>
+            <q-list>
+              <q-item clickable>
+                <q-item-section>Preferences</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+
+        <q-space />
 
         <q-btn dense flat round icon="menu" @click="toggleRightDrawer" />
       </q-toolbar>
