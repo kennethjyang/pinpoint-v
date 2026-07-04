@@ -33,10 +33,10 @@ export default defineConfig(ctx => {
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#build
     build: {
-      target: {
-        browser: "es2024",
-        node: "node24"
-      },
+      // target: {
+      //   browser: "es2024",
+      //   node: "node24"
+      // },
 
       typescript: {
         strict: true,
