@@ -57,7 +57,11 @@ export function createBabylonRuntime() {
     new HemisphericLight("MainLight", Vector3.Up(), s);
 
     // Build a demo scene.
-    const probeMesh = MeshBuilder.CreateBox("ProbeMesh", { height: 2 }, s);
+    const probeMesh = MeshBuilder.CreateBox(
+      "ProbeMesh",
+      { width: 0.25, depth: 0.25, height: 2 },
+      s
+    );
     probeMesh.setAbsolutePosition(Vector3.Up());
     const probeMover = new TransformNode("ProbeTip", s);
     probeMover.addChild(probeMesh);

@@ -20,7 +20,7 @@ Lefthook has enabled pre-commit hooks that run the formatter, linter, and type c
 Build atlases using [Atlas Converter](https://github.com/kennethjyang/atlas-converter) which will put them in `~/pinpoint_atlases`. Then run:
 
 ```bash
-npm run local-atlas
+pnpm local-atlas
 ```
 
 to serve them locally.
