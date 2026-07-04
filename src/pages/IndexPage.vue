@@ -76,7 +76,9 @@ function toggleRightDrawer() {
     </q-drawer>
 
     <q-page-container>
-      <SceneCanvas />
+      <q-page>
+        <SceneCanvas />
+      </q-page>
     </q-page-container>
   </q-layout>
 </template>

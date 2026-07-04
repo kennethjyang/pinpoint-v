@@ -3,7 +3,16 @@
  */
 
 import { InjectionKey, readonly, shallowRef } from "vue";
-import { Scene, WebGPUEngine } from "@babylonjs/core";
+import {
+  ArcRotateCamera,
+  GizmoManager,
+  HemisphericLight,
+  MeshBuilder,
+  Scene,
+  TransformNode,
+  Vector3,
+  WebGPUEngine
+} from "@babylonjs/core";
 
 /**
  * Service creator. Hosts the references to the engine and scene.
@@ -27,6 +36,32 @@ export function createBabylonRuntime() {
 
     // Attach scene.
     const s = new Scene(e);
+
+    // Attach camera.
+    const camera = new ArcRotateCamera(
+      "MainCamera",
+      -Math.PI / 2,
+      Math.PI / 4,
+      10,
+      Vector3.Zero(),
+      s
+    );
+    camera.attachControl(canvas, true);
+
+    // Attach gizmo manager.
+    const gizmoManager = new GizmoManager(s);
+    gizmoManager.positionGizmoEnabled = true;
+    gizmoManager.rotationGizmoEnabled = true;
+
+    // Add lights.
+    new HemisphericLight("MainLight", Vector3.Up(), s);
+
+    // Build a demo scene.
+    const probeMesh = MeshBuilder.CreateBox("ProbeMesh", { height: 2 }, s);
+    probeMesh.setAbsolutePosition(Vector3.Up());
+    const probeMover = new TransformNode("ProbeTip", s);
+    probeMover.addChild(probeMesh);
+    gizmoManager.attachToNode(probeMover);
 
     // Start render loop.
     e.runRenderLoop(() => {

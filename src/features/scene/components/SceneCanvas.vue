@@ -46,12 +46,12 @@ function onResize(entries: ResizeObserverEntry[]) {
   console.log(`${canvas.value.width} x ${canvas.value.height}`);
 
   // Trigger Babylon resize.
-  runtime.engine.value?.resize();
+  // runtime.engine.value?.resize();
 }
 </script>
 
 <template>
-  <div v-resize-observer="onResize">
+  <div v-resize-observer="onResize" class="fill">
     <canvas ref="canvas" />
   </div>
 </template>
@@ -60,6 +60,7 @@ function onResize(entries: ResizeObserverEntry[]) {
 div {
   width: 100%;
   height: 100%;
+  min-height: inherit;
 }
 
 canvas {
