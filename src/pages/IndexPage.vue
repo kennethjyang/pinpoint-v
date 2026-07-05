@@ -17,6 +17,7 @@ const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
+const splash = ref(true);
 const appVersion = import.meta.env.APP_VERSION;
 
 /**
@@ -82,10 +83,6 @@ function fixedQPageHeight(offset: number) {
     <q-header elevated class="bg-primary text-white">
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
-
-        <q-toolbar-title shrink> Pinpoint V</q-toolbar-title>
-
-        <i class="text-weight-light q-pr-sm">{{ appVersion }}</i>
 
         <q-btn flat label="File">
           <q-menu auto-close>
@@ -169,6 +166,31 @@ function fixedQPageHeight(offset: number) {
       </q-page>
     </q-page-container>
   </q-layout>
+
+  <q-dialog v-model="splash">
+    <q-card class="splash">
+      <q-card-section class="column full-width items-center">
+        <p class="text-h2">Pinpoint V</p>
+        <i class="text-caption">{{ appVersion }}</i>
+      </q-card-section>
+
+      <q-card-section>
+        <div class="row q-gutter-x-md justify-center">
+          <q-btn icon="play_circle" label="Resume" size="xl" />
+          <q-btn icon="add_circle" label="New" size="xl" />
+          <q-btn icon="file_open" label="Open" size="xl" />
+        </div>
+      </q-card-section>
+
+      <q-card-section class="splash__recents scroll">
+        <q-list separator>
+          <q-item v-for="n in 20" v-ripple clickable>
+            <q-item-section>Some Recent Experiment {{ n }}</q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style lang="sass" scoped>
@@ -195,8 +217,14 @@ body.body--dark .q-drawer__resizer
   background-color: $grey-8
 
 .q-drawer__resizer--left
-  right: -1px
+  right: -1.5px
 
 .q-drawer__resizer--right
-  left: -1px
+  left: -1.5px
+
+.splash
+  width: 50vw
+
+.splash__recents
+  max-height: 50vh
 </style>
