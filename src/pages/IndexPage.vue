@@ -7,7 +7,9 @@
 
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
-import { TouchPanValue } from "quasar";
+import { TouchPanValue, useQuasar } from "quasar";
+
+const $q = useQuasar();
 
 // Layout state.
 const leftDrawerOpen = ref(false);
@@ -105,6 +107,18 @@ function fixedQPageHeight(offset: number) {
           </q-menu>
         </q-btn>
 
+        <q-btn flat label="View">
+          <q-menu auto-close>
+            <q-list>
+              <q-item clickable>
+                <q-item-section @click="$q.dark.toggle"
+                  >Toggle Dark Mode
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+
         <q-space />
 
         <q-btn dense flat round icon="menu" @click="toggleRightDrawer" />
@@ -163,7 +177,7 @@ function fixedQPageHeight(offset: number) {
   top: 0
   bottom: 0
   width: 3px
-  background-color: lightgray
+  background-color: $grey-5
   cursor: ew-resize
 
   &:after
@@ -176,6 +190,9 @@ function fixedQPageHeight(offset: number) {
     transform: translateY(-50%)
     background-color: inherit
     border-radius: 4px
+
+body.body--dark .q-drawer__resizer
+  background-color: $grey-8
 
 .q-drawer__resizer--left
   right: -1px
