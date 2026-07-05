@@ -35,4 +35,4 @@ jobs:
         run: pnpm lint:check
 
       - name: 🔍 Type Check
-        run: pnpm type-check
+        run: pnpm typecheck
