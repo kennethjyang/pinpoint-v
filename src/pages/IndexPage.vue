@@ -36,7 +36,14 @@ function toggleRightDrawer() {
  * @param details Touch pan directive values.
  */
 const resizeLeftDrawer: TouchPanValue = function (details) {
-  leftDrawerWidth.value += details.delta?.x ?? 0;
+  let delta = details.delta?.x ?? 0;
+
+  // Clamp end value to be within 40% of the screen.
+  if (leftDrawerWidth.value + delta >= window.innerWidth * 0.4) {
+    delta = 0;
+  }
+
+  leftDrawerWidth.value += delta;
 };
 
 /**
@@ -44,7 +51,14 @@ const resizeLeftDrawer: TouchPanValue = function (details) {
  * @param details Touch pan directive values.
  */
 const resizeRightDrawer: TouchPanValue = function (details) {
-  rightDrawerWidth.value -= details.delta?.x ?? 0;
+  let delta = details.delta?.x ?? 0;
+
+  // Clamp end value to be within 40% of the screen.
+  if (rightDrawerWidth.value - delta >= window.innerWidth * 0.4) {
+    delta = 0;
+  }
+
+  rightDrawerWidth.value -= delta;
 };
 
 /**
