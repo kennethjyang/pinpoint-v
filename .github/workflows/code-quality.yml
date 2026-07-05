@@ -25,16 +25,14 @@ jobs:
       - name: 📦 Install node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          cache: 'pnpm'
+          node-version: lts/Krypton
+          cache: "pnpm"
 
       - name: 📦 Install dependencies
         run: pnpm install
 
-      - name: 📝 Format Code
-        run: pnpm format --check
-
-      - name: 🔍 Lint Code
-        run: pnpm lint
+      - name: 🔍 Lint Check
+        run: pnpm lint:check
 
       - name: 🔍 Type Check
-        run: pnpm type-check
+        run: pnpm typecheck

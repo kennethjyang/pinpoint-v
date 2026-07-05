@@ -1,23 +1,45 @@
 <script lang="ts" setup>
-import { onMounted, useTemplateRef } from 'vue'
-import { babylonRuntimeService } from '@/services/babylon-runtime.service'
+/**
+ * @file Create Babylon scene canvas and initialize runtime.
+ */
 
-const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
+import { onMounted, onUnmounted, useTemplateRef } from "vue";
+import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
+
+const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
+const runtime = useBabylonRuntime();
 
 onMounted(() => {
   // Exit if no canvas.
-  if (!canvas.value) throw new Error('BabylonJS canvas not found in DOM!')
+  if (!canvas.value) {
+    throw new Error("Scene canvas not found in DOM!");
+  }
 
-  // Initialize Babylon Runtime.
-  babylonRuntimeService.init(canvas.value)
-})
+  // Initialize Babylon runtime.
+  runtime.init(canvas.value);
+});
+
+onUnmounted(() => {
+  runtime.dispose();
+});
+
+/**
+ * Trigger engine resizing on page area resize.
+ */
+function onResize() {
+  runtime.engine.value?.resize();
+}
 </script>
 
 <template>
-  <canvas ref="canvas" height="500" width="500" />
+  <canvas ref="canvas" class="fit" />
+  <q-resize-observer @resize="onResize" />
 </template>
+
 <style scoped>
 canvas {
-  border: 5px solid royalblue;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 </style>
