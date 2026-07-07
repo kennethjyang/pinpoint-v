@@ -11,19 +11,20 @@ const name = ref<string | null>(null);
 
 <template>
   <q-card class="new-experiment">
-    <q-card-section>
+    <q-card-section class="q-gutter-y-md">
       <p class="text-h5">New Experiment</p>
-      <q-input v-model="name" clearable label="Name" />
+
+      <q-input v-model="name" clearable label="Experiment name" />
+
       <AtlasPicker />
     </q-card-section>
     <q-card-actions align="right">
-      <q-btn color="primary" label="Create" />
+      <q-btn color="positive" icon="add" label="Create" />
     </q-card-actions>
   </q-card>
 </template>
 
 <style lang="sass" scoped>
 .new-experiment
-  width: 50vw
-  max-height: 70vh
+  min-width: 25vw
 </style>

@@ -21,7 +21,7 @@ const appVersion = import.meta.env.APP_VERSION;
 
     <q-card-section>
       <div class="column q-gutter-y-md">
-        <div class="row q-gutter-md justify-center">
+        <div class="row q-gutter-x-md justify-center">
           <q-btn
             icon="add"
             label="New"
@@ -37,7 +37,7 @@ const appVersion = import.meta.env.APP_VERSION;
           />
           <q-btn icon="file_open" label="Open" size="xl" />
         </div>
-        <div class="row q-gutter-md justify-center">
+        <div class="row q-gutter-x-md justify-center">
           <q-btn icon="menu_book" label="User Guide" />
           <q-btn icon="web" label="VBL Website" />
         </div>
@@ -62,6 +62,7 @@ const appVersion = import.meta.env.APP_VERSION;
 
 <style lang="sass" scoped>
 .splash
+  min-width: 30vw
   max-height: 70vh
 
 .recents-list
