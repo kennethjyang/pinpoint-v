@@ -27,4 +27,5 @@ const name = ref<string | null>(null);
 <style lang="sass" scoped>
 .new-experiment
   min-width: 25vw
+  width: fit-content
 </style>

@@ -108,7 +108,7 @@ function swapSelectedAtlas() {
 </script>
 
 <template>
-  <q-form class="q-gutter-y-sm">
+  <q-form class="picker-form q-gutter-y-sm">
     <p class="text-h6">Atlas Source</p>
 
     <div class="row q-gutter-x-md">
@@ -139,50 +139,55 @@ function swapSelectedAtlas() {
 
     <div
       v-if="connectionStatus === ConnectionStatus.Connected"
-      class="row items-center q-gutter-x-md"
+      class="row items-center q-gutter-x-md no-wrap"
     >
-      <div class="column col">
+      <div class="atlas-column column">
         <p class="text-subtitle1">Atlases</p>
-        <q-virtual-scroll v-slot="{ index, item }" :items="atlases" separator>
+        <q-list class="atlas-list" separator>
           <q-item
-            :key="index"
-            clickable
+            v-for="atlasName in atlases"
             v-ripple
-            :active="item === atlas"
-            @click="atlas = item"
+            :active="atlasName === atlas"
+            clickable
+            @click="atlas = atlasName"
           >
             <q-item-section>
-              {{ item }}
+              {{ atlasName }}
             </q-item-section>
           </q-item>
-        </q-virtual-scroll>
+        </q-list>
       </div>
 
       <q-btn color="primary" icon="swap_horiz" @click="swapSelectedAtlas" />
 
-      <div class="column col">
+      <div class="atlas-column column">
         <p class="text-subtitle1">Favorites</p>
-        <q-scroll-area class="atlas-list">
-          <q-list separator>
-            <q-item
-              v-for="atlasName in favorites"
-              v-ripple
-              :active="atlasName === atlas"
-              clickable
-              @click="atlas = atlasName"
-            >
-              <q-item-section>
-                {{ atlasName }}
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-scroll-area>
+        <q-list class="atlas-list" separator>
+          <q-item
+            v-for="atlasName in favorites"
+            v-ripple
+            :active="atlasName === atlas"
+            clickable
+            @click="atlas = atlasName"
+          >
+            <q-item-section>
+              {{ atlasName }}
+            </q-item-section>
+          </q-item>
+        </q-list>
       </div>
     </div>
   </q-form>
 </template>
 
 <style lang="sass" scoped>
+.picker-form
+  width: fit-content
+
+.atlas-column
+  flex: 1 1 0
+
 .atlas-list
-  height: 30vh
+  max-height: 30vh
+  overflow-y: auto
 </style>
