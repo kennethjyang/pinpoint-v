@@ -18,7 +18,7 @@ const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
-const splash = ref(true);
+const showSplash = ref(true);
 
 /**
  * Toggle left drawer open state.
@@ -167,7 +167,7 @@ function fixedQPageHeight(offset: number) {
     </q-page-container>
   </q-layout>
 
-  <q-dialog v-model="splash">
+  <q-dialog v-model="showSplash">
     <SplashCard />
   </q-dialog>
 </template>

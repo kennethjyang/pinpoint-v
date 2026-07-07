@@ -1,4 +1,14 @@
 <script lang="ts" setup>
+/**
+ * @file Splash screen interface.
+ *
+ * Includes launching the new experiment interface.
+ */
+
+import { ref } from "vue";
+import { NewExperimentCard } from "@/features/new-experiment";
+
+const showNewExperiment = ref(true);
 const appVersion = import.meta.env.APP_VERSION;
 </script>
 
@@ -12,8 +22,19 @@ const appVersion = import.meta.env.APP_VERSION;
     <q-card-section>
       <div class="column q-gutter-y-md">
         <div class="row q-gutter-md justify-center">
-          <q-btn icon="add" label="New" size="xl" />
-          <q-btn v-close-popup icon="play_arrow" label="Resume" size="xl" />
+          <q-btn
+            icon="add"
+            label="New"
+            size="xl"
+            @click="showNewExperiment = true"
+          />
+          <q-btn
+            v-close-popup
+            color="primary"
+            icon="play_arrow"
+            label="Resume"
+            size="xl"
+          />
           <q-btn icon="file_open" label="Open" size="xl" />
         </div>
         <div class="row q-gutter-md justify-center">
@@ -31,6 +52,10 @@ const appVersion = import.meta.env.APP_VERSION;
       </q-list>
     </q-card-section>
   </q-card>
+
+  <q-dialog v-model="showNewExperiment">
+    <NewExperimentCard />
+  </q-dialog>
 </template>
 
 <style lang="sass" scoped>
