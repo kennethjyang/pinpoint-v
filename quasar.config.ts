@@ -12,7 +12,7 @@ export default defineConfig(ctx => {
     // app boot file (/src/boot)
     // --> boot files are part of "main.js"
     // https://v2.quasar.dev/quasar-cli-vite/boot-files
-    boot: ["i18n", "babylon-runtime.boot"],
+    boot: ["i18n.boot", "babylon-runtime.boot", "axios.boot"],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
     css: ["app.scss"],
@@ -92,7 +92,10 @@ export default defineConfig(ctx => {
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
     framework: {
       config: {
-        dark: "auto"
+        dark: "auto",
+        notify: {
+          position: "top-right"
+        }
       },
 
       // iconSet: 'material-icons', // Quasar icon set
@@ -106,7 +109,7 @@ export default defineConfig(ctx => {
       // directives: [],
 
       // Quasar plugins
-      plugins: []
+      plugins: ["Notify"]
     },
 
     // animations: 'all', // --- includes all animations

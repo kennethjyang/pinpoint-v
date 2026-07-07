@@ -4,24 +4,84 @@
  */
 
 import { ref } from "vue";
+import { useQuasar } from "quasar";
+import { api } from "@/boot/axios.boot";
 
+/**
+ * Atlas source connection status.
+ */
 enum ConnectionStatus {
   Disconnected,
   Connecting,
-  Failed,
   Connected
 }
 
+/**
+ * Atlas item in response structure.
+ */
+interface AtlasItem {
+  name: string;
+  type: string;
+}
+
+/**
+ * Atlas source connection response.
+ */
+interface AtlasSourceResponse {
+  files: AtlasItem[];
+}
+
+const $q = useQuasar();
+
 // Atlas source connection state.
-const atlasSource = ref<string | null>(
-  "https://virtualbrainlab.alleninstitute.org/pinpoint/atlases"
-);
+const atlasSource = ref<string | null>("http://localhost:3000");
 const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.Disconnected);
 
 // Atlas selection state.
 const atlas = ref<string | null>(null);
 let atlases = ref(["One", "Two", "Three", "Four", "Five"]);
 let favorites = ref(["Six", "Seven", "Eight"]);
+
+async function connect() {
+  // Disconnect if no source.
+  if (!atlasSource.value) {
+    connectionStatus.value = ConnectionStatus.Disconnected;
+    return;
+  }
+
+  // Set to connecting.
+  connectionStatus.value = ConnectionStatus.Connecting;
+
+  try {
+    // Make a connection.
+    const response = await api.get<AtlasSourceResponse>(atlasSource.value);
+
+    // Parse the response.
+    if (response.data) {
+      atlases.value = response.data.files
+        .filter(item => item.type === "folder")
+        .map(item => item.name);
+      connectionStatus.value = ConnectionStatus.Connected;
+    } else {
+      notifyFail();
+    }
+  } catch (e) {
+    notifyFail();
+  }
+
+  /**
+   * Notify if a connection fails and set the connection status to disconnected.
+   */
+  function notifyFail() {
+    $q.notify({
+      message: "Unable to access atlases from source.",
+      caption: "Check source URL and try again.",
+      color: "negative",
+      icon: "mobiledata_off"
+    });
+    connectionStatus.value = ConnectionStatus.Disconnected;
+  }
+}
 
 /**
  * Swaps the selected atlas between the favorites list and the general list.
@@ -62,7 +122,7 @@ function swapSelectedAtlas() {
       <q-btn
         icon="home"
         label="Locally Hosted"
-        @click="atlasSource = 'http://localhost:8080'"
+        @click="atlasSource = 'http://localhost:3000'"
       />
     </div>
 
@@ -72,18 +132,8 @@ function swapSelectedAtlas() {
       :loading="connectionStatus === ConnectionStatus.Connecting"
       color="primary"
       label="Connect"
+      @click="connect"
     />
-
-    <q-banner
-      v-if="connectionStatus === ConnectionStatus.Failed"
-      class="bg-negative"
-    >
-      <template v-slot:avatar>
-        <q-icon name="mobiledata_off" />
-      </template>
-      Unable to access atlases from source. Please check the address and try
-      again.
-    </q-banner>
 
     <div
       v-if="connectionStatus === ConnectionStatus.Connected"
