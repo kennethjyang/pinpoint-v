@@ -44,12 +44,14 @@ const appVersion = import.meta.env.APP_VERSION;
       </div>
     </q-card-section>
 
-    <q-card-section class="splash__recents scroll">
-      <q-list separator>
-        <q-item v-for="n in 20" v-ripple clickable>
-          <q-item-section>Some Recent Experiment {{ n }}</q-item-section>
-        </q-item>
-      </q-list>
+    <q-card-section>
+      <q-scroll-area class="recents-list">
+        <q-list separator>
+          <q-item v-for="n in 20" v-ripple clickable>
+            <q-item-section>Some Recent Experiment {{ n }}</q-item-section>
+          </q-item>
+        </q-list>
+      </q-scroll-area>
     </q-card-section>
   </q-card>
 
@@ -60,8 +62,8 @@ const appVersion = import.meta.env.APP_VERSION;
 
 <style lang="sass" scoped>
 .splash
-  width: 50vw
+  max-height: 70vh
 
-.splash__recents
-  max-height: 30vh
+.recents-list
+  height: 30vh
 </style>

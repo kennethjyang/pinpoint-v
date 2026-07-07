@@ -4,17 +4,17 @@
  */
 
 import { ref } from "vue";
+import { AtlasPicker } from "@/features/atlas-picker";
 
 const name = ref<string | null>(null);
 </script>
 
 <template>
-  <q-card>
+  <q-card class="new-experiment">
     <q-card-section>
       <p class="text-h5">New Experiment</p>
-      <q-form>
-        <q-input v-model="name" clearable label="Name" />
-      </q-form>
+      <q-input v-model="name" clearable label="Name" />
+      <AtlasPicker />
     </q-card-section>
     <q-card-actions align="right">
       <q-btn color="primary" label="Create" />
@@ -22,4 +22,8 @@ const name = ref<string | null>(null);
   </q-card>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+.new-experiment
+  width: 50vw
+  max-height: 70vh
+</style>
