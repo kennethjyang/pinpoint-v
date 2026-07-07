@@ -26,15 +26,15 @@
     "@babylonjs/core": "^9.15.0",
     "@quasar/extras": "^2.0.0",
     "pinia": "^3.0.1",
-    "quasar": "^2.20.0",
+    "quasar": "^2.21.0",
     "vue": "^3.5.22",
     "vue-i18n": "^11.3.0",
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@intlify/unplugin-vue-i18n": "^11.0.0",
-    "@quasar/app-vite": "^3.0.0-rc.3",
-    "@types/node": "^22.19.11",
+    "@quasar/app-vite": "^3.0.0-rc.6",
+    "@types/node": "^26.1.0",
     "autoprefixer": "^10.4.27",
     "lefthook": "^2.1.9",
     "oxfmt": "^0.x",
