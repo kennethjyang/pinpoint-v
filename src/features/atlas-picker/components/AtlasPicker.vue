@@ -5,14 +5,27 @@
 
 import { ref } from "vue";
 
+enum ConnectionStatus {
+  Disconnected,
+  Connecting,
+  Failed,
+  Connected
+}
+
+// Atlas source connection state.
 const atlasSource = ref<string | null>(
   "https://virtualbrainlab.alleninstitute.org/pinpoint/atlases"
 );
-const atlas = ref<string | null>(null);
+const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.Disconnected);
 
+// Atlas selection state.
+const atlas = ref<string | null>(null);
 let atlases = ref(["One", "Two", "Three", "Four", "Five"]);
 let favorites = ref(["Six", "Seven", "Eight"]);
 
+/**
+ * Swaps the selected atlas between the favorites list and the general list.
+ */
 function swapSelectedAtlas() {
   if (!atlas.value) return;
   const selectedAtlas = atlas.value;
@@ -37,15 +50,45 @@ function swapSelectedAtlas() {
     <p class="text-h6">Atlas Source</p>
 
     <div class="row q-gutter-x-md">
-      <q-btn color="primary" icon="public" label="Pinpoint Atlases" />
-      <q-btn icon="home" label="Locally Hosted" />
+      <q-btn
+        color="primary"
+        icon="public"
+        label="Pinpoint Atlases"
+        @click="
+          atlasSource =
+            'https://virtualbrainlab.alleninstitute.org/pinpoint/atlases'
+        "
+      />
+      <q-btn
+        icon="home"
+        label="Locally Hosted"
+        @click="atlasSource = 'http://localhost:8080'"
+      />
     </div>
 
     <q-input v-model="atlasSource" class="col" clearable label="Source URL" />
 
-    <q-btn color="primary" label="Connect" />
+    <q-btn
+      :loading="connectionStatus === ConnectionStatus.Connecting"
+      color="primary"
+      label="Connect"
+    />
 
-    <div class="row items-center q-gutter-x-md">
+    <q-banner
+      v-if="connectionStatus === ConnectionStatus.Failed"
+      class="bg-negative"
+    >
+      <template v-slot:avatar>
+        <q-icon name="mobiledata_off" />
+      </template>
+      Unable to access atlases from source. Please check the address and try
+      again.
+    </q-banner>
+
+    <div
+      v-if="connectionStatus === ConnectionStatus.Connected"
+      class="row items-center q-gutter-x-md"
+    >
       <div class="column col">
         <p class="text-subtitle1">Atlases</p>
         <q-scroll-area class="atlas-list">
