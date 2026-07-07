@@ -1,4 +1,8 @@
-import { defineStore, acceptHMRUpdate } from "pinia";
+/**
+ * @file Example Pinia store.
+ */
+
+import { acceptHMRUpdate, defineStore } from "pinia";
 
 export const useCounterStore = defineStore("counter", {
   state: () => ({
