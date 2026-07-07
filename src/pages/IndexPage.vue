@@ -84,8 +84,6 @@ function fixedQPageHeight(offset: number) {
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
 
-        <q-input v-model="tab" />
-
         <q-btn flat label="File">
           <q-menu auto-close>
             <q-list>
