@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 /**
  * @file Atlas picker interface.
+ *
+ * Handles connecting to an atlas source, picking an atlas, and managing favorites.
  */
 
 import { ref } from "vue";
@@ -39,8 +41,8 @@ const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.Disconnected);
 
 // Atlas selection state.
 const atlas = ref<string | null>(null);
-let atlases = ref(["One", "Two", "Three", "Four", "Five"]);
-let favorites = ref(["Six", "Seven", "Eight"]);
+let atlases = ref<string[]>([]);
+let favorites = ref<string[]>([]);
 
 async function connect() {
   // Disconnect if no source.
@@ -141,21 +143,19 @@ function swapSelectedAtlas() {
     >
       <div class="column col">
         <p class="text-subtitle1">Atlases</p>
-        <q-scroll-area class="atlas-list">
-          <q-list separator>
-            <q-item
-              v-for="atlasName in atlases"
-              v-ripple
-              :active="atlasName === atlas"
-              clickable
-              @click="atlas = atlasName"
-            >
-              <q-item-section>
-                {{ atlasName }}
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-scroll-area>
+        <q-virtual-scroll v-slot="{ index, item }" :items="atlases" separator>
+          <q-item
+            :key="index"
+            clickable
+            v-ripple
+            :active="item === atlas"
+            @click="atlas = item"
+          >
+            <q-item-section>
+              {{ item }}
+            </q-item-section>
+          </q-item>
+        </q-virtual-scroll>
       </div>
 
       <q-btn color="primary" icon="swap_horiz" @click="swapSelectedAtlas" />
