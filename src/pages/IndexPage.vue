@@ -8,6 +8,7 @@
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
+import { SplashCard } from "@/features/splash";
 
 const $q = useQuasar();
 
@@ -18,7 +19,6 @@ const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
 const splash = ref(true);
-const appVersion = import.meta.env.APP_VERSION;
 
 /**
  * Toggle left drawer open state.
@@ -168,28 +168,7 @@ function fixedQPageHeight(offset: number) {
   </q-layout>
 
   <q-dialog v-model="splash">
-    <q-card class="splash">
-      <q-card-section class="column full-width items-center">
-        <p class="text-h2">Pinpoint V</p>
-        <i class="text-caption">{{ appVersion }}</i>
-      </q-card-section>
-
-      <q-card-section>
-        <div class="row q-gutter-x-md justify-center">
-          <q-btn icon="play_circle" label="Resume" size="xl" />
-          <q-btn icon="add_circle" label="New" size="xl" />
-          <q-btn icon="file_open" label="Open" size="xl" />
-        </div>
-      </q-card-section>
-
-      <q-card-section class="splash__recents scroll">
-        <q-list separator>
-          <q-item v-for="n in 20" v-ripple clickable>
-            <q-item-section>Some Recent Experiment {{ n }}</q-item-section>
-          </q-item>
-        </q-list>
-      </q-card-section>
-    </q-card>
+    <SplashCard />
   </q-dialog>
 </template>
 
@@ -221,10 +200,4 @@ body.body--dark .q-drawer__resizer
 
 .q-drawer__resizer--right
   left: -1.5px
-
-.splash
-  width: 50vw
-
-.splash__recents
-  max-height: 50vh
 </style>
