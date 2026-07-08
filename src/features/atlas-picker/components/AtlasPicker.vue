@@ -5,7 +5,7 @@
  * Handles connecting to an atlas source, picking an atlas, and managing favorites.
  */
 
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "@/boot/axios.boot";
 
@@ -40,9 +40,18 @@ const atlasSource = ref<string | null>("http://localhost:3000");
 const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.Disconnected);
 
 // Atlas selection state.
-const atlas = ref<string | null>(null);
-let atlases = ref<string[]>([]);
-let favorites = ref<string[]>([]);
+const filter = ref<string | null>(null);
+const selectedAtlas = ref<string | null>(null);
+const atlases = ref<string[]>([]);
+const favorites = ref<string[]>([]);
+
+// Sorted atlas views.
+const sortedAtlases = computed(() =>
+  [...atlases.value].sort((a, b) => a.localeCompare(b))
+);
+const sortedFavorites = computed(() =>
+  [...favorites.value].sort((a, b) => a.localeCompare(b))
+);
 
 async function connect() {
   // Disconnect if no source.
@@ -86,29 +95,34 @@ async function connect() {
 }
 
 /**
- * Swaps the selected atlas between the favorites list and the general list.
+ * Move an atlas into favorites.
  */
-function swapSelectedAtlas() {
-  if (!atlas.value) return;
-  const selectedAtlas = atlas.value;
+function addToFavorites(atlas: string) {
+  // Validate selected atlas.
+  const selectionIndex = atlases.value.indexOf(atlas);
+  if (selectionIndex === -1) return;
 
-  // Index in each.
-  const atlasesIndex = atlases.value.indexOf(selectedAtlas);
-  const favoritesIndex = favorites.value.indexOf(selectedAtlas);
+  // Move.
+  atlases.value.splice(selectionIndex, 1);
+  favorites.value.push(atlas);
+}
 
-  // Swap.
-  if (atlasesIndex !== -1) {
-    atlases.value.splice(atlasesIndex, 1);
-    favorites.value.push(selectedAtlas);
-  } else {
-    favorites.value.splice(favoritesIndex, 1);
-    atlases.value.push(selectedAtlas);
-  }
+/**
+ * Move an atlas out of favorites.
+ */
+function removeFromFavorites(atlas: string) {
+  // Validate selected atlas.
+  const selectionIndex = favorites.value.indexOf(atlas);
+  if (selectionIndex === -1) return;
+
+  // Move.
+  favorites.value.splice(selectionIndex, 1);
+  atlases.value.push(atlas);
 }
 </script>
 
 <template>
-  <q-form class="picker-form q-gutter-y-sm">
+  <q-form class="q-gutter-y-sm">
     <p class="text-h6">Atlas Source</p>
 
     <div class="row q-gutter-x-md">
@@ -137,56 +151,56 @@ function swapSelectedAtlas() {
       @click="connect"
     />
 
-    <div
-      v-if="connectionStatus === ConnectionStatus.Connected"
-      class="row items-center q-gutter-x-md no-wrap"
-    >
-      <div class="atlas-column column">
-        <p class="text-subtitle1">Atlases</p>
-        <q-list class="atlas-list" separator>
+    <template v-if="connectionStatus === ConnectionStatus.Connected">
+      <q-input v-model="filter" clearable label="Filter atlases" />
+      <q-list class="atlas-list">
+        <template v-if="sortedFavorites.length > 0">
           <q-item
-            v-for="atlasName in atlases"
+            v-for="atlasName in sortedFavorites"
+            :active="atlasName === selectedAtlas"
             v-ripple
-            :active="atlasName === atlas"
             clickable
-            @click="atlas = atlasName"
+            @click="selectedAtlas = atlasName"
           >
-            <q-item-section>
-              {{ atlasName }}
+            <q-item-section>{{ atlasName }}</q-item-section>
+            <q-item-section side>
+              <q-btn
+                flat
+                round
+                color="pink"
+                icon="favorite"
+                @click.stop="removeFromFavorites(atlasName)"
+              />
             </q-item-section>
           </q-item>
-        </q-list>
-      </div>
+          <q-separator />
+        </template>
 
-      <q-btn color="primary" icon="swap_horiz" @click="swapSelectedAtlas" />
-
-      <div class="atlas-column column">
-        <p class="text-subtitle1">Favorites</p>
-        <q-list class="atlas-list" separator>
+        <template v-if="sortedAtlases.length > 0">
           <q-item
-            v-for="atlasName in favorites"
+            v-for="atlasName in sortedAtlases"
+            :active="atlasName === selectedAtlas"
             v-ripple
-            :active="atlasName === atlas"
             clickable
-            @click="atlas = atlasName"
+            @click="selectedAtlas = atlasName"
           >
-            <q-item-section>
-              {{ atlasName }}
+            <q-item-section>{{ atlasName }}</q-item-section>
+            <q-item-section side>
+              <q-btn
+                flat
+                round
+                icon="favorite_border"
+                @click.stop="addToFavorites(atlasName)"
+              />
             </q-item-section>
           </q-item>
-        </q-list>
-      </div>
-    </div>
+        </template>
+      </q-list>
+    </template>
   </q-form>
 </template>
 
 <style lang="sass" scoped>
-.picker-form
-  width: fit-content
-
-.atlas-column
-  flex: 1 1 0
-
 .atlas-list
   max-height: 30vh
   overflow-y: auto
