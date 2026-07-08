@@ -26,30 +26,62 @@ interface AtlasSourceResponse {
 }
 
 // Composables.
+
 const $q = useQuasar();
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
-// Atlas source connection state.
+// State.
+
+/**
+ * Atlas source URL.
+ */
 const atlasSource = ref<string | null>("http://localhost:3000");
 
-// Connected source URL. "" = disconnected, "connecting", "<URL>" = connected.
+/**
+ * Connected source URL.
+ *
+ * "" = disconnected, "connecting", "<URL>" = connected.
+ */
 const connectedSource = ref<string>("");
 
-// Atlas selection state.
+/**
+ * Filter string.
+ */
 const filter = ref<string | null>(null);
+
+/**
+ * Actively selected atlas.
+ */
 const selectedAtlas = ref<string | null>(null);
+
+/**
+ * Full list of atlases from the last connection.
+ */
 const atlases = ref<string[]>([]);
 
-// Sorted atlas views.
-const sortedAtlases = computed(() =>
-  [...atlases.value].sort((a, b) => a.localeCompare(b))
-);
+// Getters.
+
+/**
+ * Favorite atlases from this source. Sorted.
+ */
 const sortedFavorites = computed(() => {
   const favoritesList = favoriteAtlasesStore.favorites[connectedSource.value];
   if (!favoritesList) return [];
   return [...favoritesList].sort((a, b) => a.localeCompare(b));
 });
 
+/**
+ * Non-favorite atlases from this source.
+ */
+const sortedAtlases = computed(() =>
+  atlases.value
+    .filter(atlas => sortedFavorites.value.indexOf(atlas) === -1)
+    .sort((a, b) => a.localeCompare(b))
+);
+
+/**
+ * Make a connection to the atlas source and populate the atlas list.
+ */
 async function connect() {
   // Disconnect if no source.
   if (!atlasSource.value) {
@@ -123,7 +155,13 @@ async function connect() {
     />
 
     <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
-      <q-input v-model="filter" clearable label="Filter atlases" />
+      <q-input v-model="filter" clearable label="Search">
+        <template v-slot:prepend>
+          <q-icon name="search" />
+        </template>
+      </q-input>
+      <p>{{ sortedAtlases.length + sortedFavorites.length }} atlases</p>
+
       <q-list class="atlas-list">
         <template v-if="sortedFavorites.length > 0">
           <q-item
