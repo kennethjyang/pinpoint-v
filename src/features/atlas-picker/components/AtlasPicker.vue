@@ -8,15 +8,7 @@
 import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "@/boot/axios.boot";
-
-/**
- * Atlas source connection status.
- */
-enum ConnectionStatus {
-  Disconnected,
-  Connecting,
-  Connected
-}
+import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 
 /**
  * Atlas item in response structure.
@@ -33,35 +25,40 @@ interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
+// Composables.
 const $q = useQuasar();
+const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // Atlas source connection state.
 const atlasSource = ref<string | null>("http://localhost:3000");
-const connectionStatus = ref<ConnectionStatus>(ConnectionStatus.Disconnected);
+
+// Connected source URL. "" = disconnected, "connecting", "<URL>" = connected.
+const connectedSource = ref<string>("");
 
 // Atlas selection state.
 const filter = ref<string | null>(null);
 const selectedAtlas = ref<string | null>(null);
 const atlases = ref<string[]>([]);
-const favorites = ref<string[]>([]);
 
 // Sorted atlas views.
 const sortedAtlases = computed(() =>
   [...atlases.value].sort((a, b) => a.localeCompare(b))
 );
-const sortedFavorites = computed(() =>
-  [...favorites.value].sort((a, b) => a.localeCompare(b))
-);
+const sortedFavorites = computed(() => {
+  const favoritesList = favoriteAtlasesStore.favorites[connectedSource.value];
+  if (!favoritesList) return [];
+  return [...favoritesList].sort((a, b) => a.localeCompare(b));
+});
 
 async function connect() {
   // Disconnect if no source.
   if (!atlasSource.value) {
-    connectionStatus.value = ConnectionStatus.Disconnected;
+    connectedSource.value = "";
     return;
   }
 
   // Set to connecting.
-  connectionStatus.value = ConnectionStatus.Connecting;
+  connectedSource.value = "connecting";
 
   try {
     // Make a connection.
@@ -72,7 +69,7 @@ async function connect() {
       atlases.value = response.data.files
         .filter(item => item.type === "folder")
         .map(item => item.name);
-      connectionStatus.value = ConnectionStatus.Connected;
+      connectedSource.value = atlasSource.value;
     } else {
       notifyFail();
     }
@@ -90,34 +87,8 @@ async function connect() {
       color: "negative",
       icon: "mobiledata_off"
     });
-    connectionStatus.value = ConnectionStatus.Disconnected;
+    connectedSource.value = "";
   }
-}
-
-/**
- * Move an atlas into favorites.
- */
-function addToFavorites(atlas: string) {
-  // Validate selected atlas.
-  const selectionIndex = atlases.value.indexOf(atlas);
-  if (selectionIndex === -1) return;
-
-  // Move.
-  atlases.value.splice(selectionIndex, 1);
-  favorites.value.push(atlas);
-}
-
-/**
- * Move an atlas out of favorites.
- */
-function removeFromFavorites(atlas: string) {
-  // Validate selected atlas.
-  const selectionIndex = favorites.value.indexOf(atlas);
-  if (selectionIndex === -1) return;
-
-  // Move.
-  favorites.value.splice(selectionIndex, 1);
-  atlases.value.push(atlas);
 }
 </script>
 
@@ -145,13 +116,13 @@ function removeFromFavorites(atlas: string) {
     <q-input v-model="atlasSource" class="col" clearable label="Source URL" />
 
     <q-btn
-      :loading="connectionStatus === ConnectionStatus.Connecting"
+      :loading="connectedSource === 'connecting'"
       color="primary"
       label="Connect"
       @click="connect"
     />
 
-    <template v-if="connectionStatus === ConnectionStatus.Connected">
+    <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
       <q-input v-model="filter" clearable label="Filter atlases" />
       <q-list class="atlas-list">
         <template v-if="sortedFavorites.length > 0">
@@ -169,7 +140,9 @@ function removeFromFavorites(atlas: string) {
                 round
                 color="pink"
                 icon="favorite"
-                @click.stop="removeFromFavorites(atlasName)"
+                @click.stop="
+                  favoriteAtlasesStore.remove(connectedSource, atlasName)
+                "
               />
             </q-item-section>
           </q-item>
@@ -190,7 +163,9 @@ function removeFromFavorites(atlas: string) {
                 flat
                 round
                 icon="favorite_border"
-                @click.stop="addToFavorites(atlasName)"
+                @click.stop="
+                  favoriteAtlasesStore.add(connectedSource, atlasName)
+                "
               />
             </q-item-section>
           </q-item>
