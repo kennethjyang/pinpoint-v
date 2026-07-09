@@ -1,3 +1,7 @@
+/**
+ * @file Router configuration.
+ */
+
 import { defineRouter } from "#q-app";
 import {
   createMemoryHistory,

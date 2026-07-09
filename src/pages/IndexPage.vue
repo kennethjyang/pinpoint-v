@@ -7,7 +7,10 @@
 
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
-import { TouchPanValue } from "quasar";
+import { TouchPanValue, useQuasar } from "quasar";
+import { SplashCard } from "@/features/splash";
+
+const $q = useQuasar();
 
 // Layout state.
 const leftDrawerOpen = ref(false);
@@ -15,7 +18,7 @@ const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
-const appVersion = import.meta.env.APP_VERSION;
+const showSplash = ref(true);
 
 /**
  * Toggle left drawer open state.
@@ -36,7 +39,14 @@ function toggleRightDrawer() {
  * @param details Touch pan directive values.
  */
 const resizeLeftDrawer: TouchPanValue = function (details) {
-  leftDrawerWidth.value += details.delta?.x ?? 0;
+  let delta = details.delta?.x ?? 0;
+
+  // Clamp end value to be within 40% of the screen.
+  if (leftDrawerWidth.value + delta >= window.innerWidth * 0.4) {
+    delta = 0;
+  }
+
+  leftDrawerWidth.value += delta;
 };
 
 /**
@@ -44,7 +54,14 @@ const resizeLeftDrawer: TouchPanValue = function (details) {
  * @param details Touch pan directive values.
  */
 const resizeRightDrawer: TouchPanValue = function (details) {
-  rightDrawerWidth.value -= details.delta?.x ?? 0;
+  let delta = details.delta?.x ?? 0;
+
+  // Clamp end value to be within 40% of the screen.
+  if (rightDrawerWidth.value - delta >= window.innerWidth * 0.4) {
+    delta = 0;
+  }
+
+  rightDrawerWidth.value -= delta;
 };
 
 /**
@@ -67,10 +84,6 @@ function fixedQPageHeight(offset: number) {
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
 
-        <q-toolbar-title shrink> Pinpoint V</q-toolbar-title>
-
-        <i class="text-weight-light q-pr-sm">{{ appVersion }}</i>
-
         <q-btn flat label="File">
           <q-menu auto-close>
             <q-list>
@@ -86,6 +99,18 @@ function fixedQPageHeight(offset: number) {
             <q-list>
               <q-item clickable>
                 <q-item-section>Preferences</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+
+        <q-btn flat label="View">
+          <q-menu auto-close>
+            <q-list>
+              <q-item clickable>
+                <q-item-section @click="$q.dark.toggle"
+                  >Toggle Dark Mode
+                </q-item-section>
               </q-item>
             </q-list>
           </q-menu>
@@ -141,6 +166,10 @@ function fixedQPageHeight(offset: number) {
       </q-page>
     </q-page-container>
   </q-layout>
+
+  <q-dialog v-model="showSplash">
+    <SplashCard />
+  </q-dialog>
 </template>
 
 <style lang="sass" scoped>
@@ -149,7 +178,7 @@ function fixedQPageHeight(offset: number) {
   top: 0
   bottom: 0
   width: 3px
-  background-color: lightgray
+  background-color: $grey-5
   cursor: ew-resize
 
   &:after
@@ -163,9 +192,12 @@ function fixedQPageHeight(offset: number) {
     background-color: inherit
     border-radius: 4px
 
+body.body--dark .q-drawer__resizer
+  background-color: $grey-8
+
 .q-drawer__resizer--left
-  right: -1px
+  right: -1.5px
 
 .q-drawer__resizer--right
-  left: -1px
+  left: -1.5px
 </style>

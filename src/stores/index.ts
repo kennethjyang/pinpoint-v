@@ -1,5 +1,10 @@
+/**
+ * @file Pinia setup.
+ */
+
 import { defineStore } from "#q-app";
 import { createPinia } from "pinia";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 
 /*
  * When adding new properties to stores, you should also
@@ -26,7 +31,7 @@ export default defineStore((/* { ssrContext } */) => {
   const pinia = createPinia();
 
   // You can add Pinia plugins here
-  // pinia.use(SomePiniaPlugin)
+  pinia.use(piniaPluginPersistedstate);
 
   return pinia;
 });

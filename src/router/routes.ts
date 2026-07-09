@@ -1,3 +1,7 @@
+/**
+ * @file Route definitions.
+ */
+
 import type { RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
