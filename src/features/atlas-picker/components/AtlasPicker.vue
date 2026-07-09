@@ -60,48 +60,44 @@ const atlases = ref<string[]>([]);
 
 // Getters.
 
-const unwrappedFavorites = computed(
-  () => favoriteAtlasesStore.favorites[connectedSource.value] ?? []
-);
-
-const nonFavoriteAtlases = computed(() => {
-  // Filter out favorites.
-  if (unwrappedFavorites.value) {
-    return atlases.value.filter(
-      atlas => unwrappedFavorites.value.indexOf(atlas) === -1
-    );
-  }
-
-  // Return whole list if no favorites.
-  return atlases.value;
-});
+/**
+ * Null unwrapped search query.
+ */
 const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
 
-const fuseFavorites = useFuse(unwrappedSearchQuery, unwrappedFavorites);
-
-const fuseAtlases = useFuse(unwrappedSearchQuery, nonFavoriteAtlases);
+/**
+ * Favorites for this source as a set for fast lookup.
+ */
+const favoritesSet = computed(
+  () => new Set(favoriteAtlasesStore.favorites[connectedSource.value])
+);
 
 /**
- * Favorite atlases from this source. Sorted.
+ * Fuzzy finding results.
  */
-const computedFavorites = computed(() => {
-  // Extract favorites list for this source.
-  const favoritesList = favoriteAtlasesStore.favorites[connectedSource.value];
-  if (!favoritesList) return [];
+const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases);
 
-  // Return fuzzy search or sorted search depending on if a query is made.
-  return searchQuery.value
-    ? fuseFavorites.results.value.map(result => result.item)
-    : [...favoritesList].sort((a, b) => a.localeCompare(b));
-});
+/**
+ * Switch between showing all atlases sorted or fuzzy finding results.
+ */
+const filteredAtlases = computed(() =>
+  searchQuery.value
+    ? atlasFuse.value.map(result => result.item)
+    : [...atlases.value].sort((a, b) => a.localeCompare(b))
+);
+
+/**
+ * Favorites from this source.
+ */
+const filteredAtlasesFavorites = computed(() =>
+  filteredAtlases.value.filter(atlasName => favoritesSet.value.has(atlasName))
+);
 
 /**
  * Non-favorite atlases from this source.
  */
-const computedAtlases = computed(() =>
-  searchQuery.value
-    ? fuseAtlases.results.value.map(result => result.item)
-    : [...nonFavoriteAtlases.value].sort((a, b) => a.localeCompare(b))
+const filteredAtlasesAtlases = computed(() =>
+  filteredAtlases.value.filter(atlasName => !favoritesSet.value.has(atlasName))
 );
 
 /**
@@ -151,7 +147,7 @@ async function connect() {
 
 <template>
   <q-form class="q-gutter-y-sm">
-    <p class="text-h6">Atlas Source</p>
+    <p class="text-h6">Atlas</p>
 
     <div class="row q-gutter-x-md">
       <q-btn
@@ -185,54 +181,49 @@ async function connect() {
           <q-icon name="search" />
         </template>
       </q-input>
-      <p>{{ computedAtlases.length + computedFavorites.length }} atlases</p>
+      <p>{{ filteredAtlases.length }} atlases</p>
 
-      <q-list class="atlas-list">
-        <template v-if="computedFavorites.length > 0">
-          <q-item
-            v-for="atlasName in computedFavorites"
-            :active="atlasName === selectedAtlas"
-            v-ripple
-            clickable
-            @click="selectedAtlas = atlasName"
-          >
-            <q-item-section>{{ atlasName }}</q-item-section>
-            <q-item-section side>
-              <q-btn
-                flat
-                round
-                color="pink"
-                icon="favorite"
-                @click.stop="
-                  favoriteAtlasesStore.remove(connectedSource, atlasName)
-                "
-              />
-            </q-item-section>
-          </q-item>
-          <q-separator />
-        </template>
+      <q-list class="atlas-list" separator>
+        <q-item
+          v-for="atlasName in filteredAtlasesFavorites"
+          :key="`${connectedSource}-${atlasName}`"
+          :active="atlasName === selectedAtlas"
+          v-ripple
+          clickable
+          @click="selectedAtlas = atlasName"
+        >
+          <q-item-section>{{ atlasName }}</q-item-section>
+          <q-item-section side>
+            <q-btn
+              flat
+              round
+              color="pink"
+              icon="favorite"
+              @click.stop="
+                favoriteAtlasesStore.remove(connectedSource, atlasName)
+              "
+            />
+          </q-item-section>
+        </q-item>
 
-        <template v-if="computedAtlases.length > 0">
-          <q-item
-            v-for="atlasName in computedAtlases"
-            :active="atlasName === selectedAtlas"
-            v-ripple
-            clickable
-            @click="selectedAtlas = atlasName"
-          >
-            <q-item-section>{{ atlasName }}</q-item-section>
-            <q-item-section side>
-              <q-btn
-                flat
-                round
-                icon="favorite_border"
-                @click.stop="
-                  favoriteAtlasesStore.add(connectedSource, atlasName)
-                "
-              />
-            </q-item-section>
-          </q-item>
-        </template>
+        <q-item
+          v-for="atlasName in filteredAtlasesAtlases"
+          :key="`${connectedSource}-${atlasName}`"
+          :active="atlasName === selectedAtlas"
+          v-ripple
+          clickable
+          @click="selectedAtlas = atlasName"
+        >
+          <q-item-section>{{ atlasName }}</q-item-section>
+          <q-item-section side>
+            <q-btn
+              flat
+              round
+              icon="favorite_border"
+              @click.stop="favoriteAtlasesStore.add(connectedSource, atlasName)"
+            />
+          </q-item-section>
+        </q-item>
       </q-list>
     </template>
   </q-form>
