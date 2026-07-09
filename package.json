@@ -26,7 +26,10 @@
   "dependencies": {
     "@babylonjs/core": "^9.15.0",
     "@quasar/extras": "^2.0.0",
+    "@vueuse/core": "^14.3.0",
+    "@vueuse/integrations": "^14.3.0",
     "axios": "^1.18.1",
+    "fuse.js": "^7.4.2",
     "pinia": "^3.0.1",
     "pinia-plugin-persistedstate": "^4.7.1",
     "quasar": "^2.21.0",

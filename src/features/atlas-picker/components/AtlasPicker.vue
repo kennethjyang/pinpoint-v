@@ -9,6 +9,7 @@ import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { api } from "@/boot/axios.boot";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
+import { useFuse } from "@vueuse/integrations/useFuse";
 
 /**
  * Atlas item in response structure.
@@ -47,7 +48,7 @@ const connectedSource = ref<string>("");
 /**
  * Filter string.
  */
-const filter = ref<string | null>(null);
+const searchQuery = ref<string | null>(null);
 
 /**
  * Actively selected atlas.
@@ -61,22 +62,45 @@ const atlases = ref<string[]>([]);
 
 // Getters.
 
+const nonFavoriteAtlases = computed(() => {
+  // Filter out favorites.
+  const favorites = favoriteAtlasesStore.favorites[connectedSource.value];
+  if (favorites) {
+    return atlases.value.filter(atlas => favorites.indexOf(atlas) === -1);
+  }
+
+  // Return whole list if no favorites.
+  return atlases.value;
+});
+
+const fuseFavorites = useFuse(
+  searchQuery.value ?? "",
+  favoriteAtlasesStore.favorites[connectedSource.value] ?? []
+);
+
+const fuseAtlases = useFuse(searchQuery.value ?? "", nonFavoriteAtlases);
+
 /**
  * Favorite atlases from this source. Sorted.
  */
-const sortedFavorites = computed(() => {
+const computedFavorites = computed(() => {
+  // Extract favorites list for this source.
   const favoritesList = favoriteAtlasesStore.favorites[connectedSource.value];
   if (!favoritesList) return [];
-  return [...favoritesList].sort((a, b) => a.localeCompare(b));
+
+  // Return fuzzy search or sorted search depending on if a query is made.
+  return searchQuery.value
+    ? fuseFavorites.results.value.map(result => result.item)
+    : [...favoritesList].sort((a, b) => a.localeCompare(b));
 });
 
 /**
  * Non-favorite atlases from this source.
  */
-const sortedAtlases = computed(() =>
-  atlases.value
-    .filter(atlas => sortedFavorites.value.indexOf(atlas) === -1)
-    .sort((a, b) => a.localeCompare(b))
+const computedAtlases = computed(() =>
+  searchQuery.value
+    ? fuseAtlases.results.value.map(result => result.item)
+    : [...nonFavoriteAtlases.value].sort((a, b) => a.localeCompare(b))
 );
 
 /**
@@ -155,17 +179,17 @@ async function connect() {
     />
 
     <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
-      <q-input v-model="filter" clearable label="Search">
+      <q-input v-model="searchQuery" clearable label="Search">
         <template v-slot:prepend>
           <q-icon name="search" />
         </template>
       </q-input>
-      <p>{{ sortedAtlases.length + sortedFavorites.length }} atlases</p>
+      <p>{{ computedAtlases.length + computedFavorites.length }} atlases</p>
 
       <q-list class="atlas-list">
-        <template v-if="sortedFavorites.length > 0">
+        <template v-if="computedFavorites.length > 0">
           <q-item
-            v-for="atlasName in sortedFavorites"
+            v-for="atlasName in computedFavorites"
             :active="atlasName === selectedAtlas"
             v-ripple
             clickable
@@ -187,9 +211,9 @@ async function connect() {
           <q-separator />
         </template>
 
-        <template v-if="sortedAtlases.length > 0">
+        <template v-if="computedAtlases.length > 0">
           <q-item
-            v-for="atlasName in sortedAtlases"
+            v-for="atlasName in computedAtlases"
             :active="atlasName === selectedAtlas"
             v-ripple
             clickable
