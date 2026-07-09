@@ -7,6 +7,7 @@ import { ref } from "vue";
 import { AtlasPicker } from "@/features/atlas-picker";
 
 const name = ref<string | null>(null);
+const atlas = ref<string | null>(null);
 </script>
 
 <template>
@@ -16,7 +17,7 @@ const name = ref<string | null>(null);
 
       <q-input v-model="name" clearable label="Experiment name" />
 
-      <AtlasPicker />
+      <AtlasPicker v-model="atlas" />
     </q-card-section>
     <q-card-actions align="right">
       <q-btn color="positive" icon="add" label="Create" />

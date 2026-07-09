@@ -26,6 +26,9 @@ interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
+// Props.
+const selectedAtlas = defineModel<string | null>({ required: true });
+
 // Composables.
 
 const $q = useQuasar();
@@ -49,11 +52,6 @@ const connectedSource = ref<string>("");
  * Filter string.
  */
 const searchQuery = ref<string | null>(null);
-
-/**
- * Actively selected atlas.
- */
-const selectedAtlas = ref<string | null>(null);
 
 /**
  * Full list of atlases from the last connection.
