@@ -21,7 +21,10 @@ export const useFavoriteAtlasesStore = defineStore(
      * @param atlasName Atlas name to add.
      */
     function add(source: string, atlasName: string) {
-      (favorites.value[source] ??= []).push(atlasName);
+      const list = (favorites.value[source] ??= []);
+      if (!list.includes(atlasName)) {
+        list.push(atlasName);
+      }
     }
 
     /**
@@ -37,12 +40,8 @@ export const useFavoriteAtlasesStore = defineStore(
       const sourceList = favorites.value[source];
       if (!sourceList) return;
 
-      // Find the atlas.
-      const atlasIndex = sourceList.indexOf(atlasName);
-      if (atlasIndex < 0) return;
-
-      // Remove.
-      sourceList.splice(atlasIndex, 1);
+      // Remove (all occurrences).
+      favorites.value[source] = sourceList.filter(atlas => atlas !== atlasName);
     }
 
     /**
