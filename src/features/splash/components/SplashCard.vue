@@ -8,7 +8,7 @@
 import { ref } from "vue";
 import { NewExperimentCard } from "@/features/new-experiment";
 
-const showNewExperiment = ref(true);
+const showNewExperiment = ref(false);
 const appVersion = import.meta.env.APP_VERSION;
 </script>
 
