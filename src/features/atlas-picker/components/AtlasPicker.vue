@@ -62,23 +62,26 @@ const atlases = ref<string[]>([]);
 
 // Getters.
 
+const unwrappedFavorites = computed(
+  () => favoriteAtlasesStore.favorites[connectedSource.value] ?? []
+);
+
 const nonFavoriteAtlases = computed(() => {
   // Filter out favorites.
-  const favorites = favoriteAtlasesStore.favorites[connectedSource.value];
-  if (favorites) {
-    return atlases.value.filter(atlas => favorites.indexOf(atlas) === -1);
+  if (unwrappedFavorites.value) {
+    return atlases.value.filter(
+      atlas => unwrappedFavorites.value.indexOf(atlas) === -1
+    );
   }
 
   // Return whole list if no favorites.
   return atlases.value;
 });
+const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
 
-const fuseFavorites = useFuse(
-  searchQuery.value ?? "",
-  favoriteAtlasesStore.favorites[connectedSource.value] ?? []
-);
+const fuseFavorites = useFuse(unwrappedSearchQuery, unwrappedFavorites);
 
-const fuseAtlases = useFuse(searchQuery.value ?? "", nonFavoriteAtlases);
+const fuseAtlases = useFuse(unwrappedSearchQuery, nonFavoriteAtlases);
 
 /**
  * Favorite atlases from this source. Sorted.
