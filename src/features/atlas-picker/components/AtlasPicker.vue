@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import axios from "axios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
+import { Atlas } from "@/models/atlas.model";
 
 /**
  * Atlas item in response structure.
@@ -19,6 +20,12 @@ interface AtlasItem {
  */
 interface AtlasSourceResponse {
   files: AtlasItem[];
+}
+
+enum ConnectionState {
+  Disconnected,
+  Connecting,
+  Connected
 }
 
 // Props.
@@ -38,11 +45,9 @@ const favoriteAtlasesStore = useFavoriteAtlasesStore();
 const atlasSource = ref<string | null>("http://localhost:3000");
 
 /**
- * Connected source URL.
- *
- * "" = disconnected, "connecting", "<URL>" = connected.
+ * Connection to source.
  */
-const connectedSource = ref<string>("");
+const connectionState = ref<ConnectionState>(ConnectionState.Disconnected);
 
 /**
  * Filter string.
@@ -52,7 +57,7 @@ const searchQuery = ref<string | null>(null);
 /**
  * Full list of atlases from the last connection.
  */
-const atlases = ref<string[]>([]);
+const atlases = ref<Atlas[]>([]);
 
 // Getters.
 
@@ -64,14 +69,23 @@ const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
 /**
  * Favorites for this source as a set for fast lookup.
  */
-const favoritesSet = computed(
-  () => new Set(favoriteAtlasesStore.favorites[connectedSource.value])
-);
+const favoritesSet = computed(() => {
+  // Return the source if there are atlases.
+  if (atlases.value[0]) {
+    const source = atlases.value[0].source;
+    return new Set(favoriteAtlasesStore.favorites[source]);
+  }
+
+  // Otherwise, return the empty set.
+  return new Set();
+});
 
 /**
  * Fuzzy finding results.
  */
-const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases);
+const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases, {
+  fuseOptions: { keys: ["name"] }
+});
 
 /**
  * Switch between showing all atlases sorted or fuzzy finding results.
@@ -79,21 +93,21 @@ const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases);
 const filteredAtlases = computed(() =>
   searchQuery.value
     ? atlasFuse.value.map(result => result.item)
-    : [...atlases.value].sort((a, b) => a.localeCompare(b))
+    : [...atlases.value].sort((a, b) => a.name.localeCompare(b.name))
 );
 
 /**
  * Favorites from this source.
  */
 const filteredAtlasesFavorites = computed(() =>
-  filteredAtlases.value.filter(atlasName => favoritesSet.value.has(atlasName))
+  filteredAtlases.value.filter(atlas => favoritesSet.value.has(atlas.name))
 );
 
 /**
  * Non-favorite atlases from this source.
  */
 const filteredAtlasesAtlases = computed(() =>
-  filteredAtlases.value.filter(atlasName => !favoritesSet.value.has(atlasName))
+  filteredAtlases.value.filter(atlas => !favoritesSet.value.has(atlas.name))
 );
 
 /**
@@ -115,12 +129,13 @@ function notifyFail() {
 async function connect() {
   // Disconnect if no source.
   if (!atlasSource.value) {
-    connectedSource.value = "";
+    connectionState.value = ConnectionState.Disconnected;
     return;
   }
 
   // Set to connecting.
-  connectedSource.value = "connecting";
+  connectionState.value = ConnectionState.Connecting;
+  const source = atlasSource.value;
 
   try {
     // Make a connection.
@@ -130,8 +145,8 @@ async function connect() {
     if (response.data) {
       atlases.value = response.data.files
         .filter(item => item.type === "folder")
-        .map(item => item.name);
-      connectedSource.value = atlasSource.value;
+        .map(item => ({ name: item.name, source }));
+      connectionState.value = ConnectionState.Connected;
     } else {
       notifyFail();
     }
@@ -170,13 +185,13 @@ async function connect() {
     />
 
     <q-btn
-      :loading="connectedSource === 'connecting'"
+      :loading="connectionState === ConnectionState.Connecting"
       color="primary"
       :label="$t('atlasPicker.connect')"
       @click="connect"
     />
 
-    <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
+    <template v-if="connectionState === ConnectionState.Connected">
       <q-input
         v-model="searchQuery"
         clearable
@@ -196,42 +211,40 @@ async function connect() {
 
       <q-list class="atlas-list" separator>
         <q-item
-          v-for="atlasName in filteredAtlasesFavorites"
-          :key="`${connectedSource}-${atlasName}`"
-          :active="atlasName === selectedAtlas"
+          v-for="{ name, source } in filteredAtlasesFavorites"
+          :key="`${source}-${name}`"
+          :active="name === selectedAtlas"
           v-ripple
           clickable
-          @click="selectedAtlas = atlasName"
+          @click="selectedAtlas = name"
         >
-          <q-item-section>{{ atlasName }}</q-item-section>
+          <q-item-section>{{ name }}</q-item-section>
           <q-item-section side>
             <q-btn
               flat
               round
               color="pink"
               icon="favorite"
-              @click.stop="
-                favoriteAtlasesStore.remove(connectedSource, atlasName)
-              "
+              @click.stop="favoriteAtlasesStore.remove(source, name)"
             />
           </q-item-section>
         </q-item>
 
         <q-item
-          v-for="atlasName in filteredAtlasesAtlases"
-          :key="`${connectedSource}-${atlasName}`"
-          :active="atlasName === selectedAtlas"
+          v-for="{ name, source } in filteredAtlasesAtlases"
+          :key="`${source}-${name}`"
+          :active="name === selectedAtlas"
           v-ripple
           clickable
-          @click="selectedAtlas = atlasName"
+          @click="selectedAtlas = name"
         >
-          <q-item-section>{{ atlasName }}</q-item-section>
+          <q-item-section>{{ name }}</q-item-section>
           <q-item-section side>
             <q-btn
               flat
               round
               icon="favorite_border"
-              @click.stop="favoriteAtlasesStore.add(connectedSource, atlasName)"
+              @click.stop="favoriteAtlasesStore.add(source, name)"
             />
           </q-item-section>
         </q-item>
