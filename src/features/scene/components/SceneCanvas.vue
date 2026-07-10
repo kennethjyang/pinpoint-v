@@ -9,14 +9,14 @@ import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntime();
 
-onMounted(() => {
+onMounted(async () => {
   // Exit if no canvas.
   if (!canvas.value) {
     throw new Error("Scene canvas not found in DOM!");
   }
 
   // Initialize Babylon runtime.
-  runtime.init(canvas.value);
+  await runtime.init(canvas.value);
 });
 
 onUnmounted(() => {

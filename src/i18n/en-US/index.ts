@@ -2,10 +2,45 @@
  * @file US English internationalization configuration.
  */
 
-// This is just an example,
-// so you can safely delete all default props below
-
 export default {
-  failed: "Action failed",
-  success: "Action was successful"
+  atlasPicker: {
+    title: "Atlas",
+    pinpointAtlases: "Pinpoint Atlases",
+    locallyHosted: "Locally Hosted",
+    sourceUrl: "Source URL",
+    connect: "Connect",
+    search: "Search",
+    atlasCount: "no atlases | one atlas | {count} atlases",
+    connectFailed: "Unable to access atlases from source.",
+    connectFailedCaption: "Check source URL and try again."
+  },
+  newExperiment: {
+    title: "New Experiment",
+    experimentName: "Experiment name",
+    create: "Create"
+  },
+  splash: {
+    new: "New",
+    resume: "Resume",
+    open: "Open",
+    userGuide: "User Guide",
+    vblWebsite: "VBL Website",
+    recentExperiment: "Some Recent Experiment {n}"
+  },
+  layout: {
+    file: "File",
+    save: "Save",
+    edit: "Edit",
+    preferences: "Preferences",
+    view: "View",
+    toggleDarkMode: "Toggle Dark Mode",
+    scene: "Scene",
+    channelMaps: "Channel Maps",
+    atlas: "Atlas"
+  },
+  errorNotFound: {
+    code: "404",
+    message: "Oops. Nothing here...",
+    goHome: "Go Home"
+  }
 };

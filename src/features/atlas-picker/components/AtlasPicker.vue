@@ -7,7 +7,8 @@
 
 import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
-import { api } from "@/boot/axios.boot";
+import { useI18n } from "vue-i18n";
+import { useAxios } from "@/composable/useAxios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 
@@ -32,6 +33,8 @@ const selectedAtlas = defineModel<string | null>({ required: true });
 // Composables.
 
 const $q = useQuasar();
+const { t } = useI18n();
+const axios = useAxios();
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // State.
@@ -101,6 +104,19 @@ const filteredAtlasesAtlases = computed(() =>
 );
 
 /**
+ * Notify if a connection fails and set the connection status to disconnected.
+ */
+function notifyFail() {
+  $q.notify({
+    message: t("atlasPicker.connectFailed"),
+    caption: t("atlasPicker.connectFailedCaption"),
+    color: "negative",
+    icon: "mobiledata_off"
+  });
+  connectedSource.value = "";
+}
+
+/**
  * Make a connection to the atlas source and populate the atlas list.
  */
 async function connect() {
@@ -115,7 +131,7 @@ async function connect() {
 
   try {
     // Make a connection.
-    const response = await api.get<AtlasSourceResponse>(atlasSource.value);
+    const response = await axios.get<AtlasSourceResponse>(atlasSource.value);
 
     // Parse the response.
     if (response.data) {
@@ -129,31 +145,18 @@ async function connect() {
   } catch (e) {
     notifyFail();
   }
-
-  /**
-   * Notify if a connection fails and set the connection status to disconnected.
-   */
-  function notifyFail() {
-    $q.notify({
-      message: "Unable to access atlases from source.",
-      caption: "Check source URL and try again.",
-      color: "negative",
-      icon: "mobiledata_off"
-    });
-    connectedSource.value = "";
-  }
 }
 </script>
 
 <template>
   <q-form class="q-gutter-y-sm">
-    <p class="text-h6">Atlas</p>
+    <p class="text-h6">{{ $t("atlasPicker.title") }}</p>
 
     <div class="row q-gutter-x-md">
       <q-btn
         color="primary"
         icon="public"
-        label="Pinpoint Atlases"
+        :label="$t('atlasPicker.pinpointAtlases')"
         @click="
           atlasSource =
             'https://virtualbrainlab.alleninstitute.org/pinpoint/atlases'
@@ -161,27 +164,32 @@ async function connect() {
       />
       <q-btn
         icon="home"
-        label="Locally Hosted"
+        :label="$t('atlasPicker.locallyHosted')"
         @click="atlasSource = 'http://localhost:3000'"
       />
     </div>
 
-    <q-input v-model="atlasSource" class="col" clearable label="Source URL" />
+    <q-input
+      v-model="atlasSource"
+      class="col"
+      clearable
+      :label="$t('atlasPicker.sourceUrl')"
+    />
 
     <q-btn
       :loading="connectedSource === 'connecting'"
       color="primary"
-      label="Connect"
+      :label="$t('atlasPicker.connect')"
       @click="connect"
     />
 
     <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
-      <q-input v-model="searchQuery" clearable label="Search">
-        <template v-slot:prepend>
+      <q-input v-model="searchQuery" clearable :label="$t('atlasPicker.search')">
+        <template #prepend>
           <q-icon name="search" />
         </template>
       </q-input>
-      <p>{{ filteredAtlases.length }} atlases</p>
+      <p>{{ $t("atlasPicker.atlasCount", { count: filteredAtlases.length }, filteredAtlases.length) }}</p>
 
       <q-list class="atlas-list" separator>
         <q-item

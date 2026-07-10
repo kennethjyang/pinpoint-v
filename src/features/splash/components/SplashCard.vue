@@ -24,7 +24,7 @@ const appVersion = import.meta.env.APP_VERSION;
         <div class="row q-gutter-x-md justify-center">
           <q-btn
             icon="add"
-            label="New"
+            :label="$t('splash.new')"
             size="xl"
             @click="showNewExperiment = true"
           />
@@ -32,14 +32,14 @@ const appVersion = import.meta.env.APP_VERSION;
             v-close-popup
             color="primary"
             icon="play_arrow"
-            label="Resume"
+            :label="$t('splash.resume')"
             size="xl"
           />
-          <q-btn icon="file_open" label="Open" size="xl" />
+          <q-btn icon="file_open" :label="$t('splash.open')" size="xl" />
         </div>
         <div class="row q-gutter-x-md justify-center">
-          <q-btn icon="menu_book" label="User Guide" />
-          <q-btn icon="web" label="VBL Website" />
+          <q-btn icon="menu_book" :label="$t('splash.userGuide')" />
+          <q-btn icon="web" :label="$t('splash.vblWebsite')" />
         </div>
       </div>
     </q-card-section>
@@ -47,8 +47,8 @@ const appVersion = import.meta.env.APP_VERSION;
     <q-card-section>
       <q-scroll-area class="recents-list">
         <q-list separator>
-          <q-item v-for="n in 20" v-ripple clickable>
-            <q-item-section>Some Recent Experiment {{ n }}</q-item-section>
+          <q-item v-for="n in 20" :key="n" v-ripple clickable>
+            <q-item-section>{{ $t("splash.recentExperiment", { n }) }}</q-item-section>
           </q-item>
         </q-list>
       </q-scroll-area>
