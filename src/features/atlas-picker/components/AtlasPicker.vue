@@ -1,10 +1,4 @@
 <script lang="ts" setup>
-/**
- * @file Atlas picker interface.
- *
- * Handles connecting to an atlas source, picking an atlas, and managing favorites.
- */
-
 import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";

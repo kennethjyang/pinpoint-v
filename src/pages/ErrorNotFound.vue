@@ -1,8 +1,3 @@
-<script>
- /**
- * @file 404 page definition.
- */
-</script>
 <template>
   <div
     class="fullscreen bg-blue text-white text-center q-pa-md flex flex-center"

@@ -1,8 +1,4 @@
 <script lang="ts" setup>
-/**
- * @file Create Babylon scene canvas and initialize runtime.
- */
-
 import { onMounted, onUnmounted, useTemplateRef } from "vue";
 import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
 

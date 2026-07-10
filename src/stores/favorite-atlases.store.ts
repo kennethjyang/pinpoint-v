@@ -1,9 +1,3 @@
-/**
- * @file Favorite atlases tracking.
- *
- * Primarily used in the atlas picker interface.
- */
-
 import { defineStore } from "pinia";
 import { ref } from "vue";
 

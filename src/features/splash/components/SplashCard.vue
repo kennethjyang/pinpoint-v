@@ -1,10 +1,4 @@
 <script lang="ts" setup>
-/**
- * @file Splash screen interface.
- *
- * Includes launching the new experiment interface.
- */
-
 import { ref } from "vue";
 import { NewExperimentCard } from "@/features/new-experiment";
 

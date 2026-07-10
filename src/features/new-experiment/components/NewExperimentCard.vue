@@ -1,8 +1,4 @@
 <script lang="ts" setup>
-/**
- * @file Interface to create a new experiment.
- */
-
 import { ref } from "vue";
 import { AtlasPicker } from "@/features/atlas-picker";
 

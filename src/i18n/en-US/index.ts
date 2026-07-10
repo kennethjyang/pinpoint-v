@@ -1,7 +1,3 @@
-/**
- * @file US English internationalization configuration.
- */
-
 export default {
   atlasPicker: {
     title: "Atlas",

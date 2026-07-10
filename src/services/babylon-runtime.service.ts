@@ -1,7 +1,3 @@
-/**
- * @file Babylon runtime service that hosts the engine and scene.
- */
-
 import { InjectionKey, markRaw, readonly, shallowRef } from "vue";
 import {
   ArcRotateCamera,
