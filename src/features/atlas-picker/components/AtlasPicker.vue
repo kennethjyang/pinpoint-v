@@ -8,7 +8,7 @@
 import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { useAxios } from "@/composable/useAxios";
+import axios from "axios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 
@@ -34,7 +34,6 @@ const selectedAtlas = defineModel<string | null>({ required: true });
 
 const $q = useQuasar();
 const { t } = useI18n();
-const axios = useAxios();
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // State.
@@ -184,12 +183,22 @@ async function connect() {
     />
 
     <template v-if="connectedSource !== '' && connectedSource !== 'connecting'">
-      <q-input v-model="searchQuery" clearable :label="$t('atlasPicker.search')">
+      <q-input
+        v-model="searchQuery"
+        clearable
+        :label="$t('atlasPicker.search')"
+      >
         <template #prepend>
           <q-icon name="search" />
         </template>
       </q-input>
-      <p>{{ $t("atlasPicker.atlasCount", { count: filteredAtlases.length }, filteredAtlases.length) }}</p>
+      <p>{{
+        $t(
+          "atlasPicker.atlasCount",
+          { count: filteredAtlases.length },
+          filteredAtlases.length
+        )
+      }}</p>
 
       <q-list class="atlas-list" separator>
         <q-item

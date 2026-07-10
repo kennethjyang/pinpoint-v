@@ -24,11 +24,7 @@ const atlas = ref<string | null>(null);
       <AtlasPicker v-model="atlas" />
     </q-card-section>
     <q-card-actions align="right">
-      <q-btn
-        color="positive"
-        icon="add"
-        :label="$t('newExperiment.create')"
-      />
+      <q-btn color="positive" icon="add" :label="$t('newExperiment.create')" />
     </q-card-actions>
   </q-card>
 </template>

@@ -48,7 +48,9 @@ const appVersion = import.meta.env.APP_VERSION;
       <q-scroll-area class="recents-list">
         <q-list separator>
           <q-item v-for="n in 20" :key="n" v-ripple clickable>
-            <q-item-section>{{ $t("splash.recentExperiment", { n }) }}</q-item-section>
+            <q-item-section>{{
+              $t("splash.recentExperiment", { n })
+            }}</q-item-section>
           </q-item>
         </q-list>
       </q-scroll-area>
