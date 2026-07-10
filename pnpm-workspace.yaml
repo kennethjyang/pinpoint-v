@@ -10,3 +10,5 @@ allowBuilds:
   lightningcss: true
   rolldown: true
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - "@babylonjs/core@9.16.0"
