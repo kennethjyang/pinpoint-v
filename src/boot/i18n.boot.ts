@@ -1,7 +1,3 @@
-/**
- * @file Setup for internationalization.
- */
-
 import { defineBoot } from "#q-app";
 import { createI18n } from "vue-i18n";
 

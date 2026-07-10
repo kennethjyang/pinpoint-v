@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * @file Build the base layout of the app.
- *
- * Handles sidebar functionality locally.
- */
-
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
@@ -84,32 +78,32 @@ function fixedQPageHeight(offset: number) {
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
 
-        <q-btn flat label="File">
+        <q-btn flat :label="$t('layout.file')">
           <q-menu auto-close>
             <q-list>
               <q-item clickable>
-                <q-item-section>Save</q-item-section>
+                <q-item-section>{{ $t("layout.save") }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
         </q-btn>
 
-        <q-btn flat label="Edit">
+        <q-btn flat :label="$t('layout.edit')">
           <q-menu auto-close>
             <q-list>
               <q-item clickable>
-                <q-item-section>Preferences</q-item-section>
+                <q-item-section>{{ $t("layout.preferences") }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
         </q-btn>
 
-        <q-btn flat label="View">
+        <q-btn flat :label="$t('layout.view')">
           <q-menu auto-close>
             <q-list>
               <q-item clickable>
                 <q-item-section @click="$q.dark.toggle"
-                  >Toggle Dark Mode
+                  >{{ $t("layout.toggleDarkMode") }}
                 </q-item-section>
               </q-item>
             </q-list>
@@ -130,15 +124,17 @@ function fixedQPageHeight(offset: number) {
       side="left"
     >
       <q-tabs v-model="tab">
-        <q-tab name="scene" label="Scene" />
-        <q-tab name="channel-maps" label="Channel Maps" />
-        <q-tab name="atlas" label="Atlas" />
+        <q-tab name="scene" :label="$t('layout.scene')" />
+        <q-tab name="channel-maps" :label="$t('layout.channelMaps')" />
+        <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
       <q-tab-panels v-model="tab" animated>
-        <q-tab-panel name="scene"> Scene </q-tab-panel>
-        <q-tab-panel name="channel-maps"> Channel maps </q-tab-panel>
-        <q-tab-panel name="atlas"> Atlas </q-tab-panel>
+        <q-tab-panel name="scene">{{ $t("layout.scene") }}</q-tab-panel>
+        <q-tab-panel name="channel-maps">{{
+          $t("layout.channelMaps")
+        }}</q-tab-panel>
+        <q-tab-panel name="atlas">{{ $t("layout.atlas") }}</q-tab-panel>
       </q-tab-panels>
       <div
         v-touch-pan.horizontal.prevent.mouse="resizeLeftDrawer"

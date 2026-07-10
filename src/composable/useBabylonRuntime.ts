@@ -1,7 +1,3 @@
-/**
- * @file Composable to inject Babylon runtime service.
- */
-
 import { inject } from "vue";
 import { BabylonRuntimeKey } from "@/services/babylon-runtime.service";
 
