@@ -1,6 +1,15 @@
 import { Atlas } from "@/models/atlas.model";
-import { Scene } from "@babylonjs/core";
+import { AppendSceneAsync, Scene } from "@babylonjs/core";
 import axios from "axios";
+
+interface AtlasStructure {
+  children_ids: number[];
+}
+
+interface AtlasMetadataResponse {
+  root_id: number;
+  structures: AtlasStructure[];
+}
 
 /**
  * Add the default structures into the scene.
@@ -11,13 +20,24 @@ import axios from "axios";
  * @param scene Babylon scene to put structures into.
  */
 export async function loadDefaultStructures(atlas: Atlas, scene: Scene) {
-  // 1. Read the atlas metadata file.
-  const atlasMetadataResponse = await axios.get(
-    new URL(`${atlas.name}/atlas.json`, atlas.source).toString()
-  );
-  console.log(atlasMetadataResponse.data);
-  console.log(scene);
-  // 2. Extract the root structure.
-  // 3. Locate the files for the children of the root.
-  // 4. Load them into the scene
+  try {
+    // 1. Fetch the atlas metadata file.
+    const atlasMetadataResponse = await axios.get<AtlasMetadataResponse>(
+      new URL(`${atlas.name}/atlas.json`, atlas.source).toString()
+    );
+
+    // 2. Read the structures.
+    const { root_id, structures } = atlasMetadataResponse.data;
+    console.log(structures[root_id]!.children_ids);
+
+    // 3. Load them into the scene
+    for (const childId of structures[root_id]!.children_ids) {
+      await AppendSceneAsync(
+        new URL(`${atlas.name}/meshes/${childId}.glb`, atlas.source).toString(),
+        scene
+      );
+    }
+  } catch (e) {
+    console.error(e);
+  }
 }
