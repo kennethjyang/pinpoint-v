@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { onMounted, onUnmounted, useTemplateRef, watchEffect } from "vue";
+import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
-import { loadDefaultStructures } from "@/features/scene";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { loadDefaultStructures } from "@/features/scene";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntime();
@@ -18,13 +18,17 @@ onMounted(async () => {
   await runtime.init(canvas.value);
 
   // Load current experiment.
-  watchEffect(async () => {
-    if (!runtime.scene.value) return;
-    await loadDefaultStructures(
-      currentExperimentStore.atlas,
-      runtime.scene.value
-    );
-  });
+  watch(
+    runtime.scene,
+    async () => {
+      if (!runtime.scene.value) return;
+      await loadDefaultStructures(
+        currentExperimentStore.atlas,
+        runtime.scene.value
+      );
+    },
+    { immediate: true }
+  );
 });
 
 onUnmounted(() => {
