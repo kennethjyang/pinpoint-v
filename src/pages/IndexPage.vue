@@ -3,8 +3,10 @@ import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
 import { SplashCard } from "@/features/splash";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const $q = useQuasar();
+const currentExperimentStore = useCurrentExperimentStore();
 
 // Layout state.
 const leftDrawerOpen = ref(false);
@@ -77,6 +79,10 @@ function fixedQPageHeight(offset: number) {
     <q-header elevated class="bg-primary text-white">
       <q-toolbar>
         <q-btn dense flat round icon="menu" @click="toggleLeftDrawer" />
+
+        <q-toolbar-title shrink>{{
+          currentExperimentStore.name
+        }}</q-toolbar-title>
 
         <q-btn flat :label="$t('layout.file')">
           <q-menu auto-close>

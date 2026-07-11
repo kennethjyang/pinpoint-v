@@ -9,7 +9,10 @@ export const useCurrentExperimentStore = defineStore(
     /**
      * Current experiment instance.
      */
-    const experiment = ref<Experiment | null>(null);
+    const experiment = ref<Experiment>({
+      name: "My First Experiment",
+      atlas: { source: "http://localhost:8080", name: "allen_mouse" }
+    });
 
     /**
      * Create a new experiment with the given name and atlas.
@@ -18,6 +21,16 @@ export const useCurrentExperimentStore = defineStore(
      */
     function create(name: string, atlas: Atlas) {
       experiment.value = { name, atlas };
+    }
+
+    /**
+     * Set the name of the experiment.
+     * @param name Experiment name.
+     */
+    function setName(name: string) {
+      if (!experiment.value) return;
+
+      experiment.value.name = name;
     }
 
     /**
@@ -30,6 +43,7 @@ export const useCurrentExperimentStore = defineStore(
      */
     const atlas = computed(() => experiment.value?.atlas ?? null);
 
-    return { experiment, create, name, atlas };
-  }
+    return { experiment, create, setName, name, atlas };
+  },
+  { persist: true }
 );
