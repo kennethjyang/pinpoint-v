@@ -211,40 +211,40 @@ async function connect() {
 
       <q-list class="atlas-list" separator>
         <q-item
-          v-for="{ name, source } in filteredAtlasesFavorites"
-          :key="`${source}-${name}`"
-          :active="name === selectedAtlas?.name"
+          v-for="atlas in filteredAtlasesFavorites"
+          :key="`${atlas.source}-${atlas.name}`"
+          :active="selectedAtlas === atlas"
           v-ripple
           clickable
-          @click="selectedAtlas = { name, source }"
+          @click="selectedAtlas = atlas"
         >
-          <q-item-section>{{ name }}</q-item-section>
+          <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
             <q-btn
               flat
               round
               color="pink"
               icon="favorite"
-              @click.stop="favoriteAtlasesStore.remove(source, name)"
+              @click.stop="favoriteAtlasesStore.remove(atlas)"
             />
           </q-item-section>
         </q-item>
 
         <q-item
-          v-for="{ name, source } in filteredAtlasesAtlases"
-          :key="`${source}-${name}`"
-          :active="name === selectedAtlas?.name"
+          v-for="atlas in filteredAtlasesAtlases"
+          :key="`${atlas.source}-${atlas.name}`"
+          :active="selectedAtlas === atlas"
           v-ripple
           clickable
-          @click="selectedAtlas = { name, source }"
+          @click="selectedAtlas = atlas"
         >
-          <q-item-section>{{ name }}</q-item-section>
+          <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
             <q-btn
               flat
               round
               icon="favorite_border"
-              @click.stop="favoriteAtlasesStore.add(source, name)"
+              @click.stop="favoriteAtlasesStore.add(atlas)"
             />
           </q-item-section>
         </q-item>
