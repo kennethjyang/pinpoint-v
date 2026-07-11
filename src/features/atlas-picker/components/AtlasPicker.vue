@@ -29,7 +29,7 @@ enum ConnectionState {
 }
 
 // Props.
-const selectedAtlas = defineModel<string | null>({ required: true });
+const selectedAtlas = defineModel<Atlas | null>({ required: true });
 
 // Composables.
 
@@ -120,7 +120,7 @@ function notifyFail() {
     color: "negative",
     icon: "mobiledata_off"
   });
-  connectedSource.value = "";
+  connectionState.value = ConnectionState.Disconnected;
 }
 
 /**
@@ -213,10 +213,10 @@ async function connect() {
         <q-item
           v-for="{ name, source } in filteredAtlasesFavorites"
           :key="`${source}-${name}`"
-          :active="name === selectedAtlas"
+          :active="name === selectedAtlas?.name"
           v-ripple
           clickable
-          @click="selectedAtlas = name"
+          @click="selectedAtlas = { name, source }"
         >
           <q-item-section>{{ name }}</q-item-section>
           <q-item-section side>
@@ -233,10 +233,10 @@ async function connect() {
         <q-item
           v-for="{ name, source } in filteredAtlasesAtlases"
           :key="`${source}-${name}`"
-          :active="name === selectedAtlas"
+          :active="name === selectedAtlas?.name"
           v-ripple
           clickable
-          @click="selectedAtlas = name"
+          @click="selectedAtlas = { name, source }"
         >
           <q-item-section>{{ name }}</q-item-section>
           <q-item-section side>
