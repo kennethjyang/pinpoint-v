@@ -10,6 +10,9 @@ export default {
     connectFailed: "Unable to access atlases from source.",
     connectFailedCaption: "Check source URL and try again."
   },
+  currentExperiment: {
+    myFirstExperiment: "My First Experiment"
+  },
   newExperiment: {
     title: "New Experiment",
     experimentName: "Experiment name",
