@@ -1,4 +1,4 @@
-import { InjectionKey, markRaw, readonly, shallowRef } from "vue";
+import { InjectionKey, markRaw, shallowReadonly, shallowRef } from "vue";
 import {
   ArcRotateCamera,
   GizmoManager,
@@ -85,8 +85,8 @@ export function createBabylonRuntime() {
   }
 
   return {
-    engine: readonly(engine),
-    scene: readonly(scene),
+    engine: shallowReadonly(engine),
+    scene: shallowReadonly(scene),
     init,
     dispose
   };
