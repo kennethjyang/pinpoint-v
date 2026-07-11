@@ -3,11 +3,11 @@ import { AppendSceneAsync, Scene } from "@babylonjs/core";
 import axios from "axios";
 
 interface AtlasStructure {
-  children_ids: number[];
+  childrenIds: number[];
 }
 
 interface AtlasMetadataResponse {
-  root_id: number;
+  rootId: number;
   structures: AtlasStructure[];
 }
 
@@ -27,10 +27,10 @@ export async function loadDefaultStructures(atlas: Atlas, scene: Scene) {
     );
 
     // Read the structures.
-    const { root_id, structures } = atlasMetadataResponse.data;
+    const { rootId, structures } = atlasMetadataResponse.data;
 
     // Load them into the scene
-    for (const childId of structures[root_id]!.children_ids) {
+    for (const childId of structures[rootId]!.childrenIds) {
       await AppendSceneAsync(
         new URL(`${atlas.name}/meshes/${childId}.glb`, atlas.source).toString(),
         scene
