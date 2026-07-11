@@ -21,16 +21,15 @@ interface AtlasMetadataResponse {
  */
 export async function loadDefaultStructures(atlas: Atlas, scene: Scene) {
   try {
-    // 1. Fetch the atlas metadata file.
+    // Fetch the atlas metadata file.
     const atlasMetadataResponse = await axios.get<AtlasMetadataResponse>(
       new URL(`${atlas.name}/atlas.json`, atlas.source).toString()
     );
 
-    // 2. Read the structures.
+    // Read the structures.
     const { root_id, structures } = atlasMetadataResponse.data;
-    console.log(structures[root_id]!.children_ids);
 
-    // 3. Load them into the scene
+    // Load them into the scene
     for (const childId of structures[root_id]!.children_ids) {
       await AppendSceneAsync(
         new URL(`${atlas.name}/meshes/${childId}.glb`, atlas.source).toString(),
