@@ -13,7 +13,8 @@ export default {
   newExperiment: {
     title: "New Experiment",
     experimentName: "Experiment name",
-    create: "Create"
+    create: "Create",
+    pickNameAndAtlas: "Pick an experiment name and atlas"
   },
   splash: {
     new: "New",
@@ -25,6 +26,7 @@ export default {
   },
   layout: {
     file: "File",
+    new: "New",
     save: "Save",
     edit: "Edit",
     preferences: "Preferences",

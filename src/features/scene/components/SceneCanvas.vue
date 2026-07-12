@@ -1,9 +1,12 @@
 <script lang="ts" setup>
-import { onMounted, onUnmounted, useTemplateRef } from "vue";
-import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
+import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
+import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
+import { setStructures } from "@/features/scene";
+import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const runtime = useBabylonRuntime();
+const runtime = useBabylonRuntimeService();
+const currentAtlas = useCurrentAtlas();
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -13,6 +16,16 @@ onMounted(async () => {
 
   // Initialize Babylon runtime.
   await runtime.init(canvas.value);
+
+  // Load current experiment.
+  watch(
+    [runtime.scene, currentAtlas.defaultStructures],
+    async ([scene, defaultStructures]) => {
+      if (!scene || !defaultStructures) return;
+      await setStructures(defaultStructures, scene);
+    },
+    { immediate: true }
+  );
 });
 
 onUnmounted(() => {

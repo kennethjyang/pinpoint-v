@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.15.0",
+    "@babylonjs/loaders": "^9.16.1",
     "@quasar/extras": "^2.0.0",
     "@vueuse/core": "^14.3.0",
     "@vueuse/integrations": "^14.3.0",
