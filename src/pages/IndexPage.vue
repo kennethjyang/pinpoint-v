@@ -5,6 +5,7 @@ import { TouchPanValue, useQuasar } from "quasar";
 import { SplashCard } from "@/features/splash";
 import { NewExperimentCard } from "@/features/new-experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { AtlasHierarchy } from "@/features/atlas-hierarchy";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -145,7 +146,9 @@ function fixedQPageHeight(offset: number) {
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")
         }}</q-tab-panel>
-        <q-tab-panel name="atlas">{{ $t("layout.atlas") }}</q-tab-panel>
+        <q-tab-panel name="atlas">
+          <AtlasHierarchy />
+        </q-tab-panel>
       </q-tab-panels>
       <div
         v-touch-pan.horizontal.prevent.mouse="resizeLeftDrawer"
