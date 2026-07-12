@@ -1,5 +1,10 @@
 import { Atlas } from "@/models/atlas.model";
-import { AppendSceneAsync, Scene } from "@babylonjs/core";
+import {
+  ImportMeshAsync,
+  Scene,
+  TransformNode,
+  Vector3
+} from "@babylonjs/core";
 import axios from "axios";
 
 interface AtlasStructure {
@@ -29,12 +34,19 @@ export async function loadDefaultStructures(atlas: Atlas, scene: Scene) {
     // Read the structures.
     const { rootId, structures } = atlasMetadataResponse.data;
 
-    // Load them into the scene
+    // Create a transform node to hold the structures, oriented to match the atlas.
+    const rootNode = new TransformNode("atlasRoot", scene);
+    rootNode.rotation = new Vector3(Math.PI, -Math.PI / 2, 0);
+
+    // Load them into the scene as children of the root node.
     for (const childId of structures[rootId]!.childrenIds) {
-      await AppendSceneAsync(
+      const { meshes } = await ImportMeshAsync(
         new URL(`${atlas.name}/meshes/${childId}.glb`, atlas.source).toString(),
         scene
       );
+
+      if (!meshes[0]) continue;
+      meshes[0].parent = rootNode;
     }
   } catch (e) {
     console.error(e);
