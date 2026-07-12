@@ -22,10 +22,7 @@ onMounted(async () => {
     runtime.scene,
     async () => {
       if (!runtime.scene.value) return;
-      await loadDefaultStructures(
-        currentExperimentStore.atlas,
-        runtime.scene.value
-      );
+      await loadDefaultStructures(runtime.scene.value);
     },
     { immediate: true }
   );
