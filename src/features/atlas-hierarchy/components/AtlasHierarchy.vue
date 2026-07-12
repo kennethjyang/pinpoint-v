@@ -1,7 +1,8 @@
 <script lang="ts" setup>
-import { ref, watch } from "vue";
+import { ref, useTemplateRef, watch, watchPostEffect } from "vue";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { AtlasStructure } from "@/models/atlas-metadata.model";
+import { QTree } from "quasar";
 
 interface TreeModel {
   label: string;
@@ -12,7 +13,9 @@ const currentAtlas = useCurrentAtlas();
 
 const filter = ref<string | null>(null);
 const hierarchy = ref<TreeModel[]>([]);
+const tree = useTemplateRef<QTree>("tree");
 
+// Update the tree data to match the current atlas.
 watch(
   currentAtlas.metadata,
   metadata => {
@@ -23,6 +26,13 @@ watch(
   },
   { immediate: true }
 );
+
+// Ensure the tree is always fully expanded.
+watchPostEffect(() => {
+  if (hierarchy.value.length > 0) {
+    tree.value?.expandAll();
+  }
+});
 
 function buildHierarchyEntry(
   structure: AtlasStructure,
@@ -50,9 +60,9 @@ function buildHierarchyEntry(
     </template>
   </q-input>
   <q-tree
+    ref="tree"
     :filter="filter ?? ''"
     :nodes="hierarchy"
-    default-expand-all
     node-key="label"
   />
 </template>
