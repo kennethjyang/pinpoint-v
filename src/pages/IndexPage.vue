@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
 import { SplashCard } from "@/features/splash";
+import { NewExperimentCard } from "@/features/new-experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const $q = useQuasar();
@@ -15,6 +16,7 @@ const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
 const showSplash = ref(true);
+const showNewExperiment = ref(false);
 
 /**
  * Toggle left drawer open state.
@@ -87,6 +89,9 @@ function fixedQPageHeight(offset: number) {
         <q-btn flat :label="$t('layout.file')">
           <q-menu auto-close>
             <q-list>
+              <q-item clickable @click="showNewExperiment = true">
+                <q-item-section>{{ $t("layout.new") }}</q-item-section>
+              </q-item>
               <q-item clickable>
                 <q-item-section>{{ $t("layout.save") }}</q-item-section>
               </q-item>
@@ -170,7 +175,16 @@ function fixedQPageHeight(offset: number) {
   </q-layout>
 
   <q-dialog v-model="showSplash">
-    <SplashCard />
+    <SplashCard
+      @new="
+        showSplash = false;
+        showNewExperiment = true;
+      "
+    />
+  </q-dialog>
+
+  <q-dialog v-model="showNewExperiment">
+    <NewExperimentCard />
   </q-dialog>
 </template>
 

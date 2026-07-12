@@ -1,8 +1,6 @@
 <script lang="ts" setup>
-import { ref } from "vue";
-import { NewExperimentCard } from "@/features/new-experiment";
+const emit = defineEmits<{ new: [] }>();
 
-const showNewExperiment = ref(false);
 const appVersion = import.meta.env.APP_VERSION;
 </script>
 
@@ -20,7 +18,7 @@ const appVersion = import.meta.env.APP_VERSION;
             icon="add"
             :label="$t('splash.new')"
             size="xl"
-            @click="showNewExperiment = true"
+            @click="emit('new')"
           />
           <q-btn
             v-close-popup
@@ -50,10 +48,6 @@ const appVersion = import.meta.env.APP_VERSION;
       </q-scroll-area>
     </q-card-section>
   </q-card>
-
-  <q-dialog v-model="showNewExperiment">
-    <NewExperimentCard />
-  </q-dialog>
 </template>
 
 <style lang="sass" scoped>

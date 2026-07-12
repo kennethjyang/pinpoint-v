@@ -43,7 +43,7 @@ function create() {
         icon="add"
         :label="$t('newExperiment.create')"
         :disable="isCreateDisabled"
-        v-close-popup="2"
+        v-close-popup
         @click="create"
       >
         <q-tooltip v-if="isCreateDisabled">

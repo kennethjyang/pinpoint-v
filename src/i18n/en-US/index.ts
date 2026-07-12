@@ -29,6 +29,7 @@ export default {
   },
   layout: {
     file: "File",
+    new: "New",
     save: "Save",
     edit: "Edit",
     preferences: "Preferences",
