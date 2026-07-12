@@ -1,12 +1,12 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { loadDefaultStructures } from "@/features/scene";
+import { loadStructures } from "@/features/scene";
+import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
-const currentExperimentStore = useCurrentExperimentStore();
+const currentAtlas = useCurrentAtlas();
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -19,10 +19,10 @@ onMounted(async () => {
 
   // Load current experiment.
   watch(
-    runtime.scene,
-    async () => {
-      if (!runtime.scene.value) return;
-      await loadDefaultStructures(runtime.scene.value);
+    [runtime.scene, currentAtlas.defaultStructuresMeshPaths],
+    async ([scene, defaultStructuresMeshPaths]) => {
+      if (!scene || !defaultStructuresMeshPaths) return;
+      await loadStructures(defaultStructuresMeshPaths, scene);
     },
     { immediate: true }
   );

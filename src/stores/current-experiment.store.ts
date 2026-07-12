@@ -2,18 +2,15 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { Experiment } from "@/models/experiment.model";
 import { Atlas } from "@/models/atlas.model";
-import { useI18n } from "vue-i18n";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
   () => {
-    const { t } = useI18n();
-
     /**
      * Current experiment instance.
      */
     const experiment = ref<Experiment>({
-      name: t("currentExperiment.myFirstExperiment"),
+      name: "My First Experiment",
       atlas: { source: "http://localhost:8080", name: "allen_mouse" }
     });
 

@@ -1,4 +1,4 @@
-import { InjectionKey, markRaw, shallowReadonly, shallowRef, watch } from "vue";
+import { InjectionKey, markRaw, shallowReadonly, shallowRef } from "vue";
 import {
   ArcRotateCamera,
   GizmoManager,
@@ -16,56 +16,6 @@ import {
 export function createBabylonRuntimeService() {
   const engine = shallowRef<WebGPUEngine | null>(null);
   const scene = shallowRef<Scene | null>(null);
-
-  /**
-   * Build a promise that return an actual instance of the engine.
-   */
-  function engineReady(): Promise<WebGPUEngine> {
-    return new Promise(resolve => {
-      // Return the existing instance.
-      if (engine.value) {
-        resolve(engine.value);
-        return;
-      }
-
-      // Wait for one to become available.
-      const stop = watch(
-        engine,
-        newEngine => {
-          if (newEngine) {
-            stop();
-            resolve(newEngine);
-          }
-        },
-        { immediate: true }
-      );
-    });
-  }
-
-  /**
-   * Build a promise that returns an actual instance of the scene.
-   */
-  function sceneReady(): Promise<Scene> {
-    return new Promise(resolve => {
-      // Return the existing instance.
-      if (scene.value) {
-        resolve(scene.value);
-        return;
-      }
-
-      // Wait for one to become available.
-      const stop = watch(
-        scene,
-        newScene => {
-          if (newScene) {
-            stop();
-            resolve(newScene);
-          }
-        },
-        { immediate: true }
-      );
-    });
-  }
 
   /**
    * Create the runtime from a canvas.
@@ -138,9 +88,7 @@ export function createBabylonRuntimeService() {
     engine: shallowReadonly(engine),
     scene: shallowReadonly(scene),
     init,
-    dispose,
-    engineReady,
-    sceneReady
+    dispose
   };
 }
 
