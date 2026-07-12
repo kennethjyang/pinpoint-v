@@ -38,11 +38,16 @@ function buildHierarchyEntry(
   structure: AtlasStructure,
   structures: AtlasStructure[]
 ): TreeModel {
+  const titleCaseName = structure.name
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+
   // Only include acronym if it's different.
   const label =
     structure.name === structure.acronym
-      ? structure.name
-      : `${structure.name} (${structure.acronym.toUpperCase()})`;
+      ? titleCaseName
+      : `${titleCaseName} (${structure.acronym.toUpperCase()})`;
 
   return {
     label,
