@@ -1,2 +1,2 @@
 export { default as SceneCanvas } from "./components/SceneCanvas.vue";
-export { loadStructures } from "./api/model-loader.api";
+export { setStructures } from "./api/model-loader.api";

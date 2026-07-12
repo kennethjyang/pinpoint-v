@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import { loadStructures } from "@/features/scene";
+import { setStructures } from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
@@ -19,10 +19,10 @@ onMounted(async () => {
 
   // Load current experiment.
   watch(
-    [runtime.scene, currentAtlas.defaultStructuresMeshPaths],
-    async ([scene, defaultStructuresMeshPaths]) => {
-      if (!scene || !defaultStructuresMeshPaths) return;
-      await loadStructures(defaultStructuresMeshPaths, scene);
+    [runtime.scene, currentAtlas.defaultStructures],
+    async ([scene, defaultStructures]) => {
+      if (!scene || !defaultStructures) return;
+      await setStructures(defaultStructures, scene);
     },
     { immediate: true }
   );
