@@ -33,9 +33,13 @@ export async function setStructures(
     if (!meshes[0]) continue;
     meshes[0].parent = rootNode;
 
+    // Apply the color and transparency.
     const material = new StandardMaterial(`${meshPath}_material`, scene);
     material.diffuseColor = color;
-    material.alpha = 0.1;
-    meshes[0].material = material;
+    material.alpha = 0.2;
+
+    for (const mesh of meshes) {
+      mesh.material = material;
+    }
   }
 }
