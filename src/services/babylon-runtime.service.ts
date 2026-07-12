@@ -13,7 +13,7 @@ import {
 /**
  * Service creator. Hosts the references to the engine and scene.
  */
-export function createBabylonRuntime() {
+export function createBabylonRuntimeService() {
   const engine = shallowRef<WebGPUEngine | null>(null);
   const scene = shallowRef<Scene | null>(null);
 
@@ -92,7 +92,9 @@ export function createBabylonRuntime() {
   };
 }
 
-export type BabylonRuntime = ReturnType<typeof createBabylonRuntime>;
+export type BabylonRuntimeService = ReturnType<
+  typeof createBabylonRuntimeService
+>;
 
-export const BabylonRuntimeKey: InjectionKey<BabylonRuntime> =
-  Symbol("BabylonRuntime");
+export const BabylonRuntimeServiceKey: InjectionKey<BabylonRuntimeService> =
+  Symbol("BabylonRuntimeService");

@@ -1,11 +1,11 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
-import { useBabylonRuntime } from "@/composable/useBabylonRuntime";
+import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { loadDefaultStructures } from "@/features/scene";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const runtime = useBabylonRuntime();
+const runtime = useBabylonRuntimeService();
 const currentExperimentStore = useCurrentExperimentStore();
 
 onMounted(async () => {
