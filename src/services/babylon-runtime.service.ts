@@ -35,7 +35,7 @@ export function createBabylonRuntime() {
 
     // Attach camera.
     const camera = new ArcRotateCamera(
-      "MainCamera",
+      "main_camera",
       -Math.PI / 2,
       Math.PI / 4,
       10,
@@ -50,16 +50,16 @@ export function createBabylonRuntime() {
     gizmoManager.rotationGizmoEnabled = true;
 
     // Add lights.
-    new HemisphericLight("MainLight", Vector3.Up(), s);
+    new HemisphericLight("main_light", Vector3.Up(), s);
 
     // Build a demo scene.
     const probeMesh = MeshBuilder.CreateBox(
-      "ProbeMesh",
+      "probe_mesh",
       { width: 0.25, depth: 0.25, height: 2 },
       s
     );
     probeMesh.setAbsolutePosition(Vector3.Up());
-    const probeMover = new TransformNode("ProbeTip", s);
+    const probeMover = new TransformNode("probeTip_node", s);
     probeMover.addChild(probeMesh);
     gizmoManager.attachToNode(probeMover);
 

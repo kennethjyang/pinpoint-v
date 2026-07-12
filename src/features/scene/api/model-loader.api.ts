@@ -35,7 +35,7 @@ export async function loadDefaultStructures(atlas: Atlas, scene: Scene) {
     const { rootId, structures } = atlasMetadataResponse.data;
 
     // Create a transform node to hold the structures, oriented to match the atlas.
-    const rootNode = new TransformNode("atlasRoot", scene);
+    const rootNode = new TransformNode("atlasRoot_node", scene);
     rootNode.rotation = new Vector3(Math.PI, -Math.PI / 2, 0);
 
     // Load them into the scene as children of the root node.
