@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import { ref, useTemplateRef, watch, watchPostEffect } from "vue";
+import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
+import { useFuse } from "@vueuse/integrations/useFuse";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { AtlasStructure } from "@/models/atlas-metadata.model";
 import { QTree } from "quasar";
@@ -42,6 +43,32 @@ watchPostEffect(() => {
   }
 });
 
+// Flatten the hierarchy into a searchable list for fuzzy matching.
+const flatNodes = computed(() => {
+  const acc: TreeModel[] = [];
+  const walk = (nodes: TreeModel[]) => {
+    for (const node of nodes) {
+      acc.push(node);
+      walk(node.children);
+    }
+  };
+  walk(hierarchy.value);
+  return acc;
+});
+
+// Fuzzy search across the acronym (label) and the full name.
+const searchQuery = computed(() => filter.value ?? "");
+const { results } = useFuse(searchQuery, flatNodes, {
+  fuseOptions: { keys: ["label", "fullName"] }
+});
+const matchedLabels = computed(
+  () => new Set(results.value.map(result => result.item.label))
+);
+
+function filterMethod(node: TreeModel) {
+  return matchedLabels.value.has(node.label);
+}
+
 function buildHierarchyEntry(
   structure: AtlasStructure,
   structures: AtlasStructure[]
@@ -74,6 +101,7 @@ function buildHierarchyEntry(
       <q-tree
         ref="tree"
         :filter="filter ?? ''"
+        :filter-method="filterMethod"
         :nodes="hierarchy"
         v-model:ticked="visible"
         dense
