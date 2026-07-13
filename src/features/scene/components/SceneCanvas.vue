@@ -38,7 +38,7 @@ onMounted(async () => {
   watch(
     [
       runtime.scene,
-      currentAtlas.defaultStructuresModels,
+      currentAtlas.defaultStructureEntities,
       () => [...currentExperiment.visibleStructures]
     ],
     async ([scene, defaultStructures]) => {
