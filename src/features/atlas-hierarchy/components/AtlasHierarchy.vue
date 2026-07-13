@@ -6,11 +6,12 @@ import { AtlasStructure } from "@/models/atlas.model";
 import { QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
-interface TreeModel {
-  label: string;
+interface HierarchyModel {
+  id: number;
+  acronym: string;
   fullName: string;
   color: string;
-  children: TreeModel[];
+  children: HierarchyModel[];
 }
 
 // Global state.
@@ -22,7 +23,7 @@ const tree = useTemplateRef<QTree>("tree");
 
 // Local state.
 const filter = ref<string | null>(null);
-const hierarchy = ref<TreeModel[]>([]);
+const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
 watch(
@@ -32,10 +33,7 @@ watch(
     if (!rootId || !structures || !structures[rootId]) return;
 
     // Build from root but exclude it.
-    hierarchy.value = buildHierarchyEntry(
-      structures[rootId],
-      structures
-    ).children;
+    hierarchy.value = buildHierarchy(rootId, structures).children;
   },
   { immediate: true }
 );
@@ -49,8 +47,8 @@ watchPostEffect(() => {
 
 // Flatten the hierarchy into a searchable list for fuzzy matching.
 const flatNodes = computed(() => {
-  const flattened: TreeModel[] = [];
-  const walk = (nodes: TreeModel[]) => {
+  const flattened: HierarchyModel[] = [];
+  const walk = (nodes: HierarchyModel[]) => {
     for (const node of nodes) {
       flattened.push(node);
       walk(node.children);
@@ -63,35 +61,52 @@ const flatNodes = computed(() => {
 // Fuzzy search across the acronym (label) and the full name.
 const searchQuery = computed(() => filter.value ?? "");
 const { results } = useFuse(searchQuery, flatNodes, {
-  fuseOptions: { keys: ["label", "fullName"] }
+  fuseOptions: { keys: ["acronym", "fullName"] }
 });
 
 // Search mode: replace tree with flat result list.
 const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
 const searchResults = computed(() => results.value.map(r => r.item));
 
-// Checkbox helpers for the flat list.
-function isVisible(label: string) {
-  return currentExperiment.visibleStructures.includes(label);
+// Tick helpers for the search list.
+
+/**
+ * Is the structure visible on the atlas in the experiment.
+ * @param id ID of the structure to check.
+ */
+function isVisible(id: number) {
+  return currentExperiment.visibleStructures.includes(id);
 }
 
-function setVisible(label: string, value: boolean) {
+/**
+ * Set the visibility of the structure in the atlas.
+ * @param id ID of the structure to set the visibility of.
+ * @param value Is the structure visible or not.
+ */
+function setVisible(id: number, value: boolean) {
   if (value) {
-    if (!currentExperiment.visibleStructures.includes(label)) {
-      currentExperiment.visibleStructures.push(label);
+    if (!currentExperiment.visibleStructures.includes(id)) {
+      currentExperiment.visibleStructures.push(id);
     }
   } else {
-    const index = currentExperiment.visibleStructures.indexOf(label);
+    const index = currentExperiment.visibleStructures.indexOf(id);
     if (index !== -1) {
       currentExperiment.visibleStructures.splice(index, 1);
     }
   }
 }
 
-function buildHierarchyEntry(
-  structure: AtlasStructure,
+/**
+ * Build a tree hierarchy from a structure metadata.
+ * @param id Index of the current structure in `structures` to recurse down.
+ * @param structures All structures in atlas metadata.
+ */
+function buildHierarchy(
+  id: number,
   structures: AtlasStructure[]
-): TreeModel {
+): HierarchyModel {
+  const structure = structures[id]!;
+
   // Convert name to title case.
   const titleCaseName = structure.name
     .split(" ")
@@ -99,11 +114,12 @@ function buildHierarchyEntry(
     .join(" ");
 
   return {
-    label: structure.acronym.toLowerCase(),
+    id,
+    acronym: structure.acronym.toUpperCase(),
     fullName: titleCaseName,
     color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
-    children: structure.childrenIds.flatMap(id =>
-      structures[id] ? buildHierarchyEntry(structures[id], structures) : []
+    children: structure.childrenIds.flatMap(childId =>
+      structures[childId] ? buildHierarchy(childId, structures) : []
     )
   };
 }
@@ -118,12 +134,12 @@ function buildHierarchyEntry(
     </q-input>
     <q-scroll-area class="col">
       <q-list v-if="isSearching" dense>
-        <q-item v-for="node in searchResults" :key="node.label">
+        <q-item v-for="node in searchResults" :key="node.id">
           <q-item-section side>
             <q-checkbox
               dense
-              :model-value="isVisible(node.label)"
-              @update:model-value="v => setVisible(node.label, v)"
+              :model-value="isVisible(node.id)"
+              @update:model-value="visible => setVisible(node.id, visible)"
             />
           </q-item-section>
           <q-item-section>
@@ -132,8 +148,8 @@ function buildHierarchyEntry(
                 :style="{ color: node.color }"
                 name="radio_button_checked"
               />
-              <b>{{ node.label.toUpperCase() }}</b>
-              <span class="ellipsis">{{ node.fullName }}</span>
+              <b>{{ node.acronym }}</b>
+              <span>{{ node.fullName }}</span>
             </div>
           </q-item-section>
         </q-item>
@@ -144,8 +160,8 @@ function buildHierarchyEntry(
         :nodes="hierarchy"
         v-model:ticked="currentExperiment.visibleStructures"
         dense
-        node-key="label"
         no-transition
+        node-key="id"
         tick-strategy="strict"
       >
         <template #default-header="{ node }">
@@ -154,8 +170,8 @@ function buildHierarchyEntry(
               :style="{ color: node.color }"
               name="radio_button_checked"
             />
-            <b>{{ node.label.toUpperCase() }}</b>
-            <span class="ellipsis">{{ node.fullName }}</span>
+            <b>{{ node.acronym }}</b>
+            <span>{{ node.fullName }}</span>
           </div>
         </template>
       </q-tree>

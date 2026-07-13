@@ -15,9 +15,9 @@ export const useCurrentExperimentStore = defineStore(
     });
 
     /**
-     * List of structures actively being made shown in the atlas.
+     * List of structure ids actively being made shown in the atlas.
      */
-    const visibleStructures = ref<string[]>([]);
+    const visibleStructures = ref<number[]>([]);
 
     /**
      * Create a new experiment with the given name and atlas.
