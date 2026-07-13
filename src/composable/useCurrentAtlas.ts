@@ -1,6 +1,9 @@
 import { computedAsync } from "@vueuse/core";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { AtlasMetadata, StructureModel } from "@/models/atlas.model";
+import {
+  AtlasMetadata,
+  StructureEntityConfiguration
+} from "@/models/atlas.model";
 import axios from "axios";
 import { computed } from "vue";
 import { Color3 } from "@babylonjs/core";
@@ -36,19 +39,25 @@ export function useCurrentAtlas() {
   /**
    * Returns the resolved mesh path and color for the default structures, or an empty list if there was a problem.
    */
-  const defaultStructuresModels = computed<StructureModel[]>(
+  const defaultStructureEntityConfigurations = computed<
+    StructureEntityConfiguration[]
+  >(
     () =>
       metadata.value?.structures[metadata.value?.rootId]?.childrenIds.flatMap(
-        id => structureModelFromId(id) ?? []
+        id => structureEntityConfigurationFromId(id, 0.1) ?? []
       ) ?? []
   );
 
   /**
    * Compute the structure model from a structure ID.
    * @param id ID of the structure to build the model for.
+   * @param alpha Alpha of the structure entity (default entities would want to use 0.1, while others use 1).
    * @returns The built structure model or null if there was a problem.
    */
-  function structureModelFromId(id: number): StructureModel | null {
+  function structureEntityConfigurationFromId(
+    id: number,
+    alpha: number
+  ): StructureEntityConfiguration | null {
     // Get the structure.
     const structure = metadata.value?.structures[id];
     if (!structure) return null;
@@ -63,9 +72,13 @@ export function useCurrentAtlas() {
         `${currentExperimentStore.atlas.name}/meshes/${id}.glb`,
         currentExperimentStore.atlas.source
       ).toString(),
-      color: Color3.FromInts(r, g, b)
+      color: Color3.FromInts(r, g, b),
+      alpha
     };
   }
 
-  return { metadata, defaultStructuresModels };
+  return {
+    metadata,
+    defaultStructuresModels: defaultStructureEntityConfigurations
+  };
 }

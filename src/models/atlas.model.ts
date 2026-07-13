@@ -9,12 +9,13 @@ export interface Atlas {
 }
 
 /**
- * Structure 3D model for Babylon.
+ * Structure 3D mesh entity config for Babylon.
  */
-export interface StructureModel {
+export interface StructureEntityConfiguration {
   name: string;
   meshPath: string;
   color: Color3;
+  alpha: number;
 }
 
 /**

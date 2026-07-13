@@ -5,7 +5,7 @@ import {
   TransformNode,
   Vector3
 } from "@babylonjs/core";
-import { StructureModel } from "@/models/atlas.model";
+import { StructureEntityConfiguration } from "@/models/atlas.model";
 
 /**
  * Add the listed meshes into the atlas node, colored to match the given structure colors.
@@ -14,7 +14,7 @@ import { StructureModel } from "@/models/atlas.model";
  * @param scene Babylon scene to put structures into.
  */
 export async function setStructures(
-  structures: StructureModel[],
+  structures: StructureEntityConfiguration[],
   scene: Scene
 ) {
   // Reuse the existing root node if present, otherwise create one oriented to match the atlas.
@@ -27,7 +27,7 @@ export async function setStructures(
   }
 
   // Load them into the scene as children of the root node.
-  for (const { name, meshPath, color } of structures) {
+  for (const { name, meshPath, color, alpha } of structures) {
     const { meshes } = await ImportMeshAsync(meshPath, scene);
 
     if (!meshes[0]) continue;
@@ -37,7 +37,7 @@ export async function setStructures(
     // Apply the color and transparency.
     const material = new StandardMaterial(`${meshPath}_material`, scene);
     material.diffuseColor = color;
-    material.alpha = 0.2;
+    material.alpha = alpha;
 
     for (const mesh of meshes) {
       mesh.material = material;
