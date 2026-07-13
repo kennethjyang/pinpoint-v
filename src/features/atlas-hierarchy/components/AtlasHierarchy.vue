@@ -3,6 +3,7 @@ import { ref, useTemplateRef, watch, watchPostEffect } from "vue";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { AtlasStructure } from "@/models/atlas-metadata.model";
 import { QTree } from "quasar";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 interface TreeModel {
   label: string;
@@ -11,13 +12,16 @@ interface TreeModel {
   children: TreeModel[];
 }
 
+// Global state.
+const currentExperiment = useCurrentExperimentStore();
 const currentAtlas = useCurrentAtlas();
 
+// Components.
 const tree = useTemplateRef<QTree>("tree");
 
+// Local state.
 const filter = ref<string | null>(null);
 const hierarchy = ref<TreeModel[]>([]);
-const visible = ref<string[]>([]);
 
 // Update the tree data to match the current atlas.
 watch(
@@ -75,7 +79,7 @@ function buildHierarchyEntry(
         ref="tree"
         :filter="filter ?? ''"
         :nodes="hierarchy"
-        v-model:ticked="visible"
+        v-model:ticked="currentExperiment.visibleStructures"
         dense
         node-key="label"
         no-transition

@@ -15,6 +15,11 @@ export const useCurrentExperimentStore = defineStore(
     });
 
     /**
+     * List of structures actively being made shown in the atlas.
+     */
+    const visibleStructures = ref<string[]>([]);
+
+    /**
      * Create a new experiment with the given name and atlas.
      * @param name Experiment name.
      * @param atlas Full atlas object.
@@ -43,7 +48,7 @@ export const useCurrentExperimentStore = defineStore(
      */
     const atlas = computed(() => experiment.value?.atlas ?? null);
 
-    return { experiment, create, setName, name, atlas };
+    return { experiment, visibleStructures, create, setName, name, atlas };
   },
   { persist: true }
 );
