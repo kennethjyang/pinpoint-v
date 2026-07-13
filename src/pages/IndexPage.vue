@@ -134,6 +134,7 @@ function fixedQPageHeight(offset: number) {
       bordered
       show-if-above
       side="left"
+      class="column"
     >
       <q-tabs v-model="tab">
         <q-tab name="scene" :label="$t('layout.scene')" />
@@ -141,7 +142,7 @@ function fixedQPageHeight(offset: number) {
         <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
-      <q-tab-panels v-model="tab" animated>
+      <q-tab-panels v-model="tab" animated class="col">
         <q-tab-panel name="scene">{{ $t("layout.scene") }}</q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")

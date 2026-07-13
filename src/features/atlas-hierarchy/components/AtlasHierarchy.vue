@@ -22,7 +22,11 @@ watch(
     const { rootId, structures } = metadata ?? {};
     if (!rootId || !structures || !structures[rootId]) return;
 
-    hierarchy.value = [buildHierarchyEntry(structures[rootId], structures)];
+    // Build from root but exclude it.
+    hierarchy.value = buildHierarchyEntry(
+      structures[rootId],
+      structures
+    ).children;
   },
   { immediate: true }
 );
@@ -59,17 +63,22 @@ function buildHierarchyEntry(
 </script>
 
 <template>
-  <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
-    <template #prepend>
-      <q-icon name="search" />
-    </template>
-  </q-input>
-  <q-tree
-    ref="tree"
-    :filter="filter ?? ''"
-    :nodes="hierarchy"
-    node-key="label"
-  />
+  <div class="fit column">
+    <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
+      <template #prepend>
+        <q-icon name="search" />
+      </template>
+    </q-input>
+    <q-scroll-area class="col">
+      <q-tree
+        ref="tree"
+        :filter="filter ?? ''"
+        :nodes="hierarchy"
+        dense
+        node-key="label"
+      />
+    </q-scroll-area>
+  </div>
 </template>
 
 <style lang="sass" scoped></style>
