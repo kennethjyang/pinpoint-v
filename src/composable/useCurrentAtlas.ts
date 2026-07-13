@@ -66,18 +66,5 @@ export function useCurrentAtlas() {
     };
   }
 
-  /**
-   * Compute the structure model from a structure acronym.
-   * @param acronym Acronym of the structure to build the model for.
-   * @returns The built structure model or null if there was a problem.
-   */
-  function structureModelFromAcronym(acronym: string): StructureModel | null {
-    const candidateStructureId = metadata.value?.structures.findIndex(
-      structure => structure.acronym === acronym
-    );
-    if (!candidateStructureId) return null;
-    return structureModelFromId(candidateStructureId);
-  }
-
-  return { metadata, defaultStructuresModels, structureModelFromAcronym };
+  return { metadata, defaultStructuresModels };
 }

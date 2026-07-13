@@ -20,7 +20,7 @@ const currentAtlas = useCurrentAtlas();
 
 // Components.
 const tree = useTemplateRef<QTree>("tree");
-const scrollArea = useTemplateRef<QScrollArea>("scrollArea");
+const scrollArea = useTemplateRef<QScrollArea>("scroll-area");
 
 // Local state.
 const filter = ref<string | null>(null);
@@ -72,34 +72,6 @@ const { results } = useFuse(searchQuery, flatNodes, {
 const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
 const searchResults = computed(() => results.value.map(r => r.item));
 
-// Tick helpers for the search list.
-
-/**
- * Is the structure visible on the atlas in the experiment.
- * @param id ID of the structure to check.
- */
-function isVisible(id: number) {
-  return currentExperiment.visibleStructures.includes(id);
-}
-
-/**
- * Set the visibility of the structure in the atlas.
- * @param id ID of the structure to set the visibility of.
- * @param value Is the structure visible or not.
- */
-function setVisible(id: number, value: boolean) {
-  if (value) {
-    if (!currentExperiment.visibleStructures.includes(id)) {
-      currentExperiment.visibleStructures.push(id);
-    }
-  } else {
-    const index = currentExperiment.visibleStructures.indexOf(id);
-    if (index !== -1) {
-      currentExperiment.visibleStructures.splice(index, 1);
-    }
-  }
-}
-
 /**
  * Build a tree hierarchy from a structure metadata.
  * @param id Index of the current structure in `structures` to recurse down.
@@ -138,7 +110,7 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
-    <q-scroll-area ref="scrollArea" class="col">
+    <q-scroll-area ref="scroll-area" class="col">
       <q-virtual-scroll
         v-if="isSearching"
         :items="searchResults"
@@ -149,9 +121,12 @@ function buildHierarchy(
           <q-item :key="node.id" dense>
             <q-item-section side>
               <q-checkbox
-                :model-value="isVisible(node.id)"
+                :model-value="currentExperiment.isStructureVisible(node.id)"
                 dense
-                @update:model-value="visible => setVisible(node.id, visible)"
+                @update:model-value="
+                  visible =>
+                    currentExperiment.setStructureVisibility(node.id, visible)
+                "
               />
             </q-item-section>
             <q-item-section>
