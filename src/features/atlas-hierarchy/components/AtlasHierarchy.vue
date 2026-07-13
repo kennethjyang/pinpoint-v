@@ -30,10 +30,10 @@ watch(
   currentAtlas.metadata,
   metadata => {
     const { rootId, structures } = metadata ?? {};
-    if (!rootId || !structures || !structures[rootId]) return;
+    if (!rootId || !structures) return;
 
     // Build from root but exclude it.
-    hierarchy.value = buildHierarchy(rootId, structures).children;
+    hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
   },
   { immediate: true }
 );
@@ -104,8 +104,10 @@ function setVisible(id: number, value: boolean) {
 function buildHierarchy(
   id: number,
   structures: AtlasStructure[]
-): HierarchyModel {
-  const structure = structures[id]!;
+): HierarchyModel | null {
+  // Get the structure.
+  const structure = structures[id];
+  if (!structure) return null;
 
   // Convert name to title case.
   const titleCaseName = structure.name
@@ -118,8 +120,8 @@ function buildHierarchy(
     acronym: structure.acronym.toUpperCase(),
     fullName: titleCaseName,
     color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
-    children: structure.childrenIds.flatMap(childId =>
-      structures[childId] ? buildHierarchy(childId, structures) : []
+    children: structure.childrenIds.flatMap(
+      childId => buildHierarchy(childId, structures) ?? []
     )
   };
 }
@@ -149,7 +151,7 @@ function buildHierarchy(
                 name="radio_button_checked"
               />
               <b>{{ node.acronym }}</b>
-              <span>{{ node.fullName }}</span>
+              <span class="text-no-wrap">{{ node.fullName }}</span>
             </div>
           </q-item-section>
         </q-item>
@@ -171,7 +173,7 @@ function buildHierarchy(
               name="radio_button_checked"
             />
             <b>{{ node.acronym }}</b>
-            <span>{{ node.fullName }}</span>
+            <span class="text-no-wrap">{{ node.fullName }}</span>
           </div>
         </template>
       </q-tree>
