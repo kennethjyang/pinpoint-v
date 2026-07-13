@@ -1,9 +1,6 @@
 import { computedAsync } from "@vueuse/core";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import {
-  AtlasMetadata,
-  StructureEntityConfiguration
-} from "@/models/atlas.model";
+import { AtlasMetadata, StructureEntity } from "@/models/atlas.model";
 import axios from "axios";
 import { computed } from "vue";
 import { Color3 } from "@babylonjs/core";
@@ -39,25 +36,19 @@ export function useCurrentAtlas() {
   /**
    * Returns the resolved mesh path and color for the default structures, or an empty list if there was a problem.
    */
-  const defaultStructureEntityConfigurations = computed<
-    StructureEntityConfiguration[]
-  >(
+  const defaultStructureEntities = computed<StructureEntity[]>(
     () =>
       metadata.value?.structures[metadata.value?.rootId]?.childrenIds.flatMap(
-        id => structureEntityConfigurationFromId(id, 0.1) ?? []
+        id => structureEntityFromId(id) ?? []
       ) ?? []
   );
 
   /**
    * Compute the structure model from a structure ID.
    * @param id ID of the structure to build the model for.
-   * @param alpha Alpha of the structure entity (default entities would want to use 0.1, while others use 1).
    * @returns The built structure model or null if there was a problem.
    */
-  function structureEntityConfigurationFromId(
-    id: number,
-    alpha: number
-  ): StructureEntityConfiguration | null {
+  function structureEntityFromId(id: number): StructureEntity | null {
     // Get the structure.
     const structure = metadata.value?.structures[id];
     if (!structure) return null;
@@ -72,13 +63,12 @@ export function useCurrentAtlas() {
         `${currentExperimentStore.atlas.name}/meshes/${id}.glb`,
         currentExperimentStore.atlas.source
       ).toString(),
-      color: Color3.FromInts(r, g, b),
-      alpha
+      color: Color3.FromInts(r, g, b)
     };
   }
 
   return {
     metadata,
-    defaultStructuresModels: defaultStructureEntityConfigurations
+    defaultStructuresModels: defaultStructureEntities
   };
 }
