@@ -3,7 +3,7 @@ import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { AtlasStructure } from "@/models/atlas.model";
-import { QTree } from "quasar";
+import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 interface HierarchyModel {
@@ -20,6 +20,7 @@ const currentAtlas = useCurrentAtlas();
 
 // Components.
 const tree = useTemplateRef<QTree>("tree");
+const scrollArea = useTemplateRef<QScrollArea>("scrollArea");
 
 // Local state.
 const filter = ref<string | null>(null);
@@ -44,6 +45,9 @@ watchPostEffect(() => {
     tree.value?.expandAll();
   }
 });
+
+// Expose scroll area target for the search result virtual scroll.
+const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
 // Flatten the hierarchy into a searchable list for fuzzy matching.
 const flatNodes = computed(() => {
@@ -134,8 +138,13 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
-    <q-scroll-area class="col">
-      <q-virtual-scroll v-if="isSearching" :items="searchResults" dense>
+    <q-scroll-area ref="scrollArea" class="col">
+      <q-virtual-scroll
+        v-if="isSearching"
+        :items="searchResults"
+        :scroll-target="scrollAreaTarget"
+        dense
+      >
         <template #default="{ item: node }">
           <q-item :key="node.id" dense>
             <q-item-section side>
