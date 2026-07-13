@@ -69,6 +69,7 @@ export function useCurrentAtlas() {
 
   return {
     metadata,
-    defaultStructuresModels: defaultStructureEntities
+    defaultStructuresModels: defaultStructureEntities,
+    structureEntityFromId
   };
 }

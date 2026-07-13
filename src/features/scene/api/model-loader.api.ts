@@ -16,8 +16,6 @@ function buildAtlasRootNode(scene: Scene): TransformNode {
   if (!atlasRootNode) {
     atlasRootNode = new TransformNode("atlasRoot_node", scene);
     atlasRootNode.rotation = new Vector3(Math.PI, -Math.PI / 2, 0);
-  } else {
-    atlasRootNode.getChildren().forEach(child => child.dispose());
   }
 
   return atlasRootNode;
@@ -65,31 +63,39 @@ export async function addStructure(structure: StructureEntity, scene: Scene) {
 }
 
 /**
- * Add the listed meshes into the atlas node, colored to match the given structure colors.
+ * Remove a structure from the scene.
  *
- * @param structures Path and color for each structure mesh to load.
- * @param scene Babylon scene to put structures into.
+ * Does nothing if the structure isn't present.
+ *
+ * @param structure Entity information for the structure.
+ * @param scene Scene to remove the structure from.
  */
-export async function setStructures(
-  structures: StructureEntity[],
+export function removeStructure(structure: StructureEntity, scene: Scene) {
+  const atlasRootNode = buildAtlasRootNode(scene);
+
+  const childStructure = atlasRootNode
+    .getChildren()
+    .find(child => child.name === structure.name);
+
+  childStructure?.dispose();
+}
+
+/**
+ * Set the alpha (transparency) of a structure's material.
+ *
+ * Does nothing if the structure's material isn't loaded.
+ *
+ * @param structure Entity information for the structure.
+ * @param alpha Alpha value to set, between 0 and 1.
+ * @param scene Scene the structure belongs to.
+ */
+export function setStructureAlpha(
+  structure: StructureEntity,
+  alpha: number,
   scene: Scene
 ) {
-  const rootNode = buildAtlasRootNode(scene);
+  const material = scene.getMaterialByName(`${structure.name}_material`);
+  if (!material) return;
 
-  // Load them into the scene as children of the root node.
-  for (const { name, meshPath, color } of structures) {
-    const { meshes } = await ImportMeshAsync(meshPath, scene);
-
-    if (!meshes[0]) continue;
-    meshes[0].parent = rootNode;
-    meshes[0].name = name;
-
-    // Apply the color and transparency.
-    const material = new StandardMaterial(`${meshPath}_material`, scene);
-    material.diffuseColor = color;
-
-    for (const mesh of meshes) {
-      mesh.material = material;
-    }
-  }
+  material.alpha = alpha;
 }

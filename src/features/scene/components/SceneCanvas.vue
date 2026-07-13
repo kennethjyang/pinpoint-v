@@ -1,12 +1,28 @@
 <script lang="ts" setup>
 import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import { setStructures } from "@/features/scene";
+import {
+  addStructure,
+  removeStructure,
+  setStructureAlpha
+} from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { StructureEntity } from "@/models/atlas.model";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
 const currentAtlas = useCurrentAtlas();
+const currentExperiment = useCurrentExperimentStore();
+
+/**
+ * Non-default structures currently added to the scene, keyed by structure name, so
+ * they can be removed again without needing to be rebuilt.
+ */
+const addedStructures = new Map<string, StructureEntity>();
+
+const ALPHA_HIDDEN = 0.1;
+const ALPHA_VISIBLE = 1;
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -17,12 +33,53 @@ onMounted(async () => {
   // Initialize Babylon runtime.
   await runtime.init(canvas.value);
 
-  // Load current experiment.
+  // Keep the scene in sync with the current atlas's default structures and the
+  // experiment's visible structure selection.
   watch(
-    [runtime.scene, currentAtlas.defaultStructuresModels],
+    [
+      runtime.scene,
+      currentAtlas.defaultStructuresModels,
+      () => [...currentExperiment.visibleStructures]
+    ],
     async ([scene, defaultStructures]) => {
       if (!scene || !defaultStructures) return;
-      await setStructures(defaultStructures, scene);
+
+      // Default structures are always present; fade them in/out instead of removing.
+      for (const structure of defaultStructures) {
+        await addStructure(structure, scene);
+        setStructureAlpha(
+          structure,
+          currentExperiment.isStructureVisible(Number(structure.name))
+            ? ALPHA_VISIBLE
+            : ALPHA_HIDDEN,
+          scene
+        );
+      }
+
+      const defaultNames = new Set(defaultStructures.map(({ name }) => name));
+
+      // Non-default structures are added/removed based on visibility.
+      const desiredIds = currentExperiment.visibleStructures.filter(
+        id => !defaultNames.has(id.toString())
+      );
+
+      for (const id of desiredIds) {
+        if (addedStructures.has(id.toString())) continue;
+
+        const structure = currentAtlas.structureEntityFromId(id);
+        if (!structure) continue;
+
+        await addStructure(structure, scene);
+        addedStructures.set(structure.name, structure);
+      }
+
+      const desiredNames = new Set(desiredIds.map(id => id.toString()));
+      for (const [name, structure] of addedStructures) {
+        if (desiredNames.has(name)) continue;
+
+        removeStructure(structure, scene);
+        addedStructures.delete(name);
+      }
     },
     { immediate: true }
   );
