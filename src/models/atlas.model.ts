@@ -12,6 +12,7 @@ export interface Atlas {
  * Structure 3D model for Babylon.
  */
 export interface StructureModel {
+  name: string;
   meshPath: string;
   color: Color3;
 }

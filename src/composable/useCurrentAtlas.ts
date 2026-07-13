@@ -58,6 +58,7 @@ export function useCurrentAtlas() {
 
     // Build model.
     return {
+      name: id.toString(),
       meshPath: new URL(
         `${currentExperimentStore.atlas.name}/meshes/${id}.glb`,
         currentExperimentStore.atlas.source
