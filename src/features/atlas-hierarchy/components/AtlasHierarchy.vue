@@ -134,9 +134,14 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
-    <q-scroll-area class="col">
-      <q-list v-if="isSearching" dense>
-        <q-item v-for="node in searchResults" :key="node.id">
+    <q-virtual-scroll
+      v-if="isSearching"
+      :items="searchResults"
+      class="col"
+      dense
+    >
+      <template #default="{ item: node }">
+        <q-item :key="node.id" dense>
           <q-item-section side>
             <q-checkbox
               dense
@@ -155,9 +160,10 @@ function buildHierarchy(
             </div>
           </q-item-section>
         </q-item>
-      </q-list>
+      </template>
+    </q-virtual-scroll>
+    <q-scroll-area v-else class="col">
       <q-tree
-        v-else
         ref="tree"
         :nodes="hierarchy"
         v-model:ticked="currentExperiment.visibleStructures"
