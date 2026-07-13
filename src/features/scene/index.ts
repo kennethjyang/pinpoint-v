@@ -4,4 +4,4 @@ export {
   addStructure,
   removeStructure,
   setStructureAlpha
-} from "./api/model-loader.api";
+} from "./api/entity-loader.api";
