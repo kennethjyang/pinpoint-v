@@ -134,36 +134,32 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
-    <q-virtual-scroll
-      v-if="isSearching"
-      :items="searchResults"
-      class="col"
-      dense
-    >
-      <template #default="{ item: node }">
-        <q-item :key="node.id" dense>
-          <q-item-section side>
-            <q-checkbox
-              dense
-              :model-value="isVisible(node.id)"
-              @update:model-value="visible => setVisible(node.id, visible)"
-            />
-          </q-item-section>
-          <q-item-section>
-            <div class="row items-center q-gutter-x-xs no-wrap">
-              <q-icon
-                :style="{ color: node.color }"
-                name="radio_button_checked"
+    <q-scroll-area class="col">
+      <q-virtual-scroll v-if="isSearching" :items="searchResults" dense>
+        <template #default="{ item: node }">
+          <q-item :key="node.id" dense>
+            <q-item-section side>
+              <q-checkbox
+                :model-value="isVisible(node.id)"
+                dense
+                @update:model-value="visible => setVisible(node.id, visible)"
               />
-              <b>{{ node.acronym }}</b>
-              <span class="text-no-wrap">{{ node.fullName }}</span>
-            </div>
-          </q-item-section>
-        </q-item>
-      </template>
-    </q-virtual-scroll>
-    <q-scroll-area v-else class="col">
+            </q-item-section>
+            <q-item-section>
+              <div class="row items-center q-gutter-x-xs no-wrap">
+                <q-icon
+                  :style="{ color: node.color }"
+                  name="radio_button_checked"
+                />
+                <b>{{ node.acronym }}</b>
+                <span class="text-no-wrap">{{ node.fullName }}</span>
+              </div>
+            </q-item-section>
+          </q-item>
+        </template>
+      </q-virtual-scroll>
       <q-tree
+        v-else
         ref="tree"
         :nodes="hierarchy"
         v-model:ticked="currentExperiment.visibleStructures"
