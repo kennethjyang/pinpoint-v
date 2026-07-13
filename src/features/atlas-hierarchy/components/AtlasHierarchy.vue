@@ -65,12 +65,27 @@ const searchQuery = computed(() => filter.value ?? "");
 const { results } = useFuse(searchQuery, flatNodes, {
   fuseOptions: { keys: ["label", "fullName"] }
 });
-const matchedLabels = computed(
-  () => new Set(results.value.map(result => result.item.label))
-);
 
-function filterMethod(node: TreeModel) {
-  return matchedLabels.value.has(node.label);
+// Search mode: replace tree with flat result list.
+const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
+const searchResults = computed(() => results.value.map(r => r.item));
+
+// Checkbox helpers for the flat list.
+function isVisible(label: string) {
+  return currentExperiment.visibleStructures.includes(label);
+}
+
+function setVisible(label: string, value: boolean) {
+  if (value) {
+    if (!currentExperiment.visibleStructures.includes(label)) {
+      currentExperiment.visibleStructures.push(label);
+    }
+  } else {
+    const index = currentExperiment.visibleStructures.indexOf(label);
+    if (index !== -1) {
+      currentExperiment.visibleStructures.splice(index, 1);
+    }
+  }
 }
 
 function buildHierarchyEntry(
@@ -84,7 +99,7 @@ function buildHierarchyEntry(
     .join(" ");
 
   return {
-    label: structure.acronym.toUpperCase(),
+    label: structure.acronym.toLowerCase(),
     fullName: titleCaseName,
     color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
     children: structure.childrenIds.flatMap(id =>
@@ -102,10 +117,30 @@ function buildHierarchyEntry(
       </template>
     </q-input>
     <q-scroll-area class="col">
+      <q-list v-if="isSearching" dense>
+        <q-item v-for="node in searchResults" :key="node.label">
+          <q-item-section side>
+            <q-checkbox
+              dense
+              :model-value="isVisible(node.label)"
+              @update:model-value="v => setVisible(node.label, v)"
+            />
+          </q-item-section>
+          <q-item-section>
+            <div class="row items-center q-gutter-x-xs no-wrap">
+              <q-icon
+                :style="{ color: node.color }"
+                name="radio_button_checked"
+              />
+              <b>{{ node.label.toUpperCase() }}</b>
+              <span class="ellipsis">{{ node.fullName }}</span>
+            </div>
+          </q-item-section>
+        </q-item>
+      </q-list>
       <q-tree
+        v-else
         ref="tree"
-        :filter="filter ?? ''"
-        :filter-method="filterMethod"
         :nodes="hierarchy"
         v-model:ticked="currentExperiment.visibleStructures"
         dense
@@ -119,7 +154,7 @@ function buildHierarchyEntry(
               :style="{ color: node.color }"
               name="radio_button_checked"
             />
-            <b>{{ node.label }}</b>
+            <b>{{ node.label.toUpperCase() }}</b>
             <span class="ellipsis">{{ node.fullName }}</span>
           </div>
         </template>
