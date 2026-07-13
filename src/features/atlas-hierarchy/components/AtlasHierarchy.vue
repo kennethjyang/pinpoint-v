@@ -6,14 +6,18 @@ import { QTree } from "quasar";
 
 interface TreeModel {
   label: string;
+  fullName: string;
+  color: string;
   children: TreeModel[];
 }
 
 const currentAtlas = useCurrentAtlas();
 
+const tree = useTemplateRef<QTree>("tree");
+
 const filter = ref<string | null>(null);
 const hierarchy = ref<TreeModel[]>([]);
-const tree = useTemplateRef<QTree>("tree");
+const visible = ref<string[]>([]);
 
 // Update the tree data to match the current atlas.
 watch(
@@ -42,19 +46,16 @@ function buildHierarchyEntry(
   structure: AtlasStructure,
   structures: AtlasStructure[]
 ): TreeModel {
+  // Convert name to title case.
   const titleCaseName = structure.name
     .split(" ")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 
-  // Only include acronym if it's different.
-  const label =
-    structure.name === structure.acronym
-      ? titleCaseName
-      : `${titleCaseName} (${structure.acronym.toUpperCase()})`;
-
   return {
-    label,
+    label: structure.acronym.toUpperCase(),
+    fullName: titleCaseName,
+    color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
     children: structure.childrenIds.flatMap(id =>
       structures[id] ? [buildHierarchyEntry(structures[id], structures)] : []
     )
@@ -74,9 +75,23 @@ function buildHierarchyEntry(
         ref="tree"
         :filter="filter ?? ''"
         :nodes="hierarchy"
+        v-model:ticked="visible"
         dense
         node-key="label"
-      />
+        no-transition
+        tick-strategy="strict"
+      >
+        <template #default-header="{ node }">
+          <div class="row items-center q-gutter-x-xs no-wrap">
+            <q-icon
+              :style="{ color: node.color }"
+              name="radio_button_checked"
+            />
+            <b>{{ node.label }}</b>
+            <span class="ellipsis">{{ node.fullName }}</span>
+          </div>
+        </template>
+      </q-tree>
     </q-scroll-area>
   </div>
 </template>

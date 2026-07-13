@@ -15,7 +15,7 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("scene");
+const tab = ref("atlas");
 const showSplash = ref(false);
 const showNewExperiment = ref(false);
 
