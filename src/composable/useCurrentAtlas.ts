@@ -33,14 +33,8 @@ export function useCurrentAtlas() {
     }
   });
 
-  /**
-   * Returns the resolved mesh path and color for the default structures, or an empty list if there was a problem.
-   */
-  const defaultStructureEntities = computed<StructureEntity[]>(
-    () =>
-      metadata.value?.structures[metadata.value?.rootId]?.childrenIds.flatMap(
-        id => structureEntityFromId(id) ?? []
-      ) ?? []
+  const defaultStructureIds = computed<number[]>(
+    () => metadata.value?.structures[metadata.value?.rootId]?.childrenIds ?? []
   );
 
   /**
@@ -69,7 +63,7 @@ export function useCurrentAtlas() {
 
   return {
     metadata,
-    defaultStructureEntities,
+    defaultStructureIds,
     structureEntityFromId
   };
 }

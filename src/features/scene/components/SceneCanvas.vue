@@ -3,26 +3,17 @@ import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   addStructure,
+  buildAtlasRootNode,
   removeStructure,
   setStructureAlpha
 } from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { StructureEntity } from "@/models/atlas.model";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
 const currentAtlas = useCurrentAtlas();
 const currentExperiment = useCurrentExperimentStore();
-
-/**
- * Non-default structures currently added to the scene, keyed by structure name, so
- * they can be removed again without needing to be rebuilt.
- */
-const addedStructures = new Map<string, StructureEntity>();
-
-const ALPHA_HIDDEN = 0.1;
-const ALPHA_VISIBLE = 1;
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -38,47 +29,61 @@ onMounted(async () => {
   watch(
     [
       runtime.scene,
-      currentAtlas.defaultStructureEntities,
+      currentAtlas.defaultStructureIds,
       () => [...currentExperiment.visibleStructures]
     ],
-    async ([scene, defaultStructures]) => {
-      if (!scene || !defaultStructures) return;
+    async ([scene, defaultStructureIds, visibleStructures]) => {
+      // Exit if the scene is not ready.
+      if (!scene) return;
 
       // Default structures are always present; fade them in/out instead of removing.
-      for (const structure of defaultStructures) {
-        await addStructure(structure, scene);
+      for (const structureEntity of defaultStructureIds.map(id =>
+        currentAtlas.structureEntityFromId(id)
+      )) {
+        // Skip malformed structures.
+        if (!structureEntity) continue;
+
+        // Ensure the structure is in the scene.
+        await addStructure(structureEntity, scene);
+
+        // Set alpha depending on visibility.
         setStructureAlpha(
-          structure,
-          currentExperiment.isStructureVisible(Number(structure.name))
-            ? ALPHA_VISIBLE
-            : ALPHA_HIDDEN,
+          structureEntity,
+          currentExperiment.isStructureVisible(Number(structureEntity.name))
+            ? 1
+            : 0.1,
           scene
         );
       }
 
-      const defaultNames = new Set(defaultStructures.map(({ name }) => name));
-
       // Non-default structures are added/removed based on visibility.
-      const desiredIds = currentExperiment.visibleStructures.filter(
-        id => !defaultNames.has(id.toString())
+      const nonDefaultStructures = visibleStructures.filter(
+        id => !defaultStructureIds.includes(id)
       );
 
-      for (const id of desiredIds) {
-        if (addedStructures.has(id.toString())) continue;
-
-        const structure = currentAtlas.structureEntityFromId(id);
-        if (!structure) continue;
-
-        await addStructure(structure, scene);
-        addedStructures.set(structure.name, structure);
+      // Ensure all structures are added.
+      for (const structureEntity of nonDefaultStructures.map(id =>
+        currentAtlas.structureEntityFromId(id)
+      )) {
+        if (!structureEntity) continue;
+        await addStructure(structureEntity, scene);
       }
 
-      const desiredNames = new Set(desiredIds.map(id => id.toString()));
-      for (const [name, structure] of addedStructures) {
-        if (desiredNames.has(name)) continue;
+      // Get all structures to remove.
+      const needsRemovalStructureIds = buildAtlasRootNode(scene)
+        .getChildren()
+        .map(child => child.name)
+        .filter(
+          name =>
+            !defaultStructureIds.includes(+name) &&
+            !nonDefaultStructures.includes(+name)
+        );
 
-        removeStructure(structure, scene);
-        addedStructures.delete(name);
+      for (const needsRemovalStructureEntity of needsRemovalStructureIds.map(
+        id => currentAtlas.structureEntityFromId(+id)
+      )) {
+        if (!needsRemovalStructureEntity) continue;
+        removeStructure(needsRemovalStructureEntity, scene);
       }
     },
     { immediate: true }

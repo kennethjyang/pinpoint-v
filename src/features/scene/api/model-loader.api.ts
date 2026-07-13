@@ -11,7 +11,7 @@ import { StructureEntity } from "@/models/atlas.model";
  * Build the atlas root node or return the existing one.
  * @param scene Babylon scene to get the atlas root node from.
  */
-function buildAtlasRootNode(scene: Scene): TransformNode {
+export function buildAtlasRootNode(scene: Scene): TransformNode {
   let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
   if (!atlasRootNode) {
     atlasRootNode = new TransformNode("atlasRoot_node", scene);
