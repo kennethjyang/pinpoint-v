@@ -1,6 +1,6 @@
 import { computedAsync } from "@vueuse/core";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { AtlasMetadata } from "@/models/atlas-metadata.model";
+import { AtlasMetadata, StructureModel } from "@/models/atlas.model";
 import axios from "axios";
 import { computed } from "vue";
 import { Color3 } from "@babylonjs/core";
@@ -36,23 +36,48 @@ export function useCurrentAtlas() {
   /**
    * Returns the resolved mesh path and color for the default structures, or an empty list if there was a problem.
    */
-  const defaultStructures = computed<{ meshPath: string; color: Color3 }[]>(
+  const defaultStructuresModels = computed<StructureModel[]>(
     () =>
-      metadata.value?.structures[metadata.value?.rootId]?.childrenIds.map(
-        id => {
-          const structure = metadata.value?.structures[id];
-          const [r, g, b] = structure?.color ?? [255, 255, 255];
-
-          return {
-            meshPath: new URL(
-              `${currentExperimentStore.atlas.name}/meshes/${id}.glb`,
-              currentExperimentStore.atlas.source
-            ).toString(),
-            color: Color3.FromInts(r, g, b)
-          };
-        }
+      metadata.value?.structures[metadata.value?.rootId]?.childrenIds.flatMap(
+        id => structureModelFromId(id) ?? []
       ) ?? []
   );
 
-  return { metadata, defaultStructures };
+  /**
+   * Compute the structure model from a structure ID.
+   * @param id ID of the structure to build the model for.
+   * @returns The built structure model or null if there was a problem.
+   */
+  function structureModelFromId(id: number): StructureModel | null {
+    // Get the structure.
+    const structure = metadata.value?.structures[id];
+    if (!structure) return null;
+
+    // Extract color.
+    const [r, g, b] = structure.color;
+
+    // Build model.
+    return {
+      meshPath: new URL(
+        `${currentExperimentStore.atlas.name}/meshes/${id}.glb`,
+        currentExperimentStore.atlas.source
+      ).toString(),
+      color: Color3.FromInts(r, g, b)
+    };
+  }
+
+  /**
+   * Compute the structure model from a structure acronym.
+   * @param acronym Acronym of the structure to build the model for.
+   * @returns The built structure model or null if there was a problem.
+   */
+  function structureModelFromAcronym(acronym: string): StructureModel | null {
+    const candidateStructureId = metadata.value?.structures.findIndex(
+      structure => structure.acronym === acronym
+    );
+    if (!candidateStructureId) return null;
+    return structureModelFromId(candidateStructureId);
+  }
+
+  return { metadata, defaultStructuresModels, structureModelFromAcronym };
 }

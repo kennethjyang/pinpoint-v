@@ -19,7 +19,7 @@ onMounted(async () => {
 
   // Load current experiment.
   watch(
-    [runtime.scene, currentAtlas.defaultStructures],
+    [runtime.scene, currentAtlas.defaultStructuresModels],
     async ([scene, defaultStructures]) => {
       if (!scene || !defaultStructures) return;
       await setStructures(defaultStructures, scene);

@@ -2,7 +2,7 @@
 import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
-import { AtlasStructure } from "@/models/atlas-metadata.model";
+import { AtlasStructure } from "@/models/atlas.model";
 import { QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
@@ -88,7 +88,7 @@ function buildHierarchyEntry(
     fullName: titleCaseName,
     color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
     children: structure.childrenIds.flatMap(id =>
-      structures[id] ? [buildHierarchyEntry(structures[id], structures)] : []
+      structures[id] ? buildHierarchyEntry(structures[id], structures) : []
     )
   };
 }
