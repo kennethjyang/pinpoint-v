@@ -45,15 +45,15 @@ watchPostEffect(() => {
 
 // Flatten the hierarchy into a searchable list for fuzzy matching.
 const flatNodes = computed(() => {
-  const acc: TreeModel[] = [];
+  const flattened: TreeModel[] = [];
   const walk = (nodes: TreeModel[]) => {
     for (const node of nodes) {
-      acc.push(node);
+      flattened.push(node);
       walk(node.children);
     }
   };
   walk(hierarchy.value);
-  return acc;
+  return flattened;
 });
 
 // Fuzzy search across the acronym (label) and the full name.
