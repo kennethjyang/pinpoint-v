@@ -1,7 +1,10 @@
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import { syncStructureVisibility } from "@/features/scene";
+import {
+  setAtlasRootReference,
+  syncStructureVisibility
+} from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { StructureEntity } from "@/models/atlas.model";
@@ -50,6 +53,19 @@ onMounted(async () => {
       if (!scene) return;
 
       await syncStructureVisibility(scene, alwaysPresent, visible);
+    },
+    { immediate: true }
+  );
+
+  // Keep the atlas root positioned so the experiment's reference coordinate
+  // sits at the scene origin.
+  watch(
+    [runtime.scene, () => currentExperiment.referenceCoordinate],
+    ([scene, referenceCoordinate]) => {
+      // Exit if the scene is not ready.
+      if (!scene) return;
+
+      setAtlasRootReference(scene, referenceCoordinate);
     },
     { immediate: true }
   );

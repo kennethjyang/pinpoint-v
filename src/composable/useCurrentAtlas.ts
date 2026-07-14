@@ -1,7 +1,7 @@
 import { computedAsync } from "@vueuse/core";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasMetadata, StructureEntity } from "@/models/atlas.model";
-import axios from "axios";
+import { fetchAtlasMetadata } from "@/features/atlas-picker";
 import { computed } from "vue";
 import { Color3 } from "@babylonjs/core";
 
@@ -19,18 +19,7 @@ export function useCurrentAtlas() {
   const metadata = computedAsync<AtlasMetadata | null>(async () => {
     if (!currentExperimentStore.atlas) return null;
 
-    try {
-      const metadataResponse = await axios.get<AtlasMetadata>(
-        new URL(
-          `${currentExperimentStore.atlas.name}/atlas.json`,
-          currentExperimentStore.atlas.source
-        ).toString()
-      );
-
-      return metadataResponse.data;
-    } catch {
-      return null;
-    }
+    return fetchAtlasMetadata(currentExperimentStore.atlas);
   });
 
   const defaultStructureIds = computed<number[]>(

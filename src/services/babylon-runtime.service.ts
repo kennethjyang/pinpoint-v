@@ -37,8 +37,8 @@ export function createBabylonRuntimeService() {
     const camera = new ArcRotateCamera(
       "main_camera",
       -Math.PI / 2,
-      Math.PI / 4,
-      10,
+      Math.PI / 8,
+      30,
       Vector3.Zero(),
       s
     );
