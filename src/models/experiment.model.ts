@@ -9,4 +9,6 @@ export interface Experiment {
    * that the scene origin is at this location in ASR.
    */
   referenceCoordinate: [number, number, number];
+
+  visibleStructures: number[];
 }
