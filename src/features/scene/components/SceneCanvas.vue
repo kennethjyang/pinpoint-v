@@ -1,19 +1,36 @@
 <script lang="ts" setup>
-import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import {
-  addStructure,
-  buildAtlasRootNode,
-  removeStructure,
-  setStructureAlpha
-} from "@/features/scene";
+import { syncStructureVisibility } from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { StructureEntity } from "@/models/atlas.model";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
 const currentAtlas = useCurrentAtlas();
 const currentExperiment = useCurrentExperimentStore();
+
+/**
+ * Atlas structures that must always be present in the scene, faded out when
+ * not visible instead of being removed.
+ */
+const alwaysPresentStructures = computed<StructureEntity[]>(() =>
+  currentAtlas.defaultStructureIds.value.flatMap(id => {
+    const structureEntity = currentAtlas.structureEntityFromId(id);
+    return structureEntity ? [structureEntity] : [];
+  })
+);
+
+/**
+ * Structures the current experiment has marked visible.
+ */
+const visibleStructures = computed<StructureEntity[]>(() =>
+  currentExperiment.visibleStructures.flatMap(id => {
+    const structureEntity = currentAtlas.structureEntityFromId(id);
+    return structureEntity ? [structureEntity] : [];
+  })
+);
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -27,64 +44,12 @@ onMounted(async () => {
   // Keep the scene in sync with the current atlas's default structures and the
   // experiment's visible structure selection.
   watch(
-    [
-      runtime.scene,
-      currentAtlas.defaultStructureIds,
-      () => [...currentExperiment.visibleStructures]
-    ],
-    async ([scene, defaultStructureIds, visibleStructures]) => {
+    [runtime.scene, alwaysPresentStructures, visibleStructures],
+    async ([scene, alwaysPresent, visible]) => {
       // Exit if the scene is not ready.
       if (!scene) return;
 
-      // Default structures are always present; fade them in/out instead of removing.
-      for (const structureEntity of defaultStructureIds.map(id =>
-        currentAtlas.structureEntityFromId(id)
-      )) {
-        // Skip malformed structures.
-        if (!structureEntity) continue;
-
-        // Ensure the structure is in the scene.
-        await addStructure(structureEntity, scene);
-
-        // Set alpha depending on visibility.
-        setStructureAlpha(
-          structureEntity,
-          currentExperiment.isStructureVisible(Number(structureEntity.name))
-            ? 1
-            : 0.1,
-          scene
-        );
-      }
-
-      // Non-default structures are added/removed based on visibility.
-      const nonDefaultStructures = visibleStructures.filter(
-        id => !defaultStructureIds.includes(id)
-      );
-
-      // Ensure all structures are added.
-      for (const structureEntity of nonDefaultStructures.map(id =>
-        currentAtlas.structureEntityFromId(id)
-      )) {
-        if (!structureEntity) continue;
-        await addStructure(structureEntity, scene);
-      }
-
-      // Get all structures to remove.
-      const needsRemovalStructureIds = buildAtlasRootNode(scene)
-        .getChildren()
-        .map(child => child.name)
-        .filter(
-          name =>
-            !defaultStructureIds.includes(+name) &&
-            !nonDefaultStructures.includes(+name)
-        );
-
-      for (const needsRemovalStructureEntity of needsRemovalStructureIds.map(
-        id => currentAtlas.structureEntityFromId(+id)
-      )) {
-        if (!needsRemovalStructureEntity) continue;
-        removeStructure(needsRemovalStructureEntity, scene);
-      }
+      await syncStructureVisibility(scene, alwaysPresent, visible);
     },
     { immediate: true }
   );

@@ -11,7 +11,7 @@ import { StructureEntity } from "@/models/atlas.model";
  * Build the atlas root node or return the existing one.
  * @param scene Babylon scene to get the atlas root node from.
  */
-export function buildAtlasRootNode(scene: Scene): TransformNode {
+function buildAtlasRootNode(scene: Scene): TransformNode {
   let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
   if (!atlasRootNode) {
     atlasRootNode = new TransformNode("atlasRoot_node", scene);
@@ -22,24 +22,19 @@ export function buildAtlasRootNode(scene: Scene): TransformNode {
 }
 
 /**
- * Add a structure to the scene.
+ * Import a structure's mesh into the scene and apply its color.
  *
- * Does nothing if the structure is already added or is malformed.
+ * Does nothing if the structure is malformed.
  *
  * @param structure Entity information for the structure.
+ * @param atlasRootNode Atlas root node to parent the structure under.
  * @param scene Scene to add the structure to.
  */
-export async function addStructure(structure: StructureEntity, scene: Scene) {
-  const atlasRootNode = buildAtlasRootNode(scene);
-
-  // Exit if structure already exists.
-  if (
-    atlasRootNode
-      .getChildren()
-      .find(childStructure => childStructure.name === structure.name)
-  )
-    return;
-
+async function importStructure(
+  structure: StructureEntity,
+  atlasRootNode: TransformNode,
+  scene: Scene
+) {
   try {
     const { meshes } = await ImportMeshAsync(structure.meshPath, scene);
 
@@ -63,39 +58,47 @@ export async function addStructure(structure: StructureEntity, scene: Scene) {
 }
 
 /**
- * Remove a structure from the scene.
+ * Sync the scene's structures with the given visibility.
  *
- * Does nothing if the structure isn't present.
+ * Structures in `alwaysPresentStructures` are never removed from the scene;
+ * when they aren't also in `visibleStructures` they're faded out instead.
+ * Structures in `visibleStructures` are fully visible, and are removed from
+ * the scene once they're no longer in either list.
  *
- * @param structure Entity information for the structure.
- * @param scene Scene to remove the structure from.
+ * @param scene Scene to sync.
+ * @param alwaysPresentStructures Structures to keep in the scene at all times.
+ * @param visibleStructures Structures that should be fully visible.
  */
-export function removeStructure(structure: StructureEntity, scene: Scene) {
-  const atlasRootNode = buildAtlasRootNode(scene);
-
-  const childStructure = atlasRootNode
-    .getChildren()
-    .find(child => child.name === structure.name);
-
-  childStructure?.dispose();
-}
-
-/**
- * Set the alpha (transparency) of a structure's material.
- *
- * Does nothing if the structure's material isn't loaded.
- *
- * @param structure Entity information for the structure.
- * @param alpha Alpha value to set, between 0 and 1.
- * @param scene Scene the structure belongs to.
- */
-export function setStructureAlpha(
-  structure: StructureEntity,
-  alpha: number,
-  scene: Scene
+export async function syncStructureVisibility(
+  scene: Scene,
+  alwaysPresentStructures: StructureEntity[],
+  visibleStructures: StructureEntity[]
 ) {
-  const material = scene.getMaterialByName(`${structure.name}_material`);
-  if (!material) return;
+  const atlasRootNode = buildAtlasRootNode(scene);
+  const present = new Map(
+    atlasRootNode.getChildren().map(child => [child.name, child])
+  );
 
-  material.alpha = alpha;
+  const visibleNames = new Set(visibleStructures.map(({ name }) => name));
+  const desired = new Map(
+    [...alwaysPresentStructures, ...visibleStructures].map(structure => [
+      structure.name,
+      structure
+    ])
+  );
+
+  // Remove structures that are present but no longer desired.
+  for (const [name, node] of present) {
+    if (!desired.has(name)) node.dispose();
+  }
+
+  // Ensure each desired structure is in the scene with the right alpha.
+  for (const [name, structure] of desired) {
+    if (!present.has(name)) {
+      await importStructure(structure, atlasRootNode, scene);
+    }
+
+    const material = scene.getMaterialByName(`${name}_material`);
+    if (material) material.alpha = visibleNames.has(name) ? 1 : 0.1;
+  }
 }

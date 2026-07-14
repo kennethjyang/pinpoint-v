@@ -110,6 +110,9 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
+    <template v-if="currentExperiment.visibleStructures.length">
+      <q-btn label="Clear" />
+    </template>
     <q-scroll-area ref="scroll-area" class="col">
       <q-virtual-scroll
         v-if="isSearching"
