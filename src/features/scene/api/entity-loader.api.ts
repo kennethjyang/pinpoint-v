@@ -6,6 +6,7 @@ import {
   Vector3
 } from "@babylonjs/core";
 import { StructureEntity } from "@/models/atlas.model";
+import { asrToBabylon } from "@/features/scene";
 
 /**
  * Build the atlas root node or return the existing one.
@@ -19,6 +20,22 @@ function buildAtlasRootNode(scene: Scene): TransformNode {
   }
 
   return atlasRootNode;
+}
+
+/**
+ * Offset the atlas root node so the given reference coordinate sits at the
+ * scene origin.
+ *
+ * @param scene Scene containing the atlas root.
+ * @param referenceCoordinate Reference coordinate (in ASR, mm) that the atlas
+ * root should be offset by.
+ */
+export function setAtlasRootReference(
+  scene: Scene,
+  referenceCoordinate: [number, number, number]
+) {
+  const atlasRootNode = buildAtlasRootNode(scene);
+  atlasRootNode.position = asrToBabylon(referenceCoordinate);
 }
 
 /**

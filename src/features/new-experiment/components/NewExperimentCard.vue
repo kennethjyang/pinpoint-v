@@ -1,8 +1,14 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
-import { AtlasPicker } from "@/features/atlas-picker";
+import { AtlasPicker, fetchAtlasMetadata } from "@/features/atlas-picker";
 import { Atlas } from "@/models/atlas.model";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+
+/**
+ * Reference coordinate used when an atlas's metadata (and thus its default
+ * reference coordinate) can't be fetched.
+ */
+const FALLBACK_REFERENCE_COORDINATE: [number, number, number] = [0, 0, 0];
 
 const name = ref<string | null>(null);
 const atlas = ref<Atlas | null>(null);
@@ -15,12 +21,17 @@ const currentExperimentStore = useCurrentExperimentStore();
 const isCreateDisabled = computed(() => !name.value || !atlas.value);
 
 /**
- * Create a new experiment with the given name and atlas.
+ * Create a new experiment with the given name and atlas, seeding its
+ * reference coordinate from the atlas's default reference coordinate.
  */
-function create() {
-  if (name.value && atlas.value) {
-    currentExperimentStore.create(name.value, atlas.value);
-  }
+async function create() {
+  if (!name.value || !atlas.value) return;
+
+  const metadata = await fetchAtlasMetadata(atlas.value);
+  const referenceCoordinate =
+    metadata?.defaultReferenceCoordinate ?? FALLBACK_REFERENCE_COORDINATE;
+
+  currentExperimentStore.create(name.value, atlas.value, referenceCoordinate);
 }
 </script>
 

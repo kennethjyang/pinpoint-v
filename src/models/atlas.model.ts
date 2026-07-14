@@ -36,7 +36,8 @@ export interface AtlasStructure {
 export interface AtlasMetadata {
   name: string;
   converterVersion: string;
-  resolutions: number[];
+  resolutions: [number, number, number][];
+  defaultReferenceCoordinate: [number, number, number];
   rootId: number;
   structures: AtlasStructure[];
 }
