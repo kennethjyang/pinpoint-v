@@ -11,7 +11,7 @@ export const useCurrentExperimentStore = defineStore(
      */
     const experiment = ref<Experiment>({
       name: "My First Experiment",
-      atlas: { source: "http://localhost:8080", name: "allen_mouse" }
+      atlas: { source: "http://localhost:3000", name: "allen_mouse" }
     });
 
     /**
