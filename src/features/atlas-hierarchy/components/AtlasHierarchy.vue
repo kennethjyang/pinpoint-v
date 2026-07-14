@@ -104,15 +104,20 @@ function buildHierarchy(
 </script>
 
 <template>
-  <div class="fit column">
+  <div class="fit column q-gutter-y-sm">
     <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
       <template #prepend>
         <q-icon name="search" />
       </template>
     </q-input>
     <template v-if="currentExperiment.visibleStructures.length">
-      <q-btn label="Clear" />
+      <q-btn
+        icon="clear_all"
+        label="Clear"
+        @click="currentExperiment.clearVisibleStructures"
+      />
     </template>
+
     <q-scroll-area ref="scroll-area" class="col">
       <q-virtual-scroll
         v-if="isSearching"

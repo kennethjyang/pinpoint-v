@@ -74,6 +74,13 @@ export const useCurrentExperimentStore = defineStore(
       }
     }
 
+    /**
+     * Reset visible structures.
+     */
+    function clearVisibleStructures() {
+      visibleStructures.value = [];
+    }
+
     return {
       experiment,
       visibleStructures,
@@ -82,7 +89,8 @@ export const useCurrentExperimentStore = defineStore(
       name,
       atlas,
       isStructureVisible,
-      setStructureVisibility
+      setStructureVisibility,
+      clearVisibleStructures
     };
   },
   { persist: true }
