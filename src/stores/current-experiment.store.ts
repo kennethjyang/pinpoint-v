@@ -15,6 +15,11 @@ export const useCurrentExperimentStore = defineStore(
     });
 
     /**
+     * List of structure ids actively being made shown in the atlas.
+     */
+    const visibleStructures = ref<number[]>([]);
+
+    /**
      * Create a new experiment with the given name and atlas.
      * @param name Experiment name.
      * @param atlas Full atlas object.
@@ -43,7 +48,50 @@ export const useCurrentExperimentStore = defineStore(
      */
     const atlas = computed(() => experiment.value?.atlas ?? null);
 
-    return { experiment, create, setName, name, atlas };
+    /**
+     * Is the structure visible on the atlas in the experiment.
+     * @param id ID of the structure to check.
+     */
+    function isStructureVisible(id: number) {
+      return visibleStructures.value.includes(id);
+    }
+
+    /**
+     * Set the visibility of the structure in the atlas.
+     * @param id ID of the structure to set the visibility of.
+     * @param value Is the structure visible or not.
+     */
+    function setStructureVisibility(id: number, value: boolean) {
+      if (value) {
+        if (!isStructureVisible(id)) {
+          visibleStructures.value.push(id);
+        }
+      } else {
+        const index = visibleStructures.value.indexOf(id);
+        if (index !== -1) {
+          visibleStructures.value.splice(index, 1);
+        }
+      }
+    }
+
+    /**
+     * Reset visible structures.
+     */
+    function clearVisibleStructures() {
+      visibleStructures.value = [];
+    }
+
+    return {
+      experiment,
+      visibleStructures,
+      create,
+      setName,
+      name,
+      atlas,
+      isStructureVisible,
+      setStructureVisibility,
+      clearVisibleStructures
+    };
   },
   { persist: true }
 );

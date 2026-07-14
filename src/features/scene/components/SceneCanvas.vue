@@ -1,12 +1,36 @@
 <script lang="ts" setup>
-import { onMounted, onUnmounted, useTemplateRef, watch } from "vue";
+import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
-import { setStructures } from "@/features/scene";
+import { syncStructureVisibility } from "@/features/scene";
 import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { StructureEntity } from "@/models/atlas.model";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
 const currentAtlas = useCurrentAtlas();
+const currentExperiment = useCurrentExperimentStore();
+
+/**
+ * Atlas structures that must always be present in the scene, faded out when
+ * not visible instead of being removed.
+ */
+const alwaysPresentStructures = computed<StructureEntity[]>(() =>
+  currentAtlas.defaultStructureIds.value.flatMap(id => {
+    const structureEntity = currentAtlas.structureEntityFromId(id);
+    return structureEntity ? [structureEntity] : [];
+  })
+);
+
+/**
+ * Structures the current experiment has marked visible.
+ */
+const visibleStructures = computed<StructureEntity[]>(() =>
+  currentExperiment.visibleStructures.flatMap(id => {
+    const structureEntity = currentAtlas.structureEntityFromId(id);
+    return structureEntity ? [structureEntity] : [];
+  })
+);
 
 onMounted(async () => {
   // Exit if no canvas.
@@ -17,12 +41,15 @@ onMounted(async () => {
   // Initialize Babylon runtime.
   await runtime.init(canvas.value);
 
-  // Load current experiment.
+  // Keep the scene in sync with the current atlas's default structures and the
+  // experiment's visible structure selection.
   watch(
-    [runtime.scene, currentAtlas.defaultStructures],
-    async ([scene, defaultStructures]) => {
-      if (!scene || !defaultStructures) return;
-      await setStructures(defaultStructures, scene);
+    [runtime.scene, alwaysPresentStructures, visibleStructures],
+    async ([scene, alwaysPresent, visible]) => {
+      // Exit if the scene is not ready.
+      if (!scene) return;
+
+      await syncStructureVisibility(scene, alwaysPresent, visible);
     },
     { immediate: true }
   );

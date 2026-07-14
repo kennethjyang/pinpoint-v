@@ -5,6 +5,7 @@ import { TouchPanValue, useQuasar } from "quasar";
 import { SplashCard } from "@/features/splash";
 import { NewExperimentCard } from "@/features/new-experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { AtlasHierarchy } from "@/features/atlas-hierarchy";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -14,8 +15,8 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("scene");
-const showSplash = ref(true);
+const tab = ref("atlas");
+const showSplash = ref(false);
 const showNewExperiment = ref(false);
 
 /**
@@ -133,6 +134,7 @@ function fixedQPageHeight(offset: number) {
       bordered
       show-if-above
       side="left"
+      class="column"
     >
       <q-tabs v-model="tab">
         <q-tab name="scene" :label="$t('layout.scene')" />
@@ -140,12 +142,14 @@ function fixedQPageHeight(offset: number) {
         <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
-      <q-tab-panels v-model="tab" animated>
+      <q-tab-panels v-model="tab" animated class="col">
         <q-tab-panel name="scene">{{ $t("layout.scene") }}</q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")
         }}</q-tab-panel>
-        <q-tab-panel name="atlas">{{ $t("layout.atlas") }}</q-tab-panel>
+        <q-tab-panel name="atlas">
+          <AtlasHierarchy />
+        </q-tab-panel>
       </q-tab-panels>
       <div
         v-touch-pan.horizontal.prevent.mouse="resizeLeftDrawer"
