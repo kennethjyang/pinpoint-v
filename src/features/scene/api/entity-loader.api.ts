@@ -35,7 +35,7 @@ export function setAtlasRootReference(
   referenceCoordinate: [number, number, number]
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
-  atlasRootNode.position = asrToBabylon(referenceCoordinate);
+  atlasRootNode.position = asrToBabylon(referenceCoordinate).negate();
 }
 
 /**
