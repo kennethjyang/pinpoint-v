@@ -11,13 +11,9 @@ export const useCurrentExperimentStore = defineStore(
      */
     const experiment = ref<Experiment>({
       name: "My First Experiment",
-      atlas: { source: "http://localhost:3000", name: "allen_mouse" }
+      atlas: { source: "http://localhost:3000", name: "allen_mouse" },
+      visibleStructures: []
     });
-
-    /**
-     * List of structure ids actively being made shown in the atlas.
-     */
-    const visibleStructures = ref<number[]>([]);
 
     /**
      * Create a new experiment with the given name and atlas.
@@ -25,7 +21,7 @@ export const useCurrentExperimentStore = defineStore(
      * @param atlas Full atlas object.
      */
     function create(name: string, atlas: Atlas) {
-      experiment.value = { name, atlas };
+      experiment.value = { name, atlas, visibleStructures: [] };
     }
 
     /**
@@ -49,11 +45,21 @@ export const useCurrentExperimentStore = defineStore(
     const atlas = computed(() => experiment.value?.atlas ?? null);
 
     /**
+     * List of structure ids actively being made shown in the atlas.
+     */
+    const visibleStructures = computed({
+      get: () => experiment.value.visibleStructures,
+      set: (value: number[]) => {
+        experiment.value.visibleStructures = value;
+      }
+    });
+
+    /**
      * Is the structure visible on the atlas in the experiment.
      * @param id ID of the structure to check.
      */
     function isStructureVisible(id: number) {
-      return visibleStructures.value.includes(id);
+      return experiment.value.visibleStructures.includes(id);
     }
 
     /**
@@ -64,12 +70,12 @@ export const useCurrentExperimentStore = defineStore(
     function setStructureVisibility(id: number, value: boolean) {
       if (value) {
         if (!isStructureVisible(id)) {
-          visibleStructures.value.push(id);
+          experiment.value.visibleStructures.push(id);
         }
       } else {
-        const index = visibleStructures.value.indexOf(id);
+        const index = experiment.value.visibleStructures.indexOf(id);
         if (index !== -1) {
-          visibleStructures.value.splice(index, 1);
+          experiment.value.visibleStructures.splice(index, 1);
         }
       }
     }
@@ -78,7 +84,7 @@ export const useCurrentExperimentStore = defineStore(
      * Reset visible structures.
      */
     function clearVisibleStructures() {
-      visibleStructures.value = [];
+      experiment.value.visibleStructures = [];
     }
 
     return {
