@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
+import { computed, ref, useTemplateRef, watchPostEffect } from "vue";
+import { watchImmediate } from "@vueuse/core";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { AtlasStructure } from "@/features/atlas";
 import { QScrollArea, QTree } from "quasar";
@@ -31,11 +32,9 @@ watch(
     const { rootId, structures } = metadata ?? {};
     if (!rootId || !structures) return;
 
-    // Build from root but exclude it.
-    hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
-  },
-  { immediate: true }
-);
+  // Build from root but exclude it.
+  hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
+});
 
 // Ensure the tree is always fully expanded.
 watchPostEffect(() => {
