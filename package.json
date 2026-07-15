@@ -42,6 +42,7 @@
     "@intlify/unplugin-vue-i18n": "^11.0.0",
     "@quasar/app-vite": "^3.0.1",
     "@types/node": "^26.1.0",
+    "@vue/test-utils": "^2.4.11",
     "autoprefixer": "^10.4.27",
     "lefthook": "^2.1.9",
     "oxfmt": "^0.x",
@@ -49,6 +50,7 @@
     "oxlint-tsgolint": "^0.x",
     "serve": "^14.2.6",
     "typescript": "^6.0.0",
+    "vitest": "^4.1.10",
     "vue-tsc": "^3.3.3"
   },
   "engines": {
