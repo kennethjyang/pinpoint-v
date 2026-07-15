@@ -1,5 +1,11 @@
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, useTemplateRef, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  useTemplateRef,
+  watchEffect
+} from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
@@ -50,29 +56,25 @@ onMounted(async () => {
 
   // Keep the scene in sync with the current atlas's default structures and the
   // experiment's visible structure selection.
-  watch(
-    [runtime.scene, alwaysPresentStructures, visibleStructures],
-    async ([scene, alwaysPresent, visible]) => {
-      // Exit if the scene is not ready.
-      if (!scene) return;
+  watchEffect(async () => {
+    const scene = runtime.scene.value;
+    if (!scene) return;
 
-      await syncStructureVisibility(scene, alwaysPresent, visible);
-    },
-    { immediate: true }
-  );
+    await syncStructureVisibility(
+      scene,
+      alwaysPresentStructures.value,
+      visibleStructures.value
+    );
+  });
 
   // Keep the atlas root positioned so the experiment's reference coordinate
   // sits at the scene origin.
-  watch(
-    [runtime.scene, () => currentExperiment.referenceCoordinate],
-    ([scene, referenceCoordinate]) => {
-      // Exit if the scene is not ready.
-      if (!scene) return;
+  watchEffect(() => {
+    const scene = runtime.scene.value;
+    if (!scene) return;
 
-      setAtlasRootReference(scene, referenceCoordinate);
-    },
-    { immediate: true }
-  );
+    setAtlasRootReference(scene, currentExperiment.referenceCoordinate);
+  });
 });
 
 onUnmounted(() => {

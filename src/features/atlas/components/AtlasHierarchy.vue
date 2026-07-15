@@ -1,5 +1,11 @@
 <script lang="ts" setup>
-import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
+import {
+  computed,
+  ref,
+  useTemplateRef,
+  watchEffect,
+  watchPostEffect
+} from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { AtlasStructure } from "@/features/atlas";
 import { QScrollArea, QTree } from "quasar";
@@ -13,7 +19,6 @@ interface HierarchyModel {
   children: HierarchyModel[];
 }
 
-// Global state.
 const currentExperiment = useCurrentExperimentStore();
 
 // Components.
@@ -25,17 +30,13 @@ const filter = ref<string | null>(null);
 const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
-watch(
-  () => currentExperiment.metadata,
-  metadata => {
-    const { rootId, structures } = metadata ?? {};
-    if (!rootId || !structures) return;
+watchEffect(() => {
+  const { rootId, structures } = currentExperiment.metadata ?? {};
+  if (!rootId || !structures) return;
 
-    // Build from root but exclude it.
-    hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
-  },
-  { immediate: true }
-);
+  // Build from root but exclude it.
+  hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
+});
 
 // Ensure the tree is always fully expanded.
 watchPostEffect(() => {
