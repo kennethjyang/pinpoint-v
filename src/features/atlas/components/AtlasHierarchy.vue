@@ -1,6 +1,11 @@
 <script lang="ts" setup>
-import { computed, ref, useTemplateRef, watchPostEffect } from "vue";
-import { watchImmediate } from "@vueuse/core";
+import {
+  computed,
+  ref,
+  useTemplateRef,
+  watchEffect,
+  watchPostEffect
+} from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { AtlasStructure } from "@/features/atlas";
 import { QScrollArea, QTree } from "quasar";
@@ -26,11 +31,9 @@ const filter = ref<string | null>(null);
 const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
-watch(
-  () => currentExperiment.metadata,
-  metadata => {
-    const { rootId, structures } = metadata ?? {};
-    if (!rootId || !structures) return;
+watchEffect(() => {
+  const { rootId, structures } = currentExperiment.metadata.value ?? {};
+  if (!rootId || !structures) return;
 
   // Build from root but exclude it.
   hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
