@@ -19,7 +19,6 @@ interface HierarchyModel {
   children: HierarchyModel[];
 }
 
-// Global state.
 const currentExperiment = useCurrentExperimentStore();
 
 // Components.
@@ -32,7 +31,7 @@ const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
 watchEffect(() => {
-  const { rootId, structures } = currentExperiment.metadata.value ?? {};
+  const { rootId, structures } = currentExperiment.metadata ?? {};
   if (!rootId || !structures) return;
 
   // Build from root but exclude it.
