@@ -16,6 +16,8 @@ import {
 export function createBabylonRuntimeService() {
   const engine = shallowRef<WebGPUEngine | null>(null);
   const scene = shallowRef<Scene | null>(null);
+  const camera = shallowRef<ArcRotateCamera | null>(null);
+  const gizmoManager = shallowRef<GizmoManager | null>(null);
 
   /**
    * Create the runtime from a canvas.
@@ -34,7 +36,7 @@ export function createBabylonRuntimeService() {
     const s = markRaw(new Scene(e));
 
     // Attach camera.
-    const camera = new ArcRotateCamera(
+    const c = new ArcRotateCamera(
       "main_camera",
       -Math.PI / 2,
       Math.PI / 8,
@@ -42,12 +44,12 @@ export function createBabylonRuntimeService() {
       Vector3.Zero(),
       s
     );
-    camera.attachControl(canvas, true);
+    c.attachControl(canvas, true);
 
     // Attach gizmo manager.
-    const gizmoManager = new GizmoManager(s);
-    gizmoManager.positionGizmoEnabled = true;
-    gizmoManager.rotationGizmoEnabled = true;
+    const gm = new GizmoManager(s);
+    gm.positionGizmoEnabled = true;
+    gm.rotationGizmoEnabled = true;
 
     // Add lights.
     new HemisphericLight("main_light", Vector3.Up(), s);
@@ -61,7 +63,7 @@ export function createBabylonRuntimeService() {
     probeMesh.setAbsolutePosition(Vector3.Up());
     const probeMover = new TransformNode("probeTip_node", s);
     probeMover.addChild(probeMesh);
-    gizmoManager.attachToNode(probeMover);
+    gm.attachToNode(probeMover);
 
     // Start render loop.
     e.runRenderLoop(() => {
@@ -71,15 +73,21 @@ export function createBabylonRuntimeService() {
     // Set refs.
     engine.value = e;
     scene.value = s;
+    camera.value = c;
+    gizmoManager.value = gm;
   }
 
   /**
    * Cleanup this runtime.
    */
   function dispose() {
+    gizmoManager.value?.dispose();
+    camera.value?.dispose();
     scene.value?.dispose();
     engine.value?.dispose();
 
+    gizmoManager.value = null;
+    camera.value = null;
     scene.value = null;
     engine.value = null;
   }
@@ -87,6 +95,8 @@ export function createBabylonRuntimeService() {
   return {
     engine: shallowReadonly(engine),
     scene: shallowReadonly(scene),
+    camera: shallowReadonly(camera),
+    gizmoManager: shallowReadonly(gizmoManager),
     init,
     dispose
   };

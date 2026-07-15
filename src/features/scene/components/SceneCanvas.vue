@@ -79,10 +79,10 @@ onMounted(async () => {
 
   // Set the camera's initial zoom relative to the AP length of the atlas.
   watchEffect(() => {
-    const scene = runtime.scene.value;
-    if (!scene || !currentExperiment.metadata) return;
+    const camera = runtime.camera.value;
+    if (!camera || !currentExperiment.metadata) return;
 
-    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, scene);
+    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, camera);
   });
 });
 
