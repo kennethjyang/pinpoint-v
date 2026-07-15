@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { Atlas } from "@/models/atlas.model";
+import { Atlas } from "@/features/atlas";
 
 export const useFavoriteAtlasesStore = defineStore(
   "favorite-atlases",

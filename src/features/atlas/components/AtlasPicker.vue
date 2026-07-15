@@ -5,7 +5,7 @@ import { useI18n } from "vue-i18n";
 import axios from "axios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { Atlas } from "@/models/atlas.model";
+import { Atlas } from "@/features/atlas";
 
 /**
  * Atlas item in response structure.
@@ -162,40 +162,40 @@ async function connect() {
 
     <div class="row q-gutter-x-md">
       <q-btn
+        :label="$t('atlasPicker.pinpointAtlases')"
         color="primary"
         icon="public"
-        :label="$t('atlasPicker.pinpointAtlases')"
         @click="
           atlasSource =
             'https://virtualbrainlab.alleninstitute.org/pinpoint/atlases'
         "
       />
       <q-btn
-        icon="home"
         :label="$t('atlasPicker.locallyHosted')"
+        icon="home"
         @click="atlasSource = 'http://localhost:3000'"
       />
     </div>
 
     <q-input
       v-model="atlasSource"
+      :label="$t('atlasPicker.sourceUrl')"
       class="col"
       clearable
-      :label="$t('atlasPicker.sourceUrl')"
     />
 
     <q-btn
+      :label="$t('atlasPicker.connect')"
       :loading="connectionState === ConnectionState.Connecting"
       color="primary"
-      :label="$t('atlasPicker.connect')"
       @click="connect"
     />
 
     <template v-if="connectionState === ConnectionState.Connected">
       <q-input
         v-model="searchQuery"
-        clearable
         :label="$t('atlasPicker.search')"
+        clearable
       >
         <template #prepend>
           <q-icon name="search" />
@@ -213,18 +213,18 @@ async function connect() {
         <q-item
           v-for="atlas in filteredAtlasesFavorites"
           :key="`${atlas.source}-${atlas.name}`"
-          :active="selectedAtlas === atlas"
           v-ripple
+          :active="selectedAtlas === atlas"
           clickable
           @click="selectedAtlas = atlas"
         >
           <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
             <q-btn
-              flat
-              round
               color="pink"
+              flat
               icon="favorite"
+              round
               @click.stop="favoriteAtlasesStore.remove(atlas)"
             />
           </q-item-section>
@@ -233,8 +233,8 @@ async function connect() {
         <q-item
           v-for="atlas in filteredAtlasesAtlases"
           :key="`${atlas.source}-${atlas.name}`"
-          :active="selectedAtlas === atlas"
           v-ripple
+          :active="selectedAtlas === atlas"
           clickable
           @click="selectedAtlas = atlas"
         >
@@ -242,8 +242,8 @@ async function connect() {
           <q-item-section side>
             <q-btn
               flat
-              round
               icon="favorite_border"
+              round
               @click.stop="favoriteAtlasesStore.add(atlas)"
             />
           </q-item-section>

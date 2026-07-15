@@ -1,7 +1,13 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { computedAsync } from "@vueuse/core";
 import { Experiment } from "@/models/experiment.model";
-import { Atlas } from "@/models/atlas.model";
+import {
+  Atlas,
+  AtlasMetadata,
+  fetchAtlasMetadata,
+  getDefaultStructureIds
+} from "@/features/atlas";
 
 /**
  * Default reference coordinate for the starter experiment's atlas
@@ -56,12 +62,26 @@ export const useCurrentExperimentStore = defineStore(
     /**
      * Get the current experiment name.
      */
-    const name = computed(() => experiment.value?.name ?? null);
+    const name = computed(() => experiment.value.name);
 
     /**
      * Get the current experiment atlas.
      */
-    const atlas = computed(() => experiment.value?.atlas ?? null);
+    const atlas = computed(() => experiment.value.atlas);
+
+    /**
+     * Fetch the metadata for the current experiment's atlas.
+     */
+    const metadata = computedAsync<AtlasMetadata | null>(async () =>
+      fetchAtlasMetadata(atlas.value)
+    );
+
+    /**
+     * Default (top-level) structure ids for the current experiment's atlas.
+     */
+    const defaultStructureIds = computed<number[]>(() =>
+      metadata.value ? getDefaultStructureIds(metadata.value) : []
+    );
 
     /**
      * Set the reference coordinate of the experiment.
@@ -98,7 +118,7 @@ export const useCurrentExperimentStore = defineStore(
      * @param id ID of the structure to check.
      */
     function isStructureVisible(id: number) {
-      return experiment.value.visibleStructures.includes(id);
+      return visibleStructures.value.includes(id);
     }
 
     /**
@@ -109,12 +129,12 @@ export const useCurrentExperimentStore = defineStore(
     function setStructureVisibility(id: number, value: boolean) {
       if (value) {
         if (!isStructureVisible(id)) {
-          experiment.value.visibleStructures.push(id);
+          visibleStructures.value.push(id);
         }
       } else {
-        const index = experiment.value.visibleStructures.indexOf(id);
+        const index = visibleStructures.value.indexOf(id);
         if (index !== -1) {
-          experiment.value.visibleStructures.splice(index, 1);
+          visibleStructures.value.splice(index, 1);
         }
       }
     }
@@ -133,6 +153,8 @@ export const useCurrentExperimentStore = defineStore(
       setName,
       name,
       atlas,
+      metadata,
+      defaultStructureIds,
       setReferenceCoordinate,
       referenceCoordinate,
       isStructureVisible,
