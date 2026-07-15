@@ -33,14 +33,14 @@
     "fuse.js": "^7.4.2",
     "pinia": "^3.0.1",
     "pinia-plugin-persistedstate": "^4.7.1",
-    "quasar": "^2.21.0",
+    "quasar": "^2.21.3",
     "vue": "^3.5.22",
     "vue-i18n": "^11.3.0",
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@intlify/unplugin-vue-i18n": "^11.0.0",
-    "@quasar/app-vite": "^3.0.0-rc.6",
+    "@quasar/app-vite": "^3.0.1",
     "@types/node": "^26.1.0",
     "autoprefixer": "^10.4.27",
     "lefthook": "^2.1.9",
