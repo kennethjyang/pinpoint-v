@@ -108,13 +108,6 @@ function buildHierarchy(
         <q-icon name="search" />
       </template>
     </q-input>
-    <template v-if="currentExperiment.visibleStructures.length">
-      <q-btn
-        icon="clear_all"
-        label="Clear"
-        @click="currentExperiment.clearVisibleStructures"
-      />
-    </template>
 
     <q-scroll-area ref="scroll-area" class="col">
       <q-virtual-scroll
@@ -170,6 +163,14 @@ function buildHierarchy(
         </template>
       </q-tree>
     </q-scroll-area>
+
+    <template v-if="currentExperiment.visibleStructures.length">
+      <q-btn
+        icon="clear_all"
+        label="Clear"
+        @click="currentExperiment.clearVisibleStructures"
+      />
+    </template>
   </div>
 </template>
 
