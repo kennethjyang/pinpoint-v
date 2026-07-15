@@ -60,7 +60,7 @@ export default defineConfig(ctx => {
       // minify: false,
       // distDir
 
-      // extendViteConf (viteConf) {},
+      // extendViteConf(userConfig) {},
       // viteVuePluginOptions: {},
 
       vitePlugins: [

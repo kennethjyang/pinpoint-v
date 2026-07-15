@@ -5,22 +5,11 @@ import { useI18n } from "vue-i18n";
 import axios from "axios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { Atlas } from "@/features/atlas";
-
-/**
- * Atlas item in response structure.
- */
-interface AtlasItem {
-  name: string;
-  type: string;
-}
-
-/**
- * Atlas source connection response.
- */
-interface AtlasSourceResponse {
-  files: AtlasItem[];
-}
+import {
+  Atlas,
+  AtlasSourceResponse,
+  parseAtlasSourceResponse
+} from "@/features/atlas";
 
 enum ConnectionState {
   Disconnected,
@@ -143,9 +132,7 @@ async function connect() {
 
     // Parse the response.
     if (response.data) {
-      atlases.value = response.data.files
-        .filter(item => item.type === "folder")
-        .map(item => ({ name: item.name, source }));
+      atlases.value = parseAtlasSourceResponse(response.data, source);
       connectionState.value = ConnectionState.Connected;
     } else {
       notifyFail();
