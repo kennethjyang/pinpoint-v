@@ -1,6 +1,7 @@
 export { default as AtlasPicker } from "./components/AtlasPicker.vue";
 export { default as AtlasHierarchy } from "./components/AtlasHierarchy.vue";
 export {
+  checkConverterCompatibility,
   fetchAtlasMetadata,
   getDefaultStructureIds,
   structureEntityFromId
@@ -13,3 +14,4 @@ export type { Atlas } from "./models/atlas.model";
 export type { AtlasStructure } from "./models/atlas-structure.model";
 export type { AtlasMetadata } from "./models/atlas-metadata.model";
 export type { StructureEntity } from "./models/structure-entity.model";
+export { ConverterCompatibility } from "./models/converter-compatibility.model";

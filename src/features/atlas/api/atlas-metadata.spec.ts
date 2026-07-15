@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
 import { Color3 } from "@babylonjs/core";
 import {
+  checkConverterCompatibility,
+  ConverterCompatibility,
   fetchAtlasMetadata,
   getDefaultStructureIds,
   structureEntityFromId
@@ -81,5 +83,61 @@ describe("fetchAtlasMetadata", () => {
     const result = await fetchAtlasMetadata(atlas);
 
     expect(result).toBeNull();
+  });
+});
+
+describe("checkConverterCompatibility", () => {
+  it("returns Compatible for equal versions", () => {
+    expect(checkConverterCompatibility("5.0.0", "5.0.0")).toBe(
+      ConverterCompatibility.Compatible
+    );
+  });
+
+  it("returns Compatible for a patch/subversion difference", () => {
+    expect(checkConverterCompatibility("5.0.0", "5.0.7")).toBe(
+      ConverterCompatibility.Compatible
+    );
+  });
+
+  it("returns Warn when Pinpoint's minor is newer than the converter's", () => {
+    expect(checkConverterCompatibility("5.0.0", "5.2.0")).toBe(
+      ConverterCompatibility.Warn
+    );
+  });
+
+  it("returns Compatible when Pinpoint's minor is older than the converter's", () => {
+    expect(checkConverterCompatibility("5.2.0", "5.0.0")).toBe(
+      ConverterCompatibility.Compatible
+    );
+  });
+
+  it("returns BlockPinpointOutdated when Pinpoint's major is behind the converter's", () => {
+    expect(checkConverterCompatibility("6.0.0", "5.0.0")).toBe(
+      ConverterCompatibility.BlockPinpointOutdated
+    );
+  });
+
+  it("returns BlockAtlasOutdated when Pinpoint's major is ahead of the converter's", () => {
+    expect(checkConverterCompatibility("4.0.0", "5.0.0")).toBe(
+      ConverterCompatibility.BlockAtlasOutdated
+    );
+  });
+
+  it("returns Unverifiable for an unparseable converter version", () => {
+    expect(checkConverterCompatibility("not-a-version", "5.0.0")).toBe(
+      ConverterCompatibility.Unverifiable
+    );
+  });
+
+  it("returns Unverifiable for an undefined converter version", () => {
+    expect(checkConverterCompatibility(undefined, "5.0.0")).toBe(
+      ConverterCompatibility.Unverifiable
+    );
+  });
+
+  it("returns Unverifiable for an unparseable app version", () => {
+    expect(checkConverterCompatibility("5.0.0", "not-a-version")).toBe(
+      ConverterCompatibility.Unverifiable
+    );
   });
 });
