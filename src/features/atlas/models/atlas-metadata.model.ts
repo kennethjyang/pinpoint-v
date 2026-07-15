@@ -9,6 +9,7 @@ export interface AtlasMetadata {
   name: string;
   converterVersion: string;
   resolutions: [number, number, number][];
+  dimensions: [number, number, number];
   defaultReferenceCoordinate: [number, number, number];
   rootId: number;
   structures: AtlasStructure[];

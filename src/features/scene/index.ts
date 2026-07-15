@@ -4,3 +4,4 @@ export {
   setAtlasRootReference
 } from "./api/entity-loader.api";
 export { asrToBabylon, babylonToAsr } from "./api/coordinate-transforms.api";
+export { setZoom } from "./api/camera.api";

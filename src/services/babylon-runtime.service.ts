@@ -38,7 +38,7 @@ export function createBabylonRuntimeService() {
       "main_camera",
       -Math.PI / 2,
       Math.PI / 8,
-      30,
+      0,
       Vector3.Zero(),
       s
     );

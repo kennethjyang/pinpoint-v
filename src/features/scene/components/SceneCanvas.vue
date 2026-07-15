@@ -13,6 +13,7 @@ import {
 } from "@/features/scene";
 import { StructureEntity, structureEntityFromId } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { setZoom } from "@/features/scene/";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
@@ -74,6 +75,14 @@ onMounted(async () => {
     if (!scene) return;
 
     setAtlasRootReference(scene, currentExperiment.referenceCoordinate);
+  });
+
+  // Set the camera's initial zoom relative to the AP length of the atlas.
+  watchEffect(() => {
+    const scene = runtime.scene.value;
+    if (!scene || !currentExperiment.metadata) return;
+
+    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, scene);
   });
 });
 
