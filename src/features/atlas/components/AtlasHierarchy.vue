@@ -7,17 +7,13 @@ import {
   watchPostEffect
 } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { AtlasStructure } from "@/features/atlas";
+import {
+  buildHierarchy,
+  flattenHierarchy,
+  HierarchyModel
+} from "@/features/atlas";
 import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-
-interface HierarchyModel {
-  id: number;
-  acronym: string;
-  fullName: string;
-  color: string;
-  children: HierarchyModel[];
-}
 
 const currentExperiment = useCurrentExperimentStore();
 
@@ -49,17 +45,7 @@ watchPostEffect(() => {
 const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
 // Flatten the hierarchy into a searchable list for fuzzy matching.
-const flatNodes = computed(() => {
-  const flattened: HierarchyModel[] = [];
-  const walk = (nodes: HierarchyModel[]) => {
-    for (const node of nodes) {
-      flattened.push(node);
-      walk(node.children);
-    }
-  };
-  walk(hierarchy.value);
-  return flattened;
-});
+const flatNodes = computed(() => flattenHierarchy(hierarchy.value));
 
 // Fuzzy search across the acronym (label) and the full name.
 const searchQuery = computed(() => filter.value ?? "");
@@ -70,36 +56,6 @@ const { results } = useFuse(searchQuery, flatNodes, {
 // Search mode: replace tree with flat result list.
 const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
 const searchResults = computed(() => results.value.map(r => r.item));
-
-/**
- * Build a tree hierarchy from a structure metadata.
- * @param id Index of the current structure in `structures` to recurse down.
- * @param structures All structures in atlas metadata.
- */
-function buildHierarchy(
-  id: number,
-  structures: AtlasStructure[]
-): HierarchyModel | null {
-  // Get the structure.
-  const structure = structures[id];
-  if (!structure) return null;
-
-  // Convert name to title case.
-  const titleCaseName = structure.name
-    .split(" ")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-
-  return {
-    id,
-    acronym: structure.acronym.toUpperCase(),
-    fullName: titleCaseName,
-    color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
-    children: structure.childrenIds.flatMap(
-      childId => buildHierarchy(childId, structures) ?? []
-    )
-  };
-}
 </script>
 
 <template>

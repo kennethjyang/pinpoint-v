@@ -4,7 +4,6 @@
 import { defineConfig } from "#q-app";
 import pkg from "./package.json";
 
-// @ts-ignore
 export default defineConfig(ctx => {
   return {
     // https://v2.quasar.dev/quasar-cli-vite/prefetch-feature
@@ -61,14 +60,7 @@ export default defineConfig(ctx => {
       // minify: false,
       // distDir
 
-      extendViteConf(_, __) {
-        return {
-          test: {
-            globals: true,
-            environment: "happy-dom"
-          }
-        };
-      },
+      // extendViteConf(userConfig) {},
       // viteVuePluginOptions: {},
 
       vitePlugins: [

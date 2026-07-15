@@ -1,0 +1,25 @@
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+import vue from "@vitejs/plugin-vue";
+import { quasar } from "@quasar/vite-plugin";
+
+// Standalone Vitest config.
+//
+// Quasar's CLI (`quasar dev`/`quasar build`) reads `quasar.config.ts`, but the
+// `vitest` CLI does not go through Quasar's build pipeline, so it never sees
+// that file's `extendViteConf`/`vitePlugins`. This config mirrors what's
+// needed to run unit tests: the Vue SFC + Quasar plugins (so `.vue` files and
+// auto-imported Quasar components compile) and the `@` -> `src` alias used
+// throughout the app.
+export default defineConfig({
+  plugins: [vue(), quasar()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url))
+    }
+  },
+  test: {
+    globals: true,
+    environment: "happy-dom"
+  }
+});
