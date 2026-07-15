@@ -1,7 +1,8 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import { quasar } from "@quasar/vite-plugin";
+import pkg from "./package.json";
 
 // Standalone Vitest config.
 //
@@ -18,8 +19,14 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url))
     }
   },
+  define: {
+    // Mirrors quasar.config.ts's build.defineEnv, which the vitest CLI never
+    // sees.
+    "import.meta.env.APP_VERSION": JSON.stringify(pkg.version)
+  },
   test: {
     globals: true,
-    environment: "happy-dom"
+    environment: "happy-dom",
+    exclude: [...configDefaults.exclude, ".direnv", ".claude"]
   }
 });

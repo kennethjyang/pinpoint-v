@@ -1,6 +1,12 @@
 import axios from "axios";
+import semver from "semver";
 import { Color3 } from "@babylonjs/core";
-import { Atlas, AtlasMetadata, StructureEntity } from "@/features/atlas";
+import {
+  Atlas,
+  AtlasMetadata,
+  ConverterCompatibility,
+  StructureEntity
+} from "@/features/atlas";
 
 /**
  * Fetch the metadata for the given atlas.
@@ -59,4 +65,28 @@ export function structureEntityFromId(
     ).toString(),
     color: Color3.FromInts(r, g, b)
   };
+}
+
+/**
+ * Check whether an atlas's version is compatible with the running Pinpoint version.
+ * @param atlasVersion Atlas version from the atlas's metadata.
+ * @param appVersion Current Pinpoint version.
+ */
+export function checkAtlasCompatibility(
+  atlasVersion: string | undefined,
+  appVersion: string
+): ConverterCompatibility {
+  const converter = atlasVersion ? semver.coerce(atlasVersion) : null;
+  const app = semver.coerce(appVersion);
+  if (!converter || !app) return ConverterCompatibility.Unverifiable;
+
+  if (app.major < converter.major) {
+    return ConverterCompatibility.BlockPinpointOutdated;
+  }
+  if (app.major > converter.major) {
+    return ConverterCompatibility.BlockAtlasOutdated;
+  }
+  if (app.minor > converter.minor) return ConverterCompatibility.Warn;
+
+  return ConverterCompatibility.Compatible;
 }

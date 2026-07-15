@@ -71,7 +71,7 @@ export function makeAtlasMetadata(
 ): AtlasMetadata {
   return {
     name: "allen_mouse",
-    converterVersion: "1.0.0",
+    version: "1.0.0",
     resolutions: [[1, 1, 1]],
     dimensions: [100, 100, 100],
     defaultReferenceCoordinate: [5.7, 0.44, 5.4],

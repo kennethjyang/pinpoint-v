@@ -7,7 +7,7 @@ import { AtlasStructure } from "@/features/atlas";
  */
 export interface AtlasMetadata {
   name: string;
-  converterVersion: string;
+  version: string;
   resolutions: [number, number, number][];
   dimensions: [number, number, number];
   defaultReferenceCoordinate: [number, number, number];

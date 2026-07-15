@@ -8,6 +8,9 @@ import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   Atlas,
   AtlasSourceResponse,
+  checkAtlasCompatibility,
+  ConverterCompatibility,
+  fetchAtlasMetadata,
   parseAtlasSourceResponse
 } from "@/features/atlas";
 
@@ -141,6 +144,62 @@ async function connect() {
     notifyFail();
   }
 }
+
+/**
+ * Select an atlas, first checking that its version is compatible with the
+ * running Pinpoint version. Blocks selection (and notifies) on a major
+ * version mismatch or an unverifiable version; warns but still selects on a
+ * minor version mismatch.
+ */
+async function selectAtlas(atlas: Atlas) {
+  const metadata = await fetchAtlasMetadata(atlas);
+  const compatibility = checkAtlasCompatibility(
+    metadata?.version,
+    import.meta.env.APP_VERSION
+  );
+
+  switch (compatibility) {
+    case ConverterCompatibility.BlockPinpointOutdated:
+      $q.notify({
+        message: t("atlasPicker.pinpointOutdated"),
+        caption: t("atlasPicker.pinpointOutdatedCaption"),
+        color: "negative",
+        icon: "error"
+      });
+      selectedAtlas.value = null;
+      return;
+    case ConverterCompatibility.BlockAtlasOutdated:
+      $q.notify({
+        message: t("atlasPicker.atlasOutdated"),
+        caption: t("atlasPicker.atlasOutdatedCaption"),
+        color: "negative",
+        icon: "error"
+      });
+      selectedAtlas.value = null;
+      return;
+    case ConverterCompatibility.Unverifiable:
+      $q.notify({
+        message: t("atlasPicker.versionUnverifiable"),
+        caption: t("atlasPicker.versionUnverifiableCaption"),
+        color: "negative",
+        icon: "error"
+      });
+      selectedAtlas.value = null;
+      return;
+    case ConverterCompatibility.Warn:
+      $q.notify({
+        message: t("atlasPicker.versionWarn"),
+        caption: t("atlasPicker.versionWarnCaption"),
+        color: "warning",
+        icon: "warning"
+      });
+      break;
+    case ConverterCompatibility.Compatible:
+      break;
+  }
+
+  selectedAtlas.value = atlas;
+}
 </script>
 
 <template>
@@ -203,7 +262,7 @@ async function connect() {
           v-ripple
           :active="selectedAtlas === atlas"
           clickable
-          @click="selectedAtlas = atlas"
+          @click="selectAtlas(atlas)"
         >
           <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
@@ -223,7 +282,7 @@ async function connect() {
           v-ripple
           :active="selectedAtlas === atlas"
           clickable
-          @click="selectedAtlas = atlas"
+          @click="selectAtlas(atlas)"
         >
           <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>

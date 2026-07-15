@@ -8,7 +8,18 @@ export default {
     search: "Search",
     atlasCount: "no atlases | one atlas | {count} atlases",
     connectFailed: "Unable to access atlases from source.",
-    connectFailedCaption: "Check source URL and try again."
+    connectFailedCaption: "Check source URL and try again.",
+    pinpointOutdated: "This atlas requires a newer version of Pinpoint.",
+    pinpointOutdatedCaption: "Update Pinpoint to use this atlas.",
+    atlasOutdated: "This atlas was built for an older version of Pinpoint.",
+    atlasOutdatedCaption:
+      "Update the atlas to use it with this version of Pinpoint.",
+    versionWarn:
+      "This atlas may not support all features in this version of Pinpoint.",
+    versionWarnCaption: "Some features may not work as expected.",
+    versionUnverifiable: "Unable to verify this atlas's compatibility.",
+    versionUnverifiableCaption:
+      "Its metadata is missing or has an invalid converter version."
   },
   atlasHierarchy: {
     search: "Search"

@@ -4,14 +4,31 @@ import axios from "axios";
 import AtlasPicker from "./AtlasPicker.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
-import { makeAtlas } from "@/test/fixtures";
+import {
+  checkAtlasCompatibility,
+  ConverterCompatibility
+} from "@/features/atlas";
+import { makeAtlas, makeAtlasMetadata } from "@/test/fixtures";
 
 vi.mock("axios");
+
+// Delegates to the real implementation by default so most tests exercise the
+// actual compatibility logic; individual tests can override with
+// mockReturnValueOnce for cases that aren't reachable via a real APP_VERSION
+// (e.g. a minor mismatch where Pinpoint is newer, since the app's minor is 0).
+vi.mock("@/features/atlas", async importOriginal => {
+  const actual = await importOriginal<typeof import("@/features/atlas")>();
+  return {
+    ...actual,
+    checkAtlasCompatibility: vi.fn(actual.checkAtlasCompatibility)
+  };
+});
 
 // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
 // called unbound.
 // oxlint-disable-next-line typescript/unbound-method
 const mockedGet = vi.mocked(axios.get);
+const mockedCheckAtlasCompatibility = vi.mocked(checkAtlasCompatibility);
 
 function mountPicker(
   modelValue: ReturnType<typeof makeAtlas> | null = null,
@@ -33,6 +50,7 @@ describe("AtlasPicker", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockedGet.mockReset();
+    mockedCheckAtlasCompatibility.mockClear();
   });
 
   describe("connect", () => {
@@ -165,9 +183,9 @@ describe("AtlasPicker", () => {
     });
   });
 
-  describe("v-model contract", () => {
-    it("emits update:modelValue with the clicked atlas", async () => {
-      mockedGet.mockResolvedValue({
+  describe("converter compatibility", () => {
+    async function connectedWrapper() {
+      mockedGet.mockResolvedValueOnce({
         data: { files: [{ name: "allen_mouse", type: "folder" }] }
       });
 
@@ -175,12 +193,78 @@ describe("AtlasPicker", () => {
       await connectButton(wrapper).trigger("click");
       await new Promise(resolve => setTimeout(resolve, 0));
       await wrapper.vm.$nextTick();
+      return wrapper;
+    }
 
+    async function selectFirstAtlas(
+      wrapper: Awaited<ReturnType<typeof connectedWrapper>>
+    ) {
       await wrapper.findComponent({ name: "QItem" }).trigger("click");
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await wrapper.vm.$nextTick();
+    }
+
+    it("emits update:modelValue with the clicked atlas when compatible", async () => {
+      const wrapper = await connectedWrapper();
+      mockedGet.mockResolvedValueOnce({
+        data: makeAtlasMetadata({
+          version: import.meta.env.APP_VERSION
+        })
+      });
+
+      await selectFirstAtlas(wrapper);
 
       expect(wrapper.emitted("update:modelValue")).toEqual([
         [{ name: "allen_mouse", source: "http://localhost:3000" }]
       ]);
+    });
+
+    it("blocks selection and notifies negatively on a major version mismatch", async () => {
+      const wrapper = await connectedWrapper();
+      mockedGet.mockResolvedValueOnce({
+        data: makeAtlasMetadata({ version: "1.0.0" })
+      });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await selectFirstAtlas(wrapper);
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({ color: "negative" })
+      );
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    });
+
+    it("warns but still selects on a minor version mismatch where Pinpoint is newer", async () => {
+      const wrapper = await connectedWrapper();
+      mockedGet.mockResolvedValueOnce({ data: makeAtlasMetadata() });
+      // A real APP_VERSION with a newer minor than any converter version isn't
+      // guaranteed to exist, so stub the compatibility check for this case.
+      mockedCheckAtlasCompatibility.mockReturnValueOnce(
+        ConverterCompatibility.Warn
+      );
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await selectFirstAtlas(wrapper);
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({ color: "warning" })
+      );
+      expect(wrapper.emitted("update:modelValue")).toEqual([
+        [{ name: "allen_mouse", source: "http://localhost:3000" }]
+      ]);
+    });
+
+    it("blocks selection when the atlas metadata can't be fetched", async () => {
+      const wrapper = await connectedWrapper();
+      mockedGet.mockRejectedValueOnce(new Error("network error"));
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await selectFirstAtlas(wrapper);
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({ color: "negative" })
+      );
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
     });
   });
 });
