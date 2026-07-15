@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
-import { AtlasPicker, fetchAtlasMetadata } from "@/features/atlas-picker";
-import { Atlas } from "@/models/atlas.model";
+import { Atlas, AtlasPicker, fetchAtlasMetadata } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 /**

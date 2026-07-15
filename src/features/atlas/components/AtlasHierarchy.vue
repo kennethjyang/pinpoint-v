@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import { computed, ref, useTemplateRef, watch, watchPostEffect } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
-import { AtlasStructure } from "@/models/atlas.model";
+import { AtlasStructure } from "@/features/atlas";
 import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
@@ -16,7 +15,6 @@ interface HierarchyModel {
 
 // Global state.
 const currentExperiment = useCurrentExperimentStore();
-const currentAtlas = useCurrentAtlas();
 
 // Components.
 const tree = useTemplateRef<QTree>("tree");
@@ -28,7 +26,7 @@ const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
 watch(
-  currentAtlas.metadata,
+  () => currentExperiment.metadata,
   metadata => {
     const { rootId, structures } = metadata ?? {};
     if (!rootId || !structures) return;
@@ -153,8 +151,8 @@ function buildHierarchy(
       <q-tree
         v-else
         ref="tree"
-        :nodes="hierarchy"
         v-model:ticked="currentExperiment.visibleStructures"
+        :nodes="hierarchy"
         dense
         no-transition
         node-key="id"

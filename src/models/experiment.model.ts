@@ -1,4 +1,4 @@
-import { Atlas } from "@/models/atlas.model";
+import { Atlas } from "@/features/atlas";
 
 export interface Experiment {
   name: string;

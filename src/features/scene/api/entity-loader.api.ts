@@ -5,7 +5,7 @@ import {
   TransformNode,
   Vector3
 } from "@babylonjs/core";
-import { StructureEntity } from "@/models/atlas.model";
+import { StructureEntity } from "@/features/atlas";
 import { asrToBabylon } from "@/features/scene";
 
 /**

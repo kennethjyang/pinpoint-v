@@ -5,35 +5,39 @@ import {
   setAtlasRootReference,
   syncStructureVisibility
 } from "@/features/scene";
-import { useCurrentAtlas } from "@/composable/useCurrentAtlas";
+import { StructureEntity, structureEntityFromId } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { StructureEntity } from "@/models/atlas.model";
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const runtime = useBabylonRuntimeService();
-const currentAtlas = useCurrentAtlas();
 const currentExperiment = useCurrentExperimentStore();
 
 /**
  * Atlas structures that must always be present in the scene, faded out when
  * not visible instead of being removed.
  */
-const alwaysPresentStructures = computed<StructureEntity[]>(() =>
-  currentAtlas.defaultStructureIds.value.flatMap(id => {
-    const structureEntity = currentAtlas.structureEntityFromId(id);
+const alwaysPresentStructures = computed<StructureEntity[]>(() => {
+  const { atlas, metadata } = currentExperiment;
+  if (!atlas || !metadata) return [];
+
+  return currentExperiment.defaultStructureIds.flatMap(id => {
+    const structureEntity = structureEntityFromId(atlas, metadata, id);
     return structureEntity ? [structureEntity] : [];
-  })
-);
+  });
+});
 
 /**
  * Structures the current experiment has marked visible.
  */
-const visibleStructures = computed<StructureEntity[]>(() =>
-  currentExperiment.visibleStructures.flatMap(id => {
-    const structureEntity = currentAtlas.structureEntityFromId(id);
+const visibleStructures = computed<StructureEntity[]>(() => {
+  const { atlas, metadata } = currentExperiment;
+  if (!atlas || !metadata) return [];
+
+  return currentExperiment.visibleStructures.flatMap(id => {
+    const structureEntity = structureEntityFromId(atlas, metadata, id);
     return structureEntity ? [structureEntity] : [];
-  })
-);
+  });
+});
 
 onMounted(async () => {
   // Exit if no canvas.
