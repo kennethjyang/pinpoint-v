@@ -8,7 +8,7 @@ import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   Atlas,
   AtlasSourceResponse,
-  checkConverterCompatibility,
+  checkAtlasCompatibility,
   ConverterCompatibility,
   fetchAtlasMetadata,
   parseAtlasSourceResponse
@@ -146,15 +146,15 @@ async function connect() {
 }
 
 /**
- * Select an atlas, first checking that its converter version is compatible
- * with the running Pinpoint version. Blocks selection (and notifies) on a
- * major version mismatch or an unverifiable converter version; warns but
- * still selects on a minor version mismatch.
+ * Select an atlas, first checking that its version is compatible with the
+ * running Pinpoint version. Blocks selection (and notifies) on a major
+ * version mismatch or an unverifiable version; warns but still selects on a
+ * minor version mismatch.
  */
 async function selectAtlas(atlas: Atlas) {
   const metadata = await fetchAtlasMetadata(atlas);
-  const compatibility = checkConverterCompatibility(
-    metadata?.converterVersion,
+  const compatibility = checkAtlasCompatibility(
+    metadata?.version,
     import.meta.env.APP_VERSION
   );
 

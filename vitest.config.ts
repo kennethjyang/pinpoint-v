@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import { quasar } from "@quasar/vite-plugin";
 import pkg from "./package.json";
@@ -26,6 +26,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "happy-dom"
+    environment: "happy-dom",
+    exclude: [...configDefaults.exclude, ".direnv", ".claude"]
   }
 });

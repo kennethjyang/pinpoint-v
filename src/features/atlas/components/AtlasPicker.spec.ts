@@ -5,7 +5,7 @@ import AtlasPicker from "./AtlasPicker.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import {
-  checkConverterCompatibility,
+  checkAtlasCompatibility,
   ConverterCompatibility
 } from "@/features/atlas";
 import { makeAtlas, makeAtlasMetadata } from "@/test/fixtures";
@@ -20,7 +20,7 @@ vi.mock("@/features/atlas", async importOriginal => {
   const actual = await importOriginal<typeof import("@/features/atlas")>();
   return {
     ...actual,
-    checkConverterCompatibility: vi.fn(actual.checkConverterCompatibility)
+    checkAtlasCompatibility: vi.fn(actual.checkAtlasCompatibility)
   };
 });
 
@@ -28,9 +28,7 @@ vi.mock("@/features/atlas", async importOriginal => {
 // called unbound.
 // oxlint-disable-next-line typescript/unbound-method
 const mockedGet = vi.mocked(axios.get);
-const mockedCheckConverterCompatibility = vi.mocked(
-  checkConverterCompatibility
-);
+const mockedCheckAtlasCompatibility = vi.mocked(checkAtlasCompatibility);
 
 function mountPicker(
   modelValue: ReturnType<typeof makeAtlas> | null = null,
@@ -52,7 +50,7 @@ describe("AtlasPicker", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockedGet.mockReset();
-    mockedCheckConverterCompatibility.mockClear();
+    mockedCheckAtlasCompatibility.mockClear();
   });
 
   describe("connect", () => {
@@ -210,7 +208,7 @@ describe("AtlasPicker", () => {
       const wrapper = await connectedWrapper();
       mockedGet.mockResolvedValueOnce({
         data: makeAtlasMetadata({
-          converterVersion: import.meta.env.APP_VERSION
+          version: import.meta.env.APP_VERSION
         })
       });
 
@@ -224,7 +222,7 @@ describe("AtlasPicker", () => {
     it("blocks selection and notifies negatively on a major version mismatch", async () => {
       const wrapper = await connectedWrapper();
       mockedGet.mockResolvedValueOnce({
-        data: makeAtlasMetadata({ converterVersion: "1.0.0" })
+        data: makeAtlasMetadata({ version: "1.0.0" })
       });
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
@@ -241,7 +239,7 @@ describe("AtlasPicker", () => {
       mockedGet.mockResolvedValueOnce({ data: makeAtlasMetadata() });
       // A real APP_VERSION with a newer minor than any converter version isn't
       // guaranteed to exist, so stub the compatibility check for this case.
-      mockedCheckConverterCompatibility.mockReturnValueOnce(
+      mockedCheckAtlasCompatibility.mockReturnValueOnce(
         ConverterCompatibility.Warn
       );
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");

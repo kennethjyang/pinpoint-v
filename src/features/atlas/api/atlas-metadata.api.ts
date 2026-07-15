@@ -68,16 +68,15 @@ export function structureEntityFromId(
 }
 
 /**
- * Check whether an atlas's converter version is compatible with the running
- * Pinpoint version.
- * @param converterVersion Converter version from the atlas's metadata.
+ * Check whether an atlas's version is compatible with the running Pinpoint version.
+ * @param atlasVersion Atlas version from the atlas's metadata.
  * @param appVersion Current Pinpoint version.
  */
-export function checkConverterCompatibility(
-  converterVersion: string | undefined,
+export function checkAtlasCompatibility(
+  atlasVersion: string | undefined,
   appVersion: string
 ): ConverterCompatibility {
-  const converter = converterVersion ? semver.coerce(converterVersion) : null;
+  const converter = atlasVersion ? semver.coerce(atlasVersion) : null;
   const app = semver.coerce(appVersion);
   if (!converter || !app) return ConverterCompatibility.Unverifiable;
 
