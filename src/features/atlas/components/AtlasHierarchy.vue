@@ -31,8 +31,8 @@ const hierarchy = ref<HierarchyModel[]>([]);
 
 // Update the tree data to match the current atlas.
 watchEffect(() => {
-  const { rootId, structures } = currentExperiment.metadata ?? {};
-  if (!rootId || !structures) return;
+  if (!currentExperiment.metadata) return;
+  const { rootId, structures } = currentExperiment.metadata;
 
   // Build from root but exclude it.
   hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
