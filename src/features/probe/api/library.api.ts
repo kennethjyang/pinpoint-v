@@ -6,7 +6,6 @@ interface GitHubItem {
   type: string;
 }
 interface GitHub404 {
-  message: string;
   status: string;
 }
 type GitHubItemResponse = GitHubItem[] | GitHub404;
@@ -31,23 +30,36 @@ const fileApi = axios.create({
 });
 
 /**
+ * Check if a GitHub response was a 404 message.
+ * @param response response data from a GitHub content fetch.
+ */
+function isGitHub404(response: GitHubItemResponse): response is GitHub404 {
+  return !Array.isArray(response) && response.status === "404";
+}
+
+/**
  * Return the list of probe vendors.
  *
  * Computed as the top level non-scripting folders.
  */
 export async function getVendors(): Promise<string[]> {
-  const { data } = await githubApi.get<GitHubItemResponse>("/");
+  try {
+    const { data } = await githubApi.get<GitHubItemResponse>("/");
 
-  if (!data) return [];
+    // Exit if we can't find vendors.
+    if (!data || isGitHub404(data)) return [];
 
-  return data
-    .filter(
-      item =>
-        item.type === "dir" &&
-        !item.name.startsWith(".") &&
-        !["app", "scripts"].includes(item.name)
-    )
-    .map(item => item.name);
+    return data
+      .filter(
+        item =>
+          item.type === "dir" &&
+          !item.name.startsWith(".") &&
+          !["app", "scripts"].includes(item.name)
+      )
+      .map(item => item.name);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -58,12 +70,16 @@ export async function getVendors(): Promise<string[]> {
  * @param vendor Vendor to get probes from.
  */
 export async function getProbes(vendor: string): Promise<string[]> {
-  const { data } = await githubApi.get<GitHubItemResponse>(`/${vendor}`);
+  try {
+    const { data } = await githubApi.get<GitHubItemResponse>(`/${vendor}`);
 
-  // Exit if we can't find any probes.
-  if (!data) return [];
+    // Exit if we can't find any probes.
+    if (!data || isGitHub404(data)) return [];
 
-  return data.filter(item => item.type === "dir").map(item => item.name);
+    return data.filter(item => item.type === "dir").map(item => item.name);
+  } catch {
+    return [];
+  }
 }
 
 /**
