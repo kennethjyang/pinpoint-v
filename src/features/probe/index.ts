@@ -3,6 +3,7 @@ export {
   getProbes,
   getProbeSpecification
 } from "./api/library.api";
+export { default as ProbeLibrary } from "./components/ProbeLibrary.vue";
 export type {
   ContactShapeParams,
   ProbeViewerCamera,

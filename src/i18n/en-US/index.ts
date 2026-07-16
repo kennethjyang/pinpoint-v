@@ -44,8 +44,11 @@ export default {
     file: "File",
     new: "New",
     save: "Save",
+
     edit: "Edit",
     preferences: "Preferences",
+    probeLibrary: "Probe Library",
+
     view: "View",
     toggleDarkMode: "Toggle Dark Mode",
     scene: "Scene",

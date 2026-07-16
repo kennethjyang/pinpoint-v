@@ -6,6 +6,7 @@ import { SplashCard } from "@/features/splash";
 import { NewExperimentCard } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
+import { ProbeLibrary } from "@/features/probe";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -15,9 +16,12 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("atlas");
+const tab = ref("scene");
+
+// Dialogs.
 const showSplash = ref(false);
 const showNewExperiment = ref(false);
+const showProbeLibrary = ref(true);
 
 /**
  * Toggle left drawer open state.
@@ -107,6 +111,11 @@ function fixedQPageHeight(offset: number) {
                 <q-item-section>{{ $t("layout.preferences") }}</q-item-section>
               </q-item>
             </q-list>
+            <q-list>
+              <q-item clickable @click="showProbeLibrary = true">
+                <q-item-section>{{ $t("layout.probeLibrary") }}</q-item-section>
+              </q-item>
+            </q-list>
           </q-menu>
         </q-btn>
 
@@ -189,6 +198,10 @@ function fixedQPageHeight(offset: number) {
 
   <q-dialog v-model="showNewExperiment">
     <NewExperimentCard />
+  </q-dialog>
+
+  <q-dialog v-model="showProbeLibrary">
+    <ProbeLibrary />
   </q-dialog>
 </template>
 
