@@ -54,7 +54,7 @@ export async function getVendors(): Promise<string[]> {
         item =>
           item.type === "dir" &&
           !item.name.startsWith(".") &&
-          !["app", "scripts"].includes(item.name)
+          !["apps", "scripts"].includes(item.name)
       )
       .map(item => item.name);
   } catch {
