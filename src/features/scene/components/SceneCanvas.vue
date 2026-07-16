@@ -15,9 +15,10 @@ import { StructureEntity, structureEntityFromId } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { setZoom } from "@/features/scene/";
 
-const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const runtime = useBabylonRuntimeService();
 const currentExperiment = useCurrentExperimentStore();
+const runtime = useBabylonRuntimeService();
+
+const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
 /**
  * Atlas structures that must always be present in the scene, faded out when
