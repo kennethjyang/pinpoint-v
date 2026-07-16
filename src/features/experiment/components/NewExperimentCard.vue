@@ -9,10 +9,10 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
  */
 const FALLBACK_REFERENCE_COORDINATE: [number, number, number] = [0, 0, 0];
 
+const currentExperimentStore = useCurrentExperimentStore();
+
 const name = ref<string | null>(null);
 const atlas = ref<Atlas | null>(null);
-
-const currentExperimentStore = useCurrentExperimentStore();
 
 /**
  * Whether the Create button should be disabled.

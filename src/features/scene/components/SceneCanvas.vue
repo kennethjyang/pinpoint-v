@@ -15,9 +15,10 @@ import { StructureEntity, structureEntityFromId } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { setZoom } from "@/features/scene/";
 
-const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const runtime = useBabylonRuntimeService();
 const currentExperiment = useCurrentExperimentStore();
+const runtime = useBabylonRuntimeService();
+
+const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
 /**
  * Atlas structures that must always be present in the scene, faded out when
@@ -79,10 +80,10 @@ onMounted(async () => {
 
   // Set the camera's initial zoom relative to the AP length of the atlas.
   watchEffect(() => {
-    const scene = runtime.scene.value;
-    if (!scene || !currentExperiment.metadata) return;
+    const camera = runtime.camera.value;
+    if (!camera || !currentExperiment.metadata) return;
 
-    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, scene);
+    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, camera);
   });
 });
 
