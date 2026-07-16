@@ -1,3 +1,0 @@
-- Use pnpm
-- Only verify using static analysis and unit tests.
-- Ensure tests are up to date.
