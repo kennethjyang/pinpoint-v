@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { computedAsync } from "@vueuse/core";
-import { Experiment } from "@/models/experiment.model";
+import { Experiment } from "@/features/experiment";
 import {
   Atlas,
   AtlasMetadata,

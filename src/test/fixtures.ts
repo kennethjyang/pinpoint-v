@@ -1,5 +1,5 @@
 import type { Atlas, AtlasMetadata, AtlasStructure } from "@/features/atlas";
-import type { Experiment } from "@/models/experiment.model";
+import type { Experiment } from "@/features/experiment";
 
 /**
  * Test fixture factories.

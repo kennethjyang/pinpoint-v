@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import NewExperimentCard from "./NewExperimentCard.vue";
 import { mountWithQuasar } from "@/test/mount-helper";

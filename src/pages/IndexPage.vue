@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
 import { SplashCard } from "@/features/splash";
-import { NewExperimentCard } from "@/features/new-experiment";
+import { NewExperimentCard } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 
