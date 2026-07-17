@@ -69,7 +69,7 @@ export async function getVendors(): Promise<string[]> {
  *
  * @param vendor Vendor to get probes from.
  */
-export async function getProbes(vendor: string): Promise<string[]> {
+export async function getProbeNames(vendor: string): Promise<string[]> {
   try {
     const { data } = await githubApi.get<GitHubItemResponse>(`/${vendor}`);
 

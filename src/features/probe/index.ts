@@ -1,6 +1,6 @@
 export {
   getVendors,
-  getProbes,
+  getProbeNames,
   getProbeSpecification
 } from "./api/library.api";
 export { default as ProbeLibrary } from "./components/ProbeLibrary.vue";
