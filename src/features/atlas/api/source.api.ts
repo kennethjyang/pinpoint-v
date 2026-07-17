@@ -1,3 +1,4 @@
+import axios from "axios";
 import { Atlas } from "@/features/atlas";
 
 /**
@@ -28,4 +29,23 @@ export function parseAtlasSourceResponse(
   return response.files
     .filter(item => item.type === "folder")
     .map(item => ({ name: item.name, source }));
+}
+
+/**
+ * Connect to an atlas source and fetch the atlases it hosts.
+ * @param source Source URL to connect to.
+ * @returns The parsed atlases, or null if the source couldn't be reached or
+ * returned no data.
+ */
+export async function fetchAtlasSource(
+  source: string
+): Promise<Atlas[] | null> {
+  try {
+    const response = await axios.get<AtlasSourceResponse>(source);
+    if (!response.data) return null;
+
+    return parseAtlasSourceResponse(response.data, source);
+  } catch {
+    return null;
+  }
 }

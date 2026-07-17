@@ -19,7 +19,9 @@ export default {
     versionWarnCaption: "Some features may not work as expected.",
     versionUnverifiable: "Unable to verify this atlas's compatibility.",
     versionUnverifiableCaption:
-      "Its metadata is missing or has an invalid converter version."
+      "Its metadata is missing or has an invalid converter version.",
+    addFavorite: "Add to favorites",
+    removeFavorite: "Remove from favorites"
   },
   atlasHierarchy: {
     search: "Search"

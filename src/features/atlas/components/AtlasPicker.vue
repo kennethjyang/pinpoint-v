@@ -2,16 +2,14 @@
 import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import axios from "axios";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   Atlas,
-  AtlasSourceResponse,
   checkAtlasCompatibility,
   ConverterCompatibility,
   fetchAtlasMetadata,
-  parseAtlasSourceResponse
+  fetchAtlasSource
 } from "@/features/atlas";
 
 enum ConnectionState {
@@ -91,14 +89,14 @@ const filteredAtlases = computed(() =>
 /**
  * Favorites from this source.
  */
-const filteredAtlasesFavorites = computed(() =>
+const filteredFavorites = computed(() =>
   filteredAtlases.value.filter(atlas => favoritesSet.value.has(atlas.name))
 );
 
 /**
  * Non-favorite atlases from this source.
  */
-const filteredAtlasesAtlases = computed(() =>
+const filteredNonFavorites = computed(() =>
   filteredAtlases.value.filter(atlas => !favoritesSet.value.has(atlas.name))
 );
 
@@ -127,20 +125,13 @@ async function connect() {
 
   // Set to connecting.
   connectionState.value = ConnectionState.Connecting;
-  const source = atlasSource.value;
 
-  try {
-    // Make a connection.
-    const response = await axios.get<AtlasSourceResponse>(atlasSource.value);
-
-    // Parse the response.
-    if (response.data) {
-      atlases.value = parseAtlasSourceResponse(response.data, source);
-      connectionState.value = ConnectionState.Connected;
-    } else {
-      notifyFail();
-    }
-  } catch (e) {
+  // Make the connection.
+  const fetchedAtlases = await fetchAtlasSource(atlasSource.value);
+  if (fetchedAtlases) {
+    atlases.value = fetchedAtlases;
+    connectionState.value = ConnectionState.Connected;
+  } else {
     notifyFail();
   }
 }
@@ -257,7 +248,7 @@ async function selectAtlas(atlas: Atlas) {
 
       <q-list class="atlas-list" separator>
         <q-item
-          v-for="atlas in filteredAtlasesFavorites"
+          v-for="atlas in filteredFavorites"
           :key="`${atlas.source}-${atlas.name}`"
           v-ripple
           :active="selectedAtlas === atlas"
@@ -267,6 +258,7 @@ async function selectAtlas(atlas: Atlas) {
           <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
             <q-btn
+              :aria-label="$t('atlasPicker.removeFavorite')"
               color="pink"
               flat
               icon="favorite"
@@ -277,7 +269,7 @@ async function selectAtlas(atlas: Atlas) {
         </q-item>
 
         <q-item
-          v-for="atlas in filteredAtlasesAtlases"
+          v-for="atlas in filteredNonFavorites"
           :key="`${atlas.source}-${atlas.name}`"
           v-ripple
           :active="selectedAtlas === atlas"
@@ -287,6 +279,7 @@ async function selectAtlas(atlas: Atlas) {
           <q-item-section>{{ atlas.name }}</q-item-section>
           <q-item-section side>
             <q-btn
+              :aria-label="$t('atlasPicker.addFavorite')"
               flat
               icon="favorite_border"
               round
