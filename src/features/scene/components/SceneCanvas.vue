@@ -9,11 +9,11 @@ import {
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
+  setZoom,
   syncStructureVisibility
 } from "@/features/scene";
 import { StructureEntity, structureEntityFromId } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { setZoom } from "@/features/scene/";
 
 const currentExperiment = useCurrentExperimentStore();
 const runtime = useBabylonRuntimeService();

@@ -6,10 +6,10 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { fetchAtlasMetadata } from "@/features/atlas";
 import { makeAtlas, makeAtlasMetadata } from "@/test/fixtures";
 
-vi.mock("@/features/atlas/api/atlas-metadata.api", async () => {
+vi.mock("@/features/atlas/api/metadata.api", async () => {
   const actual = await vi.importActual<
-    typeof import("@/features/atlas/api/atlas-metadata.api")
-  >("@/features/atlas/api/atlas-metadata.api");
+    typeof import("@/features/atlas/api/metadata.api")
+  >("@/features/atlas/api/metadata.api");
   return { ...actual, fetchAtlasMetadata: vi.fn() };
 });
 
