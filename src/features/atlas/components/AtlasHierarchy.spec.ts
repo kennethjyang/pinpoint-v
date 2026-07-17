@@ -29,10 +29,10 @@ const QVirtualScrollStub = defineComponent({
   }
 });
 
-vi.mock("@/features/atlas/api/atlas-metadata.api", async () => {
+vi.mock("@/features/atlas/api/metadata.api", async () => {
   const actual = await vi.importActual<
-    typeof import("@/features/atlas/api/atlas-metadata.api")
-  >("@/features/atlas/api/atlas-metadata.api");
+    typeof import("@/features/atlas/api/metadata.api")
+  >("@/features/atlas/api/metadata.api");
   return { ...actual, fetchAtlasMetadata: vi.fn() };
 });
 

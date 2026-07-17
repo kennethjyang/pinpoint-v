@@ -54,8 +54,6 @@ export const useCurrentExperimentStore = defineStore(
      * @param name Experiment name.
      */
     function setName(name: string) {
-      if (!experiment.value) return;
-
       experiment.value.name = name;
     }
 
@@ -91,8 +89,6 @@ export const useCurrentExperimentStore = defineStore(
     function setReferenceCoordinate(
       referenceCoordinate: [number, number, number]
     ) {
-      if (!experiment.value) return;
-
       experiment.value.referenceCoordinate = referenceCoordinate;
     }
 
