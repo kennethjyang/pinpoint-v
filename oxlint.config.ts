@@ -4,6 +4,7 @@ export default defineConfig({
   $schema: "./node_modules/oxlint/configuration_schema.json",
 
   ignorePatterns: [
+    ".agent/",
     "**/node_modules/",
     "dist/",
     "quasar.config.*.temporary.compiled*",
