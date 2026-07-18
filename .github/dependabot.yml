@@ -9,6 +9,10 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "typescript"
+    cooldown:
+      default-days: 1 # matches pnpm's minimumReleaseAge in pnpm-workspace.yaml
     groups:
       npm:
         patterns:
