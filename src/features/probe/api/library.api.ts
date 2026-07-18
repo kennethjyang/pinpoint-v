@@ -21,12 +21,14 @@ const githubApi = axios.create({
   }
 });
 
+const FILE_API_BASE_URL =
+  "https://raw.githubusercontent.com/SpikeInterface/probeinterface_library/main";
+
 /**
  * Fetch URL for the contents of a file in GitHub.
  */
 const fileApi = axios.create({
-  baseURL:
-    "https://raw.githubusercontent.com/SpikeInterface/probeinterface_library/main"
+  baseURL: FILE_API_BASE_URL
 });
 
 /**
@@ -92,7 +94,7 @@ export async function getProbeNames(vendor: string): Promise<string[]> {
  * @param vendor Vendor to get probe from.
  * @param name Probe from vendor.
  */
-export async function getProbeSpecification(
+export async function getProbeInterfaceProbe(
   vendor: string,
   name: string
 ): Promise<ProbeInterfaceProbe | null> {
@@ -108,4 +110,16 @@ export async function getProbeSpecification(
 
   // Extract first one.
   return data.probes[0];
+}
+
+/**
+ * Return a probe overview image URL from Probe Library.
+ * @param vendor Vendor to get probe from.
+ * @param name Probe to get the overview image for.
+ */
+export function buildProbeOverviewImageSrc(
+  vendor: string,
+  name: string
+): string {
+  return new URL(`${vendor}/${name}/${name}.png`, FILE_API_BASE_URL).toString();
 }
