@@ -6,7 +6,7 @@ import { SplashCard } from "@/features/splash";
 import { NewExperimentCard } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
-import { ProbeLibrary } from "@/features/probe";
+import { InstallProbeDialog, ProbeLibrary } from "@/features/probe";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -21,7 +21,9 @@ const tab = ref("scene");
 // Dialogs.
 const showSplash = ref(false);
 const showNewExperiment = ref(false);
-const showProbeLibrary = ref(true);
+const showProbeLibrary = ref(false);
+
+$q.dialog({ component: InstallProbeDialog });
 
 /**
  * Toggle left drawer open state.

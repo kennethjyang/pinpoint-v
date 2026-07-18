@@ -4,6 +4,7 @@ export {
   getProbeSpecification
 } from "./api/library.api";
 export { default as ProbeLibrary } from "./components/ProbeLibrary.vue";
+export { default as InstallProbeDialog } from "./components/InstallProbeDialog.vue";
 export type {
   ContactShapeParams,
   ProbeViewerCamera,
