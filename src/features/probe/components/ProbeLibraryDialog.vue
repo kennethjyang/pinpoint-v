@@ -1,11 +1,15 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { InstallProbeDialog } from "@/features/probe";
+import { useProbeLibraryStore } from "@/stores/probe-library.store";
 
 const $q = useQuasar();
 
+// Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
+
+const probeLibraryStore = useProbeLibraryStore();
 </script>
 
 <template>
@@ -20,7 +24,17 @@ const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
           @click="$q.dialog({ component: InstallProbeDialog })"
         />
 
-        <q-list separator> </q-list>
+        <q-list separator>
+          <q-item
+            v-for="probe in probeLibraryStore.library"
+            :key="`${probe.annotations!.manufacturer}-${probe.annotations!.model_name}`"
+          >
+            <q-item-section>{{ probe.annotations!.model_name }}</q-item-section>
+            <q-item-section side>
+              <q-btn flat icon="delete" round />
+            </q-item-section>
+          </q-item>
+        </q-list>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn color="primary" label="Close" @click="onDialogOK" />
