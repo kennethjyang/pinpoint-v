@@ -57,36 +57,29 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
         />
 
         <template v-if="selectedVendorName">
-          <div class="row q-gutter-x-sm">
-            <div class="col">
-              <q-input v-model="searchQuery" clearable label="Search">
-                <template #prepend>
-                  <q-icon name="search" />
-                </template>
-              </q-input>
-              <q-list class="probe-list" separator>
-                <q-item
-                  v-for="probeName in probeNames"
-                  :key="probeName"
-                  v-ripple
-                  :active="selectedProbeName === probeName"
-                  clickable
-                  @click="selectedProbeName = probeName"
-                >
-                  <q-item-section>{{ probeName }}</q-item-section>
-                </q-item>
-              </q-list>
-            </div>
-
-            <template v-if="selectedProbeOverviewImageSrc !== ''">
-              <q-separator inset vertical />
-
-              <q-img
-                :src="selectedProbeOverviewImageSrc"
-                class="col probe-image"
-              />
+          <q-input v-model="searchQuery" clearable label="Search">
+            <template #prepend>
+              <q-icon name="search" />
             </template>
-          </div>
+          </q-input>
+          <q-list class="probe-list" separator>
+            <q-item
+              v-for="probeName in probeNames"
+              :key="probeName"
+              v-ripple
+              :active="selectedProbeName === probeName"
+              clickable
+              @click="selectedProbeName = probeName"
+            >
+              <q-item-section>{{ probeName }}</q-item-section>
+            </q-item>
+          </q-list>
+
+          <q-img
+            v-if="selectedProbeOverviewImageSrc !== ''"
+            :src="selectedProbeOverviewImageSrc"
+            fit="contain"
+          />
         </template>
       </q-card-section>
       <q-card-actions align="right">
@@ -98,11 +91,7 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
 </template>
 
 <style lang="sass" scoped>
-.install-card
-  min-width: 25vw
 .probe-list
   max-height: 30vh
   overflow-y: auto
-.probe-image
-  min-width: 30vw
 </style>
