@@ -4,7 +4,7 @@ export {
   getProbeInterfaceProbe,
   buildProbeOverviewImageSrc
 } from "./api/library.api";
-export { default as ProbeLibrary } from "./components/ProbeLibrary.vue";
+export { default as ProbeLibraryDialog } from "./components/ProbeLibraryDialog.vue";
 export { default as InstallProbeDialog } from "./components/InstallProbeDialog.vue";
 export type {
   ContactShapeParams,
