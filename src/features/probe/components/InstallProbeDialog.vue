@@ -56,9 +56,9 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
           label="Vendor"
         />
 
-        <div class="row q-gutter-x-sm">
-          <div class="col">
-            <template v-if="selectedVendorName">
+        <template v-if="selectedVendorName">
+          <div class="row q-gutter-x-sm">
+            <div class="col">
               <q-input v-model="searchQuery" clearable label="Search">
                 <template #prepend>
                   <q-icon name="search" />
@@ -76,17 +76,18 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
                   <q-item-section>{{ probeName }}</q-item-section>
                 </q-item>
               </q-list>
+            </div>
+
+            <template v-if="selectedProbeOverviewImageSrc !== ''">
+              <q-separator inset vertical />
+
+              <q-img
+                :src="selectedProbeOverviewImageSrc"
+                class="col probe-image"
+              />
             </template>
           </div>
-
-          <template v-if="selectedProbeName">
-            <q-separator inset vertical />
-
-            <div class="col">
-              <q-img :src="selectedProbeOverviewImageSrc" />
-            </div>
-          </template>
-        </div>
+        </template>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn icon="upload" label="Upload Custom Probe" />
@@ -99,8 +100,9 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
 <style lang="sass" scoped>
 .install-card
   min-width: 25vw
-  width: fit-content
 .probe-list
   max-height: 30vh
   overflow-y: auto
+.probe-image
+  min-width: 30vw
 </style>

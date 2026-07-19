@@ -22,7 +22,7 @@ const githubApi = axios.create({
 });
 
 const FILE_API_BASE_URL =
-  "https://raw.githubusercontent.com/SpikeInterface/probeinterface_library/main";
+  "https://raw.githubusercontent.com/SpikeInterface/probeinterface_library/main/";
 
 /**
  * Fetch URL for the contents of a file in GitHub.
