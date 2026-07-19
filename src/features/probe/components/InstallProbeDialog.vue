@@ -1,17 +1,24 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref, useTemplateRef, watch } from "vue";
 import { computedAsync } from "@vueuse/core";
+import { useFuse } from "@vueuse/integrations/useFuse";
+import { useDialogPluginComponent, useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import {
   buildProbeOverviewImageSrc,
+  getProbeInterfaceProbe,
   getProbeNames,
-  getVendors
+  getVendors,
+  parseProbeInterfaceFile
 } from "@/features/probe";
-import { useDialogPluginComponent } from "quasar";
 
 // Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK, onDialogCancel } =
   useDialogPluginComponent();
+
+const $q = useQuasar();
+const { t } = useI18n();
 
 const selectedVendorName = ref<string | null>(null);
 const vendors = computedAsync<string[]>(async () => await getVendors());
@@ -26,7 +33,18 @@ watch(selectedVendorName, () => {
 const probeNames = computedAsync<string[]>(async () => {
   if (!selectedVendorName.value) return [];
   return await getProbeNames(selectedVendorName.value);
+}, []);
+
+// Fuzzy search across probe names, falling back to the full list when empty.
+const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
+const { results: probeNameFuse } = useFuse(unwrappedSearchQuery, probeNames, {
+  fuseOptions: {}
 });
+const filteredProbeNames = computed(() =>
+  searchQuery.value
+    ? probeNameFuse.value.map(result => result.item)
+    : probeNames.value
+);
 
 const selectedProbeOverviewImageSrc = computed<string>(() => {
   if (!selectedVendorName.value || !selectedProbeName.value) return "";
@@ -36,30 +54,121 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
     selectedProbeName.value
   );
 });
+
+// Loading state for the two ways to resolve the dialog.
+const installing = ref(false);
+const uploading = ref(false);
+
+const fileInput = useTemplateRef<HTMLInputElement>("file-input");
+
+/**
+ * Notify that installing or reading a probe failed.
+ */
+function notifyInstallFailed() {
+  $q.notify({
+    message: t("installProbe.installFailed"),
+    caption: t("installProbe.installFailedCaption"),
+    color: "negative",
+    icon: "error"
+  });
+}
+
+/**
+ * Fetch the selected probe from the library and resolve the dialog with it.
+ */
+async function install() {
+  if (!selectedVendorName.value || !selectedProbeName.value) return;
+
+  installing.value = true;
+  const probe = await getProbeInterfaceProbe(
+    selectedVendorName.value,
+    selectedProbeName.value
+  );
+  installing.value = false;
+
+  if (!probe) {
+    notifyInstallFailed();
+    return;
+  }
+
+  onDialogOK(probe);
+}
+
+/**
+ * Open the hidden file input to let the user pick a custom probe file.
+ */
+function openFilePicker() {
+  fileInput.value?.click();
+}
+
+/**
+ * Read the selected file, validate it as a ProbeInterface file, and resolve
+ * the dialog with its first probe. Notifies an error if the file can't be
+ * read or parsed.
+ */
+async function onFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+
+  // Reset so re-selecting the same file still fires `change`.
+  input.value = "";
+
+  if (!file) return;
+
+  uploading.value = true;
+  try {
+    const text = await file.text();
+    const probe = parseProbeInterfaceFile(text);
+
+    if (!probe) {
+      $q.notify({
+        message: t("installProbe.invalidProbeFile"),
+        caption: t("installProbe.invalidProbeFileCaption"),
+        color: "negative",
+        icon: "error"
+      });
+      return;
+    }
+
+    onDialogOK(probe);
+  } catch {
+    $q.notify({
+      message: t("installProbe.invalidProbeFile"),
+      caption: t("installProbe.invalidProbeFileCaption"),
+      color: "negative",
+      icon: "error"
+    });
+  } finally {
+    uploading.value = false;
+  }
+}
 </script>
 
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="install-card">
       <q-card-section class="q-gutter-y-sm">
-        <p class="text-h5">Install Probe</p>
+        <p class="text-h5">{{ $t("installProbe.title") }}</p>
 
-        <!--        TODO: Implement filter using useFuse-->
         <q-select
           v-model="selectedVendorName"
           :options="vendors"
-          label="Vendor"
+          :label="$t('installProbe.vendor')"
         />
 
         <template v-if="selectedVendorName">
-          <q-input v-model="searchQuery" clearable label="Search">
+          <q-input
+            v-model="searchQuery"
+            clearable
+            :label="$t('installProbe.search')"
+          >
             <template #prepend>
               <q-icon name="search" />
             </template>
           </q-input>
           <q-list class="probe-list" separator>
             <q-item
-              v-for="probeName in probeNames"
+              v-for="probeName in filteredProbeNames"
               :key="probeName"
               v-ripple
               :active="selectedProbeName === probeName"
@@ -78,22 +187,33 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
         </template>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn label="Cancel" @click="onDialogCancel" />
+        <q-btn :label="$t('installProbe.cancel')" @click="onDialogCancel" />
 
-        <!--        TODO: Add click behavior to read uploaded JSON, go into loading mode, pass validated result through ok, and show notify error if error-->
-        <q-btn icon="upload" label="Upload Custom Probe" />
+        <input
+          ref="file-input"
+          accept="application/json"
+          class="hidden"
+          type="file"
+          @change="onFileSelected"
+        />
+        <q-btn
+          :label="$t('installProbe.uploadCustom')"
+          :loading="uploading"
+          icon="upload"
+          @click="openFilePicker"
+        />
 
-        <!-- TODO: Add click behavior to fetch and return probe through dialog ok. Go into loading state on click.-->
         <q-btn
           :disable="!selectedProbeName"
+          :label="$t('installProbe.install')"
+          :loading="installing"
           color="primary"
           icon="add"
-          label="Install"
+          @click="install"
         >
-          <!--          TODO: Internationalize-->
-          <q-tooltip v-if="!selectedProbeName"
-            >Select a probe to add!</q-tooltip
-          >
+          <q-tooltip v-if="!selectedProbeName">{{
+            $t("installProbe.selectProbeHint")
+          }}</q-tooltip>
         </q-btn>
       </q-card-actions>
     </q-card>

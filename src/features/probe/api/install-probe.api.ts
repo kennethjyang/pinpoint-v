@@ -98,18 +98,22 @@ export async function getProbeInterfaceProbe(
   vendor: string,
   name: string
 ): Promise<ProbeInterfaceProbe | null> {
-  const { data } = await fileApi.get<ProbeInterfaceFile>(
-    `/${vendor}/${name}/${name}.json`
-  );
+  try {
+    const { data } = await fileApi.get<ProbeInterfaceFile>(
+      `/${vendor}/${name}/${name}.json`
+    );
 
-  // Exit if we can't find the probe.
-  if (!data) return null;
+    // Exit if we can't find the probe.
+    if (!data) return null;
 
-  // Exit if no probes exist.
-  if (!data.probes[0]) return null;
+    // Exit if no probes exist.
+    if (!data.probes[0]) return null;
 
-  // Extract first one.
-  return data.probes[0];
+    // Extract first one.
+    return data.probes[0];
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -122,4 +126,47 @@ export function buildProbeOverviewImageSrc(
   name: string
 ): string {
   return new URL(`${vendor}/${name}/${name}.png`, FILE_API_BASE_URL).toString();
+}
+
+/**
+ * Check that a value has the minimal shape of a ProbeInterface probe.
+ * @param value Value to check.
+ */
+function isProbeInterfaceProbe(value: unknown): value is ProbeInterfaceProbe {
+  if (!value || typeof value !== "object") return false;
+
+  const probe = value as Record<string, unknown>;
+  return (
+    typeof probe.ndim === "number" &&
+    typeof probe.si_units === "string" &&
+    Array.isArray(probe.contact_positions)
+  );
+}
+
+/**
+ * Parse and minimally validate a ProbeInterface file's contents, returning
+ * its first probe.
+ *
+ * @remarks Mirrors {@link getProbeInterfaceProbe}, which also only extracts
+ * the first probe in a ProbeInterface file. Returns null if the text isn't
+ * valid JSON, has no probes, or its first probe is missing required fields.
+ *
+ * @param text Raw contents of a ProbeInterface JSON file.
+ */
+export function parseProbeInterfaceFile(
+  text: string
+): ProbeInterfaceProbe | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return null;
+  }
+
+  if (!data || typeof data !== "object") return null;
+
+  const { probes } = data as Record<string, unknown>;
+  if (!Array.isArray(probes) || !probes[0]) return null;
+
+  return isProbeInterfaceProbe(probes[0]) ? probes[0] : null;
 }
