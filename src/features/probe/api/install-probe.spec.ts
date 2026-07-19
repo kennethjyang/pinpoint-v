@@ -16,10 +16,20 @@ vi.mock("axios", async importOriginal => {
   return { default: mocked };
 });
 
+function makeProbe(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    ndim: 2,
+    si_units: "um",
+    contact_positions: [[0, 0]],
+    annotations: { model_name: "1.0", manufacturer: "IMEC" },
+    ...overrides
+  };
+}
+
 function probeInterfaceFileText(
-  probes: Record<string, unknown>[] = [
-    { ndim: 2, si_units: "um", contact_positions: [[0, 0]] }
-  ]
+  probes: Record<string, unknown>[] = [makeProbe()]
 ): string {
   return JSON.stringify({
     specification: "probeinterface",
@@ -39,7 +49,7 @@ describe("getProbeInterfaceProbe", () => {
   });
 
   it("returns the first probe from a successful response", async () => {
-    const probe = { ndim: 2, si_units: "um", contact_positions: [[0, 0]] };
+    const probe = makeProbe();
     mockedGet.mockResolvedValue({
       data: {
         specification: "probeinterface",
@@ -68,7 +78,7 @@ describe("getProbeInterfaceProbe", () => {
 
 describe("parseProbeInterfaceFile", () => {
   it("returns the first probe from a valid ProbeInterface file", () => {
-    const probe = { ndim: 2, si_units: "um", contact_positions: [[0, 0]] };
+    const probe = makeProbe();
 
     expect(parseProbeInterfaceFile(probeInterfaceFileText([probe]))).toEqual(
       probe
@@ -76,8 +86,8 @@ describe("parseProbeInterfaceFile", () => {
   });
 
   it("returns only the first probe when the file has more than one", () => {
-    const first = { ndim: 2, si_units: "um", contact_positions: [[0, 0]] };
-    const second = { ndim: 3, si_units: "mm", contact_positions: [[1, 1]] };
+    const first = makeProbe();
+    const second = makeProbe({ ndim: 3, si_units: "mm" });
 
     expect(
       parseProbeInterfaceFile(probeInterfaceFileText([first, second]))
@@ -115,8 +125,46 @@ describe("parseProbeInterfaceFile", () => {
   it("returns null when a required field has the wrong type", () => {
     expect(
       parseProbeInterfaceFile(
+        probeInterfaceFileText([makeProbe({ ndim: "2" })])
+      )
+    ).toBeNull();
+  });
+
+  it("returns null when annotations is missing", () => {
+    expect(
+      parseProbeInterfaceFile(
+        probeInterfaceFileText([makeProbe({ annotations: undefined })])
+      )
+    ).toBeNull();
+  });
+
+  it("returns null when model_name is missing from annotations", () => {
+    expect(
+      parseProbeInterfaceFile(
         probeInterfaceFileText([
-          { ndim: "2", si_units: "um", contact_positions: [[0, 0]] }
+          makeProbe({ annotations: { manufacturer: "IMEC" } })
+        ])
+      )
+    ).toBeNull();
+  });
+
+  it("returns null when manufacturer is missing from annotations", () => {
+    expect(
+      parseProbeInterfaceFile(
+        probeInterfaceFileText([
+          makeProbe({ annotations: { model_name: "1.0" } })
+        ])
+      )
+    ).toBeNull();
+  });
+
+  it("returns null when model_name or manufacturer has the wrong type", () => {
+    expect(
+      parseProbeInterfaceFile(
+        probeInterfaceFileText([
+          makeProbe({
+            annotations: { model_name: 1, manufacturer: "IMEC" }
+          })
         ])
       )
     ).toBeNull();

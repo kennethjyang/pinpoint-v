@@ -136,10 +136,22 @@ function isProbeInterfaceProbe(value: unknown): value is ProbeInterfaceProbe {
   if (!value || typeof value !== "object") return false;
 
   const probe = value as Record<string, unknown>;
+  if (
+    typeof probe.ndim !== "number" ||
+    typeof probe.si_units !== "string" ||
+    !Array.isArray(probe.contact_positions)
+  ) {
+    return false;
+  }
+
+  if (!probe.annotations || typeof probe.annotations !== "object") {
+    return false;
+  }
+
+  const annotations = probe.annotations as Record<string, unknown>;
   return (
-    typeof probe.ndim === "number" &&
-    typeof probe.si_units === "string" &&
-    Array.isArray(probe.contact_positions)
+    typeof annotations.model_name === "string" &&
+    typeof annotations.manufacturer === "string"
   );
 }
 

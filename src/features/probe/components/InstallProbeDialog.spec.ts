@@ -211,7 +211,12 @@ describe("InstallProbeDialog", () => {
   describe("upload custom probe", () => {
     it("resolves the dialog with the first probe from a valid file", async () => {
       const wrapper = await mountDialog();
-      const probe = { ndim: 2, si_units: "um", contact_positions: [[0, 0]] };
+      const probe = {
+        ndim: 2,
+        si_units: "um",
+        contact_positions: [[0, 0]],
+        annotations: { model_name: "1.0", manufacturer: "IMEC" }
+      };
 
       await uploadFile(
         wrapper,
