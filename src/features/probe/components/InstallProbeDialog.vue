@@ -3,16 +3,15 @@ import { computed, ref, watch } from "vue";
 import { computedAsync } from "@vueuse/core";
 import {
   buildProbeOverviewImageSrc,
-  getProbeInterfaceProbe,
   getProbeNames,
-  getVendors,
-  ProbeInterfaceProbe
+  getVendors
 } from "@/features/probe";
 import { useDialogPluginComponent } from "quasar";
 
 // Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);
-const { dialogRef, onDialogHide } = useDialogPluginComponent();
+const { dialogRef, onDialogHide, onDialogOK, onDialogCancel } =
+  useDialogPluginComponent();
 
 const selectedVendorName = ref<string | null>(null);
 const vendors = computedAsync<string[]>(async () => await getVendors());
@@ -23,20 +22,12 @@ const selectedProbeName = ref<string | null>(null);
 watch(selectedVendorName, () => {
   selectedProbeName.value = null;
 });
+
 const probeNames = computedAsync<string[]>(async () => {
   if (!selectedVendorName.value) return [];
   return await getProbeNames(selectedVendorName.value);
 });
 
-const selectedProbeInterfaceProbe = computedAsync<ProbeInterfaceProbe | null>(
-  async () => {
-    if (!selectedVendorName.value || !selectedProbeName.value) return null;
-    return await getProbeInterfaceProbe(
-      selectedVendorName.value,
-      selectedProbeName.value
-    );
-  }
-);
 const selectedProbeOverviewImageSrc = computed<string>(() => {
   if (!selectedVendorName.value || !selectedProbeName.value) return "";
 
@@ -50,9 +41,10 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="install-card">
-      <q-card-section>
+      <q-card-section class="q-gutter-y-sm">
         <p class="text-h5">Install Probe</p>
 
+        <!--        TODO: Implement filter using useFuse-->
         <q-select
           v-model="selectedVendorName"
           :options="vendors"
@@ -79,15 +71,30 @@ const selectedProbeOverviewImageSrc = computed<string>(() => {
           </q-list>
 
           <q-img
-            v-if="selectedProbeOverviewImageSrc !== ''"
+            v-if="selectedProbeName"
             :src="selectedProbeOverviewImageSrc"
             fit="contain"
           />
         </template>
       </q-card-section>
       <q-card-actions align="right">
+        <q-btn label="Cancel" @click="onDialogCancel" />
+
+        <!--        TODO: Add click behavior to read uploaded JSON, go into loading mode, pass validated result through ok, and show notify error if error-->
         <q-btn icon="upload" label="Upload Custom Probe" />
-        <q-btn color="primary" icon="add" label="Add" />
+
+        <!-- TODO: Add click behavior to fetch and return probe through dialog ok. Go into loading state on click.-->
+        <q-btn
+          :disable="!selectedProbeName"
+          color="primary"
+          icon="add"
+          label="Install"
+        >
+          <!--          TODO: Internationalize-->
+          <q-tooltip v-if="!selectedProbeName"
+            >Select a probe to add!</q-tooltip
+          >
+        </q-btn>
       </q-card-actions>
     </q-card>
   </q-dialog>
