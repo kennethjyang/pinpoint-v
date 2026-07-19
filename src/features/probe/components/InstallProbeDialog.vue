@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { computedAsync } from "@vueuse/core";
 import {
   buildProbeOverviewImageSrc,
@@ -20,6 +20,9 @@ const vendors = computedAsync<string[]>(async () => await getVendors());
 const searchQuery = ref<string | null>(null);
 
 const selectedProbeName = ref<string | null>(null);
+watch(selectedVendorName, () => {
+  selectedProbeName.value = null;
+});
 const probeNames = computedAsync<string[]>(async () => {
   if (!selectedVendorName.value) return [];
   return await getProbeNames(selectedVendorName.value);
