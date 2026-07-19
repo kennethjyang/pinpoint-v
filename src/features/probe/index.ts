@@ -2,8 +2,9 @@ export {
   getVendors,
   getProbeNames,
   getProbeInterfaceProbe,
-  buildProbeOverviewImageSrc
-} from "./api/library.api";
+  buildProbeOverviewImageSrc,
+  parseProbeInterfaceFile
+} from "./api/install-probe.api";
 export { default as ProbeLibraryDialog } from "./components/ProbeLibraryDialog.vue";
 export { default as InstallProbeDialog } from "./components/InstallProbeDialog.vue";
 export type {
