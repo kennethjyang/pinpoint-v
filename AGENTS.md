@@ -1,7 +1,6 @@
 ## Development Workflow
 
 - Use pnpm and pnpx instead of npm
-- Load the Hunk skill and use it to annotate your edits. Run `hunk skill path` to get the skill path.
 - Only verify using static analysis and unit tests. Use pnpm lint and pnpm typecheck.
 - Ensure tests are up to date. Create tests for missing branches. Run tests after any edits using pnpm test.
 
