@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import {
+  BRAINGLOBE_BASE_URL,
   fetchAtlasSource,
   listAtlases,
   listAtlasesHTTP,
@@ -113,7 +114,7 @@ describe("listAtlases", () => {
     );
   });
 
-  it("returns atlas names with the terminology suffix removed", async () => {
+  it("returns atlases with the terminology suffix removed from their names", async () => {
     mockedGet.mockResolvedValue({
       data: `<?xml version="1.0" encoding="UTF-8"?>
 <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -124,7 +125,18 @@ describe("listAtlases", () => {
 
     const result = await listAtlases();
 
-    expect(result).toEqual(["allen_mouse", "allen-adult-human"]);
+    expect(result).toEqual([
+      { name: "allen_mouse", source: BRAINGLOBE_BASE_URL },
+      { name: "allen-adult-human", source: BRAINGLOBE_BASE_URL }
+    ]);
+  });
+
+  it("returns null when the request throws", async () => {
+    mockedGet.mockRejectedValue(new Error("network error"));
+
+    const result = await listAtlases();
+
+    expect(result).toBeNull();
   });
 });
 
@@ -161,6 +173,17 @@ describe("listAtlasesHTTP", () => {
 
     const result = await listAtlasesHTTP("http://localhost:3000");
 
-    expect(result).toEqual(["allen_mouse", "allen-adult-human"]);
+    expect(result).toEqual([
+      { name: "allen_mouse", source: "http://localhost:3000" },
+      { name: "allen-adult-human", source: "http://localhost:3000" }
+    ]);
+  });
+
+  it("returns null when the request throws", async () => {
+    mockedGet.mockRejectedValue(new Error("network error"));
+
+    const result = await listAtlasesHTTP("http://localhost:3000");
+
+    expect(result).toBeNull();
   });
 });

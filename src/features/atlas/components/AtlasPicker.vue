@@ -6,10 +6,12 @@ import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   Atlas,
+  BRAINGLOBE_BASE_URL,
   checkAtlasCompatibility,
   ConverterCompatibility,
   fetchAtlasMetadata,
-  fetchAtlasSource
+  listAtlases,
+  listAtlasesHTTP
 } from "@/features/atlas";
 
 enum ConnectionState {
@@ -32,7 +34,7 @@ const favoriteAtlasesStore = useFavoriteAtlasesStore();
 /**
  * Atlas source URL.
  */
-const atlasSource = ref<string | null>("http://localhost:3000");
+const atlasSource = ref<string | null>(BRAINGLOBE_BASE_URL);
 
 /**
  * Connection to source.
@@ -127,7 +129,10 @@ async function connect() {
   connectionState.value = ConnectionState.Connecting;
 
   // Make the connection.
-  const fetchedAtlases = await fetchAtlasSource(atlasSource.value);
+  const fetchedAtlases =
+    new URL(atlasSource.value).href === new URL(BRAINGLOBE_BASE_URL).href
+      ? await listAtlases()
+      : await listAtlasesHTTP(atlasSource.value);
   if (fetchedAtlases) {
     atlases.value = fetchedAtlases;
     connectionState.value = ConnectionState.Connected;
@@ -199,18 +204,15 @@ async function selectAtlas(atlas: Atlas) {
 
     <div class="row q-gutter-x-md">
       <q-btn
-        :label="$t('atlasPicker.pinpointAtlases')"
+        :label="$t('atlasPicker.brainglobeHosted')"
         color="primary"
         icon="public"
-        @click="
-          atlasSource =
-            'https://virtualbrainlab.alleninstitute.org/pinpoint/atlases'
-        "
+        @click="atlasSource = BRAINGLOBE_BASE_URL"
       />
       <q-btn
         :label="$t('atlasPicker.locallyHosted')"
         icon="home"
-        @click="atlasSource = 'http://localhost:3000'"
+        @click="atlasSource = 'http://localhost:3000/'"
       />
     </div>
 

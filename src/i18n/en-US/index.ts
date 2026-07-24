@@ -1,7 +1,7 @@
 export default {
   atlasPicker: {
     title: "Atlas",
-    pinpointAtlases: "Pinpoint Atlases",
+    brainglobeHosted: "BrainGlobe Hosted",
     locallyHosted: "Locally Hosted",
     sourceUrl: "Source URL",
     connect: "Connect",

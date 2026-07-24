@@ -16,55 +16,70 @@ export interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
-const BRAINGLOBE_BASE_URL =
+export const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
 const TERMINOLOGY_SUFFIX = "-terminology";
 
 /**
- * Fetch and parse the list of atlas names available in the BrainGlobe
+ * Fetch and parse the list of atlases available in the BrainGlobe
  * terminology bucket.
+ * @returns The parsed atlases, or null if the bucket couldn't be reached.
  */
-export async function listAtlases(): Promise<string[]> {
-  const bucket = new URL(BRAINGLOBE_BASE_URL);
-  const params = new URLSearchParams({
-    "list-type": "2",
-    prefix: `${bucket.pathname.slice(1)}terminologies/`,
-    delimiter: "/"
-  });
+export async function listAtlases(): Promise<Atlas[] | null> {
+  try {
+    const bucket = new URL(BRAINGLOBE_BASE_URL);
+    const params = new URLSearchParams({
+      "list-type": "2",
+      prefix: `${bucket.pathname.slice(1)}terminologies/`,
+      delimiter: "/"
+    });
 
-  const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
-    responseType: "text"
-  });
+    const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
+      responseType: "text"
+    });
 
-  const doc = new DOMParser().parseFromString(response.data, "application/xml");
-  return Array.from(doc.getElementsByTagName("CommonPrefixes"))
-    .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
-    .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "")
-    .filter(Boolean)
-    .map(name =>
-      name.endsWith(TERMINOLOGY_SUFFIX)
-        ? name.slice(0, -TERMINOLOGY_SUFFIX.length)
-        : name
+    const doc = new DOMParser().parseFromString(
+      response.data,
+      "application/xml"
     );
+    return Array.from(doc.getElementsByTagName("CommonPrefixes"))
+      .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
+      .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "")
+      .filter(Boolean)
+      .map(name =>
+        name.endsWith(TERMINOLOGY_SUFFIX)
+          ? name.slice(0, -TERMINOLOGY_SUFFIX.length)
+          : name
+      )
+      .map(name => ({ name, source: BRAINGLOBE_BASE_URL }));
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Fetch and parse the list of atlas names available in the terminologies
+ * Fetch and parse the list of atlases available in the terminologies
  * directory of a BrainGlobe HTTP server.
  * @param host Root URL of the BrainGlobe HTTP server.
+ * @returns The parsed atlases, or null if the host couldn't be reached.
  */
-export async function listAtlasesHTTP(host: string): Promise<string[]> {
-  const response = await axios.get<AtlasSourceResponse>(
-    `${host}/brainglobe-atlasapi/terminologies`
-  );
-
-  return response.data.files
-    .filter(item => item.type === "folder")
-    .map(item =>
-      item.name.endsWith(TERMINOLOGY_SUFFIX)
-        ? item.name.slice(0, -TERMINOLOGY_SUFFIX.length)
-        : item.name
+export async function listAtlasesHTTP(host: string): Promise<Atlas[] | null> {
+  try {
+    const response = await axios.get<AtlasSourceResponse>(
+      `${host}/brainglobe-atlasapi/terminologies`
     );
+
+    return response.data.files
+      .filter(item => item.type === "folder")
+      .map(item =>
+        item.name.endsWith(TERMINOLOGY_SUFFIX)
+          ? item.name.slice(0, -TERMINOLOGY_SUFFIX.length)
+          : item.name
+      )
+      .map(name => ({ name, source: host }));
+  } catch {
+    return null;
+  }
 }
 
 /**

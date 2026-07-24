@@ -9,6 +9,7 @@ export {
 export { buildHierarchy, flattenHierarchy } from "./api/hierarchy.api";
 export type { HierarchyModel } from "./api/hierarchy.api";
 export {
+  BRAINGLOBE_BASE_URL,
   fetchAtlasSource,
   listAtlases,
   listAtlasesHTTP,
