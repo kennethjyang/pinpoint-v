@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import { Atlas, AtlasPicker, fetchAtlasMetadata } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { useDialogPluginComponent } from "quasar";
 
 /**
  * Reference coordinate used when an atlas's metadata (and thus its default
@@ -10,6 +11,10 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 const FALLBACK_REFERENCE_COORDINATE: [number, number, number] = [0, 0, 0];
 
 const currentExperimentStore = useCurrentExperimentStore();
+
+defineEmits([...useDialogPluginComponent.emits]);
+
+const { dialogRef, onDialogHide } = useDialogPluginComponent();
 
 const name = ref<string | null>(null);
 const atlas = ref<Atlas | null>(null);
@@ -35,33 +40,36 @@ async function create() {
 </script>
 
 <template>
-  <q-card class="new-experiment">
-    <q-card-section class="q-gutter-y-md">
-      <p class="text-h5">{{ $t("newExperiment.title") }}</p>
+  <q-dialog ref="dialogRef" @hide="onDialogHide">
+    <q-card class="new-experiment">
+      <q-card-section class="q-gutter-y-md">
+        <p class="text-h5">{{ $t("newExperiment.title") }}</p>
 
-      <q-input
-        v-model="name"
-        clearable
-        :label="$t('newExperiment.experimentName')"
-      />
+        <q-input
+          v-model="name"
+          clearable
+          :label="$t('newExperiment.experimentName')"
+        />
 
-      <AtlasPicker v-model="atlas" />
-    </q-card-section>
-    <q-card-actions align="right">
-      <q-btn
-        color="positive"
-        icon="add"
-        :label="$t('newExperiment.create')"
-        :disable="isCreateDisabled"
-        v-close-popup
-        @click="create"
-      >
-        <q-tooltip v-if="isCreateDisabled">
-          {{ $t("newExperiment.pickNameAndAtlas") }}
-        </q-tooltip>
-      </q-btn>
-    </q-card-actions>
-  </q-card>
+        <AtlasPicker v-model="atlas" />
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn v-close-popup label="Cancel" />
+        <q-btn
+          color="positive"
+          icon="add"
+          :label="$t('newExperiment.create')"
+          :disable="isCreateDisabled"
+          v-close-popup
+          @click="create"
+        >
+          <q-tooltip v-if="isCreateDisabled">
+            {{ $t("newExperiment.pickNameAndAtlas") }}
+          </q-tooltip>
+        </q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style lang="sass" scoped>

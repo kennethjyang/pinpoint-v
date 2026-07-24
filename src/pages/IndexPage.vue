@@ -2,8 +2,8 @@
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
-import { SplashCard } from "@/features/splash";
-import { NewExperimentCard } from "@/features/experiment";
+import { SplashDialog } from "@/features/splash";
+import { NewExperimentDialog } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
@@ -18,9 +18,8 @@ const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
 const tab = ref("scene");
 
-// Dialogs.
-const showSplash = ref(false);
-const showNewExperiment = ref(false);
+// Show splash.
+$q.dialog({ component: SplashDialog });
 
 /**
  * Toggle left drawer open state.
@@ -93,7 +92,10 @@ function fixedQPageHeight(offset: number) {
         <q-btn flat :label="$t('layout.file')">
           <q-menu auto-close>
             <q-list>
-              <q-item clickable @click="showNewExperiment = true">
+              <q-item
+                clickable
+                @click="$q.dialog({ component: NewExperimentDialog })"
+              >
                 <q-item-section>{{ $t("layout.new") }}</q-item-section>
               </q-item>
               <q-item clickable>
@@ -188,19 +190,6 @@ function fixedQPageHeight(offset: number) {
       </q-page>
     </q-page-container>
   </q-layout>
-
-  <q-dialog v-model="showSplash">
-    <SplashCard
-      @new="
-        showSplash = false;
-        showNewExperiment = true;
-      "
-    />
-  </q-dialog>
-
-  <q-dialog v-model="showNewExperiment">
-    <NewExperimentCard />
-  </q-dialog>
 </template>
 
 <style lang="sass" scoped>

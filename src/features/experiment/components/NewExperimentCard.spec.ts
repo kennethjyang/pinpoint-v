@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import NewExperimentCard from "./NewExperimentCard.vue";
+import NewExperimentDialog from "./NewExperimentDialog.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { fetchAtlasMetadata } from "@/features/atlas";
@@ -14,7 +14,7 @@ vi.mock("@/features/atlas/api/metadata.api", async () => {
 });
 
 function mountCard() {
-  return mountWithQuasar(NewExperimentCard, {
+  return mountWithQuasar(NewExperimentDialog, {
     global: {
       stubs: { AtlasPicker: true }
     }
