@@ -30,14 +30,14 @@ watch(selectedVendorName, () => {
   selectedProbeName.value = null;
 });
 
-const probeNamesLoaded = ref(false);
+const probeNamesEvaluating = ref(false);
 const probeNames = computedAsync<string[]>(
   async () => {
     if (!selectedVendorName.value) return [];
     return await getProbeNames(selectedVendorName.value);
   },
   [],
-  probeNamesLoaded
+  probeNamesEvaluating
 );
 
 // Fuzzy search across probe names, falling back to the full list when empty.
@@ -173,7 +173,14 @@ async function onFileSelected(event: Event) {
               </template>
             </q-input>
             <q-list class="dialog-list" separator>
-              <template v-if="probeNamesLoaded">
+              <template v-if="probeNamesEvaluating">
+                <q-item v-for="n in 5" :key="n">
+                  <q-item-section>
+                    <q-skeleton type="text" />
+                  </q-item-section>
+                </q-item>
+              </template>
+              <template v-else>
                 <q-item
                   v-for="probeName in filteredProbeNames"
                   :key="probeName"
@@ -183,13 +190,6 @@ async function onFileSelected(event: Event) {
                   @click="selectedProbeName = probeName"
                 >
                   <q-item-section>{{ probeName }}</q-item-section>
-                </q-item>
-              </template>
-              <template v-else>
-                <q-item v-for="n in 5" :key="n">
-                  <q-item-section>
-                    <q-skeleton type="text" />
-                  </q-item-section>
                 </q-item>
               </template>
             </q-list>
