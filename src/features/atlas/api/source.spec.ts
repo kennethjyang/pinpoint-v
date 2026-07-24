@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
-import { fetchAtlasSource, parseAtlasSourceResponse } from "@/features/atlas";
+import {
+  fetchAtlasSource,
+  listAtlases,
+  parseAtlasSourceResponse
+} from "@/features/atlas";
 
 vi.mock("axios");
 
@@ -81,5 +85,44 @@ describe("fetchAtlasSource", () => {
     const result = await fetchAtlasSource("http://localhost:3000");
 
     expect(result).toBeNull();
+  });
+});
+
+describe("listAtlases", () => {
+  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
+  // called unbound.
+  // oxlint-disable-next-line typescript/unbound-method
+  const mockedGet = vi.mocked(axios.get);
+
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it("requests the S3 terminology listing URL", async () => {
+    mockedGet.mockResolvedValue({
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"></ListBucketResult>`
+    });
+
+    await listAtlases();
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      "https://brainglobe.s3.us-west-2.amazonaws.com/?list-type=2&prefix=atlas-rc2%2Fterminologies%2F&delimiter=%2F",
+      { responseType: "text" }
+    );
+  });
+
+  it("returns atlas names with the terminology suffix removed", async () => {
+    mockedGet.mockResolvedValue({
+      data: `<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <CommonPrefixes><Prefix>atlas-rc2/terminologies/allen_mouse-terminology/</Prefix></CommonPrefixes>
+  <CommonPrefixes><Prefix>atlas-rc2/terminologies/allen-adult-human-terminology/</Prefix></CommonPrefixes>
+</ListBucketResult>`
+    });
+
+    const result = await listAtlases();
+
+    expect(result).toEqual(["allen_mouse", "allen-adult-human"]);
   });
 });

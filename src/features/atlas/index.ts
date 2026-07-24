@@ -8,7 +8,11 @@ export {
 } from "./api/metadata.api";
 export { buildHierarchy, flattenHierarchy } from "./api/hierarchy.api";
 export type { HierarchyModel } from "./api/hierarchy.api";
-export { fetchAtlasSource, parseAtlasSourceResponse } from "./api/source.api";
+export {
+  fetchAtlasSource,
+  listAtlases,
+  parseAtlasSourceResponse
+} from "./api/source.api";
 export type { AtlasItem, AtlasSourceResponse } from "./api/source.api";
 export type { Atlas } from "./models/atlas.model";
 export type { AtlasStructure } from "./models/structure.model";

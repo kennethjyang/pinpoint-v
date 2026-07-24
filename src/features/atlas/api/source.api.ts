@@ -16,6 +16,38 @@ export interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
+const BRAINGLOBE_BASE_URL =
+  "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
+
+/**
+ * Fetch and parse the list of atlas names available in the BrainGlobe
+ * terminology bucket.
+ */
+export async function listAtlases(): Promise<string[]> {
+  const bucket = new URL(BRAINGLOBE_BASE_URL);
+  const params = new URLSearchParams({
+    "list-type": "2",
+    prefix: `${bucket.pathname.slice(1)}terminologies/`,
+    delimiter: "/"
+  });
+
+  const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
+    responseType: "text"
+  });
+
+  const TERMINOLOGY_SUFFIX = "-terminology";
+  const doc = new DOMParser().parseFromString(response.data, "application/xml");
+  return Array.from(doc.getElementsByTagName("CommonPrefixes"))
+    .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
+    .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "")
+    .filter(Boolean)
+    .map(name =>
+      name.endsWith(TERMINOLOGY_SUFFIX)
+        ? name.slice(0, -TERMINOLOGY_SUFFIX.length)
+        : name
+    );
+}
+
 /**
  * Parse an atlas source's response into the atlases it hosts, dropping any
  * non-folder entries.
