@@ -167,7 +167,7 @@ async function onFileSelected(event: Event) {
                 <q-icon name="search" />
               </template>
             </q-input>
-            <q-list class="probe-list" separator>
+            <q-list class="dialog-list" separator>
               <q-item
                 v-for="probeName in filteredProbeNames"
                 :key="probeName"
@@ -222,8 +222,4 @@ async function onFileSelected(event: Event) {
   </q-dialog>
 </template>
 
-<style lang="sass" scoped>
-.probe-list
-  max-height: 30vh
-  overflow-y: auto
-</style>
+<style lang="sass" scoped></style>
