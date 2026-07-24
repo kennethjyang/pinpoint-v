@@ -30,10 +30,15 @@ watch(selectedVendorName, () => {
   selectedProbeName.value = null;
 });
 
-const probeNames = computedAsync<string[]>(async () => {
-  if (!selectedVendorName.value) return [];
-  return await getProbeNames(selectedVendorName.value);
-}, []);
+const probeNamesLoaded = ref(false);
+const probeNames = computedAsync<string[]>(
+  async () => {
+    if (!selectedVendorName.value) return [];
+    return await getProbeNames(selectedVendorName.value);
+  },
+  [],
+  probeNamesLoaded
+);
 
 // Fuzzy search across probe names, falling back to the full list when empty.
 const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
@@ -168,16 +173,25 @@ async function onFileSelected(event: Event) {
               </template>
             </q-input>
             <q-list class="dialog-list" separator>
-              <q-item
-                v-for="probeName in filteredProbeNames"
-                :key="probeName"
-                v-ripple
-                :active="selectedProbeName === probeName"
-                clickable
-                @click="selectedProbeName = probeName"
-              >
-                <q-item-section>{{ probeName }}</q-item-section>
-              </q-item>
+              <template v-if="probeNamesLoaded">
+                <q-item
+                  v-for="probeName in filteredProbeNames"
+                  :key="probeName"
+                  v-ripple
+                  :active="selectedProbeName === probeName"
+                  clickable
+                  @click="selectedProbeName = probeName"
+                >
+                  <q-item-section>{{ probeName }}</q-item-section>
+                </q-item>
+              </template>
+              <template v-else>
+                <q-item v-for="n in 5" :key="n">
+                  <q-item-section>
+                    <q-skeleton type="text" />
+                  </q-item-section>
+                </q-item>
+              </template>
             </q-list>
 
             <q-img
