@@ -10,6 +10,12 @@ defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 
 const probeLibraryStore = useProbeLibraryStore();
+
+function installProbe() {
+  $q.dialog({ component: InstallProbeDialog }).onOk(probe => {
+    probeLibraryStore.add(probe);
+  });
+}
 </script>
 
 <template>
@@ -18,20 +24,24 @@ const probeLibraryStore = useProbeLibraryStore();
       <q-card-section>
         <p class="text-h5">Probe Library</p>
 
-        <q-btn
-          icon="add"
-          label="Install Probe"
-          @click="$q.dialog({ component: InstallProbeDialog })"
-        />
+        <q-btn icon="add" label="Install Probe" @click="installProbe" />
 
         <q-list separator>
           <q-item
             v-for="probe in probeLibraryStore.library"
             :key="`${probe.annotations!.manufacturer}-${probe.annotations!.model_name}`"
           >
-            <q-item-section>{{ probe.annotations!.model_name }}</q-item-section>
+            <q-item-section
+              >{{ probe.annotations!.manufacturer }}
+              {{ probe.annotations!.model_name }}</q-item-section
+            >
             <q-item-section side>
-              <q-btn flat icon="delete" round />
+              <q-btn
+                flat
+                icon="delete"
+                round
+                @click="probeLibraryStore.remove(probe)"
+              />
             </q-item-section>
           </q-item>
         </q-list>
