@@ -21,12 +21,12 @@ function installProbe() {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card>
-      <q-card-section>
+      <q-card-section class="column">
         <p class="text-h5">Probe Library</p>
 
         <q-btn icon="add" label="Install Probe" @click="installProbe" />
 
-        <q-list separator>
+        <q-list class="probe-list" separator>
           <q-item
             v-for="probe in probeLibraryStore.library"
             :key="`${probe.annotations!.manufacturer}-${probe.annotations!.model_name}`"
@@ -53,4 +53,8 @@ function installProbe() {
   </q-dialog>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+.probe-list
+  max-height: 30vh
+  overflow-y: auto
+</style>

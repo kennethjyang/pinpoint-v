@@ -8,11 +8,20 @@ export const useProbeLibraryStore = defineStore(
     const library = ref<ProbeInterfaceProbe[]>([]);
 
     /**
+     * Probes are plain data with no id, so equality is structural rather
+     * than by reference.
+     */
+    function isEqual(a: ProbeInterfaceProbe, b: ProbeInterfaceProbe) {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+
+    /**
      * Add a probe to the library. Does nothing if it already exists.
      * @param probe Probe to add.
      */
     function add(probe: ProbeInterfaceProbe) {
-      if (library.value.includes(probe)) return;
+      if (library.value.some(libraryProbe => isEqual(libraryProbe, probe)))
+        return;
       library.value.push(probe);
     }
 
@@ -21,7 +30,9 @@ export const useProbeLibraryStore = defineStore(
      * @param probe Probe to remove.
      */
     function remove(probe: ProbeInterfaceProbe) {
-      library.value.filter(libraryProbe => libraryProbe !== probe);
+      library.value = library.value.filter(
+        libraryProbe => !isEqual(libraryProbe, probe)
+      );
     }
 
     return { library, add, remove };

@@ -1,5 +1,6 @@
 import type { Atlas, AtlasMetadata, AtlasStructure } from "@/features/atlas";
 import type { Experiment } from "@/features/experiment";
+import type { ProbeInterfaceProbe } from "@/features/probe";
 
 /**
  * Test fixture factories.
@@ -77,6 +78,18 @@ export function makeAtlasMetadata(
     defaultReferenceCoordinate: [5.7, 0.44, 5.4],
     rootId: 0,
     structures: makeStructures(),
+    ...overrides
+  };
+}
+
+export function makeProbe(
+  overrides: Partial<ProbeInterfaceProbe> = {}
+): ProbeInterfaceProbe {
+  return {
+    ndim: 2,
+    si_units: "um",
+    contact_positions: [[0, 0]],
+    annotations: { manufacturer: "cambridgeneurotech", model_name: "ASSY-1" },
     ...overrides
   };
 }
