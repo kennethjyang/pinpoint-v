@@ -1,3 +1,4 @@
 - Use pnpm
 - Only verify using static analysis and unit tests.
-- Ensure tests are up to date. Create tests for missing branches.
+- Ensure tests are up to date. Create tests for missing branches. Run tests after any edits.
+- Load the Hunk skill and use it for verification/review. Run `hunk skill path` to get the skill path.

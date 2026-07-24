@@ -40,12 +40,29 @@ export default {
     vblWebsite: "VBL Website",
     recentExperiment: "Some Recent Experiment {n}"
   },
+  installProbe: {
+    title: "Install Probe",
+    vendor: "Vendor",
+    search: "Search",
+    cancel: "Cancel",
+    uploadCustom: "Upload Custom Probe",
+    install: "Install",
+    selectProbeHint: "Select a probe to add!",
+    installFailed: "Unable to install probe.",
+    installFailedCaption: "Check your connection and try again.",
+    invalidProbeFile: "Unable to read probe file.",
+    invalidProbeFileCaption:
+      "Check that the file is a valid ProbeInterface JSON file."
+  },
   layout: {
     file: "File",
     new: "New",
     save: "Save",
+
     edit: "Edit",
     preferences: "Preferences",
+    probeLibrary: "Probe Library",
+
     view: "View",
     toggleDarkMode: "Toggle Dark Mode",
     scene: "Scene",

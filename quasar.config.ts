@@ -15,7 +15,7 @@ export default defineConfig(ctx => {
     boot: ["i18n.boot", "babylon-runtime.service.boot"],
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#css
-    css: ["app.scss"],
+    css: ["app.sass"],
 
     // https://github.com/quasarframework/quasar/tree/dev/extras
     extras: [
@@ -86,7 +86,7 @@ export default defineConfig(ctx => {
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
     devServer: {
       // https: true,
-      open: true // opens browser window automatically
+      open: false // opens browser window automatically
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
@@ -109,7 +109,7 @@ export default defineConfig(ctx => {
       // directives: [],
 
       // Quasar plugins
-      plugins: ["Notify"]
+      plugins: ["Notify", "Dialog"]
     },
 
     // animations: 'all', // --- includes all animations

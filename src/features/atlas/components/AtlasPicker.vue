@@ -246,7 +246,7 @@ async function selectAtlas(atlas: Atlas) {
         )
       }}</p>
 
-      <q-list class="atlas-list" separator>
+      <q-list class="dialog-list" separator>
         <q-item
           v-for="atlas in filteredFavorites"
           :key="`${atlas.source}-${atlas.name}`"
@@ -291,9 +291,3 @@ async function selectAtlas(atlas: Atlas) {
     </template>
   </q-form>
 </template>
-
-<style lang="sass" scoped>
-.atlas-list
-  max-height: 30vh
-  overflow-y: auto
-</style>

@@ -6,6 +6,7 @@ import { SplashCard } from "@/features/splash";
 import { NewExperimentCard } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
+import { ProbeLibraryDialog } from "@/features/probe";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -15,7 +16,9 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("atlas");
+const tab = ref("scene");
+
+// Dialogs.
 const showSplash = ref(false);
 const showNewExperiment = ref(false);
 
@@ -105,6 +108,14 @@ function fixedQPageHeight(offset: number) {
             <q-list>
               <q-item clickable>
                 <q-item-section>{{ $t("layout.preferences") }}</q-item-section>
+              </q-item>
+            </q-list>
+            <q-list>
+              <q-item
+                clickable
+                @click="$q.dialog({ component: ProbeLibraryDialog })"
+              >
+                <q-item-section>{{ $t("layout.probeLibrary") }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
