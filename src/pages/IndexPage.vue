@@ -22,8 +22,6 @@ const tab = ref("scene");
 const showSplash = ref(false);
 const showNewExperiment = ref(false);
 
-$q.dialog({ component: ProbeLibraryDialog });
-
 /**
  * Toggle left drawer open state.
  */
