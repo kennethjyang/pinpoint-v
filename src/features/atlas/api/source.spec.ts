@@ -3,6 +3,7 @@ import axios from "axios";
 import {
   fetchAtlasSource,
   listAtlases,
+  listAtlasesHTTP,
   parseAtlasSourceResponse
 } from "@/features/atlas";
 
@@ -122,6 +123,43 @@ describe("listAtlases", () => {
     });
 
     const result = await listAtlases();
+
+    expect(result).toEqual(["allen_mouse", "allen-adult-human"]);
+  });
+});
+
+describe("listAtlasesHTTP", () => {
+  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
+  // called unbound.
+  // oxlint-disable-next-line typescript/unbound-method
+  const mockedGet = vi.mocked(axios.get);
+
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it("requests the terminologies directory on the given host", async () => {
+    mockedGet.mockResolvedValue({ data: { files: [] } });
+
+    await listAtlasesHTTP("http://localhost:3000");
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      "http://localhost:3000/brainglobe-atlasapi/terminologies"
+    );
+  });
+
+  it("keeps only folder entries and strips the terminology suffix", async () => {
+    mockedGet.mockResolvedValue({
+      data: {
+        files: [
+          { name: "allen_mouse-terminology", type: "folder" },
+          { name: "readme.txt", type: "file" },
+          { name: "allen-adult-human-terminology", type: "folder" }
+        ]
+      }
+    });
+
+    const result = await listAtlasesHTTP("http://localhost:3000");
 
     expect(result).toEqual(["allen_mouse", "allen-adult-human"]);
   });

@@ -11,6 +11,7 @@ export type { HierarchyModel } from "./api/hierarchy.api";
 export {
   fetchAtlasSource,
   listAtlases,
+  listAtlasesHTTP,
   parseAtlasSourceResponse
 } from "./api/source.api";
 export type { AtlasItem, AtlasSourceResponse } from "./api/source.api";

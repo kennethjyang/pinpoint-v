@@ -18,6 +18,7 @@ export interface AtlasSourceResponse {
 
 const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
+const TERMINOLOGY_SUFFIX = "-terminology";
 
 /**
  * Fetch and parse the list of atlas names available in the BrainGlobe
@@ -35,7 +36,6 @@ export async function listAtlases(): Promise<string[]> {
     responseType: "text"
   });
 
-  const TERMINOLOGY_SUFFIX = "-terminology";
   const doc = new DOMParser().parseFromString(response.data, "application/xml");
   return Array.from(doc.getElementsByTagName("CommonPrefixes"))
     .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
@@ -45,6 +45,25 @@ export async function listAtlases(): Promise<string[]> {
       name.endsWith(TERMINOLOGY_SUFFIX)
         ? name.slice(0, -TERMINOLOGY_SUFFIX.length)
         : name
+    );
+}
+
+/**
+ * Fetch and parse the list of atlas names available in the terminologies
+ * directory of a BrainGlobe HTTP server.
+ * @param host Root URL of the BrainGlobe HTTP server.
+ */
+export async function listAtlasesHTTP(host: string): Promise<string[]> {
+  const response = await axios.get<AtlasSourceResponse>(
+    `${host}/brainglobe-atlasapi/terminologies`
+  );
+
+  return response.data.files
+    .filter(item => item.type === "folder")
+    .map(item =>
+      item.name.endsWith(TERMINOLOGY_SUFFIX)
+        ? item.name.slice(0, -TERMINOLOGY_SUFFIX.length)
+        : item.name
     );
 }
 
