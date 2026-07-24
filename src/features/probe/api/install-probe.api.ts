@@ -159,6 +159,8 @@ function isProbeInterfaceProbe(value: unknown): value is ProbeInterfaceProbe {
  * Parse and minimally validate a ProbeInterface file's contents, returning
  * its first probe.
  *
+ * This is meant for user uploaded files.
+ *
  * @remarks Mirrors {@link getProbeInterfaceProbe}, which also only extracts
  * the first probe in a ProbeInterface file. Returns null if the text isn't
  * valid JSON, has no probes, or its first probe is missing required fields.

@@ -147,75 +147,77 @@ async function onFileSelected(event: Event) {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="install-card">
-      <q-card-section class="q-gutter-y-sm">
-        <p class="text-h5">{{ $t("installProbe.title") }}</p>
+      <div :class="{ disabled: uploading || installing }">
+        <q-card-section class="q-gutter-y-sm">
+          <p class="text-h5">{{ $t("installProbe.title") }}</p>
 
-        <q-select
-          v-model="selectedVendorName"
-          :options="vendors"
-          :label="$t('installProbe.vendor')"
-        />
-
-        <template v-if="selectedVendorName">
-          <q-input
-            v-model="searchQuery"
-            clearable
-            :label="$t('installProbe.search')"
-          >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-          <q-list class="probe-list" separator>
-            <q-item
-              v-for="probeName in filteredProbeNames"
-              :key="probeName"
-              v-ripple
-              :active="selectedProbeName === probeName"
-              clickable
-              @click="selectedProbeName = probeName"
-            >
-              <q-item-section>{{ probeName }}</q-item-section>
-            </q-item>
-          </q-list>
-
-          <q-img
-            v-if="selectedProbeName"
-            :src="selectedProbeOverviewImageSrc"
-            fit="contain"
+          <q-select
+            v-model="selectedVendorName"
+            :label="$t('installProbe.vendor')"
+            :options="vendors"
           />
-        </template>
-      </q-card-section>
-      <q-card-actions align="right">
-        <q-btn :label="$t('installProbe.cancel')" @click="onDialogCancel" />
 
-        <input
-          ref="file-input"
-          accept="application/json"
-          class="hidden"
-          type="file"
-          @change="onFileSelected"
-        />
-        <q-btn
-          :label="$t('installProbe.uploadCustom')"
-          :loading="uploading"
-          icon="upload"
-          @click="openFilePicker"
-        />
+          <template v-if="selectedVendorName">
+            <q-input
+              v-model="searchQuery"
+              :label="$t('installProbe.search')"
+              clearable
+            >
+              <template #prepend>
+                <q-icon name="search" />
+              </template>
+            </q-input>
+            <q-list class="probe-list" separator>
+              <q-item
+                v-for="probeName in filteredProbeNames"
+                :key="probeName"
+                v-ripple
+                :active="selectedProbeName === probeName"
+                clickable
+                @click="selectedProbeName = probeName"
+              >
+                <q-item-section>{{ probeName }}</q-item-section>
+              </q-item>
+            </q-list>
 
-        <q-btn
-          :disable="!selectedProbeName"
-          :label="$t('installProbe.install')"
-          :loading="installing"
-          color="primary"
-          icon="add"
-          @click="install"
-        >
-          <q-tooltip v-if="!selectedProbeName">{{
-            $t("installProbe.selectProbeHint")
-          }}</q-tooltip>
-        </q-btn>
-      </q-card-actions>
+            <q-img
+              v-if="selectedProbeName"
+              :src="selectedProbeOverviewImageSrc"
+              fit="contain"
+            />
+          </template>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn :label="$t('installProbe.cancel')" @click="onDialogCancel" />
+
+          <input
+            ref="file-input"
+            accept="application/json"
+            class="hidden"
+            type="file"
+            @change="onFileSelected"
+          />
+          <q-btn
+            :label="$t('installProbe.uploadCustom')"
+            :loading="uploading"
+            icon="upload"
+            @click="openFilePicker"
+          />
+
+          <q-btn
+            :disable="!selectedProbeName"
+            :label="$t('installProbe.install')"
+            :loading="installing"
+            color="primary"
+            icon="add"
+            @click="install"
+          >
+            <q-tooltip v-if="!selectedProbeName">{{
+              $t("installProbe.selectProbeHint")
+            }}</q-tooltip>
+          </q-btn>
+        </q-card-actions>
+      </div>
     </q-card>
   </q-dialog>
 </template>
