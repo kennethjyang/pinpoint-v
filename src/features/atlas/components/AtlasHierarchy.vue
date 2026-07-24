@@ -25,22 +25,6 @@ const scrollArea = useTemplateRef<QScrollArea>("scroll-area");
 const filter = ref<string | null>(null);
 const hierarchy = ref<HierarchyModel[]>([]);
 
-// Update the tree data to match the current atlas.
-watchEffect(() => {
-  if (!currentExperiment.metadata) return;
-  const { rootId, structures } = currentExperiment.metadata;
-
-  // Build from root but exclude it.
-  hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
-});
-
-// Ensure the tree is always fully expanded.
-watchPostEffect(() => {
-  if (hierarchy.value.length > 0) {
-    tree.value?.expandAll();
-  }
-});
-
 // Expose scroll area target for the search result virtual scroll.
 const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
@@ -56,6 +40,22 @@ const { results } = useFuse(searchQuery, flatNodes, {
 // Search mode: replace tree with flat result list.
 const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
 const searchResults = computed(() => results.value.map(r => r.item));
+
+// Update the tree data to match the current atlas.
+watchEffect(() => {
+  if (!currentExperiment.metadata) return;
+  const { rootId, structures } = currentExperiment.metadata;
+
+  // Build from root but exclude it.
+  hierarchy.value = buildHierarchy(rootId, structures)?.children ?? [];
+});
+
+// Ensure the tree is always fully expanded.
+watchPostEffect(() => {
+  if (hierarchy.value.length > 0) {
+    tree.value?.expandAll();
+  }
+});
 </script>
 
 <template>
@@ -124,7 +124,7 @@ const searchResults = computed(() => results.value.map(r => r.item));
     <template v-if="currentExperiment.visibleStructures.length">
       <q-btn
         icon="clear_all"
-        label="Clear"
+        :label="$t('atlasHierarchy.clear')"
         @click="currentExperiment.clearVisibleStructures"
       />
     </template>

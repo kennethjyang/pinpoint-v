@@ -10,11 +10,10 @@ import { useDialogPluginComponent } from "quasar";
  */
 const FALLBACK_REFERENCE_COORDINATE: [number, number, number] = [0, 0, 0];
 
-const currentExperimentStore = useCurrentExperimentStore();
-
 defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide } = useDialogPluginComponent();
+const currentExperimentStore = useCurrentExperimentStore();
 
 const name = ref<string | null>(null);
 const atlas = ref<Atlas | null>(null);
@@ -54,7 +53,7 @@ async function create() {
         <AtlasPicker v-model="atlas" />
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn v-close-popup label="Cancel" />
+        <q-btn v-close-popup :label="$t('newExperiment.cancel')" />
         <q-btn
           color="positive"
           icon="add"

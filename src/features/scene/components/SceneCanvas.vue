@@ -47,6 +47,13 @@ const visibleStructures = computed<StructureEntity[]>(() => {
   });
 });
 
+/**
+ * Trigger engine resizing on page area resize.
+ */
+function onResize() {
+  runtime.engine.value?.resize();
+}
+
 onMounted(async () => {
   // Exit if no canvas.
   if (!canvas.value) {
@@ -90,13 +97,6 @@ onMounted(async () => {
 onUnmounted(() => {
   runtime.dispose();
 });
-
-/**
- * Trigger engine resizing on page area resize.
- */
-function onResize() {
-  runtime.engine.value?.resize();
-}
 </script>
 
 <template>

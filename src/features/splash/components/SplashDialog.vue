@@ -4,9 +4,8 @@ import { NewExperimentDialog } from "@/features/experiment";
 
 defineEmits([...useDialogPluginComponent.emits]);
 
-const $q = useQuasar();
-
 const { dialogRef, onDialogHide } = useDialogPluginComponent();
+const $q = useQuasar();
 
 const appVersion = import.meta.env.APP_VERSION;
 </script>

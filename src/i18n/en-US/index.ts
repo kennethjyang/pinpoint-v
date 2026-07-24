@@ -24,11 +24,13 @@ export default {
     removeFavorite: "Remove from favorites"
   },
   atlasHierarchy: {
-    search: "Search"
+    search: "Search",
+    clear: "Clear"
   },
   newExperiment: {
     title: "New Experiment",
     experimentName: "Experiment name",
+    cancel: "Cancel",
     create: "Create",
     pickNameAndAtlas: "Pick an experiment name and atlas"
   },
@@ -58,16 +60,19 @@ export default {
     file: "File",
     new: "New",
     save: "Save",
-
     edit: "Edit",
     preferences: "Preferences",
     probeLibrary: "Probe Library",
-
     view: "View",
     toggleDarkMode: "Toggle Dark Mode",
     scene: "Scene",
     channelMaps: "Channel Maps",
     atlas: "Atlas"
+  },
+  probeLibrary: {
+    title: "Probe Library",
+    installProbe: "Install Probe",
+    close: "Close"
   },
   errorNotFound: {
     code: "404",

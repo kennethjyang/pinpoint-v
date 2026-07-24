@@ -26,9 +26,6 @@ const vendors = computedAsync<string[]>(async () => await getVendors());
 const searchQuery = ref<string | null>(null);
 
 const selectedProbeName = ref<string | null>(null);
-watch(selectedVendorName, () => {
-  selectedProbeName.value = null;
-});
 
 const probeNamesEvaluating = ref(false);
 const probeNames = computedAsync<string[]>(
@@ -147,6 +144,10 @@ async function onFileSelected(event: Event) {
     uploading.value = false;
   }
 }
+
+watch(selectedVendorName, () => {
+  selectedProbeName.value = null;
+});
 </script>
 
 <template>
