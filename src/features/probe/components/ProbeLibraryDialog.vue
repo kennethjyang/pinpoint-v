@@ -3,12 +3,11 @@ import { useDialogPluginComponent, useQuasar } from "quasar";
 import { InstallProbeDialog } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 
-const $q = useQuasar();
-
 // Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 
+const $q = useQuasar();
 const probeLibraryStore = useProbeLibraryStore();
 
 function installProbe() {
@@ -22,9 +21,13 @@ function installProbe() {
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card>
       <q-card-section class="column">
-        <p class="text-h5">Probe Library</p>
+        <p class="text-h5">{{ $t("probeLibrary.title") }}</p>
 
-        <q-btn icon="add" label="Install Probe" @click="installProbe" />
+        <q-btn
+          icon="add"
+          :label="$t('probeLibrary.installProbe')"
+          @click="installProbe"
+        />
 
         <q-list class="dialog-list" separator>
           <q-item
@@ -47,7 +50,11 @@ function installProbe() {
         </q-list>
       </q-card-section>
       <q-card-actions align="right">
-        <q-btn color="primary" label="Close" @click="onDialogOK" />
+        <q-btn
+          color="primary"
+          :label="$t('probeLibrary.close')"
+          @click="onDialogOK"
+        />
       </q-card-actions>
     </q-card>
   </q-dialog>

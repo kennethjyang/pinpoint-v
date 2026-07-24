@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
 import {
+  getVendors,
+  getProbeNames,
   getProbeInterfaceProbe,
   parseProbeInterfaceFile
 } from "@/features/probe";
@@ -37,6 +39,131 @@ function probeInterfaceFileText(
     probes
   });
 }
+
+describe("getVendors", () => {
+  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
+  // called unbound.
+  // oxlint-disable-next-line typescript/unbound-method
+  const mockedGet = vi.mocked(axios.get);
+
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it("returns the names of top level directories", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "neuropixels", type: "dir" },
+        { name: "cambridgeneurotech", type: "dir" }
+      ]
+    });
+
+    expect(await getVendors()).toEqual(["neuropixels", "cambridgeneurotech"]);
+  });
+
+  it("excludes non-directory entries", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "neuropixels", type: "dir" },
+        { name: "README.md", type: "file" }
+      ]
+    });
+
+    expect(await getVendors()).toEqual(["neuropixels"]);
+  });
+
+  it("excludes dotfile directories", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "neuropixels", type: "dir" },
+        { name: ".github", type: "dir" }
+      ]
+    });
+
+    expect(await getVendors()).toEqual(["neuropixels"]);
+  });
+
+  it("excludes the apps and scripts directories", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "neuropixels", type: "dir" },
+        { name: "apps", type: "dir" },
+        { name: "scripts", type: "dir" }
+      ]
+    });
+
+    expect(await getVendors()).toEqual(["neuropixels"]);
+  });
+
+  it("returns an empty list when the response is a GitHub 404", async () => {
+    mockedGet.mockResolvedValue({ data: { status: "404" } });
+
+    expect(await getVendors()).toEqual([]);
+  });
+
+  it("returns an empty list when the response has no data", async () => {
+    mockedGet.mockResolvedValue({ data: undefined });
+
+    expect(await getVendors()).toEqual([]);
+  });
+
+  it("returns an empty list when the request throws", async () => {
+    mockedGet.mockRejectedValue(new Error("network error"));
+
+    expect(await getVendors()).toEqual([]);
+  });
+});
+
+describe("getProbeNames", () => {
+  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
+  // called unbound.
+  // oxlint-disable-next-line typescript/unbound-method
+  const mockedGet = vi.mocked(axios.get);
+
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it("returns the names of probe directories for a vendor", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "1.0", type: "dir" },
+        { name: "2.0", type: "dir" }
+      ]
+    });
+
+    expect(await getProbeNames("neuropixels")).toEqual(["1.0", "2.0"]);
+  });
+
+  it("excludes non-directory entries", async () => {
+    mockedGet.mockResolvedValue({
+      data: [
+        { name: "1.0", type: "dir" },
+        { name: "README.md", type: "file" }
+      ]
+    });
+
+    expect(await getProbeNames("neuropixels")).toEqual(["1.0"]);
+  });
+
+  it("returns an empty list when the response is a GitHub 404", async () => {
+    mockedGet.mockResolvedValue({ data: { status: "404" } });
+
+    expect(await getProbeNames("neuropixels")).toEqual([]);
+  });
+
+  it("returns an empty list when the response has no data", async () => {
+    mockedGet.mockResolvedValue({ data: undefined });
+
+    expect(await getProbeNames("neuropixels")).toEqual([]);
+  });
+
+  it("returns an empty list when the request throws", async () => {
+    mockedGet.mockRejectedValue(new Error("network error"));
+
+    expect(await getProbeNames("neuropixels")).toEqual([]);
+  });
+});
 
 describe("getProbeInterfaceProbe", () => {
   // axios.get is only ever passed to vi.mocked() to retrieve its mock, never

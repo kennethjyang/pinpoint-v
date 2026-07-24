@@ -26,14 +26,16 @@ const vendors = computedAsync<string[]>(async () => await getVendors());
 const searchQuery = ref<string | null>(null);
 
 const selectedProbeName = ref<string | null>(null);
-watch(selectedVendorName, () => {
-  selectedProbeName.value = null;
-});
 
-const probeNames = computedAsync<string[]>(async () => {
-  if (!selectedVendorName.value) return [];
-  return await getProbeNames(selectedVendorName.value);
-}, []);
+const probeNamesEvaluating = ref(false);
+const probeNames = computedAsync<string[]>(
+  async () => {
+    if (!selectedVendorName.value) return [];
+    return await getProbeNames(selectedVendorName.value);
+  },
+  [],
+  probeNamesEvaluating
+);
 
 // Fuzzy search across probe names, falling back to the full list when empty.
 const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
@@ -142,6 +144,10 @@ async function onFileSelected(event: Event) {
     uploading.value = false;
   }
 }
+
+watch(selectedVendorName, () => {
+  selectedProbeName.value = null;
+});
 </script>
 
 <template>
@@ -168,16 +174,25 @@ async function onFileSelected(event: Event) {
               </template>
             </q-input>
             <q-list class="dialog-list" separator>
-              <q-item
-                v-for="probeName in filteredProbeNames"
-                :key="probeName"
-                v-ripple
-                :active="selectedProbeName === probeName"
-                clickable
-                @click="selectedProbeName = probeName"
-              >
-                <q-item-section>{{ probeName }}</q-item-section>
-              </q-item>
+              <template v-if="probeNamesEvaluating">
+                <q-item v-for="n in 5" :key="n">
+                  <q-item-section>
+                    <q-skeleton type="text" />
+                  </q-item-section>
+                </q-item>
+              </template>
+              <template v-else>
+                <q-item
+                  v-for="probeName in filteredProbeNames"
+                  :key="probeName"
+                  v-ripple
+                  :active="selectedProbeName === probeName"
+                  clickable
+                  @click="selectedProbeName = probeName"
+                >
+                  <q-item-section>{{ probeName }}</q-item-section>
+                </q-item>
+              </template>
             </q-list>
 
             <q-img

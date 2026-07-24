@@ -21,6 +21,8 @@
     "build": "quasar build",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "testui": "vitest --ui",
     "postinstall": "quasar prepare --silent",
     "local-atlas": "serve -C ~/pinpoint_atlases/"
   },
@@ -48,6 +50,8 @@
     "@types/node": "^26.1.1",
     "@types/semver": "^7.7.1",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/ui": "^4.1.10",
     "@vue/test-utils": "^2.4.11",
     "autoprefixer": "^10.5.4",
     "happy-dom": "^20.11.1",
