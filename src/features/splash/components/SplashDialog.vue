@@ -8,8 +8,6 @@ const { dialogRef, onDialogHide } = useDialogPluginComponent();
 const $q = useQuasar();
 
 const appVersion = import.meta.env.APP_VERSION;
-
-$q.dialog({ component: NewExperimentDialog });
 </script>
 
 <template>

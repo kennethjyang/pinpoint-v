@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import { SceneCanvas } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
-import { SplashDialog } from "@/features/splash";
 import { NewExperimentDialog } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
@@ -19,7 +18,7 @@ const rightDrawerWidth = ref(350);
 const tab = ref("scene");
 
 // Show splash.
-$q.dialog({ component: SplashDialog });
+$q.dialog({ component: NewExperimentDialog });
 
 /**
  * Toggle left drawer open state.

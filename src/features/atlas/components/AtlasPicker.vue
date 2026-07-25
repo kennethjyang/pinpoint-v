@@ -13,12 +13,7 @@ import {
   listAtlases,
   listAtlasesHTTP
 } from "@/features/atlas";
-
-enum ConnectionState {
-  Disconnected,
-  Connecting,
-  Connected
-}
+import { computedAsync } from "@vueuse/core";
 
 enum SourceToggle {
   BrainGlobe,
@@ -58,19 +53,29 @@ watch(sourceToggle, newSource => {
 const atlasSource = ref<string | null>(BRAINGLOBE_BASE_URL);
 
 /**
- * Connection to source.
- */
-const connectionState = ref<ConnectionState>(ConnectionState.Disconnected);
-
-/**
  * Filter string.
  */
 const searchQuery = ref<string | null>(null);
 
+const atlasesEvaluating = ref(false);
+
 /**
- * Full list of atlases from the last connection.
+ * Full list of atlases from the source URL.
  */
-const atlases = ref<Atlas[]>([]);
+const atlases = computedAsync<Atlas[]>(
+  async () => {
+    if (!atlasSource.value) return [];
+
+    const fetchedAtlases =
+      new URL(atlasSource.value).href === new URL(BRAINGLOBE_BASE_URL).href
+        ? await listAtlases()
+        : await listAtlasesHTTP(atlasSource.value);
+
+    return fetchedAtlases ?? [];
+  },
+  [],
+  atlasesEvaluating
+);
 
 // Getters.
 
@@ -122,45 +127,6 @@ const filteredFavorites = computed(() =>
 const filteredNonFavorites = computed(() =>
   filteredAtlases.value.filter(atlas => !favoritesSet.value.has(atlas.name))
 );
-
-/**
- * Notify if a connection fails and set the connection status to disconnected.
- */
-function notifyFail() {
-  $q.notify({
-    message: t("atlasPicker.connectFailed"),
-    caption: t("atlasPicker.connectFailedCaption"),
-    color: "negative",
-    icon: "mobiledata_off"
-  });
-  connectionState.value = ConnectionState.Disconnected;
-}
-
-/**
- * Make a connection to the atlas source and populate the atlas list.
- */
-async function connect() {
-  // Disconnect if no source.
-  if (!atlasSource.value) {
-    connectionState.value = ConnectionState.Disconnected;
-    return;
-  }
-
-  // Set to connecting.
-  connectionState.value = ConnectionState.Connecting;
-
-  // Make the connection.
-  const fetchedAtlases =
-    new URL(atlasSource.value).href === new URL(BRAINGLOBE_BASE_URL).href
-      ? await listAtlases()
-      : await listAtlasesHTTP(atlasSource.value);
-  if (fetchedAtlases) {
-    atlases.value = fetchedAtlases;
-    connectionState.value = ConnectionState.Connected;
-  } else {
-    notifyFail();
-  }
-}
 
 /**
  * Select an atlas, first checking that its version is compatible with the
@@ -236,82 +202,89 @@ async function selectAtlas(atlas: Atlas) {
       toggle-color="primary"
     />
 
-    <template v-if="sourceToggle === SourceToggle.Custom">
-      <q-input
-        v-model="atlasSource"
-        :label="$t('atlasPicker.sourceUrl')"
-        class="col"
-        clearable
-      />
+    <q-input
+      v-if="sourceToggle === SourceToggle.Custom"
+      v-model="atlasSource"
+      :label="$t('atlasPicker.sourceUrl')"
+      class="col"
+      clearable
+    />
 
-      <q-btn
-        :label="$t('atlasPicker.connect')"
-        :loading="connectionState === ConnectionState.Connecting"
-        color="primary"
-        @click="connect"
-      />
-    </template>
-
-    <template v-if="connectionState === ConnectionState.Connected">
-      <q-input
-        v-model="searchQuery"
-        :label="$t('atlasPicker.search')"
-        clearable
-      >
-        <template #prepend>
-          <q-icon name="search" />
-        </template>
-      </q-input>
-      <p>{{
-        $t(
-          "atlasPicker.atlasCount",
-          { count: filteredAtlases.length },
-          filteredAtlases.length
-        )
-      }}</p>
-
-      <q-list class="dialog-list" separator>
-        <q-item
-          v-for="atlas in filteredFavorites"
-          :key="`${atlas.source}-${atlas.name}`"
-          v-ripple
-          :active="selectedAtlas === atlas"
-          clickable
-          @click="selectAtlas(atlas)"
-        >
-          <q-item-section>{{ atlas.name }}</q-item-section>
-          <q-item-section side>
-            <q-btn
-              :aria-label="$t('atlasPicker.removeFavorite')"
-              color="pink"
-              flat
-              icon="favorite"
-              round
-              @click.stop="favoriteAtlasesStore.remove(atlas)"
-            />
-          </q-item-section>
-        </q-item>
-
-        <q-item
-          v-for="atlas in filteredNonFavorites"
-          :key="`${atlas.source}-${atlas.name}`"
-          v-ripple
-          :active="selectedAtlas === atlas"
-          clickable
-          @click="selectAtlas(atlas)"
-        >
-          <q-item-section>{{ atlas.name }}</q-item-section>
-          <q-item-section side>
-            <q-btn
-              :aria-label="$t('atlasPicker.addFavorite')"
-              flat
-              icon="favorite_border"
-              round
-              @click.stop="favoriteAtlasesStore.add(atlas)"
-            />
+    <template v-if="atlasesEvaluating">
+      <q-list separator>
+        <q-item v-for="n in 5" :key="n">
+          <q-item-section>
+            <q-skeleton type="text" />
           </q-item-section>
         </q-item>
       </q-list>
+    </template>
+
+    <template v-else>
+      <template v-if="atlases.length > 0">
+        <q-input
+          v-model="searchQuery"
+          :label="$t('atlasPicker.search')"
+          clearable
+        >
+          <template #prepend>
+            <q-icon name="search" />
+          </template>
+        </q-input>
+        <p>{{
+          $t(
+            "atlasPicker.atlasCount",
+            { count: filteredAtlases.length },
+            filteredAtlases.length
+          )
+        }}</p>
+
+        <q-list class="dialog-list" separator>
+          <q-item
+            v-for="atlas in filteredFavorites"
+            :key="`${atlas.source}-${atlas.name}`"
+            v-ripple
+            :active="selectedAtlas === atlas"
+            clickable
+            @click="selectAtlas(atlas)"
+          >
+            <q-item-section>{{ atlas.name }}</q-item-section>
+            <q-item-section side>
+              <q-btn
+                :aria-label="$t('atlasPicker.removeFavorite')"
+                color="pink"
+                flat
+                icon="favorite"
+                round
+                @click.stop="favoriteAtlasesStore.remove(atlas)"
+              />
+            </q-item-section>
+          </q-item>
+
+          <q-item
+            v-for="atlas in filteredNonFavorites"
+            :key="`${atlas.source}-${atlas.name}`"
+            v-ripple
+            :active="selectedAtlas === atlas"
+            clickable
+            @click="selectAtlas(atlas)"
+          >
+            <q-item-section>{{ atlas.name }}</q-item-section>
+            <q-item-section side>
+              <q-btn
+                :aria-label="$t('atlasPicker.addFavorite')"
+                flat
+                icon="favorite_border"
+                round
+                @click.stop="favoriteAtlasesStore.add(atlas)"
+              />
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </template>
+      <template v-else>
+        <p>No atlases found. Check your connection to the source.</p>
+      </template>
     </template>
   </q-form>
 </template>

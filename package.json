@@ -24,7 +24,7 @@
     "coverage": "vitest run --coverage",
     "testui": "vitest --ui",
     "postinstall": "quasar prepare --silent",
-    "local-atlas": "serve -C ~/pinpoint_atlases/"
+    "local-atlas": "pnpx serve -C ~/.brainglobe/"
   },
   "dependencies": {
     "@babylonjs/core": "^9.17.1",
@@ -59,7 +59,6 @@
     "oxfmt": "^0.x",
     "oxlint": "^1.x",
     "oxlint-tsgolint": "^7.x",
-    "serve": "^14.2.6",
     "typescript": "6.0.3",
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.8"
