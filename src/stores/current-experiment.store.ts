@@ -23,7 +23,10 @@ export const useCurrentExperimentStore = defineStore(
      */
     const experiment = ref<Experiment>({
       name: "My First Experiment",
-      atlas: { source: "http://localhost:3000", name: "allen_mouse" },
+      atlas: {
+        source: "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
+        name: "allen_mouse"
+      },
       referenceCoordinate: DEFAULT_REFERENCE_COORDINATE,
       visibleStructures: []
     });

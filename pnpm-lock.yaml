@@ -17,6 +17,9 @@ importers:
       '@quasar/extras':
         specifier: ^2.0.0
         version: 2.0.2
+      '@types/papaparse':
+        specifier: ^5.5.2
+        version: 5.5.2
       '@vueuse/core':
         specifier: ^14.3.0
         version: 14.3.0(vue@3.5.40(typescript@6.0.3))
@@ -29,6 +32,9 @@ importers:
       fuse.js:
         specifier: ^7.5.0
         version: 7.5.0
+      papaparse:
+        specifier: ^5.5.4
+        version: 5.5.4
       pinia:
         specifier: ^4.0.2
         version: 4.0.2(@vue/devtools-api@8.1.5)(typescript@6.0.3)(vue@3.5.40(typescript@6.0.3))
@@ -38,9 +44,6 @@ importers:
       quasar:
         specifier: ^2.22.0
         version: 2.22.0
-      semver:
-        specifier: ^7.8.5
-        version: 7.8.5
       vue:
         specifier: ^3.5.40
         version: 3.5.40(typescript@6.0.3)
@@ -66,9 +69,6 @@ importers:
       '@types/node':
         specifier: ^26.1.1
         version: 26.1.1
-      '@types/semver':
-        specifier: ^7.7.1
-        version: 7.7.1
       '@vitejs/plugin-vue':
         specifier: ^6.0.8
         version: 6.0.8(vite@8.1.5(@types/node@26.1.1)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.49.0)(yaml@2.9.0))(vue@3.5.40(typescript@6.0.3))
@@ -1247,8 +1247,8 @@ packages:
   '@types/node@26.1.1':
     resolution: {integrity: sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==}
 
-  '@types/semver@7.7.1':
-    resolution: {integrity: sha512-FmgJfu+MOcQ370SD0ev7EI8TlCAfKYU+B4m5T3yXc1CiRN94g/SZPtsCkk506aUDtlMnFZvasDwHHUcZUEaYuA==}
+  '@types/papaparse@5.5.2':
+    resolution: {integrity: sha512-gFnFp/JMzLHCwRf7tQHrNnfhN4eYBVYYI897CGX4MY1tzY9l2aLkVyx2IlKZ/SAqDbB3I1AOZW5gTMGGsqWliA==}
 
   '@types/web-bluetooth@0.0.21':
     resolution: {integrity: sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==}
@@ -2614,6 +2614,9 @@ packages:
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
+
+  papaparse@5.5.4:
+    resolution: {integrity: sha512-SwzWD9gl/ElwYLCI0nUja1mFJzjq2D8ziShfNBa7zCHzkOozeOGDwHWQ+tvCzEZcewecWZ5U7kUopDnG+DFYEQ==}
 
   param-case@3.0.4:
     resolution: {integrity: sha512-RXlj7zCYokReqWpOPH9oYivUzLYZ5vAPIfEmCTNViosC78F8F0H9y7T7gG2M39ymgutxF5gcFEsyZQSph9Bp3A==}
@@ -4297,7 +4300,9 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
-  '@types/semver@7.7.1': {}
+  '@types/papaparse@5.5.2':
+    dependencies:
+      '@types/node': 26.1.1
 
   '@types/web-bluetooth@0.0.21': {}
 
@@ -5747,6 +5752,8 @@ snapshots:
       p-limit: 3.1.0
 
   package-json-from-dist@1.0.1: {}
+
+  papaparse@5.5.4: {}
 
   param-case@3.0.4:
     dependencies:
