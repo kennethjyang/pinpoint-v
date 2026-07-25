@@ -66,7 +66,7 @@ const favoritesSet = computed(() => {
   }
 
   // Otherwise, return the empty set.
-  return new Set();
+  return new Set<string>();
 });
 
 /**
@@ -188,7 +188,8 @@ const filteredNonFavorites = computed(() =>
         </q-list>
       </template>
       <template v-else>
-        <p>No atlases found. Check your connection to the source.</p>
+        <p>{{ $t("atlasPicker.noAtlases") }}</p>
+        <p class="text-caption">{{ $t("atlasPicker.noAtlasesCaption") }}</p>
       </template>
     </template>
   </q-form>
