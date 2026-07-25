@@ -16,7 +16,7 @@ export interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
-export const BRAINGLOBE_BASE_URL =
+const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
 const TERMINOLOGY_SUFFIX = "-terminology";
 
@@ -77,40 +77,6 @@ export async function listAtlasesHTTP(host: string): Promise<Atlas[] | null> {
           : item.name
       )
       .map(name => ({ name, source: host }));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Parse an atlas source's response into the atlases it hosts, dropping any
- * non-folder entries.
- * @param response Raw response from the atlas source.
- * @param source Source URL the response came from.
- */
-export function parseAtlasSourceResponse(
-  response: AtlasSourceResponse,
-  source: string
-): Atlas[] {
-  return response.files
-    .filter(item => item.type === "folder")
-    .map(item => ({ name: item.name, source }));
-}
-
-/**
- * Connect to an atlas source and fetch the atlases it hosts.
- * @param source Source URL to connect to.
- * @returns The parsed atlases, or null if the source couldn't be reached or
- * returned no data.
- */
-export async function fetchAtlasSource(
-  source: string
-): Promise<Atlas[] | null> {
-  try {
-    const response = await axios.get<AtlasSourceResponse>(source);
-    if (!response.data) return null;
-
-    return parseAtlasSourceResponse(response.data, source);
   } catch {
     return null;
   }
