@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
@@ -20,6 +20,11 @@ enum ConnectionState {
   Connected
 }
 
+enum SourceToggle {
+  BrainGlobe,
+  Custom
+}
+
 // Props.
 const selectedAtlas = defineModel<Atlas | null>({ required: true });
 
@@ -30,6 +35,22 @@ const { t } = useI18n();
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // State.
+
+const sourceToggle = ref<SourceToggle>(SourceToggle.BrainGlobe);
+
+watch(sourceToggle, newSource => {
+  switch (newSource) {
+    case SourceToggle.BrainGlobe:
+      atlasSource.value = BRAINGLOBE_BASE_URL;
+      break;
+    case SourceToggle.Custom:
+      atlasSource.value = "http://localhost:3000";
+      break;
+    default:
+      atlasSource.value = BRAINGLOBE_BASE_URL;
+      break;
+  }
+});
 
 /**
  * Atlas source URL.
@@ -202,33 +223,34 @@ async function selectAtlas(atlas: Atlas) {
   <q-form class="q-gutter-y-sm">
     <p class="text-h6">{{ $t("atlasPicker.title") }}</p>
 
-    <div class="row q-gutter-x-md">
+    <q-btn-toggle
+      v-model="sourceToggle"
+      :options="[
+        {
+          label: $t('atlasPicker.brainglobeHosted'),
+          value: SourceToggle.BrainGlobe
+        },
+        { label: $t('atlasPicker.customHTTPHost'), value: SourceToggle.Custom }
+      ]"
+      spread
+      toggle-color="primary"
+    />
+
+    <template v-if="sourceToggle === SourceToggle.Custom">
+      <q-input
+        v-model="atlasSource"
+        :label="$t('atlasPicker.sourceUrl')"
+        class="col"
+        clearable
+      />
+
       <q-btn
-        :label="$t('atlasPicker.brainglobeHosted')"
+        :label="$t('atlasPicker.connect')"
+        :loading="connectionState === ConnectionState.Connecting"
         color="primary"
-        icon="public"
-        @click="atlasSource = BRAINGLOBE_BASE_URL"
+        @click="connect"
       />
-      <q-btn
-        :label="$t('atlasPicker.locallyHosted')"
-        icon="home"
-        @click="atlasSource = 'http://localhost:3000/'"
-      />
-    </div>
-
-    <q-input
-      v-model="atlasSource"
-      :label="$t('atlasPicker.sourceUrl')"
-      class="col"
-      clearable
-    />
-
-    <q-btn
-      :label="$t('atlasPicker.connect')"
-      :loading="connectionState === ConnectionState.Connecting"
-      color="primary"
-      @click="connect"
-    />
+    </template>
 
     <template v-if="connectionState === ConnectionState.Connected">
       <q-input

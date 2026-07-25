@@ -2,7 +2,7 @@ export default {
   atlasPicker: {
     title: "Atlas",
     brainglobeHosted: "BrainGlobe Hosted",
-    locallyHosted: "Locally Hosted",
+    customHTTPHost: "Custom HTTP Host",
     sourceUrl: "Source URL",
     connect: "Connect",
     search: "Search",
