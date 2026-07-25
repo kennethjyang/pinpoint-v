@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { Atlas, listAtlases, listAtlasesHTTP } from "@/features/atlas";
@@ -17,7 +17,6 @@ const selectedAtlas = defineModel<Atlas | null>({ required: true });
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // State.
-
 const sourceToggle = ref<SourceToggle>(SourceToggle.BrainGlobe);
 
 /**
@@ -98,6 +97,16 @@ const filteredFavorites = computed(() =>
 const filteredNonFavorites = computed(() =>
   filteredAtlases.value.filter(atlas => !favoritesSet.value.has(atlas.name))
 );
+
+/**
+ * Compare atlases by identity fields, since instances are not stable references.
+ */
+function isSelected(atlas: Atlas) {
+  return (
+    selectedAtlas.value?.source === atlas.source &&
+    selectedAtlas.value?.name === atlas.name
+  );
+}
 </script>
 
 <template>
@@ -149,7 +158,7 @@ const filteredNonFavorites = computed(() =>
             v-for="atlas in filteredFavorites"
             :key="`${atlas.source}-${atlas.name}`"
             v-ripple
-            :active="selectedAtlas === atlas"
+            :active="isSelected(atlas)"
             clickable
             @click="selectedAtlas = atlas"
           >
@@ -170,7 +179,7 @@ const filteredNonFavorites = computed(() =>
             v-for="atlas in filteredNonFavorites"
             :key="`${atlas.source}-${atlas.name}`"
             v-ripple
-            :active="selectedAtlas === atlas"
+            :active="isSelected(atlas)"
             clickable
             @click="selectedAtlas = atlas"
           >
