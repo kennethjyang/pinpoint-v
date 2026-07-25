@@ -1,4 +1,4 @@
-export interface TerminologyModel {
+export interface TerminologyRow {
   identifier: number;
   parent_identifier: number | null;
   annotation_value: number;

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildHierarchy, flattenHierarchy } from "./hierarchy.api";
 import { makeStructures } from "@/test/fixtures";
 
@@ -11,7 +11,7 @@ describe("buildHierarchy", () => {
     const node = buildHierarchy(0, structures);
 
     expect(node?.fullName).toBe("Primary Motor Area");
-    expect(node?.acronym).toBe("MOP");
+    expect(node?.abbreviation).toBe("MOP");
   });
 
   it("formats color as an rgb() string", () => {

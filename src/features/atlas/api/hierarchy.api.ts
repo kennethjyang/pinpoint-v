@@ -5,7 +5,7 @@ import { AtlasStructure } from "@/features/atlas";
  */
 export interface HierarchyModel {
   id: number;
-  acronym: string;
+  abbreviation: string;
   fullName: string;
   color: string;
   children: HierarchyModel[];
@@ -32,7 +32,7 @@ export function buildHierarchy(
 
   return {
     id,
-    acronym: structure.acronym.toUpperCase(),
+    abbreviation: structure.acronym.toUpperCase(),
     fullName: titleCaseName,
     color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
     children: structure.childrenIds.flatMap(

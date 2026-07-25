@@ -1,10 +1,11 @@
 import axios from "axios";
-import { Atlas } from "@/features/atlas";
+import { Atlas, TerminologyRow } from "@/features/atlas";
+import Papa from "papaparse";
 
 /**
  * Atlas item in an atlas source's response structure.
  */
-export interface AtlasItem {
+interface AtlasItem {
   name: string;
   type: string;
 }
@@ -12,12 +13,14 @@ export interface AtlasItem {
 /**
  * Atlas source connection response.
  */
-export interface AtlasSourceResponse {
+interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
 const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
+const ATLAS_VERSION_STRING = "3_0";
+
 const TERMINOLOGY_SUFFIX = "-terminology";
 
 /**
@@ -60,13 +63,13 @@ export async function listAtlases(): Promise<Atlas[] | null> {
 /**
  * Fetch and parse the list of atlases available in the terminologies
  * directory of a BrainGlobe HTTP server.
- * @param host Root URL of the BrainGlobe HTTP server.
+ * @param source Root URL of the BrainGlobe HTTP server.
  * @returns The parsed atlases, or null if the host couldn't be reached.
  */
-export async function listAtlasesHTTP(host: string): Promise<Atlas[] | null> {
+export async function listAtlasesHTTP(source: string): Promise<Atlas[] | null> {
   try {
     const response = await axios.get<AtlasSourceResponse>(
-      `${host}/brainglobe-atlasapi/terminologies`
+      `${source}/brainglobe-atlasapi/terminologies`
     );
 
     return response.data.files
@@ -76,8 +79,37 @@ export async function listAtlasesHTTP(host: string): Promise<Atlas[] | null> {
           ? item.name.slice(0, -TERMINOLOGY_SUFFIX.length)
           : item.name
       )
-      .map(name => ({ name, source: host }));
+      .map(name => ({ name, source: source }));
   } catch {
     return null;
   }
+}
+
+/**
+ * Fetch and parse the terminology list for an atlas.
+ * @param atlas Atlas to get the terminology list for and parse.
+ * @returns Parsed terminology list.
+ */
+export async function getTerminology(atlas: Atlas): Promise<TerminologyRow[]> {
+  return new Promise((resolve, reject) => {
+    Papa.parse<TerminologyRow>(
+      new URL(
+        `terminologies/${atlas.name}${TERMINOLOGY_SUFFIX}/${ATLAS_VERSION_STRING}/terminology.csv`,
+        atlas.source
+      ).toString(),
+      {
+        download: true,
+        header: true,
+        complete: results => {
+          if (results.errors.length > 0) {
+            reject(results.errors);
+            return;
+          }
+
+          resolve(results.data);
+        },
+        error: reject
+      }
+    );
+  });
 }
