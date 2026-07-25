@@ -95,20 +95,3 @@ function placeTerminologyRow(
   // Continue placing.
   placeTerminologyRow(nextPathNode, terminologyRow, remainingPath.slice(1));
 }
-
-/**
- * Flatten a hierarchy tree into a depth-first list of nodes (parents appear
- * before their children).
- * @param nodes Root-level nodes to flatten.
- */
-export function flattenHierarchy(nodes: HierarchyModel[]): HierarchyModel[] {
-  const flattened: HierarchyModel[] = [];
-  const walk = (level: HierarchyModel[]) => {
-    for (const node of level) {
-      flattened.push(node);
-      walk(node.children);
-    }
-  };
-  walk(nodes);
-  return flattened;
-}

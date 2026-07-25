@@ -103,6 +103,11 @@ export async function getTerminologyRows(
         download: true,
         header: true,
         skipEmptyLines: true,
+        dynamicTyping: true,
+        transform: (value, field) =>
+          field === "root_identifier_path"
+            ? (JSON.parse(value) as number[])
+            : value,
         complete: results => {
           if (results.errors.length > 0) {
             reject(results.errors);
