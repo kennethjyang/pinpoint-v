@@ -1,44 +1,99 @@
-import { AtlasStructure } from "@/features/atlas";
+import { TerminologyRow } from "@/features/atlas";
 
 /**
  * Presentation-ready tree node built from an {@link AtlasStructure}.
  */
 export interface HierarchyModel {
-  id: number;
+  identifier: number;
   abbreviation: string;
-  fullName: string;
+  name: string;
   color: string;
   children: HierarchyModel[];
 }
 
 /**
  * Build a tree hierarchy from a structure metadata.
- * @param id Index of the current structure in `structures` to recurse down.
- * @param structures All structures in atlas metadata.
+ * @param terminologyRows Parsed terminology rows.
  */
 export function buildHierarchy(
-  id: number,
-  structures: AtlasStructure[]
+  terminologyRows: TerminologyRow[]
 ): HierarchyModel | null {
-  // Get the structure.
-  const structure = structures[id];
-  if (!structure) return null;
+  if (terminologyRows.length === 0) return null;
 
-  // Convert name to title case.
-  const titleCaseName = structure.name
-    .split(" ")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-
-  return {
-    id,
-    abbreviation: structure.acronym.toUpperCase(),
-    fullName: titleCaseName,
-    color: `rgb(${structure.color[0]} ${structure.color[1]} ${structure.color[2]})`,
-    children: structure.childrenIds.flatMap(
-      childId => buildHierarchy(childId, structures) ?? []
-    )
+  // Start hierarchy with root.
+  const root = terminologyRows.find(row => row.name === "root");
+  if (!root) return null;
+  const hierarchy: HierarchyModel = {
+    identifier: root.identifier,
+    abbreviation: root.abbreviation,
+    name: root.name,
+    color: root.color_hex_triplet,
+    children: []
   };
+
+  for (const terminologyRow of terminologyRows) {
+    placeTerminologyRow(
+      hierarchy,
+      terminologyRow,
+      terminologyRow.root_identifier_path
+    );
+  }
+
+  return hierarchy;
+}
+
+/**
+ * Recursively walk through a terminology hierarchy path and place it into the hierarchy model.
+ * @param hierarchyPointer Current node in the hierarchy to build on.
+ * @param terminologyRow Terminology row to process.
+ * @param remainingPath Current progress through the placement path.
+ */
+function placeTerminologyRow(
+  hierarchyPointer: HierarchyModel,
+  terminologyRow: TerminologyRow,
+  remainingPath: number[]
+) {
+  // Exit if path is empty.
+  if (remainingPath.length === 0) return;
+
+  // Exit if path start doesn't match hierarchy pointer.
+  if (hierarchyPointer.identifier !== remainingPath[0]) return;
+
+  // Base case: if this is the end of the path, fill in the node.
+  if (remainingPath.length === 1) {
+    hierarchyPointer.abbreviation = terminologyRow.abbreviation;
+
+    // Convert name to title case.
+    hierarchyPointer.name = terminologyRow.name
+      .split(" ")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+
+    hierarchyPointer.color = terminologyRow.color_hex_triplet;
+    return;
+  }
+
+  // Recursive case: continue traversing path.
+  if (!remainingPath[1]) return;
+
+  let nextPathNode = hierarchyPointer.children.find(
+    child => child.identifier === remainingPath[1]
+  );
+
+  // Create the path node if it doesn't exist yet.
+  if (!nextPathNode) {
+    nextPathNode = {
+      identifier: remainingPath[1],
+      abbreviation: "",
+      name: "",
+      color: "",
+      children: []
+    };
+    hierarchyPointer.children.push(nextPathNode);
+  }
+
+  // Continue placing.
+  placeTerminologyRow(nextPathNode, terminologyRow, remainingPath.slice(1));
 }
 
 /**

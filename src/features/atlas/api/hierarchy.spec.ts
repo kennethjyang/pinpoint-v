@@ -10,7 +10,7 @@ describe("buildHierarchy", () => {
 
     const node = buildHierarchy(0, structures);
 
-    expect(node?.fullName).toBe("Primary Motor Area");
+    expect(node?.name).toBe("Primary Motor Area");
     expect(node?.abbreviation).toBe("MOP");
   });
 
@@ -27,8 +27,8 @@ describe("buildHierarchy", () => {
 
     const node = buildHierarchy(0, structures);
 
-    expect(node?.children.map(c => c.id)).toEqual([1, 2]);
-    expect(node?.children[0]?.children.map(c => c.id)).toEqual([3]);
+    expect(node?.children.map(c => c.identifier)).toEqual([1, 2]);
+    expect(node?.children[0]?.children.map(c => c.identifier)).toEqual([3]);
     expect(node?.children[1]?.children).toEqual([]);
   });
 
@@ -44,7 +44,7 @@ describe("buildHierarchy", () => {
 
     const node = buildHierarchy(0, structures);
 
-    expect(node?.children.map(c => c.id)).toEqual([1]);
+    expect(node?.children.map(c => c.identifier)).toEqual([1]);
   });
 });
 
@@ -60,6 +60,6 @@ describe("flattenHierarchy", () => {
     const flat = flattenHierarchy(root.children);
 
     // root.children = [child-a(1), child-b(2)]; child-a has leaf(3).
-    expect(flat.map(n => n.id)).toEqual([1, 3, 2]);
+    expect(flat.map(n => n.identifier)).toEqual([1, 3, 2]);
   });
 });

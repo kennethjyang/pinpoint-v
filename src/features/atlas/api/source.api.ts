@@ -90,7 +90,9 @@ export async function listAtlasesHTTP(source: string): Promise<Atlas[] | null> {
  * @param atlas Atlas to get the terminology list for and parse.
  * @returns Parsed terminology list.
  */
-export async function getTerminology(atlas: Atlas): Promise<TerminologyRow[]> {
+export async function getTerminologyRows(
+  atlas: Atlas
+): Promise<TerminologyRow[]> {
   return new Promise((resolve, reject) => {
     Papa.parse<TerminologyRow>(
       new URL(
@@ -100,6 +102,7 @@ export async function getTerminology(atlas: Atlas): Promise<TerminologyRow[]> {
       {
         download: true,
         header: true,
+        skipEmptyLines: true,
         complete: results => {
           if (results.errors.length > 0) {
             reject(results.errors);
