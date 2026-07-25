@@ -5,6 +5,7 @@
 - Ensure tests are up to date. Create tests for missing branches. Run tests after any edits using pnpm test.
 - Ensure user-facing strings are encoded in i18n.
 - Use idiomatic and cleaner implementations over obscure but performant code.
+- Consider fanning out into multiple agents where appropriate.
 
 ## Vue 3 `<script setup>` ordering
 
