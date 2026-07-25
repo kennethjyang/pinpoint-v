@@ -6,6 +6,7 @@
 - Ensure user-facing strings are encoded in i18n.
 - Use idiomatic and cleaner implementations over obscure but performant code.
 - Consider fanning out into multiple agents where appropriate.
+- Review the installed skills and load the appropriate ones for the task.
 
 ## Vue 3 `<script setup>` ordering
 
