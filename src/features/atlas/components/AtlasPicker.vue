@@ -1,12 +1,11 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   Atlas,
-  BRAINGLOBE_BASE_URL,
   checkAtlasCompatibility,
   ConverterCompatibility,
   fetchAtlasMetadata,
@@ -33,24 +32,10 @@ const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 const sourceToggle = ref<SourceToggle>(SourceToggle.BrainGlobe);
 
-watch(sourceToggle, newSource => {
-  switch (newSource) {
-    case SourceToggle.BrainGlobe:
-      atlasSource.value = BRAINGLOBE_BASE_URL;
-      break;
-    case SourceToggle.Custom:
-      atlasSource.value = "http://localhost:3000";
-      break;
-    default:
-      atlasSource.value = BRAINGLOBE_BASE_URL;
-      break;
-  }
-});
-
 /**
- * Atlas source URL.
+ * Custom HTTP host URL.
  */
-const atlasSource = ref<string | null>(BRAINGLOBE_BASE_URL);
+const customHTTPHost = ref<string | null>("http://localhost:3000");
 
 /**
  * Filter string.
@@ -64,14 +49,12 @@ const atlasesEvaluating = ref(false);
  */
 const atlases = computedAsync<Atlas[]>(
   async () => {
-    if (!atlasSource.value) return [];
-
-    const fetchedAtlases =
-      new URL(atlasSource.value).href === new URL(BRAINGLOBE_BASE_URL).href
-        ? await listAtlases()
-        : await listAtlasesHTTP(atlasSource.value);
-
-    return fetchedAtlases ?? [];
+    if (sourceToggle.value == SourceToggle.BrainGlobe) {
+      return (await listAtlases()) ?? [];
+    } else {
+      if (!customHTTPHost.value) return [];
+      return (await listAtlasesHTTP(customHTTPHost.value)) ?? [];
+    }
   },
   [],
   atlasesEvaluating
@@ -204,23 +187,13 @@ async function selectAtlas(atlas: Atlas) {
 
     <q-input
       v-if="sourceToggle === SourceToggle.Custom"
-      v-model="atlasSource"
+      v-model="customHTTPHost"
       :label="$t('atlasPicker.sourceUrl')"
       class="col"
       clearable
     />
 
-    <template v-if="atlasesEvaluating">
-      <q-list separator>
-        <q-item v-for="n in 5" :key="n">
-          <q-item-section>
-            <q-skeleton type="text" />
-          </q-item-section>
-        </q-item>
-      </q-list>
-    </template>
-
-    <template v-else>
+    <template v-if="!atlasesEvaluating">
       <template v-if="atlases.length > 0">
         <q-input
           v-model="searchQuery"
