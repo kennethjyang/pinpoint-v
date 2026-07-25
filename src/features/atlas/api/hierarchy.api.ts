@@ -64,3 +64,21 @@ export function buildHierarchy(
 
   return nodesById.get(rootRow.identifier) ?? null;
 }
+
+/**
+ * Return the identifiers of the default structures.
+ *
+ * Currently, this is the identifiers of the direct children of root.
+ *
+ * @param terminologyRows
+ */
+export function getDefaultStructureIdentifiers(
+  terminologyRows: TerminologyRow[]
+): number[] {
+  const rootRow = terminologyRows.find(row => row.parent_identifier === null);
+  if (!rootRow) return [];
+
+  return terminologyRows
+    .filter(row => row.parent_identifier === rootRow.identifier)
+    .map(row => row.identifier);
+}

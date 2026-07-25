@@ -6,7 +6,8 @@ import {
   Atlas,
   AtlasMetadata,
   fetchAtlasMetadata,
-  getDefaultStructureIds
+  getDefaultStructureIdentifiers,
+  getTerminologyRows
 } from "@/features/atlas";
 
 /**
@@ -78,10 +79,20 @@ export const useCurrentExperimentStore = defineStore(
     );
 
     /**
+     * Fetch the terminology rows which provide the regions of the atlas.
+     */
+    const terminologyRows = computedAsync(
+      async () => await getTerminologyRows(atlas.value),
+      []
+    );
+
+    /**
      * Default (top-level) structure ids for the current experiment's atlas.
      */
     const defaultStructureIds = computed<number[]>(() =>
-      metadata.value ? getDefaultStructureIds(metadata.value) : []
+      terminologyRows.value
+        ? getDefaultStructureIdentifiers(terminologyRows.value)
+        : []
     );
 
     /**
@@ -153,6 +164,7 @@ export const useCurrentExperimentStore = defineStore(
       name,
       atlas,
       metadata,
+      terminologyRows,
       defaultStructureIds,
       setReferenceCoordinate,
       referenceCoordinate,

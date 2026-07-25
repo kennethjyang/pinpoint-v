@@ -13,9 +13,7 @@ export default {
   },
   atlasHierarchy: {
     search: "Search",
-    clear: "Clear",
-    loadFailed: "Unable to load atlas structures.",
-    loadFailedCaption: "Check your connection to the source."
+    clear: "Clear"
   },
   newExperiment: {
     title: "New Experiment",
