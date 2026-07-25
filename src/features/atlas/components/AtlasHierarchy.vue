@@ -10,13 +10,17 @@ import { useFuse } from "@vueuse/integrations/useFuse";
 import {
   buildHierarchy,
   getTerminologyRows,
-  HierarchyModel
+  HierarchyModel,
+  toTitleCase
 } from "@/features/atlas";
-import { QScrollArea, QTree } from "quasar";
+import { QScrollArea, QTree, useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { computedAsync } from "@vueuse/core";
 
 const currentExperiment = useCurrentExperimentStore();
+const $q = useQuasar();
+const { t } = useI18n();
 
 // Components.
 const tree = useTemplateRef<QTree>("tree");
@@ -29,13 +33,13 @@ const hierarchy = ref<HierarchyModel[]>([]);
 // Expose scroll area target for the search result virtual scroll.
 const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
-// Flatten the hierarchy into a searchable list for fuzzy matching.
-const terminologyRowsEvaluating = ref(false);
-const terminologyRows = computedAsync(
-  async () => await getTerminologyRows(currentExperiment.atlas),
-  [],
-  terminologyRowsEvaluating
-);
+// Fetch the terminology rows for the current atlas, used both to build the
+// tree and as the searchable list for fuzzy matching.
+const terminologyRows = computedAsync(async () => {
+  const rows = await getTerminologyRows(currentExperiment.atlas);
+  if (rows.length === 0) notifyLoadFailed();
+  return rows;
+}, []);
 
 // Fuzzy search across the acronym (label) and the full name.
 const searchQuery = computed(() => filter.value ?? "");
@@ -46,6 +50,18 @@ const { results } = useFuse(searchQuery, terminologyRows, {
 // Search mode: replace tree with flat result list.
 const isSearching = computed(() => (filter.value ?? "").trim().length > 0);
 const searchResults = computed(() => results.value.map(r => r.item));
+
+/**
+ * Notify that the atlas structures failed to load.
+ */
+function notifyLoadFailed() {
+  $q.notify({
+    message: t("atlasHierarchy.loadFailed"),
+    caption: t("atlasHierarchy.loadFailedCaption"),
+    color: "negative",
+    icon: "error"
+  });
+}
 
 // Update the tree data to match the current atlas.
 watchEffect(() => {
@@ -96,11 +112,11 @@ watchPostEffect(() => {
             <q-item-section>
               <div class="row items-center q-gutter-x-xs no-wrap">
                 <q-icon
-                  :style="{ color: node.color }"
+                  :style="{ color: node.color_hex_triplet }"
                   name="radio_button_checked"
                 />
                 <b>{{ node.abbreviation }}</b>
-                <span class="text-no-wrap">{{ node.name }}</span>
+                <span class="text-no-wrap">{{ toTitleCase(node.name) }}</span>
               </div>
             </q-item-section>
           </q-item>

@@ -5,7 +5,7 @@ export {
   getDefaultStructureIds,
   structureEntityFromId
 } from "./api/metadata.api";
-export { buildHierarchy } from "./api/hierarchy.api";
+export { buildHierarchy, toTitleCase } from "./api/hierarchy.api";
 export type { HierarchyModel } from "./api/hierarchy.api";
 export {
   listAtlases,

@@ -1,7 +1,7 @@
 import { TerminologyRow } from "@/features/atlas";
 
 /**
- * Presentation-ready tree node built from an {@link AtlasStructure}.
+ * Presentation-ready tree node built from a {@link TerminologyRow}.
  */
 export interface HierarchyModel {
   identifier: number;
@@ -12,86 +12,55 @@ export interface HierarchyModel {
 }
 
 /**
- * Build a tree hierarchy from a structure metadata.
+ * Convert a terminology name to title case for display.
+ * @param name Name to convert.
+ */
+export function toTitleCase(name: string): string {
+  return name
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/**
+ * Build a {@link HierarchyModel} node from a terminology row.
+ * @param terminologyRow Terminology row to convert.
+ */
+function toNode(terminologyRow: TerminologyRow): HierarchyModel {
+  return {
+    identifier: terminologyRow.identifier,
+    abbreviation: terminologyRow.abbreviation,
+    name: toTitleCase(terminologyRow.name),
+    color: terminologyRow.color_hex_triplet,
+    children: []
+  };
+}
+
+/**
+ * Build a tree hierarchy from parsed terminology rows, linking each row to
+ * its parent via `parent_identifier`.
+ *
+ * `root_identifier_path` isn't used here: it's not reliably root-anchored
+ * across atlases (some author it as relative `[parent, self]` pairs), so
+ * relying on it silently drops rows for those atlases.
  * @param terminologyRows Parsed terminology rows.
  */
 export function buildHierarchy(
   terminologyRows: TerminologyRow[]
 ): HierarchyModel | null {
-  if (terminologyRows.length === 0) return null;
+  const rootRow = terminologyRows.find(row => row.parent_identifier === null);
+  if (!rootRow) return null;
 
-  // Start hierarchy with root.
-  const root = terminologyRows.find(row => row.name === "root");
-  if (!root) return null;
-  const hierarchy: HierarchyModel = {
-    identifier: root.identifier,
-    abbreviation: root.abbreviation,
-    name: root.name,
-    color: root.color_hex_triplet,
-    children: []
-  };
-
-  for (const terminologyRow of terminologyRows) {
-    placeTerminologyRow(
-      hierarchy,
-      terminologyRow,
-      terminologyRow.root_identifier_path
-    );
-  }
-
-  return hierarchy;
-}
-
-/**
- * Recursively walk through a terminology hierarchy path and place it into the hierarchy model.
- * @param hierarchyPointer Current node in the hierarchy to build on.
- * @param terminologyRow Terminology row to process.
- * @param remainingPath Current progress through the placement path.
- */
-function placeTerminologyRow(
-  hierarchyPointer: HierarchyModel,
-  terminologyRow: TerminologyRow,
-  remainingPath: number[]
-) {
-  // Exit if path is empty.
-  if (remainingPath.length === 0) return;
-
-  // Exit if path start doesn't match hierarchy pointer.
-  if (hierarchyPointer.identifier !== remainingPath[0]) return;
-
-  // Base case: if this is the end of the path, fill in the node.
-  if (remainingPath.length === 1) {
-    hierarchyPointer.abbreviation = terminologyRow.abbreviation;
-
-    // Convert name to title case.
-    hierarchyPointer.name = terminologyRow.name
-      .split(" ")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ");
-
-    hierarchyPointer.color = terminologyRow.color_hex_triplet;
-    return;
-  }
-
-  // Recursive case: continue traversing path.
-  if (!remainingPath[1]) return;
-
-  let nextPathNode = hierarchyPointer.children.find(
-    child => child.identifier === remainingPath[1]
+  const nodesById = new Map(
+    terminologyRows.map(row => [row.identifier, toNode(row)])
   );
 
-  // Create the path node if it doesn't exist yet.
-  if (!nextPathNode) {
-    nextPathNode = {
-      identifier: remainingPath[1],
-      abbreviation: "",
-      name: "",
-      color: "",
-      children: []
-    };
-    hierarchyPointer.children.push(nextPathNode);
+  for (const row of terminologyRows) {
+    if (row.parent_identifier === null) continue;
+    nodesById
+      .get(row.parent_identifier)
+      ?.children.push(nodesById.get(row.identifier)!);
   }
 
-  // Continue placing.
-  placeTerminologyRow(nextPathNode, terminologyRow, remainingPath.slice(1));
+  return nodesById.get(rootRow.identifier) ?? null;
 }

@@ -86,15 +86,47 @@ export async function listAtlasesHTTP(source: string): Promise<Atlas[] | null> {
 }
 
 /**
+ * Raw terminology row as parsed from CSV, before numeric/array fields are
+ * converted from their string representation.
+ */
+type RawTerminologyRow = Record<keyof TerminologyRow, string>;
+
+/**
+ * Convert a raw CSV row into a {@link TerminologyRow}, parsing the numeric
+ * and array fields that PapaParse otherwise leaves as strings.
+ * @param row Raw CSV row.
+ */
+function parseTerminologyRow(row: RawTerminologyRow): TerminologyRow {
+  let rootIdentifierPath: number[];
+  try {
+    rootIdentifierPath = JSON.parse(row.root_identifier_path) as number[];
+  } catch {
+    rootIdentifierPath = [];
+  }
+
+  return {
+    identifier: Number(row.identifier),
+    parent_identifier:
+      row.parent_identifier === "" ? null : Number(row.parent_identifier),
+    annotation_value: Number(row.annotation_value),
+    name: row.name,
+    abbreviation: row.abbreviation,
+    color_hex_triplet: row.color_hex_triplet,
+    root_identifier_path: rootIdentifierPath
+  };
+}
+
+/**
  * Fetch and parse the terminology list for an atlas.
  * @param atlas Atlas to get the terminology list for and parse.
- * @returns Parsed terminology list.
+ * @returns Parsed terminology list, or an empty list if it couldn't be
+ * fetched or parsed.
  */
 export async function getTerminologyRows(
   atlas: Atlas
 ): Promise<TerminologyRow[]> {
-  return new Promise((resolve, reject) => {
-    Papa.parse<TerminologyRow>(
+  return new Promise(resolve => {
+    Papa.parse<RawTerminologyRow>(
       new URL(
         `terminologies/${atlas.name}${TERMINOLOGY_SUFFIX}/${ATLAS_VERSION_STRING}/terminology.csv`,
         atlas.source
@@ -103,20 +135,15 @@ export async function getTerminologyRows(
         download: true,
         header: true,
         skipEmptyLines: true,
-        dynamicTyping: true,
-        transform: (value, field) =>
-          field === "root_identifier_path"
-            ? (JSON.parse(value) as number[])
-            : value,
         complete: results => {
           if (results.errors.length > 0) {
-            reject(results.errors);
+            resolve([]);
             return;
           }
 
-          resolve(results.data);
+          resolve(results.data.map(parseTerminologyRow));
         },
-        error: reject
+        error: () => resolve([])
       }
     );
   });
