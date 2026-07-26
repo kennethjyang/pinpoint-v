@@ -51,18 +51,18 @@ export function buildHierarchy(
   const rootRow = terminologyRows.find(row => row.parent_identifier === null);
   if (!rootRow) return null;
 
-  const nodesById = new Map(
+  const nodesByIdentifier = new Map(
     terminologyRows.map(row => [row.identifier, toNode(row)])
   );
 
   for (const row of terminologyRows) {
     if (row.parent_identifier === null) continue;
-    nodesById
+    nodesByIdentifier
       .get(row.parent_identifier)
-      ?.children.push(nodesById.get(row.identifier)!);
+      ?.children.push(nodesByIdentifier.get(row.identifier)!);
   }
 
-  return nodesById.get(rootRow.identifier) ?? null;
+  return nodesByIdentifier.get(rootRow.identifier) ?? null;
 }
 
 /**
@@ -70,7 +70,7 @@ export function buildHierarchy(
  *
  * Currently, this is the identifiers of the direct children of root.
  *
- * @param terminologyRows
+ * @param terminologyRows Parsed terminology rows.
  */
 export function getDefaultStructureIdentifiers(
   terminologyRows: TerminologyRow[]

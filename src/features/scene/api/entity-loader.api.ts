@@ -8,7 +8,7 @@ import {
   VertexData,
   Vector3
 } from "@babylonjs/core";
-import type { IndicesArray, Scene } from "@babylonjs/core";
+import type { AbstractMesh, IndicesArray, Scene } from "@babylonjs/core";
 import axios from "axios";
 import type { StructureEntity } from "@/features/scene";
 import { asrToBabylon, simplifyGeometryInWorker } from "@/features/scene";
@@ -21,6 +21,12 @@ const MESH_VERTEX_KEEP_FRACTION = 0.05;
 
 /** Hard ceiling on vertices per structure, regardless of original size. */
 const MESH_MAX_VERTICES = 8000;
+
+/** Suffix applied to a structure's identifier to name its Babylon mesh. */
+const STRUCTURE_MESH_SUFFIX = "_structure";
+
+/** Suffix applied to a structure's identifier to name its Babylon material. */
+const STRUCTURE_MATERIAL_SUFFIX = "_material";
 
 /**
  * Compute the vertex budget for a simplified mesh: at most
@@ -170,14 +176,18 @@ async function importStructure(
 ) {
   try {
     const data = await fetchMeshData(structure.meshPath);
-    const decoded = await decodeMesh(structure.name, data, scene);
+    const decoded = await decodeMesh(
+      `${structure.identifier}_geometry`,
+      data,
+      scene
+    );
     const simplified = await simplifyGeometryInWorker(
       decoded.positions,
       decoded.indices,
       targetVertexCount(decoded.positions.length / 3)
     );
 
-    const mesh = new Mesh(structure.name, scene);
+    const mesh = new Mesh(structureMeshName(structure.identifier), scene);
     const vertexData = new VertexData();
     vertexData.positions = simplified.positions;
     vertexData.normals = simplified.normals;
@@ -188,13 +198,16 @@ async function importStructure(
     mesh.parent = atlasRootNode;
 
     // Apply the color.
-    const material = new StandardMaterial(`${structure.name}_material`, scene);
+    const material = new StandardMaterial(
+      structureMaterialName(structure.identifier),
+      scene
+    );
     material.diffuseColor = structure.color;
     mesh.material = material;
   } catch (error) {
     // Skip structures that fail to load, but don't hide why.
     Logger.Warn(
-      `Failed to import structure ${structure.name}: ${String(error)}`
+      `Failed to import structure ${structure.identifier}: ${String(error)}`
     );
     return;
   }
@@ -225,28 +238,35 @@ export async function syncStructureVisibility(
   onProgress: (completed: number, total: number) => void
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
-  const present = new Map(
-    atlasRootNode.getChildren().map(child => [child.name, child])
+  const presentMeshes = childStructureMeshes(atlasRootNode);
+
+  const visibleIdentifiers = new Set(
+    visibleStructures.map(({ identifier }) => identifier)
   );
 
-  const visibleNames = new Set(visibleStructures.map(({ name }) => name));
-  const desired = new Map(
+  // Keyed by mesh name (not identifier) so it lines up with `presentMeshes`
+  // without either side having to parse a mesh name back into a number.
+  // Also gives always-present-and-visible structures a single entry, since
+  // both list a structure under the same identifier-derived mesh name.
+  const desiredStructures = new Map(
     [...alwaysPresentStructures, ...visibleStructures].map(structure => [
-      structure.name,
+      structureMeshName(structure.identifier),
       structure
     ])
   );
 
-  // Remove structures that are present but no longer desired.
-  for (const [name, node] of present) {
-    if (!desired.has(name)) node.dispose();
+  // Remove structures that are present but no longer desired. Disposing the
+  // material too avoids leaving an orphaned same-named material behind that
+  // would shadow a later re-import's material in any name-based lookup.
+  for (const [meshName, mesh] of presentMeshes) {
+    if (!desiredStructures.has(meshName)) mesh.dispose(false, true);
   }
 
   // Import every missing structure concurrently, and await them collectively
   // rather than one at a time.
-  const missing = [...desired.values()].filter(
-    structure => !present.has(structure.name)
-  );
+  const missing = [...desiredStructures]
+    .filter(([meshName]) => !presentMeshes.has(meshName))
+    .map(([, structure]) => structure);
   if (missing.length > 0) {
     let completed = 0;
     onProgress(completed, missing.length);
@@ -262,9 +282,45 @@ export async function syncStructureVisibility(
     );
   }
 
-  // Now that every structure is in the scene, set alpha for each of them.
-  for (const [name] of desired) {
-    const material = scene.getMaterialByName(`${name}_material`);
-    if (material) material.alpha = visibleNames.has(name) ? 1 : 0.1;
+  // Now that every structure is in the scene, set alpha for each of them by
+  // reading the material directly off its mesh -- a name-based lookup would
+  // silently prefer a stale, disposed-but-not-yet-freed material of the same
+  // name over the live one.
+  const meshesByName = childStructureMeshes(atlasRootNode);
+  for (const [meshName, structure] of desiredStructures) {
+    const material = meshesByName.get(meshName)?.material;
+    if (material) {
+      material.alpha = visibleIdentifiers.has(structure.identifier) ? 1 : 0.1;
+    }
   }
+}
+
+/**
+ * Map the atlas root's direct structure-mesh children by name.
+ * @param atlasRootNode Atlas root node to read structure meshes from.
+ */
+function childStructureMeshes(
+  atlasRootNode: TransformNode
+): Map<string, AbstractMesh> {
+  return new Map(
+    atlasRootNode
+      .getChildMeshes(true, node => node.name.endsWith(STRUCTURE_MESH_SUFFIX))
+      .map(mesh => [mesh.name, mesh])
+  );
+}
+
+/**
+ * Babylon mesh name for a structure, derived from its identifier.
+ * @param identifier Structure identifier.
+ */
+function structureMeshName(identifier: number): string {
+  return `${identifier}${STRUCTURE_MESH_SUFFIX}`;
+}
+
+/**
+ * Babylon material name for a structure, derived from its identifier.
+ * @param identifier Structure identifier.
+ */
+function structureMaterialName(identifier: number): string {
+  return `${identifier}${STRUCTURE_MATERIAL_SUFFIX}`;
 }

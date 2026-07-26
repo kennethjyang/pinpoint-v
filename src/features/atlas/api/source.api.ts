@@ -290,7 +290,8 @@ export async function getManifest(atlas: Atlas): Promise<Manifest | null> {
 }
 
 /**
- * Returns a structure entity for a structure by identifier from an atlas and its parsed terminology row.
+ * Returns a structure entity for a structure by identifier from an atlas
+ * and its parsed terminology row.
  * @param atlas Atlas to pull mesh info from.
  * @param terminologyRows Parsed terminology rows for the atlas.
  * @param identifier Structure identifier to build for.
@@ -306,7 +307,7 @@ export function structureEntityFromIdentifier(
   if (!terminologyRow) return null;
 
   return {
-    name: terminologyRow.name,
+    identifier: terminologyRow.identifier,
     meshPath: new URL(
       `annotation-sets/${atlas.name}${ANNOTATION_SUFFIX}/${ATLAS_VERSION_STRING}/annotations.precomputed/mesh/${terminologyRow.identifier}`,
       atlas.source

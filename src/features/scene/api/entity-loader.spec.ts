@@ -31,7 +31,7 @@ function makeStructureEntity(
   overrides: Partial<StructureEntity> = {}
 ): StructureEntity {
   return {
-    name: "1",
+    identifier: 1,
     meshPath: "http://localhost:3000/allen_mouse/meshes/1.glb",
     color: Color3.FromInts(255, 0, 0),
     ...overrides
@@ -315,13 +315,15 @@ describe("syncStructureVisibility", () => {
   it("imports a new structure, parented to the atlas root and colored", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
     const onProgress = vi.fn();
 
     await syncStructureVisibility(scene, [], [structure], onProgress);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    const mesh = atlasRootNode.getChildren().find(c => c.name === "1") as Mesh;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
     expect(mesh).toBeDefined();
     expect(mesh.isVisible).toBe(true);
     expect(mesh.isVerticesDataPresent(VertexBuffer.NormalKind)).toBe(true);
@@ -329,7 +331,8 @@ describe("syncStructureVisibility", () => {
       mesh.getTotalVertices() * 3
     );
 
-    const material = scene.getMaterialByName("1_material") as StandardMaterial;
+    const material = mesh.material as StandardMaterial;
+    expect(material.name).toBe("1_material");
     expect(material.diffuseColor.equals(structure.color)).toBe(true);
     expect(material.alpha).toBe(1);
 
@@ -339,12 +342,15 @@ describe("syncStructureVisibility", () => {
   it("fades an always-present structure that isn't visible to alpha 0.1", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [structure], [], vi.fn());
 
-    const material = scene.getMaterialByName("1_material") as StandardMaterial;
-    expect(material.alpha).toBe(0.1);
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.material!.alpha).toBe(0.1);
 
     decodeSpy.mockRestore();
   });
@@ -352,7 +358,7 @@ describe("syncStructureVisibility", () => {
   it("does not re-import a structure that's already present", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
     decodeSpy.mockClear();
@@ -366,13 +372,65 @@ describe("syncStructureVisibility", () => {
   it("removes structures that are no longer desired", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
     await syncStructureVisibility(scene, [], [], vi.fn());
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    expect(atlasRootNode.getChildren().some(c => c.name === "1")).toBe(false);
+    expect(
+      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+    ).toBe(false);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("disposes a removed structure's material rather than leaking it, and its alpha is correct once re-imported", async () => {
+    const scene = makeScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    // Import the structure, remove it, then bring it back as
+    // always-present-but-not-visible.
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+    await syncStructureVisibility(scene, [], [], vi.fn());
+    await syncStructureVisibility(scene, [structure], [], vi.fn());
+
+    // The removed material must not linger: exactly one "1_material" should
+    // exist, not an orphaned first one shadowing the live one.
+    expect(scene.materials.filter(m => m.name === "1_material")).toHaveLength(
+      1
+    );
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.material!.alpha).toBe(0.1);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("gives each structure its own alpha rather than collapsing on a shared key", async () => {
+    const scene = makeScene();
+    const decodeSpy = stubDecode(scene);
+    const alwaysPresent = makeStructureEntity({ identifier: 1 });
+    const visible = makeStructureEntity({ identifier: 2 });
+
+    await syncStructureVisibility(
+      scene,
+      [alwaysPresent, visible],
+      [visible],
+      vi.fn()
+    );
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const meshes = atlasRootNode.getChildren() as Mesh[];
+    const fadedMesh = meshes.find(m => m.name === "1_structure")!;
+    const visibleMesh = meshes.find(m => m.name === "2_structure")!;
+
+    expect(fadedMesh.material!.alpha).toBe(0.1);
+    expect(visibleMesh.material!.alpha).toBe(1);
 
     decodeSpy.mockRestore();
   });
@@ -380,7 +438,7 @@ describe("syncStructureVisibility", () => {
   it("swallows a failed mesh fetch and adds nothing to the scene", async () => {
     const scene = makeScene();
     mockedGet.mockRejectedValue(new Error("network error"));
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
 
@@ -393,7 +451,7 @@ describe("syncStructureVisibility", () => {
     const decodeSpy = vi
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockRejectedValue(new Error("bad draco data"));
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
 
@@ -410,7 +468,7 @@ describe("syncStructureVisibility", () => {
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockRejectedValue(decodeError);
     const warnSpy = vi.spyOn(Logger, "Warn").mockImplementation(() => {});
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
 
@@ -429,8 +487,8 @@ describe("syncStructureVisibility", () => {
     const scene = makeScene();
     stubDecode(scene);
     const structures = [
-      makeStructureEntity({ name: "1" }),
-      makeStructureEntity({ name: "2" })
+      makeStructureEntity({ identifier: 1 }),
+      makeStructureEntity({ identifier: 2 })
     ];
 
     // Gate both fetches on deferred promises so neither can resolve until
@@ -460,15 +518,15 @@ describe("syncStructureVisibility", () => {
         .getChildren()
         .map(c => c.name)
         .sort()
-    ).toEqual(["1", "2"]);
+    ).toEqual(["1_structure", "2_structure"]);
   });
 
   it("reports progress once per missing structure, up to the total", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
     const structures = [
-      makeStructureEntity({ name: "1" }),
-      makeStructureEntity({ name: "2" })
+      makeStructureEntity({ identifier: 1 }),
+      makeStructureEntity({ identifier: 2 })
     ];
     const onProgress = vi.fn();
 
@@ -486,7 +544,7 @@ describe("syncStructureVisibility", () => {
     const decodeSpy = vi
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockRejectedValue(new Error("bad draco data"));
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
     const onProgress = vi.fn();
 
     await syncStructureVisibility(scene, [], [structure], onProgress);
@@ -499,7 +557,7 @@ describe("syncStructureVisibility", () => {
   it("does not report progress when every desired structure is already present", async () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ name: "1" });
+    const structure = makeStructureEntity({ identifier: 1 });
 
     await syncStructureVisibility(scene, [], [structure], vi.fn());
     const onProgress = vi.fn();
