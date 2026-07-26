@@ -4,6 +4,7 @@ import {
   Color3,
   DracoDecoder,
   Geometry,
+  Logger,
   Mesh,
   MeshBuilder,
   NullEngine,
@@ -424,6 +425,28 @@ describe("syncStructureVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren()).toEqual([]);
 
+    decodeSpy.mockRestore();
+  });
+
+  it("logs the failure reason when a decode fails, instead of hiding it", async () => {
+    const scene = makeScene();
+    const decodeError = new Error("bad draco data");
+    const decodeSpy = vi
+      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
+      .mockRejectedValue(decodeError);
+    const warnSpy = vi.spyOn(Logger, "Warn").mockImplementation(() => {});
+    const structure = makeStructureEntity({ name: "1" });
+
+    await syncStructureVisibility(scene, [], [structure]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to import structure 1")
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(decodeError.toString())
+    );
+
+    warnSpy.mockRestore();
     decodeSpy.mockRestore();
   });
 });

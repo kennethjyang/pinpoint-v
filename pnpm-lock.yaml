@@ -11,9 +11,6 @@ importers:
       '@babylonjs/core':
         specifier: ^9.17.1
         version: 9.17.1
-      '@babylonjs/loaders':
-        specifier: ^9.17.1
-        version: 9.17.1(@babylonjs/core@9.17.1)(babylonjs-gltf2interface@9.16.2)
       '@quasar/extras':
         specifier: ^2.0.0
         version: 2.0.2
@@ -159,12 +156,6 @@ packages:
 
   '@babylonjs/core@9.17.1':
     resolution: {integrity: sha512-BMA+XD1KlcMdI5jorON4jElpZVAStD5b4qzMWxI7p6kxQRJCj8ykTzai1zlEhau/WhiAluov+bMFlZIi0ipNGg==}
-
-  '@babylonjs/loaders@9.17.1':
-    resolution: {integrity: sha512-wliUrBPjjQU66y/gBf1jJvpWG2eaDj4PKkAnGaDcI0uU0u6j2wjtpTMB02mqx2CAiSQ/fsswa37M53Yol8u/Fw==}
-    peerDependencies:
-      '@babylonjs/core': ^9.0.0
-      babylonjs-gltf2interface: ^9.0.0
 
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
@@ -1565,9 +1556,6 @@ packages:
 
   axios@1.18.1:
     resolution: {integrity: sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==}
-
-  babylonjs-gltf2interface@9.16.2:
-    resolution: {integrity: sha512-h1qvmBI4DCzcz8JHjGJfCkC0KGZ80m5f/AMZYK8T9/m7VSlDxxsMTrYVPPSkuRqucmS9t0aeznPep/Luuxm/IA==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -3450,11 +3438,6 @@ snapshots:
 
   '@babylonjs/core@9.17.1': {}
 
-  '@babylonjs/loaders@9.17.1(@babylonjs/core@9.17.1)(babylonjs-gltf2interface@9.16.2)':
-    dependencies:
-      '@babylonjs/core': 9.17.1
-      babylonjs-gltf2interface: 9.16.2
-
   '@bcoe/v8-coverage@1.0.2': {}
 
   '@bufbuild/protobuf@2.13.0': {}
@@ -4681,8 +4664,6 @@ snapshots:
     transitivePeerDependencies:
       - debug
       - supports-color
-
-  babylonjs-gltf2interface@9.16.2: {}
 
   balanced-match@1.0.2: {}
 

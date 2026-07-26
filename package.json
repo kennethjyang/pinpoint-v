@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.17.1",
-    "@babylonjs/loaders": "^9.17.1",
     "@quasar/extras": "^2.0.0",
     "@types/papaparse": "^5.5.2",
     "@vueuse/core": "^14.3.0",

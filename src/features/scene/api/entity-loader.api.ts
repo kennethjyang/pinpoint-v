@@ -1,5 +1,6 @@
 import {
   DracoDecoder,
+  Logger,
   Matrix,
   Mesh,
   QuadraticErrorSimplification,
@@ -192,8 +193,11 @@ async function importStructure(
     const material = new StandardMaterial(`${structure.name}_material`, scene);
     material.diffuseColor = structure.color;
     mesh.material = material;
-  } catch {
-    // Exit if the structure doesn't exist.
+  } catch (error) {
+    // Skip structures that fail to load, but don't hide why.
+    Logger.Warn(
+      `Failed to import structure ${structure.name}: ${String(error)}`
+    );
     return;
   }
 }
