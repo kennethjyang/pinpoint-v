@@ -1,17 +1,17 @@
 import {
   DracoDecoder,
   Logger,
-  Matrix,
   Mesh,
-  QuadraticErrorSimplification,
-  Scene,
   StandardMaterial,
   TransformNode,
+  VertexBuffer,
+  VertexData,
   Vector3
 } from "@babylonjs/core";
+import type { IndicesArray, Scene } from "@babylonjs/core";
 import axios from "axios";
 import type { StructureEntity } from "@/features/scene";
-import { asrToBabylon } from "@/features/scene";
+import { asrToBabylon, simplifyGeometryInWorker } from "@/features/scene";
 
 /** BrainGlobe v3 Draco meshes store positions in nanometers. */
 const NANOMETERS_TO_MILLIMETERS = 1e-6;
@@ -46,11 +46,24 @@ export async function fetchMeshData(meshPath: string): Promise<ArrayBuffer> {
 }
 
 /**
- * Flip a mesh's triangle winding order in place.
+ * Flip a flat array of triangle indices' winding order in place.
  *
  * BrainGlobe meshes are wound for a right-handed system, but the scene is
  * left-handed; without this, faces are backface-culled and computed normals
  * point inward.
+ * @param indices Flat triangle indices, mutated in place.
+ */
+function flipIndicesWindingOrder(indices: IndicesArray): void {
+  for (let i = 0; i < indices.length; i += 3) {
+    const temp = indices[i + 1]!;
+    indices[i + 1] = indices[i + 2]!;
+    indices[i + 2] = temp;
+  }
+}
+
+/**
+ * Flip a mesh's triangle winding order in place. See
+ * {@link flipIndicesWindingOrder}.
  * @param mesh Mesh whose indices should be flipped.
  */
 export function flipWindingOrder(mesh: Mesh): void {
@@ -58,18 +71,24 @@ export function flipWindingOrder(mesh: Mesh): void {
   if (!indices) return;
 
   const flipped = Array.from(indices);
-  for (let i = 0; i < flipped.length; i += 3) {
-    const temp = flipped[i + 1]!;
-    flipped[i + 1] = flipped[i + 2]!;
-    flipped[i + 2] = temp;
-  }
+  flipIndicesWindingOrder(flipped);
   mesh.setIndices(flipped);
 }
 
 /**
- * Decode raw Draco mesh data into a Babylon mesh, correcting its winding
+ * Decoded structure geometry, ready to hand off to the simplification
+ * worker: winding order corrected, and nanometer-scale coordinates converted
+ * to millimeters.
+ */
+interface DecodedMeshData {
+  positions: Float32Array;
+  indices: Uint32Array;
+}
+
+/**
+ * Decode raw Draco mesh data into flat vertex data, correcting its winding
  * order and converting its nanometer-scale coordinates to millimeters.
- * @param name Name for the decoded mesh.
+ * @param name Name for the decoded geometry.
  * @param data Raw Draco-compressed mesh bytes.
  * @param scene Scene to decode the mesh into.
  */
@@ -77,54 +96,28 @@ export async function decodeMesh(
   name: string,
   data: ArrayBuffer,
   scene: Scene
-): Promise<Mesh> {
+): Promise<DecodedMeshData> {
   const geometry = await DracoDecoder.Default.decodeMeshToGeometryAsync(
     name,
     scene,
     data
   );
 
-  const mesh = new Mesh(name, scene);
-  geometry.applyToMesh(mesh);
-
-  flipWindingOrder(mesh);
-  mesh.bakeTransformIntoVertices(
-    Matrix.Scaling(
-      NANOMETERS_TO_MILLIMETERS,
-      NANOMETERS_TO_MILLIMETERS,
-      NANOMETERS_TO_MILLIMETERS
-    )
+  const positions = Float32Array.from(
+    geometry.getVerticesData(VertexBuffer.PositionKind) ?? []
   );
+  for (let i = 0; i < positions.length; i++) {
+    positions[i]! *= NANOMETERS_TO_MILLIMETERS;
+  }
 
-  return mesh;
-}
+  const indices = Uint32Array.from(geometry.getIndices() ?? []);
+  flipIndicesWindingOrder(indices);
 
-/**
- * Simplify a mesh down to (approximately) the given vertex count, discarding
- * the original mesh since it's no longer needed.
- * @param mesh Mesh to simplify.
- * @param targetVertices Desired vertex count.
- */
-export async function simplifyMesh(
-  mesh: Mesh,
-  targetVertices: number
-): Promise<Mesh> {
-  const vertexCount = mesh.getTotalVertices();
-  if (targetVertices >= vertexCount) return mesh;
+  // The geometry is registered with the scene, but only its raw arrays are
+  // needed here -- dispose it now that they've been copied out.
+  geometry.dispose();
 
-  const simplified = await new Promise<Mesh>(resolve => {
-    new QuadraticErrorSimplification(mesh).simplify(
-      {
-        quality: targetVertices / vertexCount,
-        distance: 0,
-        optimizeMesh: false
-      },
-      resolve
-    );
-  });
-
-  mesh.dispose();
-  return simplified;
+  return { positions, indices };
 }
 
 /**
@@ -160,7 +153,11 @@ export function setAtlasRootReference(
 /**
  * Import a structure's mesh into the scene and apply its color.
  *
- * Does nothing if the structure is malformed.
+ * Does nothing if the structure is malformed. Fetching and Draco decoding
+ * happen on the main thread (Draco already runs its own worker pool
+ * internally); the compute-heavy simplification is delegated to
+ * {@link simplifyGeometryInWorker} so many structures can load concurrently
+ * without blocking the main thread.
  *
  * @param structure Entity information for the structure.
  * @param atlasRootNode Atlas root node to parent the structure under.
@@ -173,18 +170,19 @@ async function importStructure(
 ) {
   try {
     const data = await fetchMeshData(structure.meshPath);
-    const raw = await decodeMesh(structure.name, data, scene);
-    const mesh = await simplifyMesh(
-      raw,
-      targetVertexCount(raw.getTotalVertices())
+    const decoded = await decodeMesh(structure.name, data, scene);
+    const simplified = await simplifyGeometryInWorker(
+      decoded.positions,
+      decoded.indices,
+      targetVertexCount(decoded.positions.length / 3)
     );
 
-    // Simplification returns a new (initially hidden, renamed) mesh.
-    mesh.name = structure.name;
-    mesh.isVisible = true;
-
-    // Enable smooth shading now that the mesh has its final geometry.
-    mesh.createNormals(false);
+    const mesh = new Mesh(structure.name, scene);
+    const vertexData = new VertexData();
+    vertexData.positions = simplified.positions;
+    vertexData.normals = simplified.normals;
+    vertexData.indices = simplified.indices;
+    vertexData.applyToMesh(mesh);
 
     // Configure this structure.
     mesh.parent = atlasRootNode;
@@ -210,14 +208,21 @@ async function importStructure(
  * Structures in `visibleStructures` are fully visible, and are removed from
  * the scene once they're no longer in either list.
  *
+ * Missing structures are imported concurrently rather than one at a time, so
+ * total load time is bound by the slowest structure rather than their sum.
+ *
  * @param scene Scene to sync.
  * @param alwaysPresentStructures Structures to keep in the scene at all times.
  * @param visibleStructures Structures that should be fully visible.
+ * @param onProgress Called after each missing structure finishes importing
+ * (whether it succeeded or failed), with the running and total count. Not
+ * called at all if no structures need importing.
  */
 export async function syncStructureVisibility(
   scene: Scene,
   alwaysPresentStructures: StructureEntity[],
-  visibleStructures: StructureEntity[]
+  visibleStructures: StructureEntity[],
+  onProgress: (completed: number, total: number) => void
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
   const present = new Map(
@@ -237,12 +242,28 @@ export async function syncStructureVisibility(
     if (!desired.has(name)) node.dispose();
   }
 
-  // Ensure each desired structure is in the scene with the right alpha.
-  for (const [name, structure] of desired) {
-    if (!present.has(name)) {
-      await importStructure(structure, atlasRootNode, scene);
-    }
+  // Import every missing structure concurrently, and await them collectively
+  // rather than one at a time.
+  const missing = [...desired.values()].filter(
+    structure => !present.has(structure.name)
+  );
+  if (missing.length > 0) {
+    let completed = 0;
+    onProgress(completed, missing.length);
+    await Promise.all(
+      missing.map(async structure => {
+        try {
+          await importStructure(structure, atlasRootNode, scene);
+        } finally {
+          completed++;
+          onProgress(completed, missing.length);
+        }
+      })
+    );
+  }
 
+  // Now that every structure is in the scene, set alpha for each of them.
+  for (const [name] of desired) {
     const material = scene.getMaterialByName(`${name}_material`);
     if (material) material.alpha = visibleNames.has(name) ? 1 : 0.1;
   }

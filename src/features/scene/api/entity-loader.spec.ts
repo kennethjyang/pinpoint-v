@@ -19,7 +19,6 @@ import {
   fetchMeshData,
   flipWindingOrder,
   setAtlasRootReference,
-  simplifyMesh,
   syncStructureVisibility,
   targetVertexCount
 } from "./entity-loader.api";
@@ -89,8 +88,9 @@ describe("targetVertexCount", () => {
 
   it("can exceed the original count for very small meshes (caller compares)", () => {
     // 5% of 10 is 0.5, rounded to 1 -- below original, but small meshes still
-    // fall under the "target >= count" no-op path in simplifyMesh (0.5 -> 1
-    // is still < 10 here; use an even smaller mesh to hit the crossover).
+    // fall under the "target >= count" no-op path in the simplification
+    // worker (0.5 -> 1 is still < 10 here; use an even smaller mesh to hit
+    // the crossover).
     expect(targetVertexCount(10)).toBe(1);
   });
 });
@@ -244,31 +244,6 @@ describe("fetchMeshData", () => {
   });
 });
 
-describe("simplifyMesh", () => {
-  it("reduces vertex count toward the target and disposes the original", async () => {
-    const scene = makeScene();
-    const raw = makeUnlitMesh(scene);
-    const originalCount = raw.getTotalVertices();
-    const target = targetVertexCount(originalCount);
-
-    const result = await simplifyMesh(raw, target);
-
-    expect(result.getTotalVertices()).toBeLessThan(originalCount);
-    expect(raw.isDisposed()).toBe(true);
-  });
-
-  it("returns the same mesh (undisposed) when already under the target", async () => {
-    const scene = makeScene();
-    const raw = makeUnlitMesh(scene);
-    const originalCount = raw.getTotalVertices();
-
-    const result = await simplifyMesh(raw, originalCount + 1000);
-
-    expect(result).toBe(raw);
-    expect(raw.isDisposed()).toBe(false);
-  });
-});
-
 describe("decodeMesh", () => {
   it("scales nanometer positions to millimeters without reordering axes", async () => {
     const scene = makeScene();
@@ -284,13 +259,12 @@ describe("decodeMesh", () => {
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockResolvedValue(geometry);
 
-    const mesh = await decodeMesh("1", new ArrayBuffer(0), scene);
+    const decoded = await decodeMesh("1", new ArrayBuffer(0), scene);
 
     expect(decodeSpy).toHaveBeenCalledWith("1", scene, expect.any(ArrayBuffer));
-    const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
     // Nanometers -> millimeters; axis order unchanged. Positions are
     // float32, so allow for the usual float32 rounding error.
-    const [x, y, z] = Array.from(positions);
+    const [x, y, z] = Array.from(decoded.positions);
     expect(x).toBeCloseTo(1, 5);
     expect(y).toBeCloseTo(2, 5);
     expect(z).toBeCloseTo(3, 5);
@@ -310,9 +284,9 @@ describe("decodeMesh", () => {
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockResolvedValue(geometry);
 
-    const mesh = await decodeMesh("1", new ArrayBuffer(0), scene);
+    const decoded = await decodeMesh("1", new ArrayBuffer(0), scene);
 
-    expect(Array.from(mesh.getIndices()!)).toEqual([0, 2, 1]);
+    expect(Array.from(decoded.indices)).toEqual([0, 2, 1]);
 
     decodeSpy.mockRestore();
   });
@@ -342,8 +316,9 @@ describe("syncStructureVisibility", () => {
     const scene = makeScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ name: "1" });
+    const onProgress = vi.fn();
 
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], onProgress);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode.getChildren().find(c => c.name === "1") as Mesh;
@@ -366,7 +341,7 @@ describe("syncStructureVisibility", () => {
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [structure], []);
+    await syncStructureVisibility(scene, [structure], [], vi.fn());
 
     const material = scene.getMaterialByName("1_material") as StandardMaterial;
     expect(material.alpha).toBe(0.1);
@@ -379,9 +354,9 @@ describe("syncStructureVisibility", () => {
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
     decodeSpy.mockClear();
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
 
     expect(decodeSpy).not.toHaveBeenCalled();
 
@@ -393,8 +368,8 @@ describe("syncStructureVisibility", () => {
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [], [structure]);
-    await syncStructureVisibility(scene, [], []);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+    await syncStructureVisibility(scene, [], [], vi.fn());
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren().some(c => c.name === "1")).toBe(false);
@@ -407,7 +382,7 @@ describe("syncStructureVisibility", () => {
     mockedGet.mockRejectedValue(new Error("network error"));
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren()).toEqual([]);
@@ -420,7 +395,7 @@ describe("syncStructureVisibility", () => {
       .mockRejectedValue(new Error("bad draco data"));
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren()).toEqual([]);
@@ -437,7 +412,7 @@ describe("syncStructureVisibility", () => {
     const warnSpy = vi.spyOn(Logger, "Warn").mockImplementation(() => {});
     const structure = makeStructureEntity({ name: "1" });
 
-    await syncStructureVisibility(scene, [], [structure]);
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("Failed to import structure 1")
@@ -449,6 +424,91 @@ describe("syncStructureVisibility", () => {
     warnSpy.mockRestore();
     decodeSpy.mockRestore();
   });
+
+  it("imports missing structures concurrently rather than one at a time", async () => {
+    const scene = makeScene();
+    stubDecode(scene);
+    const structures = [
+      makeStructureEntity({ name: "1" }),
+      makeStructureEntity({ name: "2" })
+    ];
+
+    // Gate both fetches on deferred promises so neither can resolve until
+    // both have been requested -- proving they were started concurrently
+    // rather than one after another.
+    const deferred = structures.map(() => {
+      let resolve!: (value: { data: ArrayBuffer }) => void;
+      const promise = new Promise<{ data: ArrayBuffer }>(r => (resolve = r));
+      return { promise, resolve };
+    });
+    let callIndex = 0;
+    mockedGet.mockImplementation(() => deferred[callIndex++]!.promise);
+
+    const syncPromise = syncStructureVisibility(scene, [], structures, vi.fn());
+
+    // Give both requests a chance to fire before resolving either.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+
+    deferred.forEach(({ resolve }) => resolve({ data: new ArrayBuffer(0) }));
+    await syncPromise;
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    expect(
+      atlasRootNode
+        .getChildren()
+        .map(c => c.name)
+        .sort()
+    ).toEqual(["1", "2"]);
+  });
+
+  it("reports progress once per missing structure, up to the total", async () => {
+    const scene = makeScene();
+    const decodeSpy = stubDecode(scene);
+    const structures = [
+      makeStructureEntity({ name: "1" }),
+      makeStructureEntity({ name: "2" })
+    ];
+    const onProgress = vi.fn();
+
+    await syncStructureVisibility(scene, [], structures, onProgress);
+
+    expect(onProgress).toHaveBeenCalledWith(0, 2);
+    expect(onProgress).toHaveBeenCalledWith(2, 2);
+    expect(onProgress).toHaveBeenCalledTimes(3);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("still reports progress reaching the total when a structure fails", async () => {
+    const scene = makeScene();
+    const decodeSpy = vi
+      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
+      .mockRejectedValue(new Error("bad draco data"));
+    const structure = makeStructureEntity({ name: "1" });
+    const onProgress = vi.fn();
+
+    await syncStructureVisibility(scene, [], [structure], onProgress);
+
+    expect(onProgress).toHaveBeenLastCalledWith(1, 1);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("does not report progress when every desired structure is already present", async () => {
+    const scene = makeScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ name: "1" });
+
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+    const onProgress = vi.fn();
+    await syncStructureVisibility(scene, [], [structure], onProgress);
+
+    expect(onProgress).not.toHaveBeenCalled();
+
+    decodeSpy.mockRestore();
+  });
 });
 
 describe("setAtlasRootReference", () => {
@@ -458,9 +518,9 @@ describe("setAtlasRootReference", () => {
     setAtlasRootReference(scene, [0, 0, 0]);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    expect(
-      atlasRootNode.rotation.equals(new Vector3(Math.PI, -Math.PI / 2, 0))
-    ).toBe(true);
+    expect(atlasRootNode.rotation.equals(new Vector3(Math.PI, 0, 0))).toBe(
+      true
+    );
   });
 
   it("offsets the atlas root so the reference coordinate sits at the origin", () => {

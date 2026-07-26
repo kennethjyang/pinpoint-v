@@ -6,6 +6,7 @@ import {
   useTemplateRef,
   watchEffect
 } from "vue";
+import { useQuasar } from "quasar";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
@@ -18,6 +19,7 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const currentExperiment = useCurrentExperimentStore();
 const runtime = useBabylonRuntimeService();
+const $q = useQuasar();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
@@ -78,11 +80,17 @@ onMounted(async () => {
     const scene = runtime.scene.value;
     if (!scene) return;
 
-    await syncStructureVisibility(
-      scene,
-      alwaysPresentStructures.value,
-      visibleStructures.value
-    );
+    $q.loadingBar.start(0);
+    try {
+      await syncStructureVisibility(
+        scene,
+        alwaysPresentStructures.value,
+        visibleStructures.value,
+        (completed, total) => $q.loadingBar.increment((completed / total) * 100)
+      );
+    } finally {
+      $q.loadingBar.stop();
+    }
   });
 
   // Keep the atlas root positioned so the experiment's reference coordinate
