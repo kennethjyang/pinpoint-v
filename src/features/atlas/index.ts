@@ -12,11 +12,11 @@ export {
 } from "./api/hierarchy.api";
 export type { HierarchyModel } from "./api/hierarchy.api";
 export {
+  BRAINGLOBE_BASE_URL,
   listAtlases,
   listAtlasesHTTP,
   getTerminologyRows,
   getManifest,
-  getManifestHTTP,
   structureEntityFromIdentifier
 } from "./api/source.api";
 export type { TerminologyRow } from "./models/terminology-row.model";

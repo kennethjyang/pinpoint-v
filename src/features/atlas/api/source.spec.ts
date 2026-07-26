@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import Papa from "papaparse";
 import {
+  BRAINGLOBE_BASE_URL,
   getManifest,
-  getManifestHTTP,
   getTerminologyRows,
   listAtlases,
   listAtlasesHTTP
@@ -17,9 +17,6 @@ vi.mock("axios");
 // mock Papa.parse itself and drive its `complete`/`error` callbacks
 // directly.
 vi.mock("papaparse", () => ({ default: { parse: vi.fn() } }));
-
-const BRAINGLOBE_BASE_URL =
-  "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
 
 describe("listAtlases", () => {
   // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
@@ -287,231 +284,237 @@ describe("getManifest", () => {
   // oxlint-disable-next-line typescript/unbound-method
   const mockedGet = vi.mocked(axios.get);
 
-  const LISTING_URL =
-    "https://brainglobe.s3.us-west-2.amazonaws.com/?list-type=2&prefix=atlas-rc2%2Fatlases%2F&delimiter=%2F";
-  const MANIFEST_URL_25 = `${BRAINGLOBE_BASE_URL}atlases/allen_mouse_25um/3_0/manifest.json`;
-  const MANIFEST_URL_100 = `${BRAINGLOBE_BASE_URL}atlases/allen_mouse_100um/3_0/manifest.json`;
+  beforeEach(() => {
+    mockedGet.mockReset();
+  });
 
-  // Lists two real size variants of allen_mouse, in the lexicographic (i.e.
-  // wrong) order S3 returns them in, plus a different atlas that merely
-  // shares the prefix.
-  const LISTING_XML = `<?xml version="1.0" encoding="UTF-8"?>
+  describe("BrainGlobe bucket source", () => {
+    const LISTING_URL =
+      "https://brainglobe.s3.us-west-2.amazonaws.com/?list-type=2&prefix=atlas-rc2%2Fatlases%2F&delimiter=%2F";
+    const MANIFEST_URL_25 = `${BRAINGLOBE_BASE_URL}atlases/allen_mouse_25um/3_0/manifest.json`;
+    const MANIFEST_URL_100 = `${BRAINGLOBE_BASE_URL}atlases/allen_mouse_100um/3_0/manifest.json`;
+
+    // Lists two real size variants of allen_mouse, in the lexicographic
+    // (i.e. wrong) order S3 returns them in, plus a different atlas that
+    // merely shares the prefix.
+    const LISTING_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
   <CommonPrefixes><Prefix>atlas-rc2/atlases/allen_mouse_100um/</Prefix></CommonPrefixes>
   <CommonPrefixes><Prefix>atlas-rc2/atlases/allen_mouse_25um/</Prefix></CommonPrefixes>
   <CommonPrefixes><Prefix>atlas-rc2/atlases/allen_mouse_bluebrain_barrels_10um/</Prefix></CommonPrefixes>
 </ListBucketResult>`;
 
-  const s3Atlas = makeAtlas({ source: BRAINGLOBE_BASE_URL });
+    const s3Atlas = makeAtlas({ source: BRAINGLOBE_BASE_URL });
 
-  /**
-   * getManifest issues one prefix listing plus one request per size variant,
-   * so the mock is keyed on URL instead of resolving a single value. Unknown
-   * URLs reject, which also asserts that no extra manifest is fetched.
-   */
-  function mockBucket(
-    listing: string,
-    manifests: Record<string, unknown> = {}
-  ) {
-    mockedGet.mockImplementation((url: string) =>
-      url === LISTING_URL
-        ? Promise.resolve({ data: listing })
-        : url in manifests
-          ? Promise.resolve({ data: manifests[url] })
-          : Promise.reject(new Error(`unexpected request: ${url}`))
-    );
-  }
+    /**
+     * getManifest issues one prefix listing plus one request per size
+     * variant, so the mock is keyed on URL instead of resolving a single
+     * value. Unknown URLs reject, which also asserts that no extra manifest
+     * is fetched.
+     */
+    function mockBucket(
+      listing: string,
+      manifests: Record<string, unknown> = {}
+    ) {
+      mockedGet.mockImplementation((url: string) =>
+        url === LISTING_URL
+          ? Promise.resolve({ data: listing })
+          : url in manifests
+            ? Promise.resolve({ data: manifests[url] })
+            : Promise.reject(new Error(`unexpected request: ${url}`))
+      );
+    }
 
-  beforeEach(() => {
-    mockedGet.mockReset();
+    it("requests the atlases listing and one manifest per size variant", async () => {
+      mockBucket(LISTING_XML, {
+        [MANIFEST_URL_100]: {
+          name: "allen_mouse",
+          resolution: [100, 100, 100],
+          shape: [132, 80, 114]
+        },
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456]
+        }
+      });
+
+      await getManifest(s3Atlas);
+
+      expect(mockedGet).toHaveBeenCalledWith(LISTING_URL, {
+        responseType: "text"
+      });
+      expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_100);
+      expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_25);
+      // Listing + two variants: the bluebrain_barrels atlas is not fetched.
+      expect(mockedGet).toHaveBeenCalledTimes(3);
+    });
+
+    it("aggregates the variants' resolutions and shapes, finest first", async () => {
+      mockBucket(LISTING_XML, {
+        [MANIFEST_URL_100]: {
+          name: "allen_mouse",
+          resolution: [100, 100, 100],
+          shape: [132, 80, 114]
+        },
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456]
+        }
+      });
+
+      const result = await getManifest(s3Atlas);
+
+      expect(result).toEqual({
+        name: "allen_mouse",
+        resolutions: [
+          [25, 25, 25],
+          [100, 100, 100]
+        ],
+        shape: [
+          [528, 320, 456],
+          [132, 80, 114]
+        ]
+      });
+    });
+
+    it("returns null when the atlas has no size variant directories", async () => {
+      mockBucket(LISTING_XML);
+
+      // allen-adult-human is a terminology name with no matching atlases/
+      // dir.
+      const result = await getManifest(
+        makeAtlas({ name: "allen-adult-human", source: BRAINGLOBE_BASE_URL })
+      );
+
+      expect(result).toBeNull();
+      expect(mockedGet).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns null when one of the manifest requests fails", async () => {
+      mockBucket(LISTING_XML, {
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456]
+        }
+      });
+
+      expect(await getManifest(s3Atlas)).toBeNull();
+    });
+
+    it("returns null when the request throws", async () => {
+      mockedGet.mockRejectedValue(new Error("network error"));
+
+      const result = await getManifest(s3Atlas);
+
+      expect(result).toBeNull();
+    });
   });
 
-  it("requests the atlases listing and one manifest per size variant", async () => {
-    mockBucket(LISTING_XML, {
-      [MANIFEST_URL_100]: {
-        name: "allen_mouse",
-        resolution: [100, 100, 100],
-        shape: [132, 80, 114]
-      },
-      [MANIFEST_URL_25]: {
-        name: "allen_mouse",
-        resolution: [25, 25, 25],
-        shape: [528, 320, 456]
-      }
-    });
+  describe("HTTP host source", () => {
+    const ATLASES_URL = "http://localhost:3000/brainglobe-atlasapi/atlases";
+    const MANIFEST_URL_25 = `${ATLASES_URL}/allen_mouse_25um/3_0/manifest.json`;
+    const MANIFEST_URL_100 = `${ATLASES_URL}/allen_mouse_100um/3_0/manifest.json`;
 
-    await getManifest(s3Atlas);
-
-    expect(mockedGet).toHaveBeenCalledWith(LISTING_URL, {
-      responseType: "text"
-    });
-    expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_100);
-    expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_25);
-    // Listing + two variants: the bluebrain_barrels atlas is not fetched.
-    expect(mockedGet).toHaveBeenCalledTimes(3);
-  });
-
-  it("aggregates the variants' resolutions and shapes, finest first", async () => {
-    mockBucket(LISTING_XML, {
-      [MANIFEST_URL_100]: {
-        name: "allen_mouse",
-        resolution: [100, 100, 100],
-        shape: [132, 80, 114]
-      },
-      [MANIFEST_URL_25]: {
-        name: "allen_mouse",
-        resolution: [25, 25, 25],
-        shape: [528, 320, 456]
-      }
-    });
-
-    const result = await getManifest(s3Atlas);
-
-    expect(result).toEqual({
-      name: "allen_mouse",
-      resolutions: [
-        [25, 25, 25],
-        [100, 100, 100]
-      ],
-      shape: [
-        [528, 320, 456],
-        [132, 80, 114]
+    const LISTING = {
+      files: [
+        { name: "allen_mouse_100um", type: "folder" },
+        { name: "allen_mouse_25um", type: "folder" },
+        { name: "allen_mouse_bluebrain_barrels_10um", type: "folder" },
+        { name: "last_versions.conf", type: "file" }
       ]
-    });
-  });
+    };
 
-  it("returns null when the atlas has no size variant directories", async () => {
-    mockBucket(LISTING_XML);
+    /** Same URL-keyed routing as the bucket tests, for the JSON listing. */
+    function mockHost(manifests: Record<string, unknown> = {}) {
+      mockedGet.mockImplementation((url: string) =>
+        url === ATLASES_URL
+          ? Promise.resolve({ data: LISTING })
+          : url in manifests
+            ? Promise.resolve({ data: manifests[url] })
+            : Promise.reject(new Error(`unexpected request: ${url}`))
+      );
+    }
 
-    // allen-adult-human is a terminology name with no matching atlases/ dir.
-    const result = await getManifest(
-      makeAtlas({ name: "allen-adult-human", source: BRAINGLOBE_BASE_URL })
-    );
+    it("requests the atlases directory and one manifest per size variant", async () => {
+      mockHost({
+        [MANIFEST_URL_100]: {
+          name: "allen_mouse",
+          resolution: [100, 100, 100],
+          shape: [132, 80, 114]
+        },
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456]
+        }
+      });
 
-    expect(result).toBeNull();
-    expect(mockedGet).toHaveBeenCalledTimes(1);
-  });
+      await getManifest(makeAtlas());
 
-  it("returns null when one of the manifest requests fails", async () => {
-    mockBucket(LISTING_XML, {
-      [MANIFEST_URL_25]: {
-        name: "allen_mouse",
-        resolution: [25, 25, 25],
-        shape: [528, 320, 456]
-      }
-    });
-
-    expect(await getManifest(s3Atlas)).toBeNull();
-  });
-
-  it("returns null when the request throws", async () => {
-    mockedGet.mockRejectedValue(new Error("network error"));
-
-    const result = await getManifest(s3Atlas);
-
-    expect(result).toBeNull();
-  });
-});
-
-describe("getManifestHTTP", () => {
-  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
-  // called unbound.
-  // oxlint-disable-next-line typescript/unbound-method
-  const mockedGet = vi.mocked(axios.get);
-
-  const ATLASES_URL = "http://localhost:3000/brainglobe-atlasapi/atlases";
-  const MANIFEST_URL_25 = `${ATLASES_URL}/allen_mouse_25um/3_0/manifest.json`;
-  const MANIFEST_URL_100 = `${ATLASES_URL}/allen_mouse_100um/3_0/manifest.json`;
-
-  const LISTING = {
-    files: [
-      { name: "allen_mouse_100um", type: "folder" },
-      { name: "allen_mouse_25um", type: "folder" },
-      { name: "allen_mouse_bluebrain_barrels_10um", type: "folder" },
-      { name: "last_versions.conf", type: "file" }
-    ]
-  };
-
-  /** Same URL-keyed routing as getManifest's tests, for the JSON listing. */
-  function mockHost(manifests: Record<string, unknown> = {}) {
-    mockedGet.mockImplementation((url: string) =>
-      url === ATLASES_URL
-        ? Promise.resolve({ data: LISTING })
-        : url in manifests
-          ? Promise.resolve({ data: manifests[url] })
-          : Promise.reject(new Error(`unexpected request: ${url}`))
-    );
-  }
-
-  beforeEach(() => {
-    mockedGet.mockReset();
-  });
-
-  it("requests the atlases directory and one manifest per size variant", async () => {
-    mockHost({
-      [MANIFEST_URL_100]: {
-        name: "allen_mouse",
-        resolution: [100, 100, 100],
-        shape: [132, 80, 114]
-      },
-      [MANIFEST_URL_25]: {
-        name: "allen_mouse",
-        resolution: [25, 25, 25],
-        shape: [528, 320, 456]
-      }
+      expect(mockedGet).toHaveBeenCalledWith(ATLASES_URL);
+      expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_100);
+      expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_25);
+      expect(mockedGet).toHaveBeenCalledTimes(3);
     });
 
-    await getManifestHTTP(makeAtlas());
+    it("never requests the BrainGlobe bucket listing", async () => {
+      mockHost();
 
-    expect(mockedGet).toHaveBeenCalledWith(ATLASES_URL);
-    expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_100);
-    expect(mockedGet).toHaveBeenCalledWith(MANIFEST_URL_25);
-    expect(mockedGet).toHaveBeenCalledTimes(3);
-  });
+      await getManifest(makeAtlas());
 
-  it("aggregates the variants' resolutions and shapes, finest first", async () => {
-    mockHost({
-      [MANIFEST_URL_100]: {
-        name: "allen_mouse",
-        resolution: [100, 100, 100],
-        shape: [132, 80, 114]
-      },
-      [MANIFEST_URL_25]: {
-        name: "allen_mouse",
-        resolution: [25, 25, 25],
-        shape: [528, 320, 456]
-      }
+      expect(mockedGet).not.toHaveBeenCalledWith(
+        expect.stringContaining("brainglobe.s3"),
+        expect.anything()
+      );
     });
 
-    const result = await getManifestHTTP(makeAtlas());
+    it("aggregates the variants' resolutions and shapes, finest first", async () => {
+      mockHost({
+        [MANIFEST_URL_100]: {
+          name: "allen_mouse",
+          resolution: [100, 100, 100],
+          shape: [132, 80, 114]
+        },
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456]
+        }
+      });
 
-    expect(result).toEqual({
-      name: "allen_mouse",
-      resolutions: [
-        [25, 25, 25],
-        [100, 100, 100]
-      ],
-      shape: [
-        [528, 320, 456],
-        [132, 80, 114]
-      ]
+      const result = await getManifest(makeAtlas());
+
+      expect(result).toEqual({
+        name: "allen_mouse",
+        resolutions: [
+          [25, 25, 25],
+          [100, 100, 100]
+        ],
+        shape: [
+          [528, 320, 456],
+          [132, 80, 114]
+        ]
+      });
     });
-  });
 
-  it("returns null when the atlas has no size variant directories", async () => {
-    mockHost();
+    it("returns null when the atlas has no size variant directories", async () => {
+      mockHost();
 
-    const result = await getManifestHTTP(makeAtlas({ name: "allen_cord" }));
+      const result = await getManifest(makeAtlas({ name: "allen_cord" }));
 
-    expect(result).toBeNull();
-    expect(mockedGet).toHaveBeenCalledTimes(1);
-  });
+      expect(result).toBeNull();
+      expect(mockedGet).toHaveBeenCalledTimes(1);
+    });
 
-  it("returns null when the request throws", async () => {
-    mockedGet.mockRejectedValue(new Error("network error"));
+    it("returns null when the request throws", async () => {
+      mockedGet.mockRejectedValue(new Error("network error"));
 
-    const result = await getManifestHTTP(makeAtlas());
+      const result = await getManifest(makeAtlas());
 
-    expect(result).toBeNull();
+      expect(result).toBeNull();
+    });
   });
 });

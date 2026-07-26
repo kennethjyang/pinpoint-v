@@ -6,8 +6,12 @@ import { fetchAtlasMetadata, getDefaultStructureIds } from "@/features/atlas";
 import { makeAtlas, makeAtlasMetadata } from "@/test/fixtures";
 
 vi.mock("@/features/atlas", () => ({
+  BRAINGLOBE_BASE_URL:
+    "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
   fetchAtlasMetadata: vi.fn(),
-  getDefaultStructureIds: vi.fn()
+  getDefaultStructureIds: vi.fn(),
+  getManifest: vi.fn(),
+  getTerminologyRows: vi.fn()
 }));
 
 describe("useCurrentExperimentStore", () => {

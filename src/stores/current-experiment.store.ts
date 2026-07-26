@@ -5,6 +5,7 @@ import { Experiment } from "@/features/experiment";
 import {
   Atlas,
   AtlasMetadata,
+  BRAINGLOBE_BASE_URL,
   fetchAtlasMetadata,
   getDefaultStructureIdentifiers,
   getManifest,
@@ -27,7 +28,7 @@ export const useCurrentExperimentStore = defineStore(
     const experiment = ref<Experiment>({
       name: "My First Experiment",
       atlas: {
-        source: "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
+        source: BRAINGLOBE_BASE_URL,
         name: "allen_mouse"
       },
       referenceCoordinate: DEFAULT_REFERENCE_COORDINATE,

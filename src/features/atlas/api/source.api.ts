@@ -30,7 +30,7 @@ interface RawManifest {
   shape: [number, number, number];
 }
 
-const BRAINGLOBE_BASE_URL =
+export const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
 const ATLAS_VERSION_STRING = "3_0";
 
@@ -220,64 +220,62 @@ async function buildManifest(
 }
 
 /**
- * Fetch and aggregate the manifests of every size variant of an atlas in an
- * S3-backed BrainGlobe bucket.
+ * List the directory names directly under `atlases/` in an S3-backed
+ * BrainGlobe bucket, via a delimited prefix listing.
+ * @param source Root URL of the bucket.
+ */
+async function listBucketAtlasDirectories(source: string): Promise<string[]> {
+  const bucket = new URL(source);
+  const params = new URLSearchParams({
+    "list-type": "2",
+    prefix: `${bucket.pathname.slice(1)}${ATLASES_DIRECTORY}/`,
+    delimiter: "/"
+  });
+
+  const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
+    responseType: "text"
+  });
+
+  const doc = new DOMParser().parseFromString(response.data, "application/xml");
+  return Array.from(doc.getElementsByTagName("CommonPrefixes"))
+    .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
+    .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "");
+}
+
+/**
+ * List the folder names in the atlases directory of a BrainGlobe HTTP
+ * server.
+ * @param atlasesUrl URL of the server's atlases directory.
+ */
+async function listServerAtlasDirectories(
+  atlasesUrl: string
+): Promise<string[]> {
+  const response = await axios.get<AtlasSourceResponse>(atlasesUrl);
+  return response.data.files
+    .filter(item => item.type === "folder")
+    .map(item => item.name);
+}
+
+/**
+ * Fetch and aggregate the manifests of every size variant of an atlas,
+ * discovering the atlases directory either via an S3-backed BrainGlobe
+ * bucket's prefix listing or a BrainGlobe HTTP server's directory listing,
+ * depending on whether `atlas.source` is the BrainGlobe bucket.
  * @param atlas Atlas to build the aggregated manifest for.
- * @returns The aggregated manifest, or null if the bucket couldn't be
+ * @returns The aggregated manifest, or null if the source couldn't be
  * reached or the atlas has no size variants there.
  */
 export async function getManifest(atlas: Atlas): Promise<Manifest | null> {
   try {
-    const bucket = new URL(atlas.source);
-    const params = new URLSearchParams({
-      "list-type": "2",
-      prefix: `${bucket.pathname.slice(1)}${ATLASES_DIRECTORY}/`,
-      delimiter: "/"
-    });
+    const isBrainGlobe = atlas.source === BRAINGLOBE_BASE_URL;
 
-    const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
-      responseType: "text"
-    });
+    const atlasesUrl = isBrainGlobe
+      ? new URL(ATLASES_DIRECTORY, atlas.source).toString()
+      : `${atlas.source}/${HTTP_SOURCE_PREFIX}/${ATLASES_DIRECTORY}`;
 
-    const doc = new DOMParser().parseFromString(
-      response.data,
-      "application/xml"
-    );
-    const directoryNames = Array.from(
-      doc.getElementsByTagName("CommonPrefixes")
-    )
-      .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
-      .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "");
-
-    return await buildManifest(
-      atlas,
-      sizeVariantDirectories(directoryNames, atlas).map(directory =>
-        new URL(
-          `${ATLASES_DIRECTORY}/${directory}/${ATLAS_VERSION_STRING}/${MANIFEST_FILE}`,
-          atlas.source
-        ).toString()
-      )
-    );
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetch and aggregate the manifests of every size variant of an atlas in the
- * atlases directory of a BrainGlobe HTTP server.
- * @param atlas Atlas to build the aggregated manifest for.
- * @returns The aggregated manifest, or null if the host couldn't be reached
- * or the atlas has no size variants there.
- */
-export async function getManifestHTTP(atlas: Atlas): Promise<Manifest | null> {
-  try {
-    const atlasesUrl = `${atlas.source}/${HTTP_SOURCE_PREFIX}/${ATLASES_DIRECTORY}`;
-    const response = await axios.get<AtlasSourceResponse>(atlasesUrl);
-
-    const directoryNames = response.data.files
-      .filter(item => item.type === "folder")
-      .map(item => item.name);
+    const directoryNames = isBrainGlobe
+      ? await listBucketAtlasDirectories(atlas.source)
+      : await listServerAtlasDirectories(atlasesUrl);
 
     return await buildManifest(
       atlas,
