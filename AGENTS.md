@@ -1,12 +1,12 @@
 ## Development Workflow
 
-- Use pnpm and pnpx instead of npm
-- Only verify using static analysis and unit tests. Use pnpm lint and pnpm typecheck.
-- Ensure tests are up to date. Create tests for missing branches. Run tests after any edits using pnpm test.
+- Use pnpm and pnpx instead of npm and npx.
+- Only verify using static analysis and unit tests. Use `pnpm lint` and `pnpm typecheck`.
+- Ensure tests are up to date. Create tests for missing branches. Run tests after any edits using `pnpm test`.
+  - Use `pnpm coverage` to help guide discovery but do not fixate on reaching 100% coverage.
 - Ensure user-facing strings are encoded in i18n.
 - Use idiomatic and cleaner implementations over obscure but performant code.
-- Consider fanning out into multiple agents where appropriate.
-- Review the installed skills and load the appropriate ones for the task.
+- Fan out into multiple agents to help parallelize tasks that can benefit from it.
 
 ## Vue 3 `<script setup>` ordering
 
@@ -34,3 +34,16 @@ Before completing any change to a Vue SFC:
 - Check the `<script setup>` declaration order.
 - Run the repository lint command.
 - Fix all ordering violations introduced or encountered in edited files.
+
+## TypeScript module order
+
+Order declarations consistently:
+
+1. Imports: third-party, then internal; separate import type imports.
+2. Exported types: types intentionally exposed by the module.
+3. Private types: implementation-only interfaces and type aliases.
+4. Constants: group related configuration and path/file constants.
+5. Exported functions: order by the public API’s logical usage.
+6. Private helpers: place near their primary caller, or after public functions when shared.
+
+Do not export a symbol only for testing. Test through the public API only.
