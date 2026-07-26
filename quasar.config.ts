@@ -95,6 +95,10 @@ export default defineConfig(ctx => {
         dark: "auto",
         notify: {
           position: "top-right"
+        },
+        loadingBar: {
+          position: "bottom",
+          skipHijack: true
         }
       },
 
@@ -109,7 +113,7 @@ export default defineConfig(ctx => {
       // directives: [],
 
       // Quasar plugins
-      plugins: ["Notify", "Dialog"]
+      plugins: ["Notify", "Dialog", "LoadingBar"]
     },
 
     // animations: 'all', // --- includes all animations

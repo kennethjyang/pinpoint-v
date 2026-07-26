@@ -1,6 +1,6 @@
 import { mount, type ComponentMountingOptions } from "@vue/test-utils";
 import type { Component } from "vue";
-import { Notify, Quasar } from "quasar";
+import { LoadingBar, Notify, Quasar } from "quasar";
 import { createI18n } from "vue-i18n";
 import { createPinia, setActivePinia, type Pinia } from "pinia";
 import messages from "@/i18n";
@@ -36,10 +36,11 @@ export function mountWithQuasar<T extends Component>(
   return mount(component, {
     ...mountOptions,
     global: {
-      // Matches the app's own `framework.plugins: ["Notify"]` (quasar.config.ts)
-      // so components calling `useQuasar().notify(...)` don't blow up.
+      // Matches the app's own `framework.plugins` (quasar.config.ts) so
+      // components calling `useQuasar().notify(...)` or `.loadingBar.*(...)`
+      // don't blow up.
       plugins: [
-        [Quasar, { plugins: { Notify } }],
+        [Quasar, { plugins: { Notify, LoadingBar } }],
         createTestI18n(),
         pinia,
         ...(mountOptions.global?.plugins ?? [])
