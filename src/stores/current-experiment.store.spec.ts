@@ -2,14 +2,18 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
-import { fetchAtlasMetadata, getDefaultStructureIds } from "@/features/atlas";
-import { makeAtlas, makeAtlasMetadata } from "@/test/fixtures";
+import {
+  fetchAtlasMetadata,
+  getDefaultStructureIdentifiers,
+  getTerminologyRows
+} from "@/features/atlas";
+import { makeAtlas, makeTerminologyRows } from "@/test/fixtures";
 
 vi.mock("@/features/atlas", () => ({
   BRAINGLOBE_BASE_URL:
     "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
   fetchAtlasMetadata: vi.fn(),
-  getDefaultStructureIds: vi.fn(),
+  getDefaultStructureIdentifiers: vi.fn(),
   getManifest: vi.fn(),
   getTerminologyRows: vi.fn()
 }));
@@ -18,7 +22,7 @@ describe("useCurrentExperimentStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(fetchAtlasMetadata).mockReset();
-    vi.mocked(getDefaultStructureIds).mockReset();
+    vi.mocked(getDefaultStructureIdentifiers).mockReset();
     // Default the async metadata fetch to "not found" so tests that don't
     // care about it don't hang on a never-resolving promise.
     vi.mocked(fetchAtlasMetadata).mockResolvedValue(null);
@@ -68,33 +72,33 @@ describe("useCurrentExperimentStore", () => {
   });
 
   describe("isStructureVisible", () => {
-    it("returns true when the id is in visibleStructures", () => {
+    it("returns true when the identifier is in visibleStructures", () => {
       const store = useCurrentExperimentStore();
       store.visibleStructures = [5];
       expect(store.isStructureVisible(5)).toBe(true);
     });
 
-    it("returns false when the id is not in visibleStructures", () => {
+    it("returns false when the identifier is not in visibleStructures", () => {
       const store = useCurrentExperimentStore();
       expect(store.isStructureVisible(5)).toBe(false);
     });
   });
 
   describe("setStructureVisibility", () => {
-    it("adds the id when setting visible and not already present", () => {
+    it("adds the identifier when setting visible and not already present", () => {
       const store = useCurrentExperimentStore();
       store.setStructureVisibility(5, true);
       expect(store.visibleStructures).toEqual([5]);
     });
 
-    it("does not duplicate the id when already visible", () => {
+    it("does not duplicate the identifier when already visible", () => {
       const store = useCurrentExperimentStore();
       store.visibleStructures = [5];
       store.setStructureVisibility(5, true);
       expect(store.visibleStructures).toEqual([5]);
     });
 
-    it("removes the id when setting invisible and present", () => {
+    it("removes the identifier when setting invisible and present", () => {
       const store = useCurrentExperimentStore();
       store.visibleStructures = [5, 6];
       store.setStructureVisibility(5, false);
@@ -118,26 +122,28 @@ describe("useCurrentExperimentStore", () => {
     });
   });
 
-  describe("defaultStructureIds", () => {
-    it("is [] while metadata hasn't resolved / is null", async () => {
+  describe("defaultStructureIdentifiers", () => {
+    it("is [] while terminologyRows hasn't resolved", async () => {
       const store = useCurrentExperimentStore();
       await flushPromises();
-      expect(store.defaultStructureIds).toEqual([]);
+      expect(store.defaultStructureIdentifiers).toEqual([]);
     });
 
-    it("delegates to getDefaultStructureIds once metadata resolves", async () => {
-      const metadata = makeAtlasMetadata();
-      vi.mocked(fetchAtlasMetadata).mockResolvedValue(metadata);
-      vi.mocked(getDefaultStructureIds).mockReturnValue([7, 8]);
+    it("delegates to getDefaultStructureIdentifiers once terminologyRows resolves", async () => {
+      const terminologyRows = makeTerminologyRows();
+      vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
+      vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([7, 8]);
 
       const store = useCurrentExperimentStore();
       await flushPromises();
 
-      expect(store.metadata).toEqual(metadata);
-      // defaultStructureIds is a lazy computed - read it before asserting on
-      // the mock it delegates to.
-      expect(store.defaultStructureIds).toEqual([7, 8]);
-      expect(getDefaultStructureIds).toHaveBeenCalledWith(metadata);
+      expect(store.terminologyRows).toEqual(terminologyRows);
+      // defaultStructureIdentifiers is a lazy computed - read it before
+      // asserting on the mock it delegates to.
+      expect(store.defaultStructureIdentifiers).toEqual([7, 8]);
+      expect(getDefaultStructureIdentifiers).toHaveBeenCalledWith(
+        terminologyRows
+      );
     });
   });
 });

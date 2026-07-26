@@ -31,7 +31,7 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
   const { atlas, terminologyRows } = currentExperiment;
   if (!atlas || !terminologyRows) return [];
 
-  return currentExperiment.defaultStructureIds.flatMap(identifier => {
+  return currentExperiment.defaultStructureIdentifiers.flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
       atlas,
       terminologyRows,

@@ -1,10 +1,6 @@
 export { default as AtlasPicker } from "./components/AtlasPicker.vue";
 export { default as AtlasHierarchy } from "./components/AtlasHierarchy.vue";
-export {
-  fetchAtlasMetadata,
-  getDefaultStructureIds,
-  structureEntityFromId
-} from "./api/metadata.api";
+export { fetchAtlasMetadata } from "./api/metadata.api";
 export {
   buildHierarchy,
   toTitleCase,
