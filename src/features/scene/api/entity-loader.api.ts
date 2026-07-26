@@ -5,8 +5,7 @@ import {
   TransformNode,
   Vector3
 } from "@babylonjs/core";
-import { StructureEntity } from "@/features/atlas";
-import { asrToBabylon } from "@/features/scene";
+import { asrToBabylon, StructureEntity } from "@/features/scene";
 
 /**
  * Build the atlas root node or return the existing one.

@@ -14,10 +14,10 @@ export type { HierarchyModel } from "./api/hierarchy.api";
 export {
   listAtlases,
   listAtlasesHTTP,
-  getTerminologyRows
+  getTerminologyRows,
+  structureEntityFromIdentifier
 } from "./api/source.api";
 export type { TerminologyRow } from "./models/terminology-row.model";
 export type { Atlas } from "./models/atlas.model";
 export type { AtlasStructure } from "./models/structure.model";
 export type { AtlasMetadata } from "./models/metadata.model";
-export type { StructureEntity } from "./models/structure-entity.model";

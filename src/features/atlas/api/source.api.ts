@@ -1,6 +1,8 @@
 import axios from "axios";
 import { Atlas, TerminologyRow } from "@/features/atlas";
 import Papa from "papaparse";
+import { StructureEntity } from "@/features/scene";
+import { Color3 } from "@babylonjs/core";
 
 /**
  * Atlas item in an atlas source's response structure.
@@ -22,6 +24,7 @@ const BRAINGLOBE_BASE_URL =
 const ATLAS_VERSION_STRING = "3_0";
 
 const TERMINOLOGY_SUFFIX = "-terminology";
+const ANNOTATION_SUFFIX = "-annotation";
 
 /**
  * Fetch and parse the list of atlases available in the BrainGlobe
@@ -147,4 +150,30 @@ export async function getTerminologyRows(
       }
     );
   });
+}
+
+/**
+ * Returns a structure entity for a structure by identifier from an atlas and its parsed terminology row.
+ * @param atlas Atlas to pull mesh info from.
+ * @param terminologyRows Parsed terminology rows for the atlas.
+ * @param identifier Structure identifier to build for.
+ */
+export function structureEntityFromIdentifier(
+  atlas: Atlas,
+  terminologyRows: TerminologyRow[],
+  identifier: number
+): StructureEntity | null {
+  const terminologyRow = terminologyRows.find(
+    row => row.identifier === identifier
+  );
+  if (!terminologyRow) return null;
+
+  return {
+    name: terminologyRow.name,
+    meshPath: new URL(
+      `annotation-sets/${atlas.name}${ANNOTATION_SUFFIX}/${ATLAS_VERSION_STRING}/annotations.precomputed/mesh/${terminologyRow.identifier}`,
+      atlas.source
+    ).toString(),
+    color: Color3.FromHexString(terminologyRow.color_hex_triplet)
+  };
 }

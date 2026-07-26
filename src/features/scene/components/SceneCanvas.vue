@@ -10,9 +10,10 @@ import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService"
 import {
   setAtlasRootReference,
   setZoom,
+  StructureEntity,
   syncStructureVisibility
 } from "@/features/scene";
-import { StructureEntity, structureEntityFromId } from "@/features/atlas";
+import { structureEntityFromIdentifier } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const currentExperiment = useCurrentExperimentStore();
@@ -25,11 +26,15 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
  * not visible instead of being removed.
  */
 const alwaysPresentStructures = computed<StructureEntity[]>(() => {
-  const { atlas, metadata } = currentExperiment;
-  if (!atlas || !metadata) return [];
+  const { atlas, terminologyRows } = currentExperiment;
+  if (!atlas || !terminologyRows) return [];
 
-  return currentExperiment.defaultStructureIds.flatMap(id => {
-    const structureEntity = structureEntityFromId(atlas, metadata, id);
+  return currentExperiment.defaultStructureIds.flatMap(identifier => {
+    const structureEntity = structureEntityFromIdentifier(
+      atlas,
+      terminologyRows,
+      identifier
+    );
     return structureEntity ? [structureEntity] : [];
   });
 });
@@ -38,11 +43,15 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
  * Structures the current experiment has marked visible.
  */
 const visibleStructures = computed<StructureEntity[]>(() => {
-  const { atlas, metadata } = currentExperiment;
-  if (!atlas || !metadata) return [];
+  const { atlas, terminologyRows } = currentExperiment;
+  if (!atlas || !terminologyRows) return [];
 
-  return currentExperiment.visibleStructures.flatMap(id => {
-    const structureEntity = structureEntityFromId(atlas, metadata, id);
+  return currentExperiment.visibleStructures.flatMap(identifier => {
+    const structureEntity = structureEntityFromIdentifier(
+      atlas,
+      terminologyRows,
+      identifier
+    );
     return structureEntity ? [structureEntity] : [];
   });
 });

@@ -73,6 +73,7 @@ export const useCurrentExperimentStore = defineStore(
 
     /**
      * Fetch the metadata for the current experiment's atlas.
+     * @deprecated
      */
     const metadata = computedAsync<AtlasMetadata | null>(async () =>
       fetchAtlasMetadata(atlas.value)

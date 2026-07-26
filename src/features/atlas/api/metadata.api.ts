@@ -1,6 +1,7 @@
 import axios from "axios";
 import { Color3 } from "@babylonjs/core";
-import { Atlas, AtlasMetadata, StructureEntity } from "@/features/atlas";
+import { Atlas, AtlasMetadata } from "@/features/atlas";
+import { StructureEntity } from "@/features/scene";
 
 /**
  * Fetch the metadata for the given atlas.
