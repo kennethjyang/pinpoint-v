@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Atlas, TerminologyRow } from "@/features/atlas";
+import { Atlas, Manifest, TerminologyRow } from "@/features/atlas";
 import Papa from "papaparse";
 import { StructureEntity } from "@/features/scene";
 import { Color3 } from "@babylonjs/core";
@@ -19,12 +19,27 @@ interface AtlasSourceResponse {
   files: AtlasItem[];
 }
 
+/**
+ * Manifest of a single size variant of an atlas, as stored at
+ * `atlases/<atlas name>_<size>um/3_0/manifest.json`. Only the fields used to
+ * build a {@link Manifest} are described here.
+ */
+interface RawManifest {
+  name: string;
+  resolution: [number, number, number];
+  shape: [number, number, number];
+}
+
 const BRAINGLOBE_BASE_URL =
   "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/";
 const ATLAS_VERSION_STRING = "3_0";
 
 const TERMINOLOGY_SUFFIX = "-terminology";
 const ANNOTATION_SUFFIX = "-annotation";
+
+const ATLASES_DIRECTORY = "atlases";
+const MANIFEST_FILE = "manifest.json";
+const HTTP_SOURCE_PREFIX = "brainglobe-atlasapi";
 
 /**
  * Fetch and parse the list of atlases available in the BrainGlobe
@@ -72,7 +87,7 @@ export async function listAtlases(): Promise<Atlas[] | null> {
 export async function listAtlasesHTTP(source: string): Promise<Atlas[] | null> {
   try {
     const response = await axios.get<AtlasSourceResponse>(
-      `${source}/brainglobe-atlasapi/terminologies`
+      `${source}/${HTTP_SOURCE_PREFIX}/terminologies`
     );
 
     return response.data.files
@@ -150,6 +165,130 @@ export async function getTerminologyRows(
       }
     );
   });
+}
+
+/**
+ * Keep only the directory names under `atlases/` that are size variants of
+ * the given atlas, i.e. `<atlas name>_<size>um`. Sibling atlases that merely
+ * share the prefix (e.g. `allen_mouse_bluebrain_barrels_10um` for
+ * `allen_mouse`) keep an underscore once the prefix is stripped, so they're
+ * dropped.
+ * @param directoryNames Directory names listed under `atlases/`.
+ * @param atlas Atlas whose size variants to keep.
+ */
+function sizeVariantDirectories(
+  directoryNames: string[],
+  atlas: Atlas
+): string[] {
+  const prefix = `${atlas.name}_`;
+  return directoryNames.filter(
+    name => name.startsWith(prefix) && !name.slice(prefix.length).includes("_")
+  );
+}
+
+/**
+ * Fetch every size variant's manifest file and aggregate them into a single
+ * {@link Manifest}, ordered finest resolution first and index-aligned so
+ * that `resolutions[i]` and `shape[i]` come from the same variant.
+ *
+ * Rejects if any manifest can't be fetched, leaving the caller's `catch` to
+ * turn that into null.
+ * @param atlas Atlas the size variants belong to.
+ * @param manifestUrls Manifest URLs, one per size variant directory.
+ * @returns The aggregated manifest, or null if the atlas has no size
+ * variants in the source.
+ */
+async function buildManifest(
+  atlas: Atlas,
+  manifestUrls: string[]
+): Promise<Manifest | null> {
+  if (manifestUrls.length === 0) return null;
+
+  const responses = await Promise.all(
+    manifestUrls.map(url => axios.get<RawManifest>(url))
+  );
+
+  const variants = responses
+    .map(response => response.data)
+    .sort((a, b) => Math.min(...a.resolution) - Math.min(...b.resolution));
+
+  return {
+    name: atlas.name,
+    resolutions: variants.map(variant => variant.resolution),
+    shape: variants.map(variant => variant.shape)
+  };
+}
+
+/**
+ * Fetch and aggregate the manifests of every size variant of an atlas in an
+ * S3-backed BrainGlobe bucket.
+ * @param atlas Atlas to build the aggregated manifest for.
+ * @returns The aggregated manifest, or null if the bucket couldn't be
+ * reached or the atlas has no size variants there.
+ */
+export async function getManifest(atlas: Atlas): Promise<Manifest | null> {
+  try {
+    const bucket = new URL(atlas.source);
+    const params = new URLSearchParams({
+      "list-type": "2",
+      prefix: `${bucket.pathname.slice(1)}${ATLASES_DIRECTORY}/`,
+      delimiter: "/"
+    });
+
+    const response = await axios.get<string>(`${bucket.origin}/?${params}`, {
+      responseType: "text"
+    });
+
+    const doc = new DOMParser().parseFromString(
+      response.data,
+      "application/xml"
+    );
+    const directoryNames = Array.from(
+      doc.getElementsByTagName("CommonPrefixes")
+    )
+      .map(el => el.getElementsByTagName("Prefix")[0]?.textContent ?? "")
+      .map(prefix => prefix.split("/").filter(Boolean).pop() ?? "");
+
+    return await buildManifest(
+      atlas,
+      sizeVariantDirectories(directoryNames, atlas).map(directory =>
+        new URL(
+          `${ATLASES_DIRECTORY}/${directory}/${ATLAS_VERSION_STRING}/${MANIFEST_FILE}`,
+          atlas.source
+        ).toString()
+      )
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch and aggregate the manifests of every size variant of an atlas in the
+ * atlases directory of a BrainGlobe HTTP server.
+ * @param atlas Atlas to build the aggregated manifest for.
+ * @returns The aggregated manifest, or null if the host couldn't be reached
+ * or the atlas has no size variants there.
+ */
+export async function getManifestHTTP(atlas: Atlas): Promise<Manifest | null> {
+  try {
+    const atlasesUrl = `${atlas.source}/${HTTP_SOURCE_PREFIX}/${ATLASES_DIRECTORY}`;
+    const response = await axios.get<AtlasSourceResponse>(atlasesUrl);
+
+    const directoryNames = response.data.files
+      .filter(item => item.type === "folder")
+      .map(item => item.name);
+
+    return await buildManifest(
+      atlas,
+      sizeVariantDirectories(directoryNames, atlas).map(
+        directory =>
+          `${atlasesUrl}/${directory}/${ATLAS_VERSION_STRING}/${MANIFEST_FILE}`
+      )
+    );
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -15,9 +15,12 @@ export {
   listAtlases,
   listAtlasesHTTP,
   getTerminologyRows,
+  getManifest,
+  getManifestHTTP,
   structureEntityFromIdentifier
 } from "./api/source.api";
 export type { TerminologyRow } from "./models/terminology-row.model";
 export type { Atlas } from "./models/atlas.model";
+export type { Manifest } from "./models/manifest.model";
 export type { AtlasStructure } from "./models/structure.model";
 export type { AtlasMetadata } from "./models/metadata.model";
