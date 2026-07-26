@@ -97,6 +97,8 @@ export default defineConfig(ctx => {
           position: "top-right"
         },
         loadingBar: {
+          color: "secondary",
+          size: "15px",
           position: "bottom",
           skipHijack: true
         }
