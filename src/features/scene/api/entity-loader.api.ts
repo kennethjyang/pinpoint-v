@@ -135,7 +135,7 @@ function buildAtlasRootNode(scene: Scene): TransformNode {
   let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
   if (!atlasRootNode) {
     atlasRootNode = new TransformNode("atlasRoot_node", scene);
-    atlasRootNode.rotation = new Vector3(Math.PI, -Math.PI / 2, 0);
+    atlasRootNode.rotation = new Vector3(Math.PI, 0, 0);
   }
 
   return atlasRootNode;
