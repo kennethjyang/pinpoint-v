@@ -1,11 +1,130 @@
 import {
-  ImportMeshAsync,
+  DracoDecoder,
+  Matrix,
+  Mesh,
+  QuadraticErrorSimplification,
   Scene,
   StandardMaterial,
   TransformNode,
   Vector3
 } from "@babylonjs/core";
-import { asrToBabylon, StructureEntity } from "@/features/scene";
+import axios from "axios";
+import type { StructureEntity } from "@/features/scene";
+import { asrToBabylon } from "@/features/scene";
+
+/** BrainGlobe v3 Draco meshes store positions in nanometers. */
+const NANOMETERS_TO_MILLIMETERS = 1e-6;
+
+/** Keep at most this fraction of a mesh's original vertices. */
+const MESH_VERTEX_KEEP_FRACTION = 0.05;
+
+/** Hard ceiling on vertices per structure, regardless of original size. */
+const MESH_MAX_VERTICES = 8000;
+
+/**
+ * Compute the vertex budget for a simplified mesh: at most
+ * `MESH_VERTEX_KEEP_FRACTION` of the original, capped at `MESH_MAX_VERTICES`.
+ * @param vertexCount Original vertex count.
+ */
+export function targetVertexCount(vertexCount: number): number {
+  return Math.min(
+    Math.round(vertexCount * MESH_VERTEX_KEEP_FRACTION),
+    MESH_MAX_VERTICES
+  );
+}
+
+/**
+ * Fetch a structure's raw Draco-compressed mesh bytes.
+ * @param meshPath URL of the mesh to fetch.
+ */
+export async function fetchMeshData(meshPath: string): Promise<ArrayBuffer> {
+  const response = await axios.get<ArrayBuffer>(meshPath, {
+    responseType: "arraybuffer"
+  });
+  return response.data;
+}
+
+/**
+ * Flip a mesh's triangle winding order in place.
+ *
+ * BrainGlobe meshes are wound for a right-handed system, but the scene is
+ * left-handed; without this, faces are backface-culled and computed normals
+ * point inward.
+ * @param mesh Mesh whose indices should be flipped.
+ */
+export function flipWindingOrder(mesh: Mesh): void {
+  const indices = mesh.getIndices();
+  if (!indices) return;
+
+  const flipped = Array.from(indices);
+  for (let i = 0; i < flipped.length; i += 3) {
+    const temp = flipped[i + 1]!;
+    flipped[i + 1] = flipped[i + 2]!;
+    flipped[i + 2] = temp;
+  }
+  mesh.setIndices(flipped);
+}
+
+/**
+ * Decode raw Draco mesh data into a Babylon mesh, correcting its winding
+ * order and converting its nanometer-scale coordinates to millimeters.
+ * @param name Name for the decoded mesh.
+ * @param data Raw Draco-compressed mesh bytes.
+ * @param scene Scene to decode the mesh into.
+ */
+export async function decodeMesh(
+  name: string,
+  data: ArrayBuffer,
+  scene: Scene
+): Promise<Mesh> {
+  const geometry = await DracoDecoder.Default.decodeMeshToGeometryAsync(
+    name,
+    scene,
+    data
+  );
+
+  const mesh = new Mesh(name, scene);
+  geometry.applyToMesh(mesh);
+
+  flipWindingOrder(mesh);
+  mesh.bakeTransformIntoVertices(
+    Matrix.Scaling(
+      NANOMETERS_TO_MILLIMETERS,
+      NANOMETERS_TO_MILLIMETERS,
+      NANOMETERS_TO_MILLIMETERS
+    )
+  );
+
+  return mesh;
+}
+
+/**
+ * Simplify a mesh down to (approximately) the given vertex count, discarding
+ * the original mesh since it's no longer needed.
+ * @param mesh Mesh to simplify.
+ * @param targetVertices Desired vertex count.
+ */
+export async function simplifyMesh(
+  mesh: Mesh,
+  targetVertices: number
+): Promise<Mesh> {
+  const vertexCount = mesh.getTotalVertices();
+  if (targetVertices >= vertexCount) return mesh;
+
+  const simplified = await new Promise<Mesh>(resolve => {
+    new QuadraticErrorSimplification(mesh).simplify(
+      {
+        quality: targetVertices / vertexCount,
+        distance: 0,
+        optimizeMesh: false
+      },
+      resolve
+    );
+  });
+
+  mesh.dispose();
+  return simplified;
+}
 
 /**
  * Build the atlas root node or return the existing one.
@@ -52,21 +171,27 @@ async function importStructure(
   scene: Scene
 ) {
   try {
-    const { meshes } = await ImportMeshAsync(structure.meshPath, scene);
+    const data = await fetchMeshData(structure.meshPath);
+    const raw = await decodeMesh(structure.name, data, scene);
+    const mesh = await simplifyMesh(
+      raw,
+      targetVertexCount(raw.getTotalVertices())
+    );
 
-    // Exit if the structure doesn't exist.
-    if (!meshes[0]) return;
+    // Simplification returns a new (initially hidden, renamed) mesh.
+    mesh.name = structure.name;
+    mesh.isVisible = true;
+
+    // Enable smooth shading now that the mesh has its final geometry.
+    mesh.createNormals(false);
 
     // Configure this structure.
-    meshes[0].parent = atlasRootNode;
-    meshes[0].name = structure.name;
+    mesh.parent = atlasRootNode;
 
     // Apply the color.
     const material = new StandardMaterial(`${structure.name}_material`, scene);
     material.diffuseColor = structure.color;
-    for (const mesh of meshes) {
-      mesh.material = material;
-    }
+    mesh.material = material;
   } catch {
     // Exit if the structure doesn't exist.
     return;
