@@ -7,7 +7,8 @@
 - Ensure user-facing strings are encoded in i18n.
 - Use idiomatic and cleaner implementations over obscure but performant code.
 - Fan out into multiple agents to help parallelize tasks that can benefit from it.
-- Never use relative imports. If a module needs to import something, put it into the feature's barrel file as the public API and import from there.
+- Never use relative imports (except for test files).
+  - If a module needs to import something, put it into the feature's barrel file as the public API and import from there.
 
 ## Vue 3 `<script setup>` ordering
 
