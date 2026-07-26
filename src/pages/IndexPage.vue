@@ -18,7 +18,7 @@ const rightDrawerWidth = ref(350);
 const tab = ref("atlas");
 
 // Show splash.
-// $q.dialog({ component: SplashDialog });
+// $q.dialog({ component: NewExperimentDialog });
 
 /**
  * Toggle left drawer open state.
