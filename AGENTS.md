@@ -48,3 +48,7 @@ Order declarations consistently:
 6. Private helpers: place near their primary caller, or after public functions when shared.
 
 Do not export a symbol only for testing. Test through the public API only.
+
+One-off helpers: Inline trivial single-use expressions. Use a module-private sibling function
+for non-trivial or domain-named logic. Nest a helper only when it meaningfully closes over
+operation-local state; do not nest solely to make it private.
