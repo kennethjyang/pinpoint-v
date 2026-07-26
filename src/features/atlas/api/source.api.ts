@@ -214,7 +214,11 @@ async function buildManifest(
 
   return {
     name: atlas.name,
-    resolutions: variants.map(variant => variant.resolution),
+    resolutions: variants.map(variant => {
+      // Convert um to mm.
+      const [ap, dv, ml] = variant.resolution;
+      return [ap / 1000, dv / 1000, ml / 1000];
+    }),
     shape: variants.map(variant => variant.shape)
   };
 }

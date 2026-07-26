@@ -10,7 +10,7 @@ import { useQuasar } from "quasar";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
-  setZoom,
+  setInitialZoom,
   StructureEntity,
   syncStructureVisibility
 } from "@/features/scene";
@@ -105,9 +105,9 @@ onMounted(async () => {
   // Set the camera's initial zoom relative to the AP length of the atlas.
   watchEffect(() => {
     const camera = runtime.camera.value;
-    if (!camera || !currentExperiment.metadata) return;
+    if (!camera || !currentExperiment.manifest) return;
 
-    setZoom(currentExperiment.metadata.dimensions[0] * 1.5, camera);
+    setInitialZoom(currentExperiment.manifest, camera);
   });
 });
 
