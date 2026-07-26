@@ -7,7 +7,9 @@ import {
   AtlasMetadata,
   fetchAtlasMetadata,
   getDefaultStructureIdentifiers,
-  getTerminologyRows
+  getManifest,
+  getTerminologyRows,
+  Manifest
 } from "@/features/atlas";
 
 /**
@@ -77,6 +79,10 @@ export const useCurrentExperimentStore = defineStore(
      */
     const metadata = computedAsync<AtlasMetadata | null>(async () =>
       fetchAtlasMetadata(atlas.value)
+    );
+
+    const manifest = computedAsync<Manifest | null>(
+      async () => await getManifest(atlas.value)
     );
 
     /**
@@ -165,6 +171,7 @@ export const useCurrentExperimentStore = defineStore(
       name,
       atlas,
       metadata,
+      manifest,
       terminologyRows,
       defaultStructureIds,
       setReferenceCoordinate,
