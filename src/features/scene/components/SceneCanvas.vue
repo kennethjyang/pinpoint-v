@@ -3,10 +3,10 @@ import {
   computed,
   onMounted,
   onUnmounted,
+  ref,
   useTemplateRef,
   watchEffect
 } from "vue";
-import { useQuasar } from "quasar";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
@@ -19,9 +19,14 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const currentExperiment = useCurrentExperimentStore();
 const runtime = useBabylonRuntimeService();
-const $q = useQuasar();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
+
+/**
+ * Whether structures are currently being synced into the scene, driving the
+ * loading bar overlaid on the canvas.
+ */
+const isLoadingStructures = ref(false);
 
 /**
  * Atlas structures that must always be present in the scene, faded out when
@@ -80,24 +85,15 @@ onMounted(async () => {
     const scene = runtime.scene.value;
     if (!scene) return;
 
-    // Only start the loading bar once there's actually something to import
-    // -- a sync that finds everything already present shouldn't flash it.
-    let barStarted = false;
+    isLoadingStructures.value = true;
     try {
       await syncStructureVisibility(
         scene,
         alwaysPresentStructures.value,
-        visibleStructures.value,
-        (completed, total) => {
-          if (!barStarted) {
-            barStarted = true;
-            $q.loadingBar.start(0);
-          }
-          $q.loadingBar.increment((completed / total) * 100);
-        }
+        visibleStructures.value
       );
     } finally {
-      if (barStarted) $q.loadingBar.stop();
+      isLoadingStructures.value = false;
     }
   });
 
@@ -125,7 +121,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <canvas ref="canvas" class="fit" />
+  <div class="fit relative-position">
+    <canvas ref="canvas" class="fit" />
+    <q-linear-progress
+      v-if="isLoadingStructures"
+      indeterminate
+      color="secondary"
+      size="lg"
+      class="absolute-bottom"
+    />
+  </div>
   <q-resize-observer @resize="onResize" />
 </template>
 

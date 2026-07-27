@@ -268,15 +268,11 @@ async function loadStructureGeometry(
  * @param scene Scene to sync.
  * @param alwaysPresentStructures Structures to keep in the scene at all times.
  * @param visibleStructures Structures that should be fully visible.
- * @param onProgress Called after each missing structure finishes importing
- * (whether it succeeded or failed), with the running and total count. Not
- * called at all if no structures need importing.
  */
 export async function syncStructureVisibility(
   scene: Scene,
   alwaysPresentStructures: StructureEntity[],
-  visibleStructures: StructureEntity[],
-  onProgress: (completed: number, total: number) => void
+  visibleStructures: StructureEntity[]
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
   const presentMeshes = childStructureMeshes(atlasRootNode);
@@ -332,21 +328,12 @@ export async function syncStructureVisibility(
     }
   }
 
-  if (pendingImports.length === 0) return;
-
   // Load every missing structure's geometry concurrently, and await them
   // collectively rather than one at a time.
-  let completed = 0;
-  onProgress(completed, pendingImports.length);
   await Promise.all(
-    pendingImports.map(async ({ structure, mesh }) => {
-      try {
-        await loadStructureGeometry(structure, mesh, scene);
-      } finally {
-        completed++;
-        onProgress(completed, pendingImports.length);
-      }
-    })
+    pendingImports.map(({ structure, mesh }) =>
+      loadStructureGeometry(structure, mesh, scene)
+    )
   );
 }
 
