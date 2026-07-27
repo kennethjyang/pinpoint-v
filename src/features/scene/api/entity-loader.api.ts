@@ -85,6 +85,11 @@ export function setAtlasRootReference(
  *
  * Missing structures are imported concurrently rather than one at a time, so
  * total load time is bound by the slowest structure rather than their sum.
+ * Every import runs to completion even if a sibling fails -- a failure only
+ * rejects the overall sync once every structure's placeholder has either
+ * been filled in or disposed, so no structure is left claimed by a
+ * permanently-invisible placeholder that a later sync would mistake for
+ * already present and never retry.
  *
  * Safe to call repeatedly and concurrently for the same desired state --
  * every phase up to and including alpha assignment runs synchronously, with
@@ -158,12 +163,20 @@ export async function syncStructureVisibility(
   }
 
   // Load every missing structure's geometry concurrently, and await them
-  // collectively rather than one at a time.
-  await Promise.all(
+  // collectively rather than one at a time. `allSettled` (not `all`) so a
+  // failing structure doesn't leave its still-loading siblings' placeholders
+  // dangling -- every import disposes its own placeholder on failure, but
+  // only once it's had the chance to run.
+  const results = await Promise.allSettled(
     pendingImports.map(({ structure, mesh }) =>
       loadStructureGeometry(structure, mesh, scene)
     )
   );
+
+  // Surface the first failure now that every import has settled, so callers
+  // can notify -- but without hiding a sync that otherwise succeeded.
+  const failure = results.find(result => result.status === "rejected");
+  if (failure) throw failure.reason;
 }
 
 /**

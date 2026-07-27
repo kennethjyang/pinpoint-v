@@ -24,6 +24,8 @@ describe("useCurrentExperimentStore", () => {
     setActivePinia(createPinia());
     vi.mocked(getDefaultStructureIdentifiers).mockReset();
     vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([]);
+    vi.mocked(getManifest).mockReset();
+    vi.mocked(getTerminologyRows).mockReset();
   });
 
   describe("create", () => {
@@ -147,6 +149,93 @@ describe("useCurrentExperimentStore", () => {
       expect(getDefaultStructureIdentifiers).toHaveBeenCalledWith(
         terminologyRows
       );
+    });
+
+    it("is [] while the manifest is still evaluating, even once terminologyRows has rows", async () => {
+      const terminologyRows = makeTerminologyRows();
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
+      vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
+      vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([7, 8]);
+
+      const store = useCurrentExperimentStore();
+      await flushPromises();
+      await flushPromises();
+      // terminologyRows has resolved with rows, but re-trigger evaluation by
+      // switching the atlas -- the guard must hold even once rows were
+      // previously populated, not just before their first resolution.
+      vi.mocked(getManifest).mockReturnValue(new Promise(() => {}));
+      store.create(
+        "New Experiment",
+        makeAtlas({ name: "allen_human" }),
+        [0, 0, 0]
+      );
+      await flushPromises();
+
+      expect(store.terminologyRows).toEqual(terminologyRows);
+      expect(store.areAtlasComponentsEvaluating).toBe(true);
+      expect(store.defaultStructureIdentifiers).toEqual([]);
+    });
+  });
+
+  describe("areAtlasComponentsEvaluating", () => {
+    it("is true while getManifest is still pending", async () => {
+      vi.mocked(getManifest).mockReturnValue(new Promise(() => {}));
+
+      const store = useCurrentExperimentStore();
+      // `computedAsync`'s `evaluating` flag flips on a microtask after the
+      // callback starts, not synchronously with store creation.
+      await flushPromises();
+
+      expect(store.areAtlasComponentsEvaluating).toBe(true);
+    });
+
+    it("is true while getTerminologyRows is still pending, once the manifest has resolved", async () => {
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
+      vi.mocked(getTerminologyRows).mockReturnValue(new Promise(() => {}));
+
+      const store = useCurrentExperimentStore();
+      // Let the manifest's own computedAsync resolve before checking that
+      // terminologyRows's own evaluating flag has taken over.
+      await flushPromises();
+
+      expect(store.manifest).not.toBeNull();
+      expect(store.areAtlasComponentsEvaluating).toBe(true);
+    });
+
+    it("is false once both the manifest and terminologyRows have resolved", async () => {
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
+      vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
+
+      const store = useCurrentExperimentStore();
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.areAtlasComponentsEvaluating).toBe(false);
+    });
+  });
+
+  describe("terminologyRows", () => {
+    it("is [] when getManifest resolves null, without calling getTerminologyRows", async () => {
+      vi.mocked(getManifest).mockResolvedValue(null);
+
+      const store = useCurrentExperimentStore();
+      await flushPromises();
+      await flushPromises();
+
+      expect(store.terminologyRows).toEqual([]);
+      expect(getTerminologyRows).not.toHaveBeenCalled();
+    });
+
+    it("calls getTerminologyRows with the resolved manifest", async () => {
+      const manifest = makeManifest();
+      vi.mocked(getManifest).mockResolvedValue(manifest);
+      vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
+
+      useCurrentExperimentStore();
+      await flushPromises();
+      await flushPromises();
+
+      expect(getTerminologyRows).toHaveBeenCalledWith(manifest);
     });
   });
 

@@ -501,17 +501,52 @@ describe("getManifest", () => {
       expect(await getManifest(s3Atlas)).toBeNull();
     });
 
-    it("returns null when the finest variant's manifest has no terminology or annotation set location", async () => {
+    it("returns null when the finest variant's manifest has no terminology location", async () => {
       mockBucket(LISTING_XML, {
         [MANIFEST_URL_100]: {
           name: "allen_mouse",
           resolution: [100, 100, 100],
-          shape: [132, 80, 114]
+          shape: [132, 80, 114],
+          terminology: {
+            location: "/terminologies/allen_mouse-terminology/3_0"
+          },
+          annotation_set: {
+            location: "/annotation-sets/allen_mouse-annotation/3_0"
+          }
         },
         [MANIFEST_URL_25]: {
           name: "allen_mouse",
           resolution: [25, 25, 25],
-          shape: [528, 320, 456]
+          shape: [528, 320, 456],
+          annotation_set: {
+            location: "/annotation-sets/allen_mouse-annotation/3_0"
+          }
+        }
+      });
+
+      expect(await getManifest(s3Atlas)).toBeNull();
+    });
+
+    it("returns null when the finest variant's manifest has no annotation set location", async () => {
+      mockBucket(LISTING_XML, {
+        [MANIFEST_URL_100]: {
+          name: "allen_mouse",
+          resolution: [100, 100, 100],
+          shape: [132, 80, 114],
+          terminology: {
+            location: "/terminologies/allen_mouse-terminology/3_0"
+          },
+          annotation_set: {
+            location: "/annotation-sets/allen_mouse-annotation/3_0"
+          }
+        },
+        [MANIFEST_URL_25]: {
+          name: "allen_mouse",
+          resolution: [25, 25, 25],
+          shape: [528, 320, 456],
+          terminology: {
+            location: "/terminologies/allen_mouse-terminology/3_0"
+          }
         }
       });
 
