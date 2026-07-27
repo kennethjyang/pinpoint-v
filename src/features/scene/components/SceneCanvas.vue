@@ -10,10 +10,10 @@ import {
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
   setAtlasRootReference,
-  setInitialZoom,
-  StructureEntity,
   syncStructureVisibility
-} from "@/features/scene";
+} from "../api/entity-loader.api";
+import { setInitialZoom } from "../api/camera.api";
+import { StructureEntity } from "../models/structure-entity.model";
 import { structureEntityFromIdentifier } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 

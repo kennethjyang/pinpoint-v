@@ -2,13 +2,13 @@ import { AutoReleaseWorkerPool } from "@babylonjs/core";
 import {
   createMeshSimplifyWorker,
   loadMeshSimplifyWorkerModule
-} from "@/features/scene";
+} from "../worker/mesh-simplify-host";
 import type {
   MeshSimplifyErrorResponse,
   MeshSimplifyRequest,
-  MeshSimplifyResponse,
-  SimplifiedGeometry
-} from "@/features/scene";
+  MeshSimplifyResponse
+} from "../worker/mesh-simplify.worker";
+import type { SimplifiedGeometry } from "../models/structure-entity.model";
 
 interface PendingRequest {
   resolve: (geometry: SimplifiedGeometry) => void;

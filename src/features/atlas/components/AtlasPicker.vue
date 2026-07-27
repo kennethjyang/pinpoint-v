@@ -1,8 +1,9 @@
 <script lang="ts" setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { Atlas, listAtlases, listAtlasesHTTP } from "@/features/atlas";
+import { Atlas } from "../models/atlas.model";
+import { listAtlases, listAtlasesHTTP } from "../api/source.api";
 import { computedAsync } from "@vueuse/core";
 
 enum SourceToggle {

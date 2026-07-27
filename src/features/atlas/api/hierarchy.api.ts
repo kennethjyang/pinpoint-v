@@ -1,4 +1,4 @@
-import { TerminologyRow } from "@/features/atlas";
+import { TerminologyRow } from "../models/terminology-row.model";
 
 /**
  * Presentation-ready tree node built from a {@link TerminologyRow}.

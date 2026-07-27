@@ -7,7 +7,7 @@ import {
   getTerminologyRows,
   listAtlases,
   listAtlasesHTTP
-} from "@/features/atlas";
+} from "./source.api";
 import { makeAtlas } from "@/test/fixtures";
 
 vi.mock("axios");

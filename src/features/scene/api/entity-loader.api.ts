@@ -1,17 +1,28 @@
+import type { AbstractMesh, IndicesArray, Scene } from "@babylonjs/core";
 import {
   DracoDecoder,
   Logger,
   Mesh,
   StandardMaterial,
   TransformNode,
+  Vector3,
   VertexBuffer,
-  VertexData,
-  Vector3
+  VertexData
 } from "@babylonjs/core";
-import type { AbstractMesh, IndicesArray, Scene } from "@babylonjs/core";
 import axios from "axios";
-import type { StructureEntity } from "@/features/scene";
-import { asrToBabylon, simplifyGeometryInWorker } from "@/features/scene";
+import type { StructureEntity } from "../models/structure-entity.model";
+import { asrToBabylon } from "./coordinate-transforms.api";
+import { simplifyGeometryInWorker } from "./mesh-simplify-pool.api";
+
+/**
+ * Decoded structure geometry, ready to hand off to the simplification
+ * worker: winding order corrected, and nanometer-scale coordinates converted
+ * to millimeters.
+ */
+interface DecodedMeshData {
+  positions: Float32Array;
+  indices: Uint32Array;
+}
 
 /** BrainGlobe v3 Draco meshes store positions in nanometers. */
 const NANOMETERS_TO_MILLIMETERS = 1e-6;
@@ -29,118 +40,6 @@ const STRUCTURE_MESH_SUFFIX = "_structure";
 const STRUCTURE_MATERIAL_SUFFIX = "_material";
 
 /**
- * Compute the vertex budget for a simplified mesh: at most
- * `MESH_VERTEX_KEEP_FRACTION` of the original, capped at `MESH_MAX_VERTICES`.
- * @param vertexCount Original vertex count.
- */
-export function targetVertexCount(vertexCount: number): number {
-  return Math.min(
-    Math.round(vertexCount * MESH_VERTEX_KEEP_FRACTION),
-    MESH_MAX_VERTICES
-  );
-}
-
-/**
- * Fetch a structure's raw Draco-compressed mesh bytes.
- * @param meshPath URL of the mesh to fetch.
- */
-export async function fetchMeshData(meshPath: string): Promise<ArrayBuffer> {
-  const response = await axios.get<ArrayBuffer>(meshPath, {
-    responseType: "arraybuffer"
-  });
-  return response.data;
-}
-
-/**
- * Flip a flat array of triangle indices' winding order in place.
- *
- * BrainGlobe meshes are wound for a right-handed system, but the scene is
- * left-handed; without this, faces are backface-culled and computed normals
- * point inward.
- * @param indices Flat triangle indices, mutated in place.
- */
-function flipIndicesWindingOrder(indices: IndicesArray): void {
-  for (let i = 0; i < indices.length; i += 3) {
-    const temp = indices[i + 1]!;
-    indices[i + 1] = indices[i + 2]!;
-    indices[i + 2] = temp;
-  }
-}
-
-/**
- * Flip a mesh's triangle winding order in place. See
- * {@link flipIndicesWindingOrder}.
- * @param mesh Mesh whose indices should be flipped.
- */
-export function flipWindingOrder(mesh: Mesh): void {
-  const indices = mesh.getIndices();
-  if (!indices) return;
-
-  const flipped = Array.from(indices);
-  flipIndicesWindingOrder(flipped);
-  mesh.setIndices(flipped);
-}
-
-/**
- * Decoded structure geometry, ready to hand off to the simplification
- * worker: winding order corrected, and nanometer-scale coordinates converted
- * to millimeters.
- */
-interface DecodedMeshData {
-  positions: Float32Array;
-  indices: Uint32Array;
-}
-
-/**
- * Decode raw Draco mesh data into flat vertex data, correcting its winding
- * order and converting its nanometer-scale coordinates to millimeters.
- * @param name Name for the decoded geometry.
- * @param data Raw Draco-compressed mesh bytes.
- * @param scene Scene to decode the mesh into.
- */
-export async function decodeMesh(
-  name: string,
-  data: ArrayBuffer,
-  scene: Scene
-): Promise<DecodedMeshData> {
-  const geometry = await DracoDecoder.Default.decodeMeshToGeometryAsync(
-    name,
-    scene,
-    data
-  );
-
-  const positions = Float32Array.from(
-    geometry.getVerticesData(VertexBuffer.PositionKind) ?? []
-  );
-  for (let i = 0; i < positions.length; i++) {
-    positions[i]! *= NANOMETERS_TO_MILLIMETERS;
-  }
-
-  const indices = Uint32Array.from(geometry.getIndices() ?? []);
-  flipIndicesWindingOrder(indices);
-
-  // The geometry is registered with the scene, but only its raw arrays are
-  // needed here -- dispose it now that they've been copied out.
-  geometry.dispose();
-
-  return { positions, indices };
-}
-
-/**
- * Build the atlas root node or return the existing one.
- * @param scene Babylon scene to get the atlas root node from.
- */
-function buildAtlasRootNode(scene: Scene): TransformNode {
-  let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
-  if (!atlasRootNode) {
-    atlasRootNode = new TransformNode("atlasRoot_node", scene);
-    atlasRootNode.rotation = new Vector3(Math.PI, 0, 0);
-  }
-
-  return atlasRootNode;
-}
-
-/**
  * Offset the atlas root node so the given reference coordinate sits at the
  * scene origin.
  *
@@ -154,96 +53,6 @@ export function setAtlasRootReference(
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
   atlasRootNode.position = asrToBabylon(referenceCoordinate).negate();
-}
-
-/**
- * Synchronously create a structure's mesh and material, parented under the
- * atlas root, with no geometry yet -- hidden until
- * {@link loadStructureGeometry} fills it in.
- *
- * Kept synchronous (no awaits) so a mesh exists under `atlasRootNode` the
- * instant a structure is claimed, before anything yields to the event loop.
- * That's what lets an overlapping {@link syncStructureVisibility} call see
- * this structure as already accounted for instead of importing it again.
- *
- * @param structure Entity information for the structure.
- * @param atlasRootNode Atlas root node to parent the structure under.
- * @param scene Scene to add the structure to.
- */
-function buildStructureMesh(
-  structure: StructureEntity,
-  atlasRootNode: TransformNode,
-  scene: Scene
-): Mesh {
-  const mesh = new Mesh(structureMeshName(structure.identifier), scene);
-  mesh.parent = atlasRootNode;
-  mesh.isVisible = false;
-
-  const material = new StandardMaterial(
-    structureMaterialName(structure.identifier),
-    scene
-  );
-  material.diffuseColor = structure.color;
-  mesh.material = material;
-
-  return mesh;
-}
-
-/**
- * Fetch, decode, and simplify a structure's mesh geometry, then apply it to
- * its (already-present) placeholder mesh and reveal it.
- *
- * Fetching and Draco decoding happen on the main thread (Draco already runs
- * its own worker pool internally); the compute-heavy simplification is
- * delegated to {@link simplifyGeometryInWorker} so many structures can load
- * concurrently without blocking the main thread.
- *
- * Bails out after each await if `mesh` was disposed in the meantime -- a
- * later sync decided this structure is no longer desired, so its geometry
- * shouldn't resurrect it.
- *
- * @param structure Entity information for the structure.
- * @param mesh Placeholder mesh created by {@link buildStructureMesh}.
- * @param scene Scene the structure is being added to.
- */
-async function loadStructureGeometry(
-  structure: StructureEntity,
-  mesh: Mesh,
-  scene: Scene
-) {
-  try {
-    const data = await fetchMeshData(structure.meshPath);
-    if (mesh.isDisposed()) return;
-
-    const decoded = await decodeMesh(
-      `${structure.identifier}_geometry`,
-      data,
-      scene
-    );
-    if (mesh.isDisposed()) return;
-
-    const simplified = await simplifyGeometryInWorker(
-      decoded.positions,
-      decoded.indices,
-      targetVertexCount(decoded.positions.length / 3)
-    );
-    if (mesh.isDisposed()) return;
-
-    const vertexData = new VertexData();
-    vertexData.positions = simplified.positions;
-    vertexData.normals = simplified.normals;
-    vertexData.indices = simplified.indices;
-    vertexData.applyToMesh(mesh);
-    mesh.isVisible = true;
-  } catch (error) {
-    // Skip structures that fail to load, but don't hide why. Dispose the
-    // placeholder too so a later sync retries rather than leaving an empty,
-    // permanently-hidden mesh behind.
-    mesh.dispose(false, true);
-    Logger.Warn(
-      `Failed to import structure ${structure.identifier}: ${String(error)}`
-    );
-  }
 }
 
 /**
@@ -338,6 +147,22 @@ export async function syncStructureVisibility(
 }
 
 /**
+ * Build the atlas root node or return the existing one.
+ *
+ * Shared by both exported functions above.
+ * @param scene Babylon scene to get the atlas root node from.
+ */
+function buildAtlasRootNode(scene: Scene): TransformNode {
+  let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
+  if (!atlasRootNode) {
+    atlasRootNode = new TransformNode("atlasRoot_node", scene);
+    atlasRootNode.rotation = new Vector3(Math.PI, 0, 0);
+  }
+
+  return atlasRootNode;
+}
+
+/**
  * Map the atlas root's direct structure-mesh children by name.
  * @param atlasRootNode Atlas root node to read structure meshes from.
  */
@@ -348,6 +173,170 @@ function childStructureMeshes(
     atlasRootNode
       .getChildMeshes(true, node => node.name.endsWith(STRUCTURE_MESH_SUFFIX))
       .map(mesh => [mesh.name, mesh])
+  );
+}
+
+/**
+ * Synchronously create a structure's mesh and material, parented under the
+ * atlas root, with no geometry yet -- hidden until
+ * {@link loadStructureGeometry} fills it in.
+ *
+ * Kept synchronous (no awaits) so a mesh exists under `atlasRootNode` the
+ * instant a structure is claimed, before anything yields to the event loop.
+ * That's what lets an overlapping {@link syncStructureVisibility} call see
+ * this structure as already accounted for instead of importing it again.
+ *
+ * @param structure Entity information for the structure.
+ * @param atlasRootNode Atlas root node to parent the structure under.
+ * @param scene Scene to add the structure to.
+ */
+function buildStructureMesh(
+  structure: StructureEntity,
+  atlasRootNode: TransformNode,
+  scene: Scene
+): Mesh {
+  const mesh = new Mesh(structureMeshName(structure.identifier), scene);
+  mesh.parent = atlasRootNode;
+  mesh.isVisible = false;
+
+  const material = new StandardMaterial(
+    structureMaterialName(structure.identifier),
+    scene
+  );
+  material.diffuseColor = structure.color;
+  mesh.material = material;
+
+  return mesh;
+}
+
+/**
+ * Fetch, decode, and simplify a structure's mesh geometry, then apply it to
+ * its (already-present) placeholder mesh and reveal it.
+ *
+ * Fetching and Draco decoding happen on the main thread (Draco already runs
+ * its own worker pool internally); the compute-heavy simplification is
+ * delegated to {@link simplifyGeometryInWorker} so many structures can load
+ * concurrently without blocking the main thread.
+ *
+ * Bails out after each await if `mesh` was disposed in the meantime -- a
+ * later sync decided this structure is no longer desired, so its geometry
+ * shouldn't resurrect it.
+ *
+ * @param structure Entity information for the structure.
+ * @param mesh Placeholder mesh created by {@link buildStructureMesh}.
+ * @param scene Scene the structure is being added to.
+ */
+async function loadStructureGeometry(
+  structure: StructureEntity,
+  mesh: Mesh,
+  scene: Scene
+) {
+  try {
+    const data = await fetchMeshData(structure.meshPath);
+    if (mesh.isDisposed()) return;
+
+    const decoded = await decodeMesh(
+      `${structure.identifier}_geometry`,
+      data,
+      scene
+    );
+    if (mesh.isDisposed()) return;
+
+    const simplified = await simplifyGeometryInWorker(
+      decoded.positions,
+      decoded.indices,
+      targetVertexCount(decoded.positions.length / 3)
+    );
+    if (mesh.isDisposed()) return;
+
+    const vertexData = new VertexData();
+    vertexData.positions = simplified.positions;
+    vertexData.normals = simplified.normals;
+    vertexData.indices = simplified.indices;
+    vertexData.applyToMesh(mesh);
+    mesh.isVisible = true;
+  } catch (error) {
+    // Skip structures that fail to load, but don't hide why. Dispose the
+    // placeholder too so a later sync retries rather than leaving an empty,
+    // permanently-hidden mesh behind.
+    mesh.dispose(false, true);
+    Logger.Warn(
+      `Failed to import structure ${structure.identifier}: ${String(error)}`
+    );
+  }
+}
+
+/**
+ * Fetch a structure's raw Draco-compressed mesh bytes.
+ * @param meshPath URL of the mesh to fetch.
+ */
+async function fetchMeshData(meshPath: string): Promise<ArrayBuffer> {
+  const response = await axios.get<ArrayBuffer>(meshPath, {
+    responseType: "arraybuffer"
+  });
+  return response.data;
+}
+
+/**
+ * Decode raw Draco mesh data into flat vertex data, correcting its winding
+ * order and converting its nanometer-scale coordinates to millimeters.
+ * @param name Name for the decoded geometry.
+ * @param data Raw Draco-compressed mesh bytes.
+ * @param scene Scene to decode the mesh into.
+ */
+async function decodeMesh(
+  name: string,
+  data: ArrayBuffer,
+  scene: Scene
+): Promise<DecodedMeshData> {
+  const geometry = await DracoDecoder.Default.decodeMeshToGeometryAsync(
+    name,
+    scene,
+    data
+  );
+
+  const positions = Float32Array.from(
+    geometry.getVerticesData(VertexBuffer.PositionKind) ?? []
+  );
+  for (let i = 0; i < positions.length; i++) {
+    positions[i]! *= NANOMETERS_TO_MILLIMETERS;
+  }
+
+  const indices = Uint32Array.from(geometry.getIndices() ?? []);
+  flipIndicesWindingOrder(indices);
+
+  // The geometry is registered with the scene, but only its raw arrays are
+  // needed here -- dispose it now that they've been copied out.
+  geometry.dispose();
+
+  return { positions, indices };
+}
+
+/**
+ * Flip a flat array of triangle indices' winding order in place.
+ *
+ * BrainGlobe meshes are wound for a right-handed system, but the scene is
+ * left-handed; without this, faces are backface-culled and computed normals
+ * point inward.
+ * @param indices Flat triangle indices, mutated in place.
+ */
+function flipIndicesWindingOrder(indices: IndicesArray): void {
+  for (let i = 0; i < indices.length; i += 3) {
+    const temp = indices[i + 1]!;
+    indices[i + 1] = indices[i + 2]!;
+    indices[i + 2] = temp;
+  }
+}
+
+/**
+ * Compute the vertex budget for a simplified mesh: at most
+ * `MESH_VERTEX_KEEP_FRACTION` of the original, capped at `MESH_MAX_VERTICES`.
+ * @param vertexCount Original vertex count.
+ */
+function targetVertexCount(vertexCount: number): number {
+  return Math.min(
+    Math.round(vertexCount * MESH_VERTEX_KEEP_FRACTION),
+    MESH_MAX_VERTICES
   );
 }
 
