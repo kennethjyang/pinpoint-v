@@ -109,6 +109,9 @@ describe("NewExperimentDialog", () => {
       expect(store.name).toBe("My Experiment");
       expect(store.atlas).toEqual(atlas);
       expect(store.referenceCoordinate).toEqual([1, 1, 1]);
+      // Closing is now driven by `onDialogOK` (so the splash dialog that
+      // opened this one can close itself too), not `v-close-popup`.
+      expect(wrapper.emitted("ok")).toBeTruthy();
     });
 
     it("falls back to [0, 0, 0] when the manifest can't be fetched", async () => {
@@ -137,6 +140,7 @@ describe("NewExperimentDialog", () => {
       await flush();
 
       expect(createSpy).not.toHaveBeenCalled();
+      expect(wrapper.emitted("ok")).toBeFalsy();
     });
   });
 });
