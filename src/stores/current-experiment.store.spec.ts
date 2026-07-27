@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createApp } from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
 import {
@@ -144,6 +146,34 @@ describe("useCurrentExperimentStore", () => {
       expect(getDefaultStructureIdentifiers).toHaveBeenCalledWith(
         terminologyRows
       );
+    });
+  });
+
+  describe("persistence", () => {
+    it("only writes experiment to storage, not the computedAsync-derived state", async () => {
+      const terminologyRows = makeTerminologyRows();
+      vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
+      localStorage.removeItem("current-experiment");
+
+      // The default `beforeEach` pinia has no persistence plugin -- build
+      // one here so `$subscribe`-driven writes to `localStorage` happen as
+      // they would in the app. Pinia only activates plugins registered
+      // before an app installs it, so a bare `setActivePinia` (skipping
+      // `app.use`) would silently no-op the persistence plugin.
+      const pinia = createPinia();
+      pinia.use(piniaPluginPersistedstate);
+      createApp({}).use(pinia);
+      setActivePinia(pinia);
+
+      const store = useCurrentExperimentStore();
+      await flushPromises();
+
+      // `terminologyRows` is populated (proving it isn't just absent because
+      // it hasn't resolved yet), but only `experiment` should have been
+      // written to storage.
+      expect(store.terminologyRows).toEqual(terminologyRows);
+      const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
+      expect(Object.keys(persisted)).toEqual(["experiment"]);
     });
   });
 });

@@ -80,16 +80,24 @@ onMounted(async () => {
     const scene = runtime.scene.value;
     if (!scene) return;
 
-    $q.loadingBar.start(0);
+    // Only start the loading bar once there's actually something to import
+    // -- a sync that finds everything already present shouldn't flash it.
+    let barStarted = false;
     try {
       await syncStructureVisibility(
         scene,
         alwaysPresentStructures.value,
         visibleStructures.value,
-        (completed, total) => $q.loadingBar.increment((completed / total) * 100)
+        (completed, total) => {
+          if (!barStarted) {
+            barStarted = true;
+            $q.loadingBar.start(0);
+          }
+          $q.loadingBar.increment((completed / total) * 100);
+        }
       );
     } finally {
-      $q.loadingBar.stop();
+      if (barStarted) $q.loadingBar.stop();
     }
   });
 

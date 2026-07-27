@@ -444,6 +444,9 @@ describe("syncStructureVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren()).toEqual([]);
+    // The placeholder mesh created up front, and its material, must not
+    // linger once the import that would have filled it in fails.
+    expect(scene.materials).toEqual([]);
   });
 
   it("swallows a failed decode and adds nothing to the scene", async () => {
@@ -457,6 +460,7 @@ describe("syncStructureVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.getChildren()).toEqual([]);
+    expect(scene.materials).toEqual([]);
 
     decodeSpy.mockRestore();
   });
@@ -519,6 +523,96 @@ describe("syncStructureVisibility", () => {
         .map(c => c.name)
         .sort()
     ).toEqual(["1_structure", "2_structure"]);
+  });
+
+  it("imports a structure only once when two syncs overlap for it", async () => {
+    const scene = makeScene();
+    stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    // Gate the fetch so the first sync's import is still in flight when the
+    // second sync starts -- reproducing the reported race, where an
+    // overlapping call used to see an empty scene and import again.
+    let resolveFetch!: (value: { data: ArrayBuffer }) => void;
+    mockedGet.mockImplementation(
+      () => new Promise(resolve => (resolveFetch = resolve))
+    );
+
+    const first = syncStructureVisibility(scene, [], [structure], vi.fn());
+    await Promise.resolve(); // let the first sync claim its placeholder mesh
+    const second = syncStructureVisibility(scene, [], [structure], vi.fn());
+
+    resolveFetch({ data: new ArrayBuffer(0) });
+    await Promise.all([first, second]);
+
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    expect(
+      atlasRootNode.getChildren().filter(c => c.name === "1_structure")
+    ).toHaveLength(1);
+    expect(scene.materials.filter(m => m.name === "1_material")).toHaveLength(
+      1
+    );
+  });
+
+  it("sets a faded structure's alpha before its geometry has loaded", async () => {
+    const scene = makeScene();
+    stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    let resolveFetch!: (value: { data: ArrayBuffer }) => void;
+    mockedGet.mockImplementation(
+      () => new Promise(resolve => (resolveFetch = resolve))
+    );
+
+    const syncPromise = syncStructureVisibility(
+      scene,
+      [structure],
+      [],
+      vi.fn()
+    );
+    await Promise.resolve();
+
+    // The placeholder's material must already be at the assigned alpha
+    // before the fetch (or anything after it) resolves -- a structure should
+    // never render at a material's default alpha while it loads.
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.material!.alpha).toBe(0.1);
+    expect(mesh.isVisible).toBe(false);
+
+    resolveFetch({ data: new ArrayBuffer(0) });
+    await syncPromise;
+    expect(mesh.isVisible).toBe(true);
+  });
+
+  it("does not resurrect a structure that a later sync removed while its import was in flight", async () => {
+    const scene = makeScene();
+    stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    let resolveFetch!: (value: { data: ArrayBuffer }) => void;
+    mockedGet.mockImplementation(
+      () => new Promise(resolve => (resolveFetch = resolve))
+    );
+
+    const first = syncStructureVisibility(scene, [], [structure], vi.fn());
+    await Promise.resolve();
+
+    // The structure is no longer desired by the time the second sync runs,
+    // so it disposes the still-loading placeholder mesh.
+    const second = syncStructureVisibility(scene, [], [], vi.fn());
+
+    resolveFetch({ data: new ArrayBuffer(0) });
+    await Promise.all([first, second]);
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    expect(
+      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+    ).toBe(false);
+    expect(scene.materials).toEqual([]);
   });
 
   it("reports progress once per missing structure, up to the total", async () => {

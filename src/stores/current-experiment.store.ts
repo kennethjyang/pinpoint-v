@@ -183,5 +183,14 @@ export const useCurrentExperimentStore = defineStore(
       clearVisibleStructures
     };
   },
-  { persist: true }
+  {
+    // Only `experiment` is real state. `metadata`, `manifest`, and
+    // `terminologyRows` are `computedAsync`, which returns a plain
+    // `shallowRef` -- pinia's `isComputed` check can't tell that apart from
+    // state (it looks for a `.effect` property, which only a `computed`
+    // has), so without this `pick` the entire fetched terminology CSV would
+    // be persisted to `localStorage` and hydrated back on startup, ahead of
+    // (and then overwritten by) the actual fetch.
+    persist: { pick: ["experiment"] }
+  }
 );
