@@ -11,11 +11,16 @@ import {
   Manifest
 } from "@/features/atlas";
 
-/**
- * Default reference coordinate for the starter experiment's atlas
- * (`allen_mouse`'s default reference coordinate, in ASR, mm).
- */
-const DEFAULT_REFERENCE_COORDINATE: [number, number, number] = [5.7, 0.44, 5.4];
+// Hardcoded first experiment.
+const MY_FIRST_EXPERIMENT: Experiment = {
+  name: "My First Experiment",
+  atlas: {
+    source: BRAINGLOBE_BASE_URL,
+    name: "allen_mouse"
+  },
+  referenceCoordinate: [5.7, 0.44, 5.4],
+  visibleStructures: []
+};
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
@@ -23,15 +28,7 @@ export const useCurrentExperimentStore = defineStore(
     /**
      * Current experiment instance.
      */
-    const experiment = ref<Experiment>({
-      name: "My First Experiment",
-      atlas: {
-        source: BRAINGLOBE_BASE_URL,
-        name: "allen_mouse"
-      },
-      referenceCoordinate: DEFAULT_REFERENCE_COORDINATE,
-      visibleStructures: []
-    });
+    const experiment = ref<Experiment>(MY_FIRST_EXPERIMENT);
 
     /**
      * Create a new experiment with the given name, atlas, and reference
