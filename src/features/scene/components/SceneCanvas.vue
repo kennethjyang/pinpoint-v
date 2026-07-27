@@ -33,12 +33,12 @@ const isLoadingStructures = ref(false);
  * not visible instead of being removed.
  */
 const alwaysPresentStructures = computed<StructureEntity[]>(() => {
-  const { atlas, terminologyRows } = currentExperiment;
-  if (!atlas || !terminologyRows) return [];
+  const { manifest, terminologyRows } = currentExperiment;
+  if (!manifest || !terminologyRows) return [];
 
   return currentExperiment.defaultStructureIdentifiers.flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
-      atlas,
+      manifest,
       terminologyRows,
       identifier
     );
@@ -50,12 +50,12 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
  * Structures the current experiment has marked visible.
  */
 const visibleStructures = computed<StructureEntity[]>(() => {
-  const { atlas, terminologyRows } = currentExperiment;
-  if (!atlas || !terminologyRows) return [];
+  const { manifest, terminologyRows } = currentExperiment;
+  if (!manifest || !terminologyRows) return [];
 
   return currentExperiment.visibleStructures.flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
-      atlas,
+      manifest,
       terminologyRows,
       identifier
     );

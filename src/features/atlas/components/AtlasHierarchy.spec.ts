@@ -6,7 +6,7 @@ import AtlasHierarchy from "./AtlasHierarchy.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getManifest, getTerminologyRows } from "../api/source.api";
-import { makeTerminologyRows } from "@/test/fixtures";
+import { makeManifest, makeTerminologyRows } from "@/test/fixtures";
 
 /**
  * `QVirtualScroll` only renders the rows that fit its measured scroll
@@ -37,7 +37,7 @@ vi.mock("../api/source.api", async () => {
     await vi.importActual<typeof import("../api/source.api")>(
       "../api/source.api"
     );
-  return { ...actual, getTerminologyRows: vi.fn(), getManifest: vi.fn() };
+  return { ...actual, getManifest: vi.fn(), getTerminologyRows: vi.fn() };
 });
 
 async function mountHierarchy() {
@@ -47,6 +47,9 @@ async function mountHierarchy() {
     pinia,
     global: { stubs: { QVirtualScroll: QVirtualScrollStub } }
   });
+  // terminologyRows depends on manifest resolving first, so flush an extra
+  // microtask round for that hop to settle.
+  await flushPromises();
   await flushPromises();
   await wrapper.vm.$nextTick();
   return wrapper;
@@ -54,10 +57,10 @@ async function mountHierarchy() {
 
 describe("AtlasHierarchy", () => {
   beforeEach(() => {
+    vi.mocked(getManifest).mockReset();
+    vi.mocked(getManifest).mockResolvedValue(makeManifest());
     vi.mocked(getTerminologyRows).mockReset();
     vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
-    vi.mocked(getManifest).mockReset();
-    vi.mocked(getManifest).mockResolvedValue(null);
   });
 
   it("renders the q-tree (not the virtual scroll) when the filter is empty", async () => {
@@ -156,6 +159,7 @@ describe("AtlasHierarchy", () => {
       global: { stubs: { QVirtualScroll: QVirtualScrollStub } }
     });
 
+    await flushPromises();
     await flushPromises();
     await wrapper.vm.$nextTick();
 

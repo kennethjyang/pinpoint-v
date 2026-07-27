@@ -74,7 +74,8 @@ export const useCurrentExperimentStore = defineStore(
      * Fetch the terminology rows which provide the regions of the atlas.
      */
     const terminologyRows = computedAsync(
-      async () => await getTerminologyRows(atlas.value),
+      async () =>
+        manifest.value ? await getTerminologyRows(manifest.value) : [],
       []
     );
 

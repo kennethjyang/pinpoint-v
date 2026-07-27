@@ -6,9 +6,10 @@ import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
 import {
   getDefaultStructureIdentifiers,
+  getManifest,
   getTerminologyRows
 } from "@/features/atlas";
-import { makeAtlas, makeTerminologyRows } from "@/test/fixtures";
+import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
 
 vi.mock("@/features/atlas", () => ({
   BRAINGLOBE_BASE_URL:
@@ -22,6 +23,7 @@ describe("useCurrentExperimentStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(getDefaultStructureIdentifiers).mockReset();
+    vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([]);
   });
 
   describe("create", () => {
@@ -127,10 +129,15 @@ describe("useCurrentExperimentStore", () => {
 
     it("delegates to getDefaultStructureIdentifiers once terminologyRows resolves", async () => {
       const terminologyRows = makeTerminologyRows();
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
       vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
       vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([7, 8]);
 
       const store = useCurrentExperimentStore();
+      // terminologyRows now depends on manifest, which resolves through its
+      // own computedAsync first, so flush an extra microtask round for that
+      // hop to settle before terminologyRows's callback re-runs.
+      await flushPromises();
       await flushPromises();
 
       expect(store.terminologyRows).toEqual(terminologyRows);
@@ -146,6 +153,7 @@ describe("useCurrentExperimentStore", () => {
   describe("persistence", () => {
     it("only writes experiment to storage, not the computedAsync-derived state", async () => {
       const terminologyRows = makeTerminologyRows();
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
       vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
       localStorage.removeItem("current-experiment");
 
@@ -160,6 +168,9 @@ describe("useCurrentExperimentStore", () => {
       setActivePinia(pinia);
 
       const store = useCurrentExperimentStore();
+      // terminologyRows now depends on manifest resolving first - see the
+      // defaultStructureIdentifiers test above.
+      await flushPromises();
       await flushPromises();
 
       // `terminologyRows` is populated (proving it isn't just absent because

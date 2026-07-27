@@ -98,7 +98,7 @@ describe("NewExperimentDialog", () => {
     it("seeds the reference coordinate from the atlas's manifest when available", async () => {
       const atlas = makeAtlas();
       const manifest = makeManifest({
-        name: "allen_human",
+        atlas: makeAtlas({ name: "allen_human" }),
         resolutions: [[0.02, 0.02, 0.02]],
         shape: [[100, 100, 100]]
       });
