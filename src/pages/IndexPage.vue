@@ -6,6 +6,7 @@ import { NewExperimentDialog } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
+import { SplashDialog } from "@/features/splash";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -15,10 +16,10 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("atlas");
+const tab = ref("scene");
 
 // Show splash.
-// $q.dialog({ component: NewExperimentDialog });
+$q.dialog({ component: SplashDialog });
 
 /**
  * Toggle left drawer open state.
