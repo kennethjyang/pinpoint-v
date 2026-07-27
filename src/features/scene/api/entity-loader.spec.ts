@@ -371,6 +371,7 @@ describe("syncStructureVisibility", () => {
     const scene = makeScene();
     mockedGet.mockRejectedValue(new Error("network error"));
     const structure = makeStructureEntity({ identifier: 1 });
+    const warnSpy = vi.spyOn(Logger, "Warn").mockImplementation(() => {});
 
     await syncStructureVisibility(scene, [], [structure]);
 
@@ -379,6 +380,8 @@ describe("syncStructureVisibility", () => {
     // The placeholder mesh created up front, and its material, must not
     // linger once the import that would have filled it in fails.
     expect(scene.materials).toEqual([]);
+
+    warnSpy.mockRestore();
   });
 
   it("swallows a failed decode and adds nothing to the scene", async () => {
@@ -387,6 +390,7 @@ describe("syncStructureVisibility", () => {
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockRejectedValue(new Error("bad draco data"));
     const structure = makeStructureEntity({ identifier: 1 });
+    const warnSpy = vi.spyOn(Logger, "Warn").mockImplementation(() => {});
 
     await syncStructureVisibility(scene, [], [structure]);
 
@@ -394,6 +398,7 @@ describe("syncStructureVisibility", () => {
     expect(atlasRootNode.getChildren()).toEqual([]);
     expect(scene.materials).toEqual([]);
 
+    warnSpy.mockRestore();
     decodeSpy.mockRestore();
   });
 
