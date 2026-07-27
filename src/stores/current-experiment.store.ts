@@ -5,6 +5,7 @@ import { Experiment } from "@/features/experiment";
 import {
   Atlas,
   BRAINGLOBE_BASE_URL,
+  getAtlasCenter,
   getDefaultStructureIdentifiers,
   getManifest,
   getTerminologyRows,
@@ -113,6 +114,15 @@ export const useCurrentExperimentStore = defineStore(
     );
 
     /**
+     * Current experiment's atlas center.
+     */
+    const atlasCenter = computed<[number, number, number]>(() =>
+      manifest.value && !areAtlasComponentsEvaluating.value
+        ? getAtlasCenter(manifest.value)
+        : [0, 0, 0]
+    );
+
+    /**
      * Set the reference coordinate of the experiment.
      * @param referenceCoordinate Reference coordinate (in ASR, mm) that the
      * atlas root should be offset by.
@@ -184,6 +194,7 @@ export const useCurrentExperimentStore = defineStore(
       terminologyRows,
       areAtlasComponentsEvaluating,
       defaultStructureIdentifiers,
+      atlasCenter,
       setReferenceCoordinate,
       referenceCoordinate,
       isStructureVisible,

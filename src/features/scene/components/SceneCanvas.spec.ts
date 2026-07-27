@@ -10,7 +10,7 @@ import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   removeAllStructures,
-  setAtlasRootReference,
+  setAtlasCenterOffset,
   syncStructureVisibility
 } from "../api/entity-loader.api";
 import { setInitialZoom } from "../api/camera.api";
@@ -19,8 +19,8 @@ import {
   getTerminologyRows,
   structureEntityFromIdentifier
 } from "@/features/atlas";
-import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
+import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
 
 vi.mock("../api/entity-loader.api", async () => {
@@ -127,7 +127,7 @@ describe("SceneCanvas", () => {
     vi.mocked(structureEntityFromIdentifier).mockReturnValue(null);
     vi.mocked(syncStructureVisibility).mockReset();
     vi.mocked(syncStructureVisibility).mockResolvedValue(undefined);
-    vi.mocked(setAtlasRootReference).mockReset();
+    vi.mocked(setAtlasCenterOffset).mockReset();
     vi.mocked(removeAllStructures).mockReset();
     vi.mocked(setInitialZoom).mockReset();
   });
@@ -226,7 +226,7 @@ describe("SceneCanvas", () => {
     await mountCanvas();
 
     const store = useCurrentExperimentStore();
-    expect(setAtlasRootReference).toHaveBeenCalledWith(
+    expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
       store.referenceCoordinate
     );
@@ -234,13 +234,13 @@ describe("SceneCanvas", () => {
 
   it("re-sets the atlas root reference when it changes", async () => {
     await mountCanvas();
-    vi.mocked(setAtlasRootReference).mockClear();
+    vi.mocked(setAtlasCenterOffset).mockClear();
 
     const store = useCurrentExperimentStore();
     store.setReferenceCoordinate([1, 2, 3]);
     await flushPromises();
 
-    expect(setAtlasRootReference).toHaveBeenCalledWith(
+    expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
       [1, 2, 3]
     );

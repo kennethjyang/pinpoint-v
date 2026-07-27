@@ -16,7 +16,7 @@ import {
 } from "@babylonjs/core";
 import {
   removeAllStructures,
-  setAtlasRootReference,
+  setAtlasCenterOffset,
   syncStructureVisibility
 } from "./entity-loader.api";
 import type { StructureEntity } from "../models/structure-entity.model";
@@ -667,7 +667,7 @@ describe("setAtlasRootReference", () => {
   it("creates the atlas root node with the expected rotation", () => {
     const scene = makeScene();
 
-    setAtlasRootReference(scene, [0, 0, 0]);
+    setAtlasCenterOffset(scene, [0, 0, 0]);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(atlasRootNode.rotation.equals(new Vector3(Math.PI, 0, 0))).toBe(
@@ -679,7 +679,7 @@ describe("setAtlasRootReference", () => {
     const scene = makeScene();
     const reference: [number, number, number] = [5.7, 0.44, 5.4];
 
-    setAtlasRootReference(scene, reference);
+    setAtlasCenterOffset(scene, reference);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(
@@ -690,9 +690,9 @@ describe("setAtlasRootReference", () => {
   it("reuses the existing atlas root node on a second call", () => {
     const scene = makeScene();
 
-    setAtlasRootReference(scene, [1, 2, 3]);
+    setAtlasCenterOffset(scene, [1, 2, 3]);
     const first = scene.getTransformNodeByName("atlasRoot_node");
-    setAtlasRootReference(scene, [4, 5, 6]);
+    setAtlasCenterOffset(scene, [4, 5, 6]);
     const second = scene.getTransformNodeByName("atlasRoot_node");
 
     expect(first).toBe(second);
