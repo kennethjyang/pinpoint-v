@@ -9,7 +9,6 @@ import {
   Vector3,
   WebGPUEngine
 } from "@babylonjs/core";
-import { disposeMeshSimplifyPool } from "@/features/scene";
 
 /**
  * Service creator. Hosts the references to the engine and scene.
@@ -82,7 +81,6 @@ export function createBabylonRuntimeService() {
    * Cleanup this runtime.
    */
   function dispose() {
-    disposeMeshSimplifyPool();
     gizmoManager.value?.dispose();
     camera.value?.dispose();
     scene.value?.dispose();
