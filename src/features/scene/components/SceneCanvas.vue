@@ -9,6 +9,7 @@ import {
 } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
 import {
+  removeAllStructures,
   setAtlasRootReference,
   syncStructureVisibility
 } from "../api/entity-loader.api";
@@ -112,6 +113,15 @@ onMounted(async () => {
     if (!camera || !currentExperiment.manifest) return;
 
     setInitialZoom(currentExperiment.manifest, camera);
+  });
+
+  // Clear the scene whenever the atlas changes.
+  watchEffect(() => {
+    const scene = runtime.scene.value;
+    const atlas = currentExperiment.atlas;
+    if (!scene || !atlas) return;
+
+    removeAllStructures(scene);
   });
 });
 

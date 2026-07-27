@@ -168,6 +168,18 @@ export async function syncStructureVisibility(
 }
 
 /**
+ * Clear the structures in the scene.
+ * @param scene Scene to clear structures for.
+ */
+export function removeAllStructures(scene: Scene) {
+  const atlasRootNode = buildAtlasRootNode(scene);
+  const children = childStructureMeshes(atlasRootNode);
+  for (const [_, mesh] of children) {
+    mesh.dispose(false, true);
+  }
+}
+
+/**
  * Build the atlas root node or return the existing one.
  *
  * Shared by both exported functions above.
