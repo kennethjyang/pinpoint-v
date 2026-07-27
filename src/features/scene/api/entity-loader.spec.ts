@@ -12,7 +12,8 @@ import {
   StandardMaterial,
   Vector3,
   VertexBuffer,
-  VertexData
+  VertexData,
+  WorkerPool
 } from "@babylonjs/core";
 import {
   setAtlasRootReference,
@@ -22,6 +23,15 @@ import type { StructureEntity } from "../models/structure-entity.model";
 import { asrToBabylon } from "./coordinate-transforms.api";
 
 vi.mock("axios");
+
+// Every test spies on `decodeMeshToGeometryAsync` directly, so the codec's
+// own worker pool is never exercised -- but merely accessing
+// `DracoDecoder.Default` still lazily constructs it, and its default
+// configuration would fetch the real wasm binary from
+// cdn.babylonjs.com. Supplying an (unused) empty worker pool short-circuits
+// that construction with no network access.
+DracoDecoder.ResetDefault(true);
+DracoDecoder.DefaultConfiguration = { workerPool: new WorkerPool([]) };
 
 function makeStructureEntity(
   overrides: Partial<StructureEntity> = {}
