@@ -30,7 +30,7 @@ vi.mock("../api/entity-loader.api", async () => {
   return {
     ...actual,
     syncStructureVisibility: vi.fn(),
-    setAtlasRootReference: vi.fn(),
+    setAtlasCenterOffset: vi.fn(),
     removeAllStructures: vi.fn()
   };
 });
@@ -215,34 +215,62 @@ describe("SceneCanvas", () => {
     await flushPromises();
 
     expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ color: "negative" })
+      expect.objectContaining({ color: "warning" })
     );
     expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
       false
     );
   });
 
-  it("sets the atlas root reference from the experiment's reference coordinate", async () => {
+  it("offsets the atlas root by the atlas center once the manifest resolves", async () => {
     await mountCanvas();
 
     const store = useCurrentExperimentStore();
     expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
-      store.referenceCoordinate
+      store.atlasCenter
     );
   });
 
-  it("re-sets the atlas root reference when it changes", async () => {
+  it("re-offsets when the experiment's atlas changes", async () => {
     await mountCanvas();
     vi.mocked(setAtlasCenterOffset).mockClear();
 
+    const manifest = makeManifest({
+      resolutions: [[0.02, 0.02, 0.02]],
+      shape: [[100, 100, 100]]
+    });
+    vi.mocked(getManifest).mockResolvedValue(manifest);
+
     const store = useCurrentExperimentStore();
-    store.setReferenceCoordinate([1, 2, 3]);
+    store.create(
+      "New Experiment",
+      makeAtlas({ name: "allen_human" }),
+      [0, 0, 0]
+    );
+    await flushPromises();
     await flushPromises();
 
     expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
-      [1, 2, 3]
+      [1, 1, 1]
+    );
+  });
+
+  it("offsets by the resolved atlas center even while terminology rows are still loading", async () => {
+    vi.mocked(getManifest).mockResolvedValue(
+      makeManifest({
+        resolutions: [[0.02, 0.02, 0.02]],
+        shape: [[100, 100, 100]]
+      })
+    );
+    vi.mocked(getTerminologyRows).mockReturnValue(new Promise(() => {}));
+
+    await mountCanvas();
+
+    expect(setAtlasCenterOffset).toHaveBeenCalledWith(
+      expect.anything(),
+      [1, 1, 1]
     );
   });
 

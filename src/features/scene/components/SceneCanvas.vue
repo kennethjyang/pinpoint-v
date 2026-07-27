@@ -112,8 +112,7 @@ onMounted(async () => {
     }
   });
 
-  // Keep the atlas root positioned so the atlas center
-  // sits at the scene origin.
+  // Keep the atlas root positioned so the atlas center sits at the scene origin.
   watchEffect(() => {
     const scene = runtime.scene.value;
     if (!scene) return;

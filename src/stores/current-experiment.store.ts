@@ -33,8 +33,8 @@ export const useCurrentExperimentStore = defineStore(
      * coordinate.
      * @param name Experiment name.
      * @param atlas Full atlas object.
-     * @param referenceCoordinate Reference coordinate (in ASR, mm) that the
-     * atlas root should be offset by.
+     * @param referenceCoordinate Reference coordinate (in ASR, mm) marking
+     * the experiment's landmark of interest within the atlas.
      */
     function create(
       name: string,
@@ -117,15 +117,15 @@ export const useCurrentExperimentStore = defineStore(
      * Current experiment's atlas center.
      */
     const atlasCenter = computed<[number, number, number]>(() =>
-      manifest.value && !areAtlasComponentsEvaluating.value
+      manifest.value && !isManifestEvaluating.value
         ? getAtlasCenter(manifest.value)
         : [0, 0, 0]
     );
 
     /**
      * Set the reference coordinate of the experiment.
-     * @param referenceCoordinate Reference coordinate (in ASR, mm) that the
-     * atlas root should be offset by.
+     * @param referenceCoordinate Reference coordinate (in ASR, mm) marking
+     * the experiment's landmark of interest within the atlas.
      */
     function setReferenceCoordinate(
       referenceCoordinate: [number, number, number]

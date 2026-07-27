@@ -34,8 +34,8 @@ async function create() {
   // Stop creation if manifest doesn't exist.
   if (!manifest) {
     $q.notify({
-      message: t("newExperimentDialog.failedToFetchAtlas"),
-      caption: t("newExperimentDialog.checkAtlas"),
+      message: t("newExperiment.failedToFetchAtlas"),
+      caption: t("newExperiment.checkAtlas"),
       color: "negative",
       icon: "error"
     });

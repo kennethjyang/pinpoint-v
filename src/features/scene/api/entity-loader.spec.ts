@@ -663,7 +663,7 @@ describe("removeAllStructures", () => {
   });
 });
 
-describe("setAtlasRootReference", () => {
+describe("setAtlasCenterOffset", () => {
   it("creates the atlas root node with the expected rotation", () => {
     const scene = makeScene();
 
@@ -675,16 +675,16 @@ describe("setAtlasRootReference", () => {
     );
   });
 
-  it("offsets the atlas root so the reference coordinate sits at the origin", () => {
+  it("offsets the atlas root so the atlas center sits at the origin", () => {
     const scene = makeScene();
-    const reference: [number, number, number] = [5.7, 0.44, 5.4];
+    const center: [number, number, number] = [5.7, 0.44, 5.4];
 
-    setAtlasCenterOffset(scene, reference);
+    setAtlasCenterOffset(scene, center);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    expect(
-      atlasRootNode.position.equals(asrToBabylon(reference).negate())
-    ).toBe(true);
+    expect(atlasRootNode.position.equals(asrToBabylon(center).negate())).toBe(
+      true
+    );
   });
 
   it("reuses the existing atlas root node on a second call", () => {
