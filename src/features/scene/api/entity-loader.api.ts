@@ -157,59 +157,92 @@ export function setAtlasRootReference(
 }
 
 /**
- * Import a structure's mesh into the scene and apply its color.
+ * Synchronously create a structure's mesh and material, parented under the
+ * atlas root, with no geometry yet -- hidden until
+ * {@link loadStructureGeometry} fills it in.
  *
- * Does nothing if the structure is malformed. Fetching and Draco decoding
- * happen on the main thread (Draco already runs its own worker pool
- * internally); the compute-heavy simplification is delegated to
- * {@link simplifyGeometryInWorker} so many structures can load concurrently
- * without blocking the main thread.
+ * Kept synchronous (no awaits) so a mesh exists under `atlasRootNode` the
+ * instant a structure is claimed, before anything yields to the event loop.
+ * That's what lets an overlapping {@link syncStructureVisibility} call see
+ * this structure as already accounted for instead of importing it again.
  *
  * @param structure Entity information for the structure.
  * @param atlasRootNode Atlas root node to parent the structure under.
  * @param scene Scene to add the structure to.
  */
-async function importStructure(
+function buildStructureMesh(
   structure: StructureEntity,
   atlasRootNode: TransformNode,
+  scene: Scene
+): Mesh {
+  const mesh = new Mesh(structureMeshName(structure.identifier), scene);
+  mesh.parent = atlasRootNode;
+  mesh.isVisible = false;
+
+  const material = new StandardMaterial(
+    structureMaterialName(structure.identifier),
+    scene
+  );
+  material.diffuseColor = structure.color;
+  mesh.material = material;
+
+  return mesh;
+}
+
+/**
+ * Fetch, decode, and simplify a structure's mesh geometry, then apply it to
+ * its (already-present) placeholder mesh and reveal it.
+ *
+ * Fetching and Draco decoding happen on the main thread (Draco already runs
+ * its own worker pool internally); the compute-heavy simplification is
+ * delegated to {@link simplifyGeometryInWorker} so many structures can load
+ * concurrently without blocking the main thread.
+ *
+ * Bails out after each await if `mesh` was disposed in the meantime -- a
+ * later sync decided this structure is no longer desired, so its geometry
+ * shouldn't resurrect it.
+ *
+ * @param structure Entity information for the structure.
+ * @param mesh Placeholder mesh created by {@link buildStructureMesh}.
+ * @param scene Scene the structure is being added to.
+ */
+async function loadStructureGeometry(
+  structure: StructureEntity,
+  mesh: Mesh,
   scene: Scene
 ) {
   try {
     const data = await fetchMeshData(structure.meshPath);
+    if (mesh.isDisposed()) return;
+
     const decoded = await decodeMesh(
       `${structure.identifier}_geometry`,
       data,
       scene
     );
+    if (mesh.isDisposed()) return;
+
     const simplified = await simplifyGeometryInWorker(
       decoded.positions,
       decoded.indices,
       targetVertexCount(decoded.positions.length / 3)
     );
+    if (mesh.isDisposed()) return;
 
-    const mesh = new Mesh(structureMeshName(structure.identifier), scene);
     const vertexData = new VertexData();
     vertexData.positions = simplified.positions;
     vertexData.normals = simplified.normals;
     vertexData.indices = simplified.indices;
     vertexData.applyToMesh(mesh);
-
-    // Configure this structure.
-    mesh.parent = atlasRootNode;
-
-    // Apply the color.
-    const material = new StandardMaterial(
-      structureMaterialName(structure.identifier),
-      scene
-    );
-    material.diffuseColor = structure.color;
-    mesh.material = material;
+    mesh.isVisible = true;
   } catch (error) {
-    // Skip structures that fail to load, but don't hide why.
+    // Skip structures that fail to load, but don't hide why. Dispose the
+    // placeholder too so a later sync retries rather than leaving an empty,
+    // permanently-hidden mesh behind.
+    mesh.dispose(false, true);
     Logger.Warn(
       `Failed to import structure ${structure.identifier}: ${String(error)}`
     );
-    return;
   }
 }
 
@@ -223,6 +256,14 @@ async function importStructure(
  *
  * Missing structures are imported concurrently rather than one at a time, so
  * total load time is bound by the slowest structure rather than their sum.
+ *
+ * Safe to call repeatedly and concurrently for the same desired state --
+ * every phase up to and including alpha assignment runs synchronously, with
+ * a placeholder mesh claiming each missing structure's name before this
+ * function ever yields. An overlapping call's presence check therefore sees
+ * that placeholder and skips the structure instead of importing it a second
+ * time, and never observes a structure at any alpha other than the one this
+ * call assigns it.
  *
  * @param scene Scene to sync.
  * @param alwaysPresentStructures Structures to keep in the scene at all times.
@@ -257,42 +298,56 @@ export async function syncStructureVisibility(
 
   // Remove structures that are present but no longer desired. Disposing the
   // material too avoids leaving an orphaned same-named material behind that
-  // would shadow a later re-import's material in any name-based lookup.
+  // would shadow a later re-import's material in any name-based lookup. Safe
+  // even if another sync's import for this identifier is still in flight --
+  // that import checks `mesh.isDisposed()` after every await and bails out.
   for (const [meshName, mesh] of presentMeshes) {
     if (!desiredStructures.has(meshName)) mesh.dispose(false, true);
   }
 
-  // Import every missing structure concurrently, and await them collectively
-  // rather than one at a time.
-  const missing = [...desiredStructures]
-    .filter(([meshName]) => !presentMeshes.has(meshName))
-    .map(([, structure]) => structure);
-  if (missing.length > 0) {
-    let completed = 0;
-    onProgress(completed, missing.length);
-    await Promise.all(
-      missing.map(async structure => {
-        try {
-          await importStructure(structure, atlasRootNode, scene);
-        } finally {
-          completed++;
-          onProgress(completed, missing.length);
-        }
-      })
-    );
+  // Claim every missing structure with a placeholder mesh, synchronously, so
+  // a concurrent sync's presence check sees it before this call's first
+  // await. `pendingImports` tracks the ones this call is responsible for
+  // loading geometry for.
+  const desiredMeshes = new Map<string, AbstractMesh>();
+  const pendingImports: { structure: StructureEntity; mesh: Mesh }[] = [];
+  for (const [meshName, structure] of desiredStructures) {
+    const existing = presentMeshes.get(meshName);
+    if (existing) {
+      desiredMeshes.set(meshName, existing);
+      continue;
+    }
+
+    const mesh = buildStructureMesh(structure, atlasRootNode, scene);
+    desiredMeshes.set(meshName, mesh);
+    pendingImports.push({ structure, mesh });
   }
 
-  // Now that every structure is in the scene, set alpha for each of them by
-  // reading the material directly off its mesh -- a name-based lookup would
-  // silently prefer a stale, disposed-but-not-yet-freed material of the same
-  // name over the live one.
-  const meshesByName = childStructureMeshes(atlasRootNode);
+  // Set every structure's alpha now, before any geometry has loaded, so one
+  // is never briefly visible at a material's default alpha.
   for (const [meshName, structure] of desiredStructures) {
-    const material = meshesByName.get(meshName)?.material;
+    const material = desiredMeshes.get(meshName)?.material;
     if (material) {
       material.alpha = visibleIdentifiers.has(structure.identifier) ? 1 : 0.1;
     }
   }
+
+  if (pendingImports.length === 0) return;
+
+  // Load every missing structure's geometry concurrently, and await them
+  // collectively rather than one at a time.
+  let completed = 0;
+  onProgress(completed, pendingImports.length);
+  await Promise.all(
+    pendingImports.map(async ({ structure, mesh }) => {
+      try {
+        await loadStructureGeometry(structure, mesh, scene);
+      } finally {
+        completed++;
+        onProgress(completed, pendingImports.length);
+      }
+    })
+  );
 }
 
 /**

@@ -1,9 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MeshBuilder, NullEngine, Scene, VertexBuffer } from "@babylonjs/core";
 import {
   disposeMeshSimplifyPool,
   simplifyGeometryInWorker
 } from "./mesh-simplify-pool.api";
+
+/**
+ * Minimal `Worker` stand-in that never responds, so a request made through
+ * it stays pending until something else settles it -- letting tests exercise
+ * teardown-while-in-flight without a real worker thread.
+ */
+class UnresponsiveWorker {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  postMessage(): void {}
+  terminate(): void {}
+}
 
 /**
  * Build sphere geometry as flat, transferable typed arrays, mirroring what
@@ -64,5 +76,25 @@ describe("simplifyGeometryInWorker", () => {
 describe("disposeMeshSimplifyPool", () => {
   it("does not throw when no pool has been created yet", () => {
     expect(() => disposeMeshSimplifyPool()).not.toThrow();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects a request still pending at teardown instead of leaving it hanging", async () => {
+    // Stub `Worker` so this request goes through the real worker-pool path
+    // (`happy-dom`'s missing `Worker` global would otherwise route it
+    // through the main-thread fallback, which has nothing to reject).
+    vi.stubGlobal("Worker", UnresponsiveWorker);
+    const { positions, indices } = makeSphereGeometry();
+
+    const pending = simplifyGeometryInWorker(positions, indices, 10);
+    // Let the pool assign a worker and post the message before disposing.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    disposeMeshSimplifyPool();
+
+    await expect(pending).rejects.toThrow();
   });
 });

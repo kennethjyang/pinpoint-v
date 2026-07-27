@@ -36,6 +36,25 @@ let nextRequestId = 0;
 const pendingRequests = new Map<number, PendingRequest>();
 
 /**
+ * Settle a pending request with a worker's response and release its worker
+ * slot. Shared by the success/error `onmessage` path and the `onerror` path,
+ * since both end the same way: look up the request, remove it, settle it.
+ * @param id Id of the request to settle.
+ * @param settle Called with the pending request, if one is still tracked.
+ */
+function settlePendingRequest(
+  id: number,
+  settle: (pending: PendingRequest) => void
+): void {
+  const pending = pendingRequests.get(id);
+  if (!pending) return;
+  pendingRequests.delete(id);
+
+  settle(pending);
+  pending.onComplete();
+}
+
+/**
  * Create a mesh simplification worker, wiring its responses back to
  * whichever request they answer.
  */
@@ -45,17 +64,14 @@ function createSimplifyWorkerAsync(): Promise<Worker> {
   worker.onmessage = (
     event: MessageEvent<MeshSimplifyResponse | MeshSimplifyErrorResponse>
   ) => {
-    const pending = pendingRequests.get(event.data.id);
-    if (!pending) return;
-    pendingRequests.delete(event.data.id);
-
-    if ("error" in event.data) {
-      pending.reject(new Error(event.data.error));
-    } else {
-      const { id: _id, ...geometry } = event.data;
-      pending.resolve(geometry);
-    }
-    pending.onComplete();
+    settlePendingRequest(event.data.id, pending => {
+      if ("error" in event.data) {
+        pending.reject(new Error(event.data.error));
+      } else {
+        const { id: _id, ...geometry } = event.data;
+        pending.resolve(geometry);
+      }
+    });
   };
 
   return Promise.resolve(worker);
@@ -107,6 +123,14 @@ export async function simplifyGeometryInWorker(
   return await new Promise<SimplifiedGeometry>((resolve, reject) => {
     getPool().push((worker, onComplete) => {
       pendingRequests.set(id, { resolve, reject, onComplete });
+      // Scoped to whichever request is currently on this worker -- a worker
+      // handles one request at a time, so a module-scope failure in it is
+      // attributed to that request rather than left to hang forever.
+      worker.onerror = errorEvent => {
+        settlePendingRequest(id, pending => {
+          pending.reject(new Error(errorEvent.message));
+        });
+      };
       worker.postMessage(request, [positions.buffer, indices.buffer]);
     });
   });
@@ -114,11 +138,20 @@ export async function simplifyGeometryInWorker(
 
 /**
  * Dispose the shared mesh simplification worker pool. Call on app teardown.
+ *
+ * Rejects every pending request first -- `pool.dispose()` terminates workers
+ * and drops queued actions without settling anything, so a request in flight
+ * at teardown would otherwise never resolve or reject, leaving its awaiter
+ * (and anything awaiting that, like `syncStructureVisibility`) hung forever.
  */
 export function disposeMeshSimplifyPool(): void {
+  for (const pending of pendingRequests.values()) {
+    pending.reject(new Error("Mesh simplification pool was disposed."));
+  }
+  pendingRequests.clear();
+
   pool?.dispose();
   pool = null;
-  pendingRequests.clear();
 }
 
 /**
