@@ -3,6 +3,7 @@ import {
   DracoDecoder,
   Logger,
   Mesh,
+  QuadraticErrorSimplification,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -12,15 +13,24 @@ import {
 import axios from "axios";
 import type { StructureEntity } from "../models/structure-entity.model";
 import { asrToBabylon } from "./coordinate-transforms.api";
-import { simplifyGeometryInWorker } from "./mesh-simplify-pool.api";
 
 /**
- * Decoded structure geometry, ready to hand off to the simplification
- * worker: winding order corrected, and nanometer-scale coordinates converted
- * to millimeters.
+ * Decoded structure geometry, ready to hand off to {@link simplifyGeometry}:
+ * winding order corrected, and nanometer-scale coordinates converted to
+ * millimeters.
  */
 interface DecodedMeshData {
   positions: Float32Array;
+  indices: Uint32Array;
+}
+
+/**
+ * Simplified vertex data, ready to apply to a mesh with
+ * `VertexData.applyToMesh`.
+ */
+interface SimplifiedGeometry {
+  positions: Float32Array;
+  normals: Float32Array;
   indices: Uint32Array;
 }
 
@@ -32,6 +42,17 @@ const MESH_VERTEX_KEEP_FRACTION = 0.05;
 
 /** Hard ceiling on vertices per structure, regardless of original size. */
 const MESH_MAX_VERTICES = 8000;
+
+/**
+ * Iterations `QuadraticErrorSimplification` runs between `setTimeout` yields.
+ *
+ * Babylon defaults this to 5000, which for these meshes means ~900 timer hops.
+ * Browsers clamp nested `setTimeout` to a 4ms floor, so those hops cost more in
+ * idle waiting (~3.4s, measured) than the simplification itself costs in CPU
+ * (~2.4s, measured). Yielding less often trades a slightly longer worst-case
+ * frame (~76ms, measured) for roughly half the wall-clock.
+ */
+const SIMPLIFY_SYNC_ITERATIONS = 20000;
 
 /** Suffix applied to a structure's identifier to name its Babylon mesh. */
 const STRUCTURE_MESH_SUFFIX = "_structure";
@@ -213,10 +234,11 @@ function buildStructureMesh(
  * Fetch, decode, and simplify a structure's mesh geometry, then apply it to
  * its (already-present) placeholder mesh and reveal it.
  *
- * Fetching and Draco decoding happen on the main thread (Draco already runs
- * its own worker pool internally); the compute-heavy simplification is
- * delegated to {@link simplifyGeometryInWorker} so many structures can load
- * concurrently without blocking the main thread.
+ * Simplification runs on the main thread, but {@link simplifyGeometry} yields
+ * to the event loop throughout via Babylon's own chunked scheduling, so it
+ * doesn't block rendering for its whole duration; concurrency across
+ * structures comes from {@link syncStructureVisibility}'s `Promise.all`,
+ * which lets their simplifications interleave instead of queuing.
  *
  * Bails out after each await if `mesh` was disposed in the meantime -- a
  * later sync decided this structure is no longer desired, so its geometry
@@ -242,10 +264,11 @@ async function loadStructureGeometry(
     );
     if (mesh.isDisposed()) return;
 
-    const simplified = await simplifyGeometryInWorker(
+    const simplified = await simplifyGeometry(
       decoded.positions,
       decoded.indices,
-      targetVertexCount(decoded.positions.length / 3)
+      targetVertexCount(decoded.positions.length / 3),
+      scene
     );
     if (mesh.isDisposed()) return;
 
@@ -264,6 +287,68 @@ async function loadStructureGeometry(
       `Failed to import structure ${structure.identifier}: ${String(error)}`
     );
   }
+}
+
+/**
+ * Simplify a mesh's geometry down to (approximately) the given vertex count
+ * and compute smooth-shaded normals for it.
+ *
+ * Builds its own temporary mesh in `scene` rather than taking one -- both the
+ * source and `QuadraticErrorSimplification`'s reconstructed output are
+ * disposed before returning, so nothing from this call lingers in the scene.
+ * The temporary mesh is explicitly hidden and left unparented so it can never
+ * flash on screen or be mistaken for a structure mesh by
+ * {@link childStructureMeshes} while simplification runs.
+ *
+ * @param positions Flat `[x, y, z, ...]` vertex positions.
+ * @param indices Triangle indices.
+ * @param targetVertices Desired vertex count.
+ * @param scene Scene to build the temporary mesh in.
+ */
+async function simplifyGeometry(
+  positions: Float32Array,
+  indices: Uint32Array,
+  targetVertices: number,
+  scene: Scene
+): Promise<SimplifiedGeometry> {
+  const mesh = new Mesh("simplify_scratch", scene);
+  mesh.isVisible = false;
+  const vertexData = new VertexData();
+  vertexData.positions = positions;
+  vertexData.indices = indices;
+  vertexData.applyToMesh(mesh);
+
+  let simplified = mesh;
+  if (targetVertices < mesh.getTotalVertices()) {
+    const simplification = new QuadraticErrorSimplification(mesh);
+    simplification.syncIterations = SIMPLIFY_SYNC_ITERATIONS;
+    simplified = await new Promise<Mesh>(resolve => {
+      simplification.simplify(
+        {
+          quality: targetVertices / mesh.getTotalVertices(),
+          distance: 0,
+          optimizeMesh: false
+        },
+        resolve
+      );
+    });
+    mesh.dispose();
+  }
+
+  simplified.createNormals(false);
+
+  const result: SimplifiedGeometry = {
+    positions: Float32Array.from(
+      simplified.getVerticesData(VertexBuffer.PositionKind)!
+    ),
+    normals: Float32Array.from(
+      simplified.getVerticesData(VertexBuffer.NormalKind)!
+    ),
+    indices: Uint32Array.from(simplified.getIndices()!)
+  };
+
+  simplified.dispose();
+  return result;
 }
 
 /**
