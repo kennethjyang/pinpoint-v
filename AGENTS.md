@@ -1,8 +1,8 @@
 ## Core rules
 
 - Prefer clear, idiomatic implementations over clever or micro-optimized code.
-- Keep changes focused. Do not refactor unrelated code.
-- Preserve existing public APIs unless the task explicitly requires changing them.
+- Keep changes focused. Do not refactor unrelated code unless tasked with exploratory work.
+- Preserve existing public APIs unless changing them would provide an idiomatic implementation.
 - Add or update tests when behavior changes, including meaningful untested branches.
 - Do not export implementation details solely to make them testable; test through the module or feature’s public API.
 - Put all user-visible strings in i18n resources.
