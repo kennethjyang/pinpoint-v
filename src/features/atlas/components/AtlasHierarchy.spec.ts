@@ -5,7 +5,7 @@ import { flushPromises } from "@vue/test-utils";
 import AtlasHierarchy from "./AtlasHierarchy.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { getTerminologyRows } from "@/features/atlas";
+import { getTerminologyRows } from "../api/source.api";
 import { makeTerminologyRows } from "@/test/fixtures";
 
 /**
@@ -29,10 +29,11 @@ const QVirtualScrollStub = defineComponent({
   }
 });
 
-vi.mock("@/features/atlas/api/source.api", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/features/atlas/api/source.api")
-  >("@/features/atlas/api/source.api");
+vi.mock("../api/source.api", async () => {
+  const actual =
+    await vi.importActual<typeof import("../api/source.api")>(
+      "../api/source.api"
+    );
   return { ...actual, getTerminologyRows: vi.fn() };
 });
 

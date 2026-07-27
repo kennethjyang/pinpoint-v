@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildHierarchy, toTitleCase } from "./hierarchy.api";
+import {
+  buildHierarchy,
+  getDefaultStructureIdentifiers,
+  toTitleCase
+} from "./hierarchy.api";
 import {
   makeRelativePathTerminologyRows,
   makeTerminologyRow,
@@ -93,6 +97,27 @@ describe("buildHierarchy", () => {
     expect(flatten(node!).sort(numericSort)).toEqual(
       rows.map(r => r.identifier).sort(numericSort)
     );
+  });
+});
+
+describe("getDefaultStructureIdentifiers", () => {
+  it("returns the identifiers of root's direct children", () => {
+    const result = getDefaultStructureIdentifiers(makeTerminologyRows());
+
+    expect(result).toEqual([8]);
+  });
+
+  it("returns an empty list when no row has a null parent_identifier", () => {
+    const rows = makeTerminologyRows().map(row => ({
+      ...row,
+      parent_identifier: row.parent_identifier ?? 1
+    }));
+
+    expect(getDefaultStructureIdentifiers(rows)).toEqual([]);
+  });
+
+  it("returns an empty list for an empty list", () => {
+    expect(getDefaultStructureIdentifiers([])).toEqual([]);
   });
 });
 

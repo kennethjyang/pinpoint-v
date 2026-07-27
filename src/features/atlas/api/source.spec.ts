@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import Papa from "papaparse";
+import { Color3 } from "@babylonjs/core";
 import {
   BRAINGLOBE_BASE_URL,
   getManifest,
   getTerminologyRows,
   listAtlases,
-  listAtlasesHTTP
+  listAtlasesHTTP,
+  structureEntityFromIdentifier
 } from "./source.api";
-import { makeAtlas } from "@/test/fixtures";
+import { makeAtlas, makeTerminologyRows } from "@/test/fixtures";
 
 vi.mock("axios");
 
@@ -516,5 +518,39 @@ describe("getManifest", () => {
 
       expect(result).toBeNull();
     });
+  });
+});
+
+describe("structureEntityFromIdentifier", () => {
+  const atlas = makeAtlas({
+    name: "allen_mouse",
+    source: "http://localhost:3000/"
+  });
+  const terminologyRows = makeTerminologyRows();
+
+  it("returns null when no row matches the identifier", () => {
+    const result = structureEntityFromIdentifier(atlas, terminologyRows, 12345);
+
+    expect(result).toBeNull();
+  });
+
+  it("builds the mesh path from the atlas's annotation set at version 3_0", () => {
+    const result = structureEntityFromIdentifier(atlas, terminologyRows, 8);
+
+    expect(result?.meshPath).toBe(
+      "http://localhost:3000/annotation-sets/allen_mouse-annotation/3_0/annotations.precomputed/mesh/8"
+    );
+  });
+
+  it("carries the matched row's identifier through", () => {
+    const result = structureEntityFromIdentifier(atlas, terminologyRows, 8);
+
+    expect(result?.identifier).toBe(8);
+  });
+
+  it("parses color_hex_triplet into a Color3", () => {
+    const result = structureEntityFromIdentifier(atlas, terminologyRows, 8);
+
+    expect(result?.color).toEqual(Color3.FromHexString("#BFDAE3"));
   });
 });

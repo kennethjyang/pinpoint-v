@@ -8,11 +8,9 @@ import {
   getVendors
 } from "../api/install-probe.api";
 
-vi.mock("@/features/probe/api/install-probe.api", async importOriginal => {
+vi.mock("../api/install-probe.api", async importOriginal => {
   const actual =
-    await importOriginal<
-      typeof import("@/features/probe/api/install-probe.api")
-    >();
+    await importOriginal<typeof import("../api/install-probe.api")>();
   return {
     ...actual,
     getVendors: vi.fn(),

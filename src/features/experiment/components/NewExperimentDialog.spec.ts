@@ -7,10 +7,11 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getManifest } from "@/features/atlas";
 import { makeAtlas, makeManifest } from "@/test/fixtures";
 
-vi.mock("@/features/atlas/api/source.api", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/features/atlas/api/source.api")
-  >("@/features/atlas/api/source.api");
+vi.mock("@/features/atlas", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/features/atlas")>(
+      "@/features/atlas"
+    );
   return { ...actual, getManifest: vi.fn() };
 });
 

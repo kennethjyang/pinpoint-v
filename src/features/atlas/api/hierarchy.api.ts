@@ -23,20 +23,6 @@ export function toTitleCase(name: string): string {
 }
 
 /**
- * Build a {@link HierarchyModel} node from a terminology row.
- * @param terminologyRow Terminology row to convert.
- */
-function toNode(terminologyRow: TerminologyRow): HierarchyModel {
-  return {
-    identifier: terminologyRow.identifier,
-    abbreviation: terminologyRow.abbreviation,
-    name: toTitleCase(terminologyRow.name),
-    color: terminologyRow.color_hex_triplet,
-    children: []
-  };
-}
-
-/**
  * Build a tree hierarchy from parsed terminology rows, linking each row to
  * its parent via `parent_identifier`.
  *
@@ -81,4 +67,18 @@ export function getDefaultStructureIdentifiers(
   return terminologyRows
     .filter(row => row.parent_identifier === rootRow.identifier)
     .map(row => row.identifier);
+}
+
+/**
+ * Build a {@link HierarchyModel} node from a terminology row.
+ * @param terminologyRow Terminology row to convert.
+ */
+function toNode(terminologyRow: TerminologyRow): HierarchyModel {
+  return {
+    identifier: terminologyRow.identifier,
+    abbreviation: terminologyRow.abbreviation,
+    name: toTitleCase(terminologyRow.name),
+    color: terminologyRow.color_hex_triplet,
+    children: []
+  };
 }
