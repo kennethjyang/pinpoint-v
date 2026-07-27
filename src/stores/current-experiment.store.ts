@@ -11,24 +11,21 @@ import {
   Manifest
 } from "@/features/atlas";
 
-// Hardcoded first experiment.
-const MY_FIRST_EXPERIMENT: Experiment = {
-  name: "My First Experiment",
-  atlas: {
-    source: BRAINGLOBE_BASE_URL,
-    name: "allen_mouse"
-  },
-  referenceCoordinate: [5.7, 0.44, 5.4],
-  visibleStructures: []
-};
-
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
   () => {
     /**
      * Current experiment instance.
      */
-    const experiment = ref<Experiment>(MY_FIRST_EXPERIMENT);
+    const experiment = ref<Experiment>({
+      name: "My First Experiment",
+      atlas: {
+        source: BRAINGLOBE_BASE_URL,
+        name: "allen_mouse"
+      },
+      referenceCoordinate: [5.7, 0.44, 5.4],
+      visibleStructures: []
+    });
 
     /**
      * Create a new experiment with the given name, atlas, and reference
