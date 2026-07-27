@@ -17,7 +17,11 @@ import { setInitialZoom } from "../api/camera.api";
 import { StructureEntity } from "../models/structure-entity.model";
 import { structureEntityFromIdentifier } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { useQuasar } from "quasar";
+import { useI18n } from "vue-i18n";
 
+const $q = useQuasar();
+const { t } = useI18n();
 const currentExperiment = useCurrentExperimentStore();
 const runtime = useBabylonRuntimeService();
 
@@ -93,6 +97,13 @@ onMounted(async () => {
         alwaysPresentStructures.value,
         visibleStructures.value
       );
+    } catch {
+      $q.notify({
+        message: t("sceneCanvas.problemLoadingAtlasMeshes"),
+        caption: t("sceneCanvas.atlasLikelyNotSupportedYet"),
+        color: "negative",
+        icon: "error"
+      });
     } finally {
       isLoadingStructures.value = false;
     }

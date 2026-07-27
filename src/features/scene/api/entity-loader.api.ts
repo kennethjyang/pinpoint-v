@@ -1,7 +1,6 @@
 import type { AbstractMesh, IndicesArray, Scene } from "@babylonjs/core";
 import {
   DracoDecoder,
-  Logger,
   Mesh,
   QuadraticErrorSimplification,
   StandardMaterial,
@@ -291,13 +290,11 @@ async function loadStructureGeometry(
     vertexData.applyToMesh(mesh);
     mesh.isVisible = true;
   } catch (error) {
-    // Skip structures that fail to load, but don't hide why. Dispose the
-    // placeholder too so a later sync retries rather than leaving an empty,
-    // permanently-hidden mesh behind.
+    // Dispose mesh and skip this mesh.
     mesh.dispose(false, true);
-    Logger.Warn(
-      `Failed to import structure ${structure.identifier}: ${String(error)}`
-    );
+
+    // Percolate error up.
+    throw error;
   }
 }
 
