@@ -3,9 +3,7 @@ import {
   ArcRotateCamera,
   GizmoManager,
   HemisphericLight,
-  MeshBuilder,
   Scene,
-  TransformNode,
   Vector3,
   WebGPUEngine
 } from "@babylonjs/core";
@@ -53,17 +51,6 @@ export function createBabylonRuntimeService() {
 
     // Add lights.
     new HemisphericLight("main_light", Vector3.Up(), s);
-
-    // Build a demo scene.
-    const probeMesh = MeshBuilder.CreateBox(
-      "probe_mesh",
-      { width: 0.25, depth: 0.25, height: 2 },
-      s
-    );
-    probeMesh.setAbsolutePosition(Vector3.Up());
-    const probeMover = new TransformNode("probeTip_node", s);
-    probeMover.addChild(probeMesh);
-    gm.attachToNode(probeMover);
 
     // Start render loop.
     e.runRenderLoop(() => {
