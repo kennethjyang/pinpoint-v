@@ -6,7 +6,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh.js";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData.js";
 import { QuadraticErrorSimplification } from "@babylonjs/core/Meshes/meshSimplification.js";
 import { Scene } from "@babylonjs/core/scene.js";
-import type { SimplifiedGeometry } from "@/features/scene";
+import type { SimplifiedGeometry } from "../models/structure-entity.model";
 
 /** A mesh simplification request sent from the main thread. */
 export interface MeshSimplifyRequest {

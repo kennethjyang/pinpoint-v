@@ -1,8 +1,10 @@
 import axios from "axios";
-import { Atlas, Manifest, TerminologyRow } from "@/features/atlas";
 import Papa from "papaparse";
-import { StructureEntity } from "@/features/scene";
 import { Color3 } from "@babylonjs/core";
+import { StructureEntity } from "@/features/scene";
+import { Atlas } from "../models/atlas.model";
+import { Manifest } from "../models/manifest.model";
+import { TerminologyRow } from "../models/terminology-row.model";
 
 /**
  * Atlas item in an atlas source's response structure.

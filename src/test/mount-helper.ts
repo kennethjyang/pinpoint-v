@@ -36,16 +36,17 @@ export function mountWithQuasar<T extends Component>(
   return mount(component, {
     ...mountOptions,
     global: {
+      ...mountOptions.global,
       // Matches the app's own `framework.plugins` (quasar.config.ts) so
       // components calling `useQuasar().notify(...)` or `.loadingBar.*(...)`
-      // don't blow up.
+      // don't blow up. Spread after `...mountOptions.global` so a caller's
+      // own `global.plugins` is merged in rather than clobbering this array.
       plugins: [
         [Quasar, { plugins: { Notify, LoadingBar } }],
         createTestI18n(),
         pinia,
         ...(mountOptions.global?.plugins ?? [])
-      ],
-      ...mountOptions.global
+      ]
     }
   });
 }

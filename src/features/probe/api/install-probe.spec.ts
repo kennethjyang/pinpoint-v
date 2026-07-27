@@ -5,7 +5,7 @@ import {
   getProbeNames,
   getProbeInterfaceProbe,
   parseProbeInterfaceFile
-} from "@/features/probe";
+} from "./install-probe.api";
 
 // install-probe.api.ts calls `axios.create()` to build dedicated instances
 // (githubApi, fileApi), so mocking `axios.get` alone wouldn't reach their

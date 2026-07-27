@@ -6,7 +6,7 @@ import { useDialogPluginComponent } from "quasar";
 import {
   buildInitialReferenceCoordinate,
   FALLBACK_REFERENCE_COORDINATE
-} from "@/features/experiment";
+} from "../api/reference-coordinate.api";
 
 defineEmits([...useDialogPluginComponent.emits]);
 

@@ -7,7 +7,11 @@ import {
   watchPostEffect
 } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { buildHierarchy, HierarchyModel, toTitleCase } from "@/features/atlas";
+import {
+  buildHierarchy,
+  HierarchyModel,
+  toTitleCase
+} from "../api/hierarchy.api";
 import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
@@ -24,7 +28,7 @@ const hierarchy = ref<HierarchyModel[]>([]);
 // Expose scroll area target for the search result virtual scroll.
 const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
-// Fuzzy search across the acronym (label) and the full name.
+// Fuzzy search across the abbreviation (label) and the full name.
 const searchQuery = computed(() => filter.value ?? "");
 const terminologyRows = computed(() => currentExperiment.terminologyRows);
 const { results } = useFuse(searchQuery, terminologyRows, {

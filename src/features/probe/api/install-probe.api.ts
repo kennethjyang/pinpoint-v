@@ -1,5 +1,8 @@
 import axios from "axios";
-import { ProbeInterfaceFile, ProbeInterfaceProbe } from "@/features/probe";
+import {
+  ProbeInterfaceFile,
+  ProbeInterfaceProbe
+} from "../models/probe-interface.model";
 
 interface GitHubItem {
   name: string;

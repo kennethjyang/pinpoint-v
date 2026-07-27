@@ -15,15 +15,11 @@ import {
   VertexData
 } from "@babylonjs/core";
 import {
-  decodeMesh,
-  fetchMeshData,
-  flipWindingOrder,
   setAtlasRootReference,
-  syncStructureVisibility,
-  targetVertexCount
+  syncStructureVisibility
 } from "./entity-loader.api";
-import type { StructureEntity } from "@/features/scene";
-import { asrToBabylon } from "@/features/scene";
+import type { StructureEntity } from "../models/structure-entity.model";
+import { asrToBabylon } from "./coordinate-transforms.api";
 
 vi.mock("axios");
 
@@ -69,228 +65,64 @@ function makeUnlitMesh(scene: Scene, name = "raw"): Mesh {
   return mesh;
 }
 
-describe("targetVertexCount", () => {
-  it("keeps 5% of the original vertex count", () => {
-    expect(targetVertexCount(100_000)).toBe(5000);
-  });
-
-  it("clamps to 8000 vertices for large meshes", () => {
-    expect(targetVertexCount(1_000_000)).toBe(8000);
-  });
-
-  it("rounds to the nearest vertex", () => {
-    expect(targetVertexCount(101)).toBe(5); // 101 * 0.05 = 5.05 -> 5
-  });
-
-  it("returns 0 for an empty mesh", () => {
-    expect(targetVertexCount(0)).toBe(0);
-  });
-
-  it("can exceed the original count for very small meshes (caller compares)", () => {
-    // 5% of 10 is 0.5, rounded to 1 -- below original, but small meshes still
-    // fall under the "target >= count" no-op path in the simplification
-    // worker (0.5 -> 1 is still < 10 here; use an even smaller mesh to hit
-    // the crossover).
-    expect(targetVertexCount(10)).toBe(1);
-  });
-});
-
-describe("flipWindingOrder", () => {
-  it("swaps the last two indices of each triangle", () => {
-    const scene = makeScene();
-    const mesh = new Mesh("m", scene);
-    const vertexData = new VertexData();
-    vertexData.positions = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1];
-    vertexData.indices = [0, 1, 2, 3, 4, 5];
-    vertexData.applyToMesh(mesh);
-
-    flipWindingOrder(mesh);
-
-    expect(Array.from(mesh.getIndices()!)).toEqual([0, 2, 1, 3, 5, 4]);
-  });
-
-  it("leaves vertex positions untouched", () => {
-    const scene = makeScene();
-    const mesh = new Mesh("m", scene);
-    const vertexData = new VertexData();
-    const positions = [0, 0, 0, 1, 0, 0, 0, 1, 0];
-    vertexData.positions = [...positions];
-    vertexData.indices = [0, 1, 2];
-    vertexData.applyToMesh(mesh);
-
-    flipWindingOrder(mesh);
-
-    expect(
-      Array.from(mesh.getVerticesData(VertexBuffer.PositionKind)!)
-    ).toEqual(positions);
-  });
-
-  it("does nothing when the mesh has no indices", () => {
-    const scene = makeScene();
-    const mesh = new Mesh("m", scene);
-    const vertexData = new VertexData();
-    vertexData.positions = [0, 0, 0, 1, 0, 0, 0, 1, 0];
-    vertexData.applyToMesh(mesh);
-
-    expect(() => flipWindingOrder(mesh)).not.toThrow();
-  });
-
-  /**
-   * Fraction of a mesh's vertices whose computed normal points away from
-   * the mesh centroid (i.e. outward).
-   */
-  function outwardNormalFraction(mesh: Mesh): number {
-    const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
-    const normals = mesh.getVerticesData(VertexBuffer.NormalKind)!;
-    const vertexCount = mesh.getTotalVertices();
-
-    const centroid = new Vector3(0, 0, 0);
-    for (let i = 0; i < vertexCount; i++) {
-      centroid.addInPlace(
-        new Vector3(
-          positions[i * 3],
-          positions[i * 3 + 1],
-          positions[i * 3 + 2]
-        )
-      );
-    }
-    centroid.scaleInPlace(1 / vertexCount);
-
-    let outward = 0;
-    for (let i = 0; i < vertexCount; i++) {
-      const direction = new Vector3(
-        positions[i * 3]!,
-        positions[i * 3 + 1]!,
-        positions[i * 3 + 2]!
-      )
-        .subtract(centroid)
-        .normalize();
-      const normal = new Vector3(
-        normals[i * 3]!,
-        normals[i * 3 + 1]!,
-        normals[i * 3 + 2]!
-      );
-      if (Vector3.Dot(direction, normal) > 0) outward++;
-    }
-    return outward / vertexCount;
+/**
+ * Build a positions+indices-only geometry wound for a right-handed system,
+ * like a real BrainGlobe Draco mesh -- the opposite of what this (left-handed)
+ * scene expects, and what `decodeMesh`'s internal winding-order fix corrects.
+ */
+function makeRightHandedWoundGeometry(scene: Scene, id = "geometry"): Geometry {
+  const mesh = makeUnlitMesh(scene, `${id}_mesh`);
+  const reversed = Array.from(mesh.getIndices()!);
+  for (let i = 0; i < reversed.length; i += 3) {
+    const temp = reversed[i + 1]!;
+    reversed[i + 1] = reversed[i + 2]!;
+    reversed[i + 2] = temp;
   }
+  mesh.setIndices(reversed);
 
-  it("makes computed normals face outward on a mesh wound for a right-handed system", () => {
-    const scene = makeScene();
-    // Babylon's built-in sphere is already wound for this (left-handed)
-    // scene; reverse it once to simulate a right-handed source like a
-    // BrainGlobe Draco mesh, matching what flipWindingOrder is meant to fix.
-    const rightHandedWound = makeUnlitMesh(scene, "sphere");
-    const reversed = Array.from(rightHandedWound.getIndices()!);
-    for (let i = 0; i < reversed.length; i += 3) {
-      const temp = reversed[i + 1]!;
-      reversed[i + 1] = reversed[i + 2]!;
-      reversed[i + 2] = temp;
-    }
-    rightHandedWound.setIndices(reversed);
+  const vertexData = new VertexData();
+  vertexData.positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+  vertexData.indices = mesh.getIndices();
+  mesh.dispose();
 
-    flipWindingOrder(rightHandedWound);
-    rightHandedWound.createNormals(false);
+  return new Geometry(id, scene, vertexData, false);
+}
 
-    expect(outwardNormalFraction(rightHandedWound)).toBeGreaterThan(0.9);
-  });
+/**
+ * Fraction of a mesh's vertices whose computed normal points away from the
+ * mesh centroid (i.e. outward).
+ */
+function outwardNormalFraction(mesh: Mesh): number {
+  const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+  const normals = mesh.getVerticesData(VertexBuffer.NormalKind)!;
+  const vertexCount = mesh.getTotalVertices();
 
-  it("without the fix, a right-handed-wound mesh's normals point inward", () => {
-    const scene = makeScene();
-    const rightHandedWound = makeUnlitMesh(scene, "sphere");
-    const reversed = Array.from(rightHandedWound.getIndices()!);
-    for (let i = 0; i < reversed.length; i += 3) {
-      const temp = reversed[i + 1]!;
-      reversed[i + 1] = reversed[i + 2]!;
-      reversed[i + 2] = temp;
-    }
-    rightHandedWound.setIndices(reversed);
+  const centroid = new Vector3(0, 0, 0);
+  for (let i = 0; i < vertexCount; i++) {
+    centroid.addInPlace(
+      new Vector3(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+    );
+  }
+  centroid.scaleInPlace(1 / vertexCount);
 
-    // No flipWindingOrder call here -- this is the control case.
-    rightHandedWound.createNormals(false);
-
-    expect(outwardNormalFraction(rightHandedWound)).toBeLessThan(0.1);
-  });
-});
-
-describe("fetchMeshData", () => {
-  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
-  // called unbound.
-  // oxlint-disable-next-line typescript/unbound-method
-  const mockedGet = vi.mocked(axios.get);
-
-  beforeEach(() => {
-    mockedGet.mockReset();
-  });
-
-  it("fetches the mesh path as an array buffer", async () => {
-    const buffer = new ArrayBuffer(4);
-    mockedGet.mockResolvedValue({ data: buffer });
-
-    const result = await fetchMeshData("http://localhost:3000/meshes/1");
-
-    expect(mockedGet).toHaveBeenCalledWith("http://localhost:3000/meshes/1", {
-      responseType: "arraybuffer"
-    });
-    expect(result).toBe(buffer);
-  });
-
-  it("propagates a rejection when the request fails", async () => {
-    mockedGet.mockRejectedValue(new Error("network error"));
-
-    await expect(
-      fetchMeshData("http://localhost:3000/meshes/1")
-    ).rejects.toThrow("network error");
-  });
-});
-
-describe("decodeMesh", () => {
-  it("scales nanometer positions to millimeters without reordering axes", async () => {
-    const scene = makeScene();
-    const geometry = new Geometry("draco_geometry", scene, undefined, false);
-    const vertexData = new VertexData();
-    // A single triangle at (1_000_000, 2_000_000, 3_000_000) nm, no normals
-    // -- mirroring a Draco-decoded structure mesh.
-    vertexData.positions = [1_000_000, 2_000_000, 3_000_000, 0, 0, 0, 0, 0, 0];
-    vertexData.indices = [0, 1, 2];
-    vertexData.applyToGeometry(geometry);
-
-    const decodeSpy = vi
-      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
-      .mockResolvedValue(geometry);
-
-    const decoded = await decodeMesh("1", new ArrayBuffer(0), scene);
-
-    expect(decodeSpy).toHaveBeenCalledWith("1", scene, expect.any(ArrayBuffer));
-    // Nanometers -> millimeters; axis order unchanged. Positions are
-    // float32, so allow for the usual float32 rounding error.
-    const [x, y, z] = Array.from(decoded.positions);
-    expect(x).toBeCloseTo(1, 5);
-    expect(y).toBeCloseTo(2, 5);
-    expect(z).toBeCloseTo(3, 5);
-
-    decodeSpy.mockRestore();
-  });
-
-  it("flips the triangle winding order", async () => {
-    const scene = makeScene();
-    const geometry = new Geometry("draco_geometry", scene, undefined, false);
-    const vertexData = new VertexData();
-    vertexData.positions = [0, 0, 0, 1, 0, 0, 0, 1, 0];
-    vertexData.indices = [0, 1, 2];
-    vertexData.applyToGeometry(geometry);
-
-    const decodeSpy = vi
-      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
-      .mockResolvedValue(geometry);
-
-    const decoded = await decodeMesh("1", new ArrayBuffer(0), scene);
-
-    expect(Array.from(decoded.indices)).toEqual([0, 2, 1]);
-
-    decodeSpy.mockRestore();
-  });
-});
+  let outward = 0;
+  for (let i = 0; i < vertexCount; i++) {
+    const direction = new Vector3(
+      positions[i * 3]!,
+      positions[i * 3 + 1]!,
+      positions[i * 3 + 2]!
+    )
+      .subtract(centroid)
+      .normalize();
+    const normal = new Vector3(
+      normals[i * 3]!,
+      normals[i * 3 + 1]!,
+      normals[i * 3 + 2]!
+    );
+    if (Vector3.Dot(direction, normal) > 0) outward++;
+  }
+  return outward / vertexCount;
+}
 
 describe("syncStructureVisibility", () => {
   // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
@@ -335,6 +167,102 @@ describe("syncStructureVisibility", () => {
     expect(material.name).toBe("1_material");
     expect(material.diffuseColor.equals(structure.color)).toBe(true);
     expect(material.alpha).toBe(1);
+
+    // Mesh bytes are fetched as a raw array buffer from the structure's own
+    // mesh path.
+    expect(mockedGet).toHaveBeenCalledWith(structure.meshPath, {
+      responseType: "arraybuffer"
+    });
+
+    decodeSpy.mockRestore();
+  });
+
+  it("scales a structure's decoded geometry from nanometers to millimeters", async () => {
+    const scene = makeScene();
+    // A single triangle at (1_000_000, 2_000_000, 3_000_000) nm, mirroring a
+    // Draco-decoded structure mesh, so the resulting mesh should sit at
+    // (1, 2, 3) mm.
+    const vertexData = new VertexData();
+    vertexData.positions = [1_000_000, 2_000_000, 3_000_000, 0, 0, 0, 0, 0, 0];
+    vertexData.indices = [0, 1, 2];
+    const geometry = new Geometry("draco_geometry", scene, vertexData, false);
+    const decodeSpy = vi
+      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
+      .mockResolvedValue(geometry);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    // Positions are float32, so allow for the usual float32 rounding error.
+    const [x, y, z] = Array.from(
+      mesh.getVerticesData(VertexBuffer.PositionKind)!
+    );
+    expect(x).toBeCloseTo(1, 5);
+    expect(y).toBeCloseTo(2, 5);
+    expect(z).toBeCloseTo(3, 5);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("caps a structure's simplified vertex count at 8000", async () => {
+    const scene = makeScene();
+    // A sphere with well over 8000 * 20 vertices, so the 5%-of-original
+    // budget alone would exceed the hard cap and only the cap applies.
+    const denseSphere = MeshBuilder.CreateSphere(
+      "dense",
+      { segments: 200 },
+      scene
+    );
+    const vertexData = new VertexData();
+    vertexData.positions = denseSphere.getVerticesData(
+      VertexBuffer.PositionKind
+    );
+    vertexData.indices = denseSphere.getIndices();
+    const originalVertexCount = denseSphere.getTotalVertices();
+    denseSphere.dispose();
+    // decodeMesh disposes the geometry it's handed once its data is copied
+    // out, so the original count must be read before syncing.
+    const geometry = new Geometry("draco_geometry", scene, vertexData, false);
+    const decodeSpy = vi
+      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
+      .mockResolvedValue(geometry);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.getTotalVertices()).toBeLessThanOrEqual(8000);
+    expect(mesh.getTotalVertices()).toBeLessThan(originalVertexCount);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("corrects a right-handed-wound mesh so its normals face outward", async () => {
+    const scene = makeScene();
+    // BrainGlobe Draco meshes are wound for a right-handed system; decodeMesh
+    // must flip that internally so the scene's (left-handed) lighting sees
+    // outward-facing normals instead of backface-culled, inward-facing ones.
+    const decodeSpy = vi
+      .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
+      .mockImplementation(name =>
+        Promise.resolve(makeRightHandedWoundGeometry(scene, name))
+      );
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructureVisibility(scene, [], [structure], vi.fn());
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(outwardNormalFraction(mesh)).toBeGreaterThan(0.9);
 
     decodeSpy.mockRestore();
   });

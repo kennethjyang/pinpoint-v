@@ -6,7 +6,7 @@ import {
   getProbeInterfaceProbe,
   getProbeNames,
   getVendors
-} from "@/features/probe";
+} from "../api/install-probe.api";
 
 vi.mock("@/features/probe/api/install-probe.api", async importOriginal => {
   const actual =

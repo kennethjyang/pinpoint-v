@@ -1,15 +1,8 @@
 export { default as AtlasPicker } from "./components/AtlasPicker.vue";
 export { default as AtlasHierarchy } from "./components/AtlasHierarchy.vue";
-export {
-  buildHierarchy,
-  toTitleCase,
-  getDefaultStructureIdentifiers
-} from "./api/hierarchy.api";
-export type { HierarchyModel } from "./api/hierarchy.api";
+export { getDefaultStructureIdentifiers } from "./api/hierarchy.api";
 export {
   BRAINGLOBE_BASE_URL,
-  listAtlases,
-  listAtlasesHTTP,
   getTerminologyRows,
   getManifest,
   structureEntityFromIdentifier
