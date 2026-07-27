@@ -8,13 +8,10 @@ import {
 } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { buildHierarchy, HierarchyModel, toTitleCase } from "@/features/atlas";
-import { QScrollArea, QTree, useQuasar } from "quasar";
-import { useI18n } from "vue-i18n";
+import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const currentExperiment = useCurrentExperimentStore();
-const $q = useQuasar();
-const { t } = useI18n();
 
 // Components.
 const tree = useTemplateRef<QTree>("tree");
@@ -29,7 +26,8 @@ const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
 // Fuzzy search across the acronym (label) and the full name.
 const searchQuery = computed(() => filter.value ?? "");
-const { results } = useFuse(searchQuery, currentExperiment.terminologyRows, {
+const terminologyRows = computed(() => currentExperiment.terminologyRows);
+const { results } = useFuse(searchQuery, terminologyRows, {
   fuseOptions: { keys: ["name", "abbreviation"] }
 });
 

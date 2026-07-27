@@ -1,6 +1,5 @@
 export { default as AtlasPicker } from "./components/AtlasPicker.vue";
 export { default as AtlasHierarchy } from "./components/AtlasHierarchy.vue";
-export { fetchAtlasMetadata } from "./api/metadata.api";
 export {
   buildHierarchy,
   toTitleCase,
@@ -18,5 +17,3 @@ export {
 export type { TerminologyRow } from "./models/terminology-row.model";
 export type { Atlas } from "./models/atlas.model";
 export type { Manifest } from "./models/manifest.model";
-export type { AtlasStructure } from "./models/structure.model";
-export type { AtlasMetadata } from "./models/metadata.model";

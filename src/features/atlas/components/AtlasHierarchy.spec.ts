@@ -141,7 +141,7 @@ describe("AtlasHierarchy", () => {
     expect(wrapper.text()).toContain("Basic Cell Groups And Regions");
   });
 
-  it("notifies an error and leaves the tree empty when the fetch fails", async () => {
+  it("leaves the tree empty when the fetch fails", async () => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     const pinia = createPinia();
     setActivePinia(pinia);
@@ -149,14 +149,10 @@ describe("AtlasHierarchy", () => {
       pinia,
       global: { stubs: { QVirtualScroll: QVirtualScrollStub } }
     });
-    const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
     await flushPromises();
     await wrapper.vm.$nextTick();
 
-    expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ color: "negative" })
-    );
     expect(wrapper.findComponent({ name: "QTree" }).props("nodes")).toEqual([]);
   });
 });

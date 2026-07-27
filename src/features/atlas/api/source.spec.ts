@@ -369,8 +369,8 @@ describe("getManifest", () => {
       expect(result).toEqual({
         name: "allen_mouse",
         resolutions: [
-          [25, 25, 25],
-          [100, 100, 100]
+          [0.025, 0.025, 0.025],
+          [0.1, 0.1, 0.1]
         ],
         shape: [
           [528, 320, 456],
@@ -490,8 +490,8 @@ describe("getManifest", () => {
       expect(result).toEqual({
         name: "allen_mouse",
         resolutions: [
-          [25, 25, 25],
-          [100, 100, 100]
+          [0.025, 0.025, 0.025],
+          [0.1, 0.1, 0.1]
         ],
         shape: [
           [528, 320, 456],

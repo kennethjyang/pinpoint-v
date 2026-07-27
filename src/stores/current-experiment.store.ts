@@ -4,9 +4,7 @@ import { computedAsync } from "@vueuse/core";
 import { Experiment } from "@/features/experiment";
 import {
   Atlas,
-  AtlasMetadata,
   BRAINGLOBE_BASE_URL,
-  fetchAtlasMetadata,
   getDefaultStructureIdentifiers,
   getManifest,
   getTerminologyRows,
@@ -73,14 +71,6 @@ export const useCurrentExperimentStore = defineStore(
      * Get the current experiment atlas.
      */
     const atlas = computed(() => experiment.value.atlas);
-
-    /**
-     * Fetch the metadata for the current experiment's atlas.
-     * @deprecated
-     */
-    const metadata = computedAsync<AtlasMetadata | null>(async () =>
-      fetchAtlasMetadata(atlas.value)
-    );
 
     const manifest = computedAsync<Manifest | null>(
       async () => await getManifest(atlas.value)
@@ -172,7 +162,6 @@ export const useCurrentExperimentStore = defineStore(
       setName,
       name,
       atlas,
-      metadata,
       manifest,
       terminologyRows,
       defaultStructureIdentifiers,
@@ -184,8 +173,8 @@ export const useCurrentExperimentStore = defineStore(
     };
   },
   {
-    // Only `experiment` is real state. `metadata`, `manifest`, and
-    // `terminologyRows` are `computedAsync`, which returns a plain
+    // Only `experiment` is real state. `manifest` and `terminologyRows` are
+    // `computedAsync`, which returns a plain
     // `shallowRef` -- pinia's `isComputed` check can't tell that apart from
     // state (it looks for a `.effect` property, which only a `computed`
     // has), so without this `pick` the entire fetched terminology CSV would

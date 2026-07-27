@@ -5,7 +5,6 @@ import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
 import {
-  fetchAtlasMetadata,
   getDefaultStructureIdentifiers,
   getTerminologyRows
 } from "@/features/atlas";
@@ -14,7 +13,6 @@ import { makeAtlas, makeTerminologyRows } from "@/test/fixtures";
 vi.mock("@/features/atlas", () => ({
   BRAINGLOBE_BASE_URL:
     "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
-  fetchAtlasMetadata: vi.fn(),
   getDefaultStructureIdentifiers: vi.fn(),
   getManifest: vi.fn(),
   getTerminologyRows: vi.fn()
@@ -23,11 +21,7 @@ vi.mock("@/features/atlas", () => ({
 describe("useCurrentExperimentStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    vi.mocked(fetchAtlasMetadata).mockReset();
     vi.mocked(getDefaultStructureIdentifiers).mockReset();
-    // Default the async metadata fetch to "not found" so tests that don't
-    // care about it don't hang on a never-resolving promise.
-    vi.mocked(fetchAtlasMetadata).mockResolvedValue(null);
   });
 
   describe("create", () => {
