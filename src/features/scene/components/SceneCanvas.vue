@@ -5,6 +5,7 @@ import {
   onUnmounted,
   ref,
   useTemplateRef,
+  watch,
   watchEffect
 } from "vue";
 import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
@@ -38,8 +39,9 @@ const isLoadingStructures = ref(false);
  * not visible instead of being removed.
  */
 const alwaysPresentStructures = computed<StructureEntity[]>(() => {
-  const { manifest, terminologyRows } = currentExperiment;
-  if (!manifest || !terminologyRows) return [];
+  const { manifest, terminologyRows, areAtlasComponentsEvaluating } =
+    currentExperiment;
+  if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
 
   return currentExperiment.defaultStructureIdentifiers.flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
@@ -55,8 +57,9 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
  * Structures the current experiment has marked visible.
  */
 const visibleStructures = computed<StructureEntity[]>(() => {
-  const { manifest, terminologyRows } = currentExperiment;
-  if (!manifest || !terminologyRows) return [];
+  const { manifest, terminologyRows, areAtlasComponentsEvaluating } =
+    currentExperiment;
+  if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
 
   return currentExperiment.visibleStructures.flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
@@ -121,19 +124,21 @@ onMounted(async () => {
   // Set the camera's initial zoom relative to the AP length of the atlas.
   watchEffect(() => {
     const camera = runtime.camera.value;
-    if (!camera || !currentExperiment.manifest) return;
+    const { manifest, areAtlasComponentsEvaluating } = currentExperiment;
+    if (!camera || !manifest || areAtlasComponentsEvaluating) return;
 
-    setInitialZoom(currentExperiment.manifest, camera);
+    setInitialZoom(manifest, camera);
   });
 
   // Clear the scene whenever the atlas changes.
-  watchEffect(() => {
-    const scene = runtime.scene.value;
-    const atlas = currentExperiment.atlas;
-    if (!scene || !atlas) return;
+  watch(
+    [() => runtime.scene.value, () => currentExperiment.atlas],
+    ([newScene]) => {
+      if (!newScene) return;
 
-    removeAllStructures(scene);
-  });
+      removeAllStructures(newScene);
+    }
+  );
 });
 
 onUnmounted(() => {
