@@ -6,11 +6,10 @@ import {
   getProbeInterfaceProbe,
   getProbeNames,
   getVendors
-} from "../api/install-probe.api";
+} from "../api/install.api";
 
 vi.mock("../api/install-probe.api", async importOriginal => {
-  const actual =
-    await importOriginal<typeof import("../api/install-probe.api")>();
+  const actual = await importOriginal<typeof import("../api/install.api")>();
   return {
     ...actual,
     getVendors: vi.fn(),

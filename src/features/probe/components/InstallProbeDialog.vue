@@ -10,7 +10,7 @@ import {
   getProbeNames,
   getVendors,
   parseProbeInterfaceFile
-} from "../api/install-probe.api";
+} from "../api/install.api";
 
 // Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);

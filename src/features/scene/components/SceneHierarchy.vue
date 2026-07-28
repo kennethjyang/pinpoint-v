@@ -1,22 +1,28 @@
 <script lang="ts" setup>
 import { useQuasar } from "quasar";
-import { ProbeLibraryDialog } from "@/features/probe";
+import { buildProbe, ProbeLibraryDialog } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
+const currentExperiment = useCurrentExperimentStore();
 </script>
 
 <template>
   <div class="column">
     <q-btn-dropdown color="primary" dropdown-icon="add" label="Add Probe">
       <q-list>
-        <q-item v-for="probe of probeLibrary.library" v-close-popup clickable>
+        <q-item
+          v-for="probeInterfaceProbe of probeLibrary.library"
+          v-close-popup
+          v-ripple
+          clickable
+          @click="currentExperiment.addProbe(buildProbe(probeInterfaceProbe))"
+        >
           <q-item-section>
-            <q-item-label>
-              {{ probe.annotations!.manufacturer }}
-              {{ probe.annotations!.model_name }}
-            </q-item-label>
+            {{ probeInterfaceProbe.annotations!.manufacturer }}
+            {{ probeInterfaceProbe.annotations!.model_name }}
           </q-item-section>
         </q-item>
         <q-separator />
@@ -32,8 +38,17 @@ const probeLibrary = useProbeLibraryStore();
       </q-list>
     </q-btn-dropdown>
     <q-list separator>
-      <q-item>
-        <q-item-section>Probe 1</q-item-section>
+      <q-item v-for="probe of currentExperiment.probes" clickable>
+        <q-item-section side>
+          <q-icon :style="{ color: probe.color }" name="radio_button_checked" />
+        </q-item-section>
+        <q-item-section>{{ probe.name }}</q-item-section>
+        <q-item-section side>
+          <div class="row">
+            <q-btn flat icon="visibility" round />
+            <q-btn flat icon="delete" round />
+          </div>
+        </q-item-section>
       </q-item>
     </q-list>
   </div>

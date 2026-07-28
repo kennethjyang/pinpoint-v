@@ -188,6 +188,23 @@ export const useCurrentExperimentStore = defineStore(
 
     const probes = computed<Probe[]>(() => experiment.value.probes);
 
+    /**
+     * Add a probe to the experiment.
+     *
+     * Do nothing if a probe with the same name already exists.
+     * @param probe Probe to add.
+     */
+    function addProbe(probe: Probe) {
+      if (
+        experiment.value.probes.find(
+          existingProbe => existingProbe.name === probe.name
+        )
+      )
+        return;
+
+      experiment.value.probes.push(probe);
+    }
+
     return {
       experiment,
       visibleStructures,
@@ -205,7 +222,8 @@ export const useCurrentExperimentStore = defineStore(
       isStructureVisible,
       setStructureVisibility,
       clearVisibleStructures,
-      probes
+      probes,
+      addProbe
     };
   },
   {

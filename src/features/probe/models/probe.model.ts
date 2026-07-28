@@ -8,11 +8,25 @@ export interface Probe {
   name: string;
 
   color: string;
-  probeInterface: ProbeInterfaceProbe;
+  probeInterfaceProbe: ProbeInterfaceProbe;
 
-  // AP, DV, ML order. ASR orientation. In mm.
+  /**
+   * Internal position representation of the probe tip.
+   * - AP, DV, ML order.
+   * - ASR orientation.
+   * - Relative to atlas origin.
+   * - In mm.
+   *
+   * UI may convert this information for different displays.
+   */
   tipPosition: [number, number, number];
 
-  // Pitch, yaw, roll. Pivot on tip. In Degrees.
+  /**
+   * Internal orientation representation of the probe.
+   * - Roll, yaw, pitch order (aligned to AP, DV, ML order
+   * where zero is electrodes facing superior and tip facing anterior).
+   * - Pivot on tip.
+   * - In radians.
+   */
   orientation: [number, number, number];
 }
