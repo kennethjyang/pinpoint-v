@@ -153,7 +153,7 @@ onUnmounted(() => {
       indeterminate
       color="secondary"
       size="lg"
-      class="absolute-bottom"
+      class="absolute-top"
     />
   </div>
   <q-resize-observer @resize="onResize" />
