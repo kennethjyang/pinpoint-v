@@ -6,10 +6,10 @@ import { Atlas } from "../models/atlas.model";
 import { listAtlases, listAtlasesHTTP } from "../api/source.api";
 import { computedAsync } from "@vueuse/core";
 
-enum SourceToggle {
-  BrainGlobe,
-  Custom
-}
+/**
+ * Atlas source the picker lists atlases from.
+ */
+type SourceToggle = "brainglobe" | "custom";
 
 // Props.
 const selectedAtlas = defineModel<Atlas | null>({ required: true });
@@ -18,7 +18,7 @@ const selectedAtlas = defineModel<Atlas | null>({ required: true });
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
 // State.
-const sourceToggle = ref<SourceToggle>(SourceToggle.BrainGlobe);
+const sourceToggle = ref<SourceToggle>("brainglobe");
 
 /**
  * Custom HTTP host URL.
@@ -37,7 +37,7 @@ const atlasesEvaluating = ref(false);
  */
 const atlases = computedAsync<Atlas[]>(
   async () => {
-    if (sourceToggle.value == SourceToggle.BrainGlobe) {
+    if (sourceToggle.value === "brainglobe") {
       return (await listAtlases()) ?? [];
     } else {
       if (!customHTTPHost.value) return [];
@@ -117,18 +117,15 @@ function isSelected(atlas: Atlas) {
     <q-btn-toggle
       v-model="sourceToggle"
       :options="[
-        {
-          label: $t('atlasPicker.brainglobeHosted'),
-          value: SourceToggle.BrainGlobe
-        },
-        { label: $t('atlasPicker.customHTTPHost'), value: SourceToggle.Custom }
+        { label: $t('atlasPicker.brainglobeHosted'), value: 'brainglobe' },
+        { label: $t('atlasPicker.customHTTPHost'), value: 'custom' }
       ]"
       spread
       toggle-color="primary"
     />
 
     <q-input
-      v-if="sourceToggle === SourceToggle.Custom"
+      v-if="sourceToggle === 'custom'"
       v-model="customHTTPHost"
       :label="$t('atlasPicker.sourceUrl')"
       class="col"
