@@ -1,13 +1,17 @@
 import { ProbeInterfaceProbe } from "@/features/probe";
+import { ProbeVisibility } from "../models/visibility.model";
+import { InspectableKind } from "@/features/scene";
 
 export interface Probe {
-  // Inspectable kind.
-  kind: "probe";
+  // Should always be set to "probe".
+  inspectableKind: InspectableKind;
 
   // Unique identifier.
   name: string;
 
   color: string;
+  visibility: ProbeVisibility;
+
   probeInterfaceProbe: ProbeInterfaceProbe;
 
   /**

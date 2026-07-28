@@ -12,7 +12,7 @@ import {
   Manifest
 } from "@/features/atlas";
 import { Probe } from "@/features/probe";
-import { Entity } from "@/features/scene";
+import { Inspectable } from "@/features/scene";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
@@ -31,7 +31,7 @@ export const useCurrentExperimentStore = defineStore(
       probes: []
     });
 
-    const selectedEntity = ref<Entity | null>(null);
+    const selectedInspectable = ref<Inspectable | null>(null);
 
     /**
      * Create a new experiment with the given name, atlas, and reference
@@ -205,7 +205,7 @@ export const useCurrentExperimentStore = defineStore(
         return;
 
       experiment.value.probes.push(probe);
-      selectedEntity.value = probe;
+      selectedInspectable.value = probe;
     }
 
     /**
@@ -222,8 +222,8 @@ export const useCurrentExperimentStore = defineStore(
       experiment.value.probes.splice(probeIndex, 1);
 
       // Deselects it.
-      if (isEntitySelected(probe)) {
-        selectedEntity.value = null;
+      if (isInspectableSelected(probe)) {
+        selectedInspectable.value = null;
       }
     }
 
@@ -231,14 +231,15 @@ export const useCurrentExperimentStore = defineStore(
      * Helper to determine if the passed entity is the actively selected one.
      * @param entity
      */
-    function isEntitySelected(entity: Entity): boolean {
-      if (!selectedEntity.value) return false;
+    function isInspectableSelected(entity: Inspectable): boolean {
+      if (!selectedInspectable.value) return false;
 
-      if (selectedEntity.value.kind !== entity.kind) return false;
+      if (selectedInspectable.value.inspectableKind !== entity.inspectableKind)
+        return false;
 
-      switch (selectedEntity.value.kind) {
+      switch (selectedInspectable.value.inspectableKind) {
         case "probe":
-          return selectedEntity.value.name === entity.name;
+          return selectedInspectable.value.name === entity.name;
         default:
           return false;
       }
@@ -246,7 +247,7 @@ export const useCurrentExperimentStore = defineStore(
 
     return {
       experiment,
-      selectedEntity,
+      selectedInspectable,
       visibleStructures,
       create,
       setName,
@@ -265,7 +266,7 @@ export const useCurrentExperimentStore = defineStore(
       probes,
       addProbe,
       removeProbe,
-      isEntitySelected
+      isInspectableSelected
     };
   },
   {

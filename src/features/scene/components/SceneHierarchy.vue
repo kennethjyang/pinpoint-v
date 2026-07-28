@@ -1,12 +1,34 @@
 <script lang="ts" setup>
 import { useQuasar } from "quasar";
-import { buildProbe, ProbeLibraryDialog } from "@/features/probe";
+import {
+  buildProbe,
+  Probe,
+  ProbeLibraryDialog,
+  rotateProbeVisibility
+} from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
 const currentExperiment = useCurrentExperimentStore();
+
+/**
+ * Convert probe visibility state to icon name.
+ * @param probe Probe to extract visibility info from.
+ */
+function probeVisibilityIcon(probe: Probe): string {
+  switch (probe.visibility) {
+    case "visible":
+      return "sym_o_visibility";
+    case "shanks":
+      return "sym_o_undereye";
+    case "hidden":
+      return "sym_o_visibility_off";
+    default:
+      return "sym_o_visibility";
+  }
+}
 </script>
 
 <template>
@@ -42,9 +64,9 @@ const currentExperiment = useCurrentExperimentStore();
         v-for="probe of currentExperiment.probes"
         :key="probe.name"
         v-ripple
-        :active="currentExperiment.isEntitySelected(probe)"
+        :active="currentExperiment.isInspectableSelected(probe)"
         clickable
-        @click="currentExperiment.selectedEntity = probe"
+        @click="currentExperiment.selectedInspectable = probe"
       >
         <q-item-section side>
           <q-icon :style="{ color: probe.color }" name="radio_button_checked" />
@@ -52,11 +74,17 @@ const currentExperiment = useCurrentExperimentStore();
         <q-item-section>{{ probe.name }}</q-item-section>
         <q-item-section side>
           <div class="row">
-            <q-btn flat icon="visibility" round />
+            <q-btn
+              :icon="probeVisibilityIcon(probe)"
+              class="probe--visibility-button"
+              flat
+              round
+              @click="rotateProbeVisibility(probe)"
+            />
             <q-btn
               flat
-              icon="delete"
               round
+              icon="delete"
               @click="currentExperiment.removeProbe(probe)"
             />
           </div>
@@ -66,4 +94,7 @@ const currentExperiment = useCurrentExperimentStore();
   </div>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+.probe--visibility-button
+  font-variation-settings: 'FILL' 1
+</style>
