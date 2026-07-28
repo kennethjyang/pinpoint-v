@@ -12,6 +12,7 @@ import {
   Manifest
 } from "@/features/atlas";
 import { Probe } from "@/features/probe";
+import { Entity } from "@/features/scene";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
@@ -29,6 +30,8 @@ export const useCurrentExperimentStore = defineStore(
       visibleStructures: [],
       probes: []
     });
+
+    const selectedEntity = ref<Entity | null>(null);
 
     /**
      * Create a new experiment with the given name, atlas, and reference
@@ -218,8 +221,26 @@ export const useCurrentExperimentStore = defineStore(
       experiment.value.probes.splice(probeIndex, 1);
     }
 
+    /**
+     * Helper to determine if the passed entity is the actively selected one.
+     * @param entity
+     */
+    function isEntitySelected(entity: Entity): boolean {
+      if (!selectedEntity.value) return false;
+
+      if (selectedEntity.value.kind !== entity.kind) return false;
+
+      switch (selectedEntity.value.kind) {
+        case "probe":
+          return selectedEntity.value.name === entity.name;
+        default:
+          return false;
+      }
+    }
+
     return {
       experiment,
+      selectedEntity,
       visibleStructures,
       create,
       setName,
@@ -237,7 +258,8 @@ export const useCurrentExperimentStore = defineStore(
       clearVisibleStructures,
       probes,
       addProbe,
-      removeProbe
+      removeProbe,
+      isEntitySelected
     };
   },
   {
