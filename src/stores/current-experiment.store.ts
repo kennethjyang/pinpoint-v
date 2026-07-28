@@ -191,7 +191,7 @@ export const useCurrentExperimentStore = defineStore(
     const probes = computed<Probe[]>(() => experiment.value.probes);
 
     /**
-     * Add a probe to the experiment.
+     * Add a probe to the experiment and select it.
      *
      * Do nothing if a probe with the same name already exists.
      * @param probe Probe to add.
@@ -205,12 +205,13 @@ export const useCurrentExperimentStore = defineStore(
         return;
 
       experiment.value.probes.push(probe);
+      selectedEntity.value = probe;
     }
 
     /**
      * Remove probe from experiment.
      *
-     * Do nothing if the probe is not in the experiment.
+     * Do nothing if the probe is not in the experiment. Deselects it as well.
      * @param probe Probe to remove.
      */
     function removeProbe(probe: Probe) {
@@ -219,6 +220,11 @@ export const useCurrentExperimentStore = defineStore(
       );
       if (probeIndex === -1) return;
       experiment.value.probes.splice(probeIndex, 1);
+
+      // Deselects it.
+      if (isEntitySelected(probe)) {
+        selectedEntity.value = null;
+      }
     }
 
     /**
