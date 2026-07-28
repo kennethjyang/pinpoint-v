@@ -102,7 +102,7 @@ const filteredNonFavorites = computed(() =>
 /**
  * Compare atlases by identity fields, since instances are not stable references.
  */
-function isSelected(atlas: Atlas) {
+function isSelected(atlas: Atlas): boolean {
   return (
     selectedAtlas.value?.source === atlas.source &&
     selectedAtlas.value?.name === atlas.name

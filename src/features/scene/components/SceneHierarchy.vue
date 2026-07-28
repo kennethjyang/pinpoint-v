@@ -3,10 +3,31 @@ import { useQuasar } from "quasar";
 import { buildProbe, ProbeLibraryDialog } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { ref } from "vue";
+import { Entity } from "../models/entity.model";
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
 const currentExperiment = useCurrentExperimentStore();
+
+const selectedEntity = ref<Entity | null>(null);
+
+/**
+ * Helper to determine if the passed entity is the actively selected one.
+ * @param entity
+ */
+function isSelected(entity: Entity): boolean {
+  if (!selectedEntity.value) return false;
+
+  if (selectedEntity.value.kind !== entity.kind) return false;
+
+  switch (selectedEntity.value.kind) {
+    case "probe":
+      return selectedEntity.value.name === entity.name;
+    default:
+      return false;
+  }
+}
 </script>
 
 <template>
@@ -38,7 +59,14 @@ const currentExperiment = useCurrentExperimentStore();
       </q-list>
     </q-btn-dropdown>
     <q-list separator>
-      <q-item v-for="probe of currentExperiment.probes" clickable>
+      <q-item
+        v-for="probe of currentExperiment.probes"
+        :key="probe.name"
+        v-ripple
+        :active="isSelected(probe)"
+        clickable
+        @click="selectedEntity = probe"
+      >
         <q-item-section side>
           <q-icon :style="{ color: probe.color }" name="radio_button_checked" />
         </q-item-section>
