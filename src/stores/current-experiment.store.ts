@@ -173,9 +173,8 @@ export const useCurrentExperimentStore = defineStore(
         }
       } else {
         const index = visibleStructures.value.indexOf(identifier);
-        if (index !== -1) {
-          visibleStructures.value.splice(index, 1);
-        }
+        if (index === -1) return;
+        visibleStructures.value.splice(index, 1);
       }
     }
 
@@ -205,6 +204,20 @@ export const useCurrentExperimentStore = defineStore(
       experiment.value.probes.push(probe);
     }
 
+    /**
+     * Remove probe from experiment.
+     *
+     * Do nothing if the probe is not in the experiment.
+     * @param probe Probe to remove.
+     */
+    function removeProbe(probe: Probe) {
+      const probeIndex = experiment.value.probes.findIndex(
+        experimentProbe => experimentProbe.name === probe.name
+      );
+      if (probeIndex === -1) return;
+      experiment.value.probes.splice(probeIndex, 1);
+    }
+
     return {
       experiment,
       visibleStructures,
@@ -223,17 +236,11 @@ export const useCurrentExperimentStore = defineStore(
       setStructureVisibility,
       clearVisibleStructures,
       probes,
-      addProbe
+      addProbe,
+      removeProbe
     };
   },
   {
-    // Only `experiment` is real state. `manifest` and `terminologyRows` are
-    // `computedAsync`, which returns a plain
-    // `shallowRef` -- pinia's `isComputed` check can't tell that apart from
-    // state (it looks for a `.effect` property, which only a `computed`
-    // has), so without this `pick` the entire fetched terminology CSV would
-    // be persisted to `localStorage` and hydrated back on startup, ahead of
-    // (and then overwritten by) the actual fetch.
     persist: { pick: ["experiment"] }
   }
 );

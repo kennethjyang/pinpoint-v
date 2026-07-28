@@ -21,6 +21,7 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Add or update tests when behavior changes, including meaningful untested branches.
 - Do not export implementation details solely to enable testing; test through public APIs.
 - Put all user-visible strings in i18n resources.
+- Add concise comments over blocks of implementation and use tsdoc for methods. Avoid long explanatory comments.
 
 ## Tooling
 

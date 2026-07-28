@@ -74,7 +74,12 @@ function isSelected(entity: Entity): boolean {
         <q-item-section side>
           <div class="row">
             <q-btn flat icon="visibility" round />
-            <q-btn flat icon="delete" round />
+            <q-btn
+              flat
+              icon="delete"
+              round
+              @click="currentExperiment.removeProbe(probe)"
+            />
           </div>
         </q-item-section>
       </q-item>
