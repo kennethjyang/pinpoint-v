@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { SceneCanvas } from "@/features/scene";
+import { SceneCanvas, SceneHierarchy } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
 import { NewExperimentDialog } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
-import { SplashDialog } from "@/features/splash";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -77,7 +76,7 @@ function fixedQPageHeight(offset: number) {
 
 onMounted(() => {
   // Show splash.
-  $q.dialog({ component: SplashDialog });
+  // $q.dialog({ component: SplashDialog });
 });
 </script>
 
@@ -158,7 +157,7 @@ onMounted(() => {
       </q-tabs>
       <q-separator />
       <q-tab-panels v-model="tab" animated class="col">
-        <q-tab-panel name="scene">{{ $t("layout.scene") }}</q-tab-panel>
+        <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")
         }}</q-tab-panel>
