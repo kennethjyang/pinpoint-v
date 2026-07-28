@@ -1,4 +1,5 @@
 import { Atlas } from "@/features/atlas";
+import { Probe } from "@/features/probe";
 
 export interface Experiment {
   name: string;
@@ -15,4 +16,6 @@ export interface Experiment {
    * Identifiers of the atlas structures currently marked visible.
    */
   visibleStructures: number[];
+
+  probes: Probe[];
 }

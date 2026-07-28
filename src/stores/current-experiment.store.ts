@@ -11,6 +11,7 @@ import {
   getTerminologyRows,
   Manifest
 } from "@/features/atlas";
+import { Probe } from "@/features/probe";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
@@ -25,7 +26,8 @@ export const useCurrentExperimentStore = defineStore(
         name: "allen_mouse"
       },
       referenceCoordinate: [5.7, 0.44, 5.4],
-      visibleStructures: []
+      visibleStructures: [],
+      probes: []
     });
 
     /**
@@ -45,7 +47,8 @@ export const useCurrentExperimentStore = defineStore(
         name,
         atlas,
         referenceCoordinate,
-        visibleStructures: []
+        visibleStructures: [],
+        probes: []
       };
     }
 
@@ -183,6 +186,8 @@ export const useCurrentExperimentStore = defineStore(
       experiment.value.visibleStructures = [];
     }
 
+    const probes = computed<Probe[]>(() => experiment.value.probes);
+
     return {
       experiment,
       visibleStructures,
@@ -199,7 +204,8 @@ export const useCurrentExperimentStore = defineStore(
       referenceCoordinate,
       isStructureVisible,
       setStructureVisibility,
-      clearVisibleStructures
+      clearVisibleStructures,
+      probes
     };
   },
   {
