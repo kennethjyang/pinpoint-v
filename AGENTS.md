@@ -21,7 +21,7 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Add or update tests when behavior changes, including meaningful untested branches.
 - Do not export implementation details solely to enable testing; test through public APIs.
 - Put all user-visible strings in i18n resources.
-- Add concise comments over blocks of implementation and use tsdoc for methods. Avoid long explanatory comments.
+  Add TSDoc to every function. Keep it to 1-2 concise lines describing the function and its inputs/outputs. Avoid implementation details, extended rationale, performance explanations, and narrative comments. Use brief block comments only for non-obvious code. Surface notable tradeoffs, concerns, or implementation context in your response to the user, not in code comments.
 
 ## Tooling
 
