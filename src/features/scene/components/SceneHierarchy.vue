@@ -2,6 +2,7 @@
 import { useQuasar } from "quasar";
 import {
   buildProbe,
+  getProbeIdentifier,
   Probe,
   ProbeLibraryDialog,
   rotateProbeVisibility
@@ -37,6 +38,7 @@ function probeVisibilityIcon(probe: Probe): string {
       <q-list>
         <q-item
           v-for="probeInterfaceProbe of probeLibrary.library"
+          :key="getProbeIdentifier(probeInterfaceProbe)"
           v-close-popup
           v-ripple
           clickable
@@ -49,8 +51,7 @@ function probeVisibilityIcon(probe: Probe): string {
           "
         >
           <q-item-section>
-            {{ probeInterfaceProbe.annotations!.manufacturer }}
-            {{ probeInterfaceProbe.annotations!.model_name }}
+            {{ getProbeIdentifier(probeInterfaceProbe) }}
           </q-item-section>
         </q-item>
         <q-separator />

@@ -7,17 +7,17 @@ import { STANDARD_COLORS } from "@/features/scene";
  * Returns a probe referencing the given probe interface definition, which
  * must already be interned into the experiment (see
  * `useCurrentExperimentStore().internProbeInterfaceProbe`).
- * @param probeInterfaceProbeId Id of the definition, as interned into the
+ * @param probeIdentifier Identifier of the definition, as interned into the
  * experiment's `probeInterfaceProbes`.
  */
-export function buildProbe(probeInterfaceProbeId: string): Probe {
+export function buildProbe(probeIdentifier: string): Probe {
   const uniqueName = crypto.randomUUID().slice(0, 8);
   return {
     inspectableKind: "probe",
     name: `Probe ${uniqueName}`,
     color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
     visibility: "visible",
-    probeInterfaceProbeId,
+    probeIdentifier,
     tipPosition: [0, 0, 0],
     orientation: [0, 0, 0]
   };
@@ -32,7 +32,7 @@ export function buildProbe(probeInterfaceProbeId: string): Probe {
 export function getProbeIdentifier(
   probeInterfaceProbe: ProbeInterfaceProbe
 ): string {
-  return `${probeInterfaceProbe.annotations!.manufacturer} ${probeInterfaceProbe.annotations!.model_name}`;
+  return `${String(probeInterfaceProbe.annotations!.manufacturer)} ${String(probeInterfaceProbe.annotations!.model_name)}`;
 }
 
 /**

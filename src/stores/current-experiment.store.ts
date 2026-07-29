@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref, toRaw } from "vue";
+import { computed, ref } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { Experiment } from "@/features/experiment";
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/features/atlas";
 import {
   detachProbeInterfaceProbe,
+  getProbeIdentifier,
   Probe,
   ProbeInterfaceProbe
 } from "@/features/probe";
@@ -29,7 +30,7 @@ export const useCurrentExperimentStore = defineStore(
       },
       referenceCoordinate: [5.7, 0.44, 5.4],
       visibleStructures: [],
-      probeInterfaceProbes: [],
+      probeInterfaceProbes: {},
       probes: []
     });
 
@@ -101,51 +102,38 @@ export const useCurrentExperimentStore = defineStore(
     const probes = computed<Probe[]>(() => experiment.value.probes);
 
     /**
-     * Probe interface definitions used by this experiment's probes.
+     * Probe interface definitions used by this experiment's probes, keyed by
+     * probe identifier.
      */
     const probeInterfaceProbes = computed(
       () => experiment.value.probeInterfaceProbes
     );
 
     /**
-     * Intern a probe interface definition into the experiment, deduping
-     * against definitions already present, and return its id.
-     *
-     * The returned definition is detached from Vue's reactivity (see
-     * `detachProbeInterfaceProbe`) so that the (possibly large) definition
-     * doesn't get deep-traversed on every store mutation.
+     * Intern a probe interface definition into the experiment and return its
+     * identifier, keeping the existing definition if one is already interned
+     * under that identifier.
      * @param probeInterfaceProbe Probe interface definition to intern, e.g.
      * from the probe library.
      */
     function internProbeInterfaceProbe(
       probeInterfaceProbe: ProbeInterfaceProbe
     ): string {
-      const key = JSON.stringify(toRaw(probeInterfaceProbe));
-      const existing = experiment.value.probeInterfaceProbes.find(
-        entry => JSON.stringify(entry.probeInterfaceProbe) === key
-      );
-      if (existing) return existing.id;
-
-      const id = crypto.randomUUID();
-      experiment.value.probeInterfaceProbes.push({
-        id,
-        probeInterfaceProbe: detachProbeInterfaceProbe(probeInterfaceProbe)
-      });
-      return id;
+      const identifier = getProbeIdentifier(probeInterfaceProbe);
+      if (!experiment.value.probeInterfaceProbes[identifier]) {
+        experiment.value.probeInterfaceProbes[identifier] =
+          detachProbeInterfaceProbe(probeInterfaceProbe);
+      }
+      return identifier;
     }
 
     /**
-     * Resolve a probe's interface definition.
-     *
-     * Returns null if the probe's definition isn't in the experiment, e.g.
-     * an experiment persisted before `probeInterfaceProbes` was introduced.
+     * Resolve a probe's interface definition, or null if it isn't interned.
      * @param probe Probe to resolve the definition of.
      */
     function probeInterfaceProbeFor(probe: Probe): ProbeInterfaceProbe | null {
       return (
-        experiment.value.probeInterfaceProbes.find(
-          entry => entry.id === probe.probeInterfaceProbeId
-        )?.probeInterfaceProbe ?? null
+        experiment.value.probeInterfaceProbes[probe.probeIdentifier] ?? null
       );
     }
 
@@ -184,15 +172,10 @@ export const useCurrentExperimentStore = defineStore(
 
       const stillReferenced = experiment.value.probes.some(
         experimentProbe =>
-          experimentProbe.probeInterfaceProbeId ===
-          removed!.probeInterfaceProbeId
+          experimentProbe.probeIdentifier === removed!.probeIdentifier
       );
       if (!stillReferenced) {
-        const definitionIndex = experiment.value.probeInterfaceProbes.findIndex(
-          entry => entry.id === removed!.probeInterfaceProbeId
-        );
-        if (definitionIndex !== -1)
-          experiment.value.probeInterfaceProbes.splice(definitionIndex, 1);
+        delete experiment.value.probeInterfaceProbes[removed!.probeIdentifier];
       }
 
       // Deselects it.
@@ -243,12 +226,14 @@ export const useCurrentExperimentStore = defineStore(
     persist: {
       pick: ["experiment"],
 
-      // Re-mark probe instance definitions as raw to prevent tracking.
+      // Re-mark probe interface definitions as raw to prevent tracking.
       afterHydrate: context => {
-        for (const entry of context.store.experiment.probeInterfaceProbes) {
-          entry.probeInterfaceProbe = detachProbeInterfaceProbe(
-            entry.probeInterfaceProbe
-          );
+        const experiment: Experiment = context.store.experiment;
+        for (const [identifier, definition] of Object.entries(
+          experiment.probeInterfaceProbes
+        )) {
+          experiment.probeInterfaceProbes[identifier] =
+            detachProbeInterfaceProbe(definition);
         }
       }
     }

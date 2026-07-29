@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import InstallProbeDialog from "./InstallProbeDialog.vue";
+import { getProbeIdentifier } from "../api/probe.api";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 
 // Setup dialog.
@@ -32,12 +33,9 @@ function installProbe() {
         <q-list class="dialog-list" separator>
           <q-item
             v-for="probe in probeLibraryStore.library"
-            :key="`${probe.annotations!.manufacturer}-${probe.annotations!.model_name}`"
+            :key="getProbeIdentifier(probe)"
           >
-            <q-item-section
-              >{{ probe.annotations!.manufacturer }}
-              {{ probe.annotations!.model_name }}</q-item-section
-            >
+            <q-item-section>{{ getProbeIdentifier(probe) }}</q-item-section>
             <q-item-section side>
               <q-btn
                 flat

@@ -1,16 +1,6 @@
 import { Atlas } from "@/features/atlas";
 import { Probe, ProbeInterfaceProbe } from "@/features/probe";
 
-/**
- * A probe interface definition carried by an experiment, addressed by a
- * stable id so the file stays self-contained and portable, and so probes
- * can reference it without duplicating or reactively wrapping its data.
- */
-export interface ExperimentProbeInterfaceProbe {
-  id: string;
-  probeInterfaceProbe: ProbeInterfaceProbe;
-}
-
 export interface Experiment {
   name: string;
   atlas: Atlas;
@@ -28,12 +18,10 @@ export interface Experiment {
   visibleStructures: number[];
 
   /**
-   * Probe interface definitions used by this experiment's probes, stored
-   * once each (deduped) and referenced by id from `Probe.probeInterfaceProbeId`.
-   * Carrying these here (rather than only in the probe library) is what
-   * makes an experiment self-contained and portable across machines.
+   * Probe interface definitions used by this experiment's probes, keyed by
+   * probe identifier and referenced from `Probe.probeIdentifier`.
    */
-  probeInterfaceProbes: ExperimentProbeInterfaceProbe[];
+  probeInterfaceProbes: Record<string, ProbeInterfaceProbe>;
 
   probes: Probe[];
 }

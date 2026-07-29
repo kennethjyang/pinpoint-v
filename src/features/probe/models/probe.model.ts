@@ -12,13 +12,10 @@ export interface Probe {
   visibility: ProbeVisibility;
 
   /**
-   * Id into `Experiment.probeInterfaceProbes`, the experiment-local, deduped
-   * store of probe interface definitions. Kept as a reference rather than
-   * embedding the definition directly so that reactively watching a probe
-   * (e.g. for persistence) doesn't have to traverse its definition's
-   * thousands of nested contact entries.
+   * Key into `Experiment.probeInterfaceProbes`, as produced by
+   * `getProbeIdentifier`.
    */
-  probeInterfaceProbeId: string;
+  probeIdentifier: string;
 
   /**
    * Internal position representation of the probe tip.
