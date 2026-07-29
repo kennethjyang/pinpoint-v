@@ -98,38 +98,6 @@ export const useCurrentExperimentStore = defineStore(
       }
     });
 
-    /**
-     * Is the structure visible on the atlas in the experiment.
-     * @param identifier Identifier of the structure to check.
-     */
-    function isStructureVisible(identifier: number) {
-      return visibleStructures.value.includes(identifier);
-    }
-
-    /**
-     * Set the visibility of the structure in the atlas.
-     * @param identifier Identifier of the structure to set the visibility of.
-     * @param value Is the structure visible or not.
-     */
-    function setStructureVisibility(identifier: number, value: boolean) {
-      if (value) {
-        if (!isStructureVisible(identifier)) {
-          visibleStructures.value.push(identifier);
-        }
-      } else {
-        const index = visibleStructures.value.indexOf(identifier);
-        if (index === -1) return;
-        visibleStructures.value.splice(index, 1);
-      }
-    }
-
-    /**
-     * Reset visible structures.
-     */
-    function clearVisibleStructures() {
-      experiment.value.visibleStructures = [];
-    }
-
     const probes = computed<Probe[]>(() => experiment.value.probes);
 
     /**
@@ -262,9 +230,6 @@ export const useCurrentExperimentStore = defineStore(
       terminologyRows,
       areAtlasComponentsEvaluating,
       referenceCoordinate,
-      isStructureVisible,
-      setStructureVisibility,
-      clearVisibleStructures,
       probes,
       probeInterfaceProbes,
       internProbeInterfaceProbe,

@@ -14,6 +14,11 @@ import {
 } from "../api/hierarchy.api";
 import { QScrollArea, QTree } from "quasar";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import {
+  clearVisibleStructures,
+  isStructureVisible,
+  setStructureVisibility
+} from "@/features/experiment";
 
 const currentExperiment = useCurrentExperimentStore();
 
@@ -74,12 +79,16 @@ watchPostEffect(() => {
             <q-item-section side>
               <q-checkbox
                 :model-value="
-                  currentExperiment.isStructureVisible(node.identifier)
+                  isStructureVisible(
+                    currentExperiment.experiment,
+                    node.identifier
+                  )
                 "
                 dense
                 @update:model-value="
                   visible =>
-                    currentExperiment.setStructureVisibility(
+                    setStructureVisibility(
+                      currentExperiment.experiment,
                       node.identifier,
                       visible
                     )
@@ -126,7 +135,7 @@ watchPostEffect(() => {
       <q-btn
         icon="clear_all"
         :label="$t('atlasHierarchy.clear')"
-        @click="currentExperiment.clearVisibleStructures"
+        @click="clearVisibleStructures(currentExperiment.experiment)"
       />
     </template>
   </div>

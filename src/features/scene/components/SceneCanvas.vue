@@ -60,7 +60,7 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
 /**
  * Structures the current experiment has marked visible.
  */
-const visibleStructures = computed<StructureEntity[]>(() => {
+const visibleStructureEntities = computed<StructureEntity[]>(() => {
   const { manifest, terminologyRows, areAtlasComponentsEvaluating } =
     currentExperiment;
   if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
@@ -102,7 +102,7 @@ onMounted(async () => {
       await syncStructureVisibility(
         scene,
         alwaysPresentStructures.value,
-        visibleStructures.value
+        visibleStructureEntities.value
       );
     } catch {
       $q.notify({

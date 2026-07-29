@@ -18,10 +18,13 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Keep changes focused; do not refactor unrelated code unless explicitly tasked.
 - Preserve existing public APIs unless an idiomatic change requires updating them.
 - Design APIs to be as functional and pure as possible: prefer functions that take explicit inputs and return values over functions that read or mutate shared state. Pure APIs are inherently easier to test in isolation.
+- When dealing with Pinia stores, prefer mutation of state. Even in pure function settings.
 - Add or update tests when behavior changes, including meaningful untested branches.
 - Do not export implementation details solely to enable testing; test through public APIs.
 - Put all user-visible strings in i18n resources.
-  Add TSDoc to every function. Keep it to 1-2 concise lines describing the function and its inputs/outputs. Avoid implementation details, extended rationale, performance explanations, and narrative comments. Use brief block comments only for non-obvious code. Surface notable tradeoffs, concerns, or implementation context in your response to the user, not in code comments.
+- Add TSDoc to every function. Keep it to 1-2 concise lines describing the function and its inputs/outputs. Avoid implementation details, extended rationale, performance explanations, and narrative comments. Use brief block comments only for non-obvious code. Surface notable tradeoffs, concerns, or implementation context in your response to the user, not in code comments.
+- When modifying Pinia stores, do not try to engineer for backwards compatibility.
+- Pure functions that mutate or use some object should have the object be the first argument.
 
 ## Tooling
 
