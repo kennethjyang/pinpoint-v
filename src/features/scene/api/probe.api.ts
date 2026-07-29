@@ -173,7 +173,7 @@ export function disposeProbe(scene: Scene, probeId: string): void {
     .getMaterialByName(probeEntityName(probeId, PROBE_MATERIAL_SUFFIX))
     ?.dispose();
   scene
-    .getMaterialByName(probeEntityName(probe.id, CONTACTS_MATERIAL_SUFFIX))
+    .getMaterialByName(probeEntityName(probeId, CONTACTS_MATERIAL_SUFFIX))
     ?.dispose();
 }
 
@@ -495,10 +495,11 @@ function buildContactsMesh(
     },
     scene
   );
+  mesh.rotation = new Vector3(Math.PI / 2, 0, 0);
   mesh.position = new Vector3(
     contactsBox.centerX,
+    SHANK_THICKNESS_MILLIMETERS / 2 + CONTACTS_CLEARANCE_MILLIMETERS,
     contactsBox.centerY,
-    SHANK_THICKNESS_MILLIMETERS / 2 + CONTACTS_CLEARANCE_MILLIMETERS
   );
   return mesh;
 }
