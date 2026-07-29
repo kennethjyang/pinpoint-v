@@ -9,8 +9,8 @@ import {
   Vector3
 } from "@babylonjs/core";
 import earcut from "earcut";
-import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Experiment } from "@/features/experiment";
+import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
@@ -60,8 +60,7 @@ const ROD_RADIUS_MILLIMETERS = 8;
 const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
   m: 1000,
   mm: 1,
-  um: 1e-3,
-  µm: 1e-3
+  um: 1e-3
 };
 
 /** Fallback conversion factor for an unrecognized `si_units` value. */
@@ -121,6 +120,31 @@ export function buildProbe(
 }
 
 /**
+ * Dispose a probe's transform node, its meshes, and its own material,
+ * leaving shared materials (e.g. `rod_material`) untouched.
+ * @param scene Scene the probe was built in.
+ * @param probe Probe to remove any existing entity for.
+ */
+export function disposeProbe(scene: Scene, probe: Probe): void {
+  scene
+    .getTransformNodeByName(probeEntityName(probe.id, PROBE_NODE_SUFFIX))
+    ?.dispose(false, false);
+  scene
+    .getMaterialByName(probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX))
+    ?.dispose();
+}
+
+/**
+ * Sync each probe entity to the visibility model.
+ * @param scene Scene to modify entities in.
+ * @param experiment Experiment with probe models to get visibility from.
+ */
+export function syncProbeVisibility(scene: Scene, experiment: Experiment) {
+  console.log(scene);
+  console.log(experiment);
+}
+
+/**
  * Reduce a probe interface definition's planar contour to millimeters,
  * re-origined on its center tip. Returns null if the contour is missing or
  * has too few usable points.
@@ -162,21 +186,6 @@ function buildProbeContour(
     width: maximumX - minimumX,
     height: maximumY - minimumY
   };
-}
-
-/**
- * Dispose a probe's transform node, its meshes, and its own material,
- * leaving shared materials (e.g. `rod_material`) untouched.
- * @param scene Scene the probe was built in.
- * @param probe Probe to remove any existing entity for.
- */
-function disposeProbe(scene: Scene, probe: Probe): void {
-  scene
-    .getTransformNodeByName(probeEntityName(probe.id, PROBE_NODE_SUFFIX))
-    ?.dispose(false, false);
-  scene
-    .getMaterialByName(probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX))
-    ?.dispose();
 }
 
 /**
@@ -241,6 +250,7 @@ function buildHeadStageMesh(
   contour: ProbeContour,
   name: string
 ): Mesh {
+  // noinspection JSSuspiciousNameCombination
   const mesh = MeshBuilder.CreateCylinder(
     name,
     {
@@ -292,14 +302,4 @@ function buildRodMaterial(scene: Scene): StandardMaterial {
   const material = new StandardMaterial(ROD_MATERIAL_NAME, scene);
   material.diffuseColor = Color3.Gray();
   return material;
-}
-
-/**
- * Sync each probe entity to the visibility model.
- * @param scene Scene to modify entities in.
- * @param experiment Experiment with probe models to get visibility from.
- */
-export function syncProbeVisibility(scene: Scene, experiment: Experiment) {
-  console.log(scene);
-  console.log(experiment);
 }
