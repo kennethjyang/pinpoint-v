@@ -5,6 +5,7 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { buildInitialReferenceCoordinate } from "../api/reference-coordinate.api";
 import { useI18n } from "vue-i18n";
+import { buildExperiment } from "@/features/experiment";
 
 defineEmits([...useDialogPluginComponent.emits]);
 
@@ -46,7 +47,11 @@ async function create() {
   const referenceCoordinate = buildInitialReferenceCoordinate(manifest);
 
   // Build experiment and set current.
-  currentExperimentStore.create(name.value, atlas.value, referenceCoordinate);
+  currentExperimentStore.experiment = buildExperiment(
+    name.value,
+    atlas.value,
+    referenceCoordinate
+  );
 
   // Close.
   onDialogOK();

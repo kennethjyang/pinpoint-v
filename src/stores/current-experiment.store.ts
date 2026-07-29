@@ -3,10 +3,7 @@ import { computed, ref, toRaw } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { Experiment } from "@/features/experiment";
 import {
-  Atlas,
   BRAINGLOBE_BASE_URL,
-  getAtlasCenter,
-  getDefaultStructureIdentifiers,
   getManifest,
   getTerminologyRows,
   Manifest
@@ -39,35 +36,21 @@ export const useCurrentExperimentStore = defineStore(
     const selectedInspectable = ref<Inspectable | null>(null);
 
     /**
-     * Create a new experiment with the given name, atlas, and reference
-     * coordinate.
-     * @param name Experiment name.
-     * @param atlas Full atlas object.
-     * @param referenceCoordinate Reference coordinate (in ASR, mm) marking
-     * the experiment's landmark of interest within the atlas.
+     * Flag for when the manifest is being updated to match the new atlas.
      */
-    function create(
-      name: string,
-      atlas: Atlas,
-      referenceCoordinate: [number, number, number]
-    ) {
-      experiment.value = {
-        name,
-        atlas,
-        referenceCoordinate,
-        visibleStructures: [],
-        probeInterfaceProbes: [],
-        probes: []
-      };
-    }
+    const isManifestEvaluating = ref(false);
 
     /**
-     * Set the name of the experiment.
-     * @param name Experiment name.
+     * Flag for when the terminology rows are being updated to match the new atlas.
      */
-    function setName(name: string) {
-      experiment.value.name = name;
-    }
+    const isTerminologyRowsEvaluating = ref(false);
+
+    /**
+     * Are the getters into the current atlas still evaluating.
+     */
+    const areAtlasComponentsEvaluating = computed(
+      () => isManifestEvaluating.value || isTerminologyRowsEvaluating.value
+    );
 
     /**
      * Get the current experiment name.
@@ -80,11 +63,6 @@ export const useCurrentExperimentStore = defineStore(
     const atlas = computed(() => experiment.value.atlas);
 
     /**
-     * Flag for when the manifest is being updated to match the new atlas.
-     */
-    const isManifestEvaluating = ref(false);
-
-    /**
      * Manifest of the current atlas.
      */
     const manifest = computedAsync<Manifest | null>(
@@ -92,11 +70,6 @@ export const useCurrentExperimentStore = defineStore(
       null,
       isManifestEvaluating
     );
-
-    /**
-     * Flag for when the terminology rows are being updated to match the new atlas.
-     */
-    const isTerminologyRowsEvaluating = ref(false);
 
     /**
      * Terminology rows of the current atlas.
@@ -107,43 +80,6 @@ export const useCurrentExperimentStore = defineStore(
       [],
       isTerminologyRowsEvaluating
     );
-
-    /**
-     * Are the getters into the current atlas still evaluating.
-     */
-    const areAtlasComponentsEvaluating = computed(
-      () => isManifestEvaluating.value || isTerminologyRowsEvaluating.value
-    );
-
-    /**
-     * Default (top-level) structure identifiers for the current experiment's
-     * atlas.
-     */
-    const defaultStructureIdentifiers = computed<number[]>(() =>
-      terminologyRows.value && !areAtlasComponentsEvaluating.value
-        ? getDefaultStructureIdentifiers(terminologyRows.value)
-        : []
-    );
-
-    /**
-     * Current experiment's atlas center.
-     */
-    const atlasCenter = computed<[number, number, number]>(() =>
-      manifest.value && !isManifestEvaluating.value
-        ? getAtlasCenter(manifest.value)
-        : [0, 0, 0]
-    );
-
-    /**
-     * Set the reference coordinate of the experiment.
-     * @param referenceCoordinate Reference coordinate (in ASR, mm) marking
-     * the experiment's landmark of interest within the atlas.
-     */
-    function setReferenceCoordinate(
-      referenceCoordinate: [number, number, number]
-    ) {
-      experiment.value.referenceCoordinate = referenceCoordinate;
-    }
 
     /**
      * Get the current experiment's reference coordinate.
@@ -318,17 +254,13 @@ export const useCurrentExperimentStore = defineStore(
     return {
       experiment,
       selectedInspectable,
+      isManifestEvaluating,
       visibleStructures,
-      create,
-      setName,
       name,
       atlas,
       manifest,
       terminologyRows,
       areAtlasComponentsEvaluating,
-      defaultStructureIdentifiers,
-      atlasCenter,
-      setReferenceCoordinate,
       referenceCoordinate,
       isStructureVisible,
       setStructureVisibility,
@@ -345,11 +277,8 @@ export const useCurrentExperimentStore = defineStore(
   {
     persist: {
       pick: ["experiment"],
-      // `markRaw` (applied by `detachProbeInterfaceProbe` when a definition
-      // is interned) doesn't survive a JSON round-trip, so probe interface
-      // definitions come back out of storage as plain, reactive objects.
-      // Re-apply it on hydration or the perf problem it exists to prevent
-      // would silently return after a reload.
+
+      // Re-mark probe instance definitions as raw to prevent tracking.
       afterHydrate: context => {
         for (const entry of context.store.experiment.probeInterfaceProbes) {
           entry.probeInterfaceProbe = detachProbeInterfaceProbe(

@@ -16,7 +16,11 @@ import {
 } from "../api/entity-loader.api";
 import { setInitialZoom } from "../api/camera.api";
 import { StructureEntity } from "../models/structure-entity.model";
-import { structureEntityFromIdentifier } from "@/features/atlas";
+import {
+  getAtlasCenter,
+  getDefaultStructureIdentifiers,
+  structureEntityFromIdentifier
+} from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
@@ -43,7 +47,7 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
     currentExperiment;
   if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
 
-  return currentExperiment.defaultStructureIdentifiers.flatMap(identifier => {
+  return getDefaultStructureIdentifiers(terminologyRows).flatMap(identifier => {
     const structureEntity = structureEntityFromIdentifier(
       manifest,
       terminologyRows,
@@ -115,9 +119,10 @@ onMounted(async () => {
   // Keep the atlas root positioned so the atlas center sits at the scene origin.
   watchEffect(() => {
     const scene = runtime.scene.value;
-    if (!scene) return;
+    const { manifest } = currentExperiment;
+    if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
 
-    setAtlasCenterOffset(scene, currentExperiment.atlasCenter);
+    setAtlasCenterOffset(scene, getAtlasCenter(manifest));
   });
 
   // Set the camera's initial zoom relative to the AP length of the atlas.
