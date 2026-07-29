@@ -16,13 +16,9 @@ export function buildReferenceCoordinateNode(
 ): TransformNode {
   // Get the existing node or create it and add it to the atlas root.
   const atlasRootNode = buildAtlasRootNode(scene);
-  const referenceCoordinateNodeCandidates = atlasRootNode.getChildren(
-    node => node.name === REFERENCE_COORDINATE_NODE_NAME
+  let referenceCoordinateNode = scene.getTransformNodeByName(
+    REFERENCE_COORDINATE_NODE_NAME
   );
-  let referenceCoordinateNode =
-    referenceCoordinateNodeCandidates.length === 1
-      ? (referenceCoordinateNodeCandidates[0] as TransformNode)
-      : null;
   if (!referenceCoordinateNode) {
     referenceCoordinateNode = new TransformNode(
       REFERENCE_COORDINATE_NODE_NAME,

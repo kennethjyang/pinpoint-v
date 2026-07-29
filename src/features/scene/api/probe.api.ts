@@ -135,6 +135,19 @@ export function disposeProbe(scene: Scene, probe: Probe): void {
 }
 
 /**
+ * Synchronize the probe entity with its states.
+ * @param scene Scene to sync the probes of.
+ * @param probe Probe state to use.
+ */
+export function syncProbe(scene: Scene, probe: Probe) {
+  console.log(scene);
+  console.log(probe);
+  // Sync existence.
+  // Sync materials.
+  // Sync visibility.
+}
+
+/**
  * Sync each probe entity to the visibility model.
  * @param scene Scene to modify entities in.
  * @param experiment Experiment with probe models to get visibility from.
