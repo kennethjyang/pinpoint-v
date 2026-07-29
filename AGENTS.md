@@ -25,7 +25,6 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Add TSDoc to every function. Keep it to 1-2 concise lines describing the function and its inputs/outputs. Avoid implementation details, extended rationale, performance explanations, and narrative comments. Use brief block comments only for non-obvious code. Surface notable tradeoffs, concerns, or implementation context in your response to the user, not in code comments.
 - When modifying Pinia stores, do not try to engineer for backwards compatibility.
 - Pure functions that mutate or use some object should have the object be the first argument.
-- Use Quasar classes, directives, and composables first if they can do the job.
 
 ## Tooling
 

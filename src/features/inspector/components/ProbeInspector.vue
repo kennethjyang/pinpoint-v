@@ -1,11 +1,54 @@
 <script lang="ts" setup>
 import { computed } from "vue";
-import { Probe } from "@/features/probe";
+import { getProbeIdentifier, Probe } from "@/features/probe";
 import { STANDARD_COLORS } from "@/features/scene";
+import { useProbeLibraryStore } from "@/stores/probe-library.store";
+import {
+  internProbeInterfaceProbe,
+  removeInternProbeInterfaceProbe
+} from "@/features/experiment";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const { probe } = defineProps<{
   probe: Probe;
 }>();
+
+const probeLibraryStore = useProbeLibraryStore();
+const currentExperimentStore = useCurrentExperimentStore();
+
+/**
+ * Link to the probe identifier that also checks to remove interned interfaces after switching.
+ */
+const probeIdentifier = computed({
+  get: () => probe.probeIdentifier,
+  set: (value: string) => {
+    // Remember old identifier for removal.
+    const oldIdentifier = probeIdentifier.value;
+
+    // Get the new probe interface definition and intern it. Exit if not found.
+    const newProbeInterfaceProbe = probeLibraryStore.library.find(
+      probeInterfaceProbe => getProbeIdentifier(probeInterfaceProbe) === value
+    );
+    if (!newProbeInterfaceProbe) return;
+    internProbeInterfaceProbe(
+      currentExperimentStore.experiment,
+      newProbeInterfaceProbe
+    );
+
+    // Set the new value.
+    probe.probeIdentifier = value;
+
+    // Ensure the old one is removed.
+    removeInternProbeInterfaceProbe(
+      currentExperimentStore.experiment,
+      oldIdentifier
+    );
+  }
+});
+
+const probeIdentifiers = computed<string[]>(() =>
+  probeLibraryStore.library.map(getProbeIdentifier)
+);
 
 const ap = computed({
   get: () => probe.tipPosition[0],
@@ -41,6 +84,13 @@ const pitch = computed({
 <template>
   <div class="column q-gutter-y-md">
     <q-input v-model="probe.name" clearable label="Name" outlined />
+
+    <q-select
+      v-model="probeIdentifier"
+      :options="probeIdentifiers"
+      label="Probe Type"
+      outlined
+    />
 
     <div>
       <p class="text-h6">Tip Position</p>

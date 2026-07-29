@@ -67,8 +67,8 @@ export function clearVisibleStructures(experiment: Experiment) {
 }
 
 /**
- * Intern a probe interface definition into the experiment and return its
- * identifier, keeping the existing definition if one is already interned
+ * Intern a probe interface definition into the experiment,
+ * keeping the existing definition if one is already interned
  * under that identifier.
  * @param experiment Experiment to intern a probe into.
  * @param probeInterfaceProbe Probe interface definition to intern.
@@ -76,13 +76,31 @@ export function clearVisibleStructures(experiment: Experiment) {
 export function internProbeInterfaceProbe(
   experiment: Experiment,
   probeInterfaceProbe: ProbeInterfaceProbe
-): string {
+) {
   const identifier = getProbeIdentifier(probeInterfaceProbe);
   if (!experiment.probeInterfaceProbes[identifier]) {
     experiment.probeInterfaceProbes[identifier] =
       detachProbeInterfaceProbe(probeInterfaceProbe);
   }
-  return identifier;
+}
+
+/**
+ * Remove a probe interface definition by identifier from the experiment.
+ *
+ * Does nothing if there is at least 1 reference left in the experiment.
+ * @param experiment Experiment to remove an interned probe interface definition from.
+ * @param probeIdentifier Probe interface definition identifier.
+ */
+export function removeInternProbeInterfaceProbe(
+  experiment: Experiment,
+  probeIdentifier: string
+) {
+  const stillReferenced = experiment.probes.some(
+    experimentProbe => experimentProbe.probeIdentifier === probeIdentifier
+  );
+  if (stillReferenced) return;
+
+  delete experiment.probeInterfaceProbes[probeIdentifier];
 }
 
 /**
@@ -128,11 +146,5 @@ export function removeProbe(experiment: Experiment, probe: Probe) {
   if (probeIndex === -1) return;
   const [removed] = experiment.probes.splice(probeIndex, 1);
 
-  const stillReferenced = experiment.probes.some(
-    experimentProbe =>
-      experimentProbe.probeIdentifier === removed!.probeIdentifier
-  );
-  if (!stillReferenced) {
-    delete experiment.probeInterfaceProbes[removed!.probeIdentifier];
-  }
+  removeInternProbeInterfaceProbe(experiment, removed!.probeIdentifier);
 }
