@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed } from "vue";
 import { Probe } from "@/features/probe";
+import { STANDARD_COLORS } from "@/features/scene";
 
 const { probe } = defineProps<{
   probe: Probe;
@@ -38,19 +39,46 @@ const pitch = computed({
 </script>
 
 <template>
-  <div class="column">
-    <p class="text-h6">Tip Position</p>
-    <div class="row">
-      <q-input label="AP" v-model="ap" />
-      <q-input label="DV" v-model="dv" />
-      <q-input label="ML" v-model="ml" />
+  <div class="column q-gutter-y-md">
+    <q-input v-model="probe.name" label="Name" outlined />
+
+    <div>
+      <p class="text-h6">Tip Position</p>
+      <div class="row q-gutter-x-sm">
+        <q-input v-model.number="ap" class="col" dense label="AP" outlined />
+        <q-input v-model.number="dv" class="col" dense label="DV" outlined />
+        <q-input v-model.number="ml" class="col" dense label="ML" outlined />
+      </div>
     </div>
 
-    <p class="text-h6">Orientation</p>
-    <div class="row">
-      <q-input label="Roll" v-model="roll" />
-      <q-input label="Yaw" v-model="yaw" />
-      <q-input label="Pitch" v-model="pitch" />
+    <div>
+      <p class="text-h6">Orientation</p>
+      <div class="row q-gutter-x-sm">
+        <q-input
+          v-model.number="roll"
+          class="col"
+          dense
+          label="Roll"
+          outlined
+        />
+        <q-input v-model.number="yaw" class="col" dense label="Yaw" outlined />
+        <q-input
+          v-model.number="pitch"
+          class="col"
+          dense
+          label="Pitch"
+          outlined
+        />
+      </div>
+    </div>
+
+    <div>
+      <p class="text-h6">Color</p>
+      <q-color
+        v-model="probe.color"
+        :palette="STANDARD_COLORS"
+        default-view="palette"
+      />
     </div>
   </div>
 </template>

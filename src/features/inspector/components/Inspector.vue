@@ -6,10 +6,17 @@ const currentExperiment = useCurrentExperimentStore();
 </script>
 
 <template>
-  <ProbeInspector
-    v-if="currentExperiment.selectedInspectable?.inspectableKind === 'probe'"
-    :probe="currentExperiment.selectedInspectable"
-  />
+  <div class="q-pa-md full-height column">
+    <ProbeInspector
+      v-if="currentExperiment.selectedInspectable?.inspectableKind === 'probe'"
+      :probe="currentExperiment.selectedInspectable"
+    />
+    <div v-else class="col flex flex-center text-center">
+      <p class="text-weight-light">
+        <i>Pick something from the scene to inspect.</i>
+      </p>
+    </div>
+  </div>
 </template>
 
 <style lang="sass" scoped></style>

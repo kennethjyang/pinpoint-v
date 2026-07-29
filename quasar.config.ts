@@ -98,6 +98,7 @@ export default defineConfig(ctx => {
           position: "top-right"
         }
       },
+      cssAddon: true,
 
       // iconSet: 'material-icons', // Quasar icon set
       // lang: 'en-US', // Quasar language pack
