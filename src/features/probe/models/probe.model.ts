@@ -1,4 +1,3 @@
-import { ProbeInterfaceProbe } from "@/features/probe";
 import { ProbeVisibility } from "../models/visibility.model";
 import { InspectableKind } from "@/features/scene";
 
@@ -12,7 +11,14 @@ export interface Probe {
   color: string;
   visibility: ProbeVisibility;
 
-  probeInterfaceProbe: ProbeInterfaceProbe;
+  /**
+   * Id into `Experiment.probeInterfaceProbes`, the experiment-local, deduped
+   * store of probe interface definitions. Kept as a reference rather than
+   * embedding the definition directly so that reactively watching a probe
+   * (e.g. for persistence) doesn't have to traverse its definition's
+   * thousands of nested contact entries.
+   */
+  probeInterfaceProbeId: string;
 
   /**
    * Internal position representation of the probe tip.

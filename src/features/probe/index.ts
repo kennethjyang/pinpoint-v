@@ -1,4 +1,11 @@
 export { default as ProbeLibraryDialog } from "./components/ProbeLibraryDialog.vue";
-export type { ProbeInterfaceProbe } from "./models/probe-interface.model";
+export type {
+  ExperimentProbeInterfaceProbe,
+  ProbeInterfaceProbe
+} from "./models/probe-interface.model";
 export type { Probe } from "./models/probe.model";
-export { buildProbe, rotateProbeVisibility } from "./api/probe.api";
+export {
+  buildProbe,
+  detachProbeInterfaceProbe,
+  rotateProbeVisibility
+} from "./api/probe.api";

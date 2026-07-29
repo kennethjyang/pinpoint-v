@@ -40,7 +40,13 @@ function probeVisibilityIcon(probe: Probe): string {
           v-close-popup
           v-ripple
           clickable
-          @click="currentExperiment.addProbe(buildProbe(probeInterfaceProbe))"
+          @click="
+            currentExperiment.addProbe(
+              buildProbe(
+                currentExperiment.internProbeInterfaceProbe(probeInterfaceProbe)
+              )
+            )
+          "
         >
           <q-item-section>
             {{ probeInterfaceProbe.annotations!.manufacturer }}
