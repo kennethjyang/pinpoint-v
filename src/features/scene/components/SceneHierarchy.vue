@@ -85,13 +85,13 @@ function probeVisibilityIcon(probe: Probe): string {
               class="probe--visibility-button"
               flat
               round
-              @click="rotateProbeVisibility(probe)"
+              @click.stop="rotateProbeVisibility(probe)"
             />
             <q-btn
               flat
               round
               icon="delete"
-              @click="currentExperiment.removeProbe(probe)"
+              @click.stop="currentExperiment.removeProbe(probe)"
             />
           </div>
         </q-item-section>
