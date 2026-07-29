@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
-import { createPinia, setActivePinia, type Pinia } from "pinia";
+import { createPinia, type Pinia, setActivePinia } from "pinia";
 import SceneHierarchy from "./SceneHierarchy.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
@@ -106,7 +106,7 @@ describe("SceneHierarchy", () => {
     expect(currentExperiment.probes).toHaveLength(2);
     expect(Object.keys(currentExperiment.probeInterfaceProbes)).toHaveLength(1);
     const [a, b] = currentExperiment.probes;
-    expect(a!.probeIdentifier).toBe(b!.probeIdentifier);
+    expect(a!.probeInterfaceIdentifier).toBe(b!.probeInterfaceIdentifier);
   });
 
   it("removes a probe's definition from the experiment along with the probe", async () => {

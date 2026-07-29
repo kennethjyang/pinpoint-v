@@ -17,7 +17,7 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     name: `Probe ${uniqueName}`,
     color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
     visibility: "visible",
-    probeIdentifier: getProbeIdentifier(probeInterfaceProbe),
+    probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     tipPosition: [0, 0, 0],
     orientation: [0, 0, 0]
   };
@@ -59,7 +59,7 @@ export function rotateProbeVisibility(probe: Probe) {
  * Return the probe's manufacturer and model name as a single identifier string.
  * @param probeInterfaceProbe Probe interface definition to extract identifier from.
  */
-export function getProbeIdentifier(
+export function getProbeInterfaceIdentifier(
   probeInterfaceProbe: ProbeInterfaceProbe
 ): string {
   return `${String(probeInterfaceProbe.annotations!.manufacturer)} ${String(probeInterfaceProbe.annotations!.model_name)}`;
@@ -69,7 +69,7 @@ export function getProbeIdentifier(
  * Find a probe interface definition in a library by its identifier, or null
  * if none match.
  * @param library Probe interface definitions to search.
- * @param identifier Identifier to match, as produced by {@link getProbeIdentifier}.
+ * @param identifier Identifier to match, as produced by {@link getProbeInterfaceIdentifier}.
  */
 export function findProbeInterfaceProbeByIdentifier(
   library: ProbeInterfaceProbe[],
@@ -78,7 +78,7 @@ export function findProbeInterfaceProbeByIdentifier(
   return (
     library.find(
       probeInterfaceProbe =>
-        getProbeIdentifier(probeInterfaceProbe) === identifier
+        getProbeInterfaceIdentifier(probeInterfaceProbe) === identifier
     ) ?? null
   );
 }

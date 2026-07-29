@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { reactive, isReactive, isProxy, toRaw } from "vue";
+import { describe, expect, it } from "vitest";
+import { isProxy, isReactive, reactive, toRaw } from "vue";
 import type { Probe } from "../models/probe.model";
 import {
   buildProbe,
   detachProbeInterfaceProbe,
   findProbeInterfaceProbeByIdentifier,
-  getProbeIdentifier,
+  getProbeInterfaceIdentifier,
   rotateProbeVisibility
 } from "./probe.api";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
@@ -16,7 +16,7 @@ describe("buildProbe", () => {
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     const probe = buildProbe(spec);
-    expect(probe.probeIdentifier).toBe("imec np1");
+    expect(probe.probeInterfaceIdentifier).toBe("imec np1");
   });
 
   it("builds a probe with sensible defaults", () => {
@@ -42,13 +42,13 @@ describe("getProbeIdentifier", () => {
     const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
-    expect(getProbeIdentifier(spec)).toBe("imec np1");
+    expect(getProbeInterfaceIdentifier(spec)).toBe("imec np1");
   });
 
   it("returns the same identifier for definitions differing only in geometry", () => {
     const a = makeProbeInterfaceProbe({ si_units: "um" });
     const b = makeProbeInterfaceProbe({ si_units: "mm" });
-    expect(getProbeIdentifier(a)).toBe(getProbeIdentifier(b));
+    expect(getProbeInterfaceIdentifier(a)).toBe(getProbeInterfaceIdentifier(b));
   });
 });
 
@@ -124,7 +124,10 @@ describe("findProbeInterfaceProbeByIdentifier", () => {
     });
 
     expect(
-      findProbeInterfaceProbeByIdentifier([spec], getProbeIdentifier(spec))
+      findProbeInterfaceProbeByIdentifier(
+        [spec],
+        getProbeInterfaceIdentifier(spec)
+      )
     ).toEqual(spec);
   });
 

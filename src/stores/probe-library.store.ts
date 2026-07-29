@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { ProbeInterfaceProbe } from "@/features/probe";
-import { getProbeIdentifier } from "@/features/probe";
+import { getProbeInterfaceIdentifier } from "@/features/probe";
 
 export const useProbeLibraryStore = defineStore(
   "probe-library",
@@ -16,7 +16,8 @@ export const useProbeLibraryStore = defineStore(
       if (
         library.value.some(
           libraryProbe =>
-            getProbeIdentifier(libraryProbe) === getProbeIdentifier(probe)
+            getProbeInterfaceIdentifier(libraryProbe) ===
+            getProbeInterfaceIdentifier(probe)
         )
       )
         return;
@@ -28,9 +29,9 @@ export const useProbeLibraryStore = defineStore(
      * @param probe Probe to remove.
      */
     function remove(probe: ProbeInterfaceProbe) {
-      const identifier = getProbeIdentifier(probe);
+      const identifier = getProbeInterfaceIdentifier(probe);
       for (let i = library.value.length - 1; i >= 0; i--) {
-        if (getProbeIdentifier(library.value[i]!) === identifier) {
+        if (getProbeInterfaceIdentifier(library.value[i]!) === identifier) {
           library.value.splice(i, 1);
         }
       }

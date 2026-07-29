@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { isReactive } from "vue";
 import {
   addProbe,
@@ -13,7 +13,7 @@ import {
   setProbeInterface,
   setStructureVisibility
 } from "./experiment.api";
-import { buildProbe, getProbeIdentifier } from "@/features/probe";
+import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
 import { makeAtlas, makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 
 describe("buildExperiment", () => {
@@ -108,7 +108,7 @@ describe("internProbeInterfaceProbe", () => {
 
   it("does not replace the existing entry when the same definition is interned twice", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const identifier = getProbeIdentifier(makeProbeInterfaceProbe());
+    const identifier = getProbeInterfaceIdentifier(makeProbeInterfaceProbe());
 
     internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
     const first = experiment.probeInterfaceProbes[identifier];
@@ -137,7 +137,7 @@ describe("internProbeInterfaceProbe", () => {
 
   it("keeps the first definition when another shares its identifier", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const identifier = getProbeIdentifier(makeProbeInterfaceProbe());
+    const identifier = getProbeInterfaceIdentifier(makeProbeInterfaceProbe());
 
     internProbeInterfaceProbe(
       experiment,
@@ -157,7 +157,8 @@ describe("internProbeInterfaceProbe", () => {
     const spec = makeProbeInterfaceProbe();
 
     internProbeInterfaceProbe(experiment, spec);
-    const interned = experiment.probeInterfaceProbes[getProbeIdentifier(spec)];
+    const interned =
+      experiment.probeInterfaceProbes[getProbeInterfaceIdentifier(spec)];
 
     expect(interned).toEqual(spec);
     expect(isReactive(interned)).toBe(false);
@@ -171,7 +172,7 @@ describe("internProbeInterfaceProbe", () => {
     spec.contact_positions.push([9, 9]);
 
     expect(
-      experiment.probeInterfaceProbes[getProbeIdentifier(spec)]!
+      experiment.probeInterfaceProbes[getProbeInterfaceIdentifier(spec)]!
         .contact_positions
     ).toEqual([[0, 0]]);
   });
@@ -183,7 +184,10 @@ describe("removeInternProbeInterfaceProbe", () => {
     const spec = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(experiment, spec);
 
-    removeInternProbeInterfaceProbe(experiment, getProbeIdentifier(spec));
+    removeInternProbeInterfaceProbe(
+      experiment,
+      getProbeInterfaceIdentifier(spec)
+    );
 
     expect(experiment.probeInterfaceProbes).toEqual({});
   });
@@ -195,7 +199,7 @@ describe("removeInternProbeInterfaceProbe", () => {
     const probe = makeProbe();
     addProbe(experiment, probe);
 
-    removeInternProbeInterfaceProbe(experiment, probe.probeIdentifier);
+    removeInternProbeInterfaceProbe(experiment, probe.probeInterfaceIdentifier);
 
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toEqual(spec);
   });
@@ -219,7 +223,10 @@ describe("removeInternProbeInterfaceProbe", () => {
     internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
     internProbeInterfaceProbe(experiment, imec);
 
-    removeInternProbeInterfaceProbe(experiment, getProbeIdentifier(imec));
+    removeInternProbeInterfaceProbe(
+      experiment,
+      getProbeInterfaceIdentifier(imec)
+    );
 
     expect(Object.keys(experiment.probeInterfaceProbes)).toEqual([
       "cambridgeneurotech ASSY-1"
@@ -240,7 +247,9 @@ describe("setProbeInterface", () => {
     });
     setProbeInterface(experiment, probe, newSpec);
 
-    expect(probe.probeIdentifier).toBe(getProbeIdentifier(newSpec));
+    expect(probe.probeInterfaceIdentifier).toBe(
+      getProbeInterfaceIdentifier(newSpec)
+    );
   });
 
   it("interns the new definition", () => {
@@ -271,7 +280,7 @@ describe("setProbeInterface", () => {
     setProbeInterface(experiment, probe, newSpec);
 
     expect(experiment.probeInterfaceProbes).toEqual({
-      [getProbeIdentifier(newSpec)]: newSpec
+      [getProbeInterfaceIdentifier(newSpec)]: newSpec
     });
   });
 
@@ -290,7 +299,7 @@ describe("setProbeInterface", () => {
     setProbeInterface(experiment, probe, newSpec);
 
     expect(
-      experiment.probeInterfaceProbes[getProbeIdentifier(oldSpec)]
+      experiment.probeInterfaceProbes[getProbeInterfaceIdentifier(oldSpec)]
     ).toEqual(oldSpec);
   });
 });
@@ -307,7 +316,7 @@ describe("getInternedProbeInterfaceProbe", () => {
 
   it("returns null when the probe's definition isn't in the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const probe = makeProbe({ probeIdentifier: "missing probe" });
+    const probe = makeProbe({ probeInterfaceIdentifier: "missing probe" });
 
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toBeNull();
   });

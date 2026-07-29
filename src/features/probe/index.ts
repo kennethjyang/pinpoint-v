@@ -3,7 +3,7 @@ export type { ProbeInterfaceProbe } from "./models/probe-interface.model";
 export type { Probe } from "./models/probe.model";
 export {
   buildProbe,
-  getProbeIdentifier,
+  getProbeInterfaceIdentifier,
   detachProbeInterfaceProbe,
   rotateProbeVisibility,
   findProbeInterfaceProbeByIdentifier

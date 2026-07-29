@@ -3,7 +3,7 @@ import type { Experiment } from "../models/experiment.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import {
   detachProbeInterfaceProbe,
-  getProbeIdentifier
+  getProbeInterfaceIdentifier
 } from "@/features/probe";
 
 /**
@@ -76,7 +76,7 @@ export function internProbeInterfaceProbe(
   experiment: Experiment,
   probeInterfaceProbe: ProbeInterfaceProbe
 ) {
-  const identifier = getProbeIdentifier(probeInterfaceProbe);
+  const identifier = getProbeInterfaceIdentifier(probeInterfaceProbe);
   if (!experiment.probeInterfaceProbes[identifier]) {
     experiment.probeInterfaceProbes[identifier] =
       detachProbeInterfaceProbe(probeInterfaceProbe);
@@ -95,7 +95,8 @@ export function removeInternProbeInterfaceProbe(
   probeIdentifier: string
 ) {
   const stillReferenced = experiment.probes.some(
-    experimentProbe => experimentProbe.probeIdentifier === probeIdentifier
+    experimentProbe =>
+      experimentProbe.probeInterfaceIdentifier === probeIdentifier
   );
   if (stillReferenced) return;
 
@@ -114,11 +115,11 @@ export function setProbeInterface(
   probe: Probe,
   probeInterfaceProbe: ProbeInterfaceProbe
 ) {
-  const oldIdentifier = probe.probeIdentifier;
-  const newIdentifier = getProbeIdentifier(probeInterfaceProbe);
+  const oldIdentifier = probe.probeInterfaceIdentifier;
+  const newIdentifier = getProbeInterfaceIdentifier(probeInterfaceProbe);
 
   internProbeInterfaceProbe(experiment, probeInterfaceProbe);
-  probe.probeIdentifier = newIdentifier;
+  probe.probeInterfaceIdentifier = newIdentifier;
   removeInternProbeInterfaceProbe(experiment, oldIdentifier);
 }
 
@@ -131,7 +132,9 @@ export function getInternedProbeInterfaceProbe(
   experiment: Experiment,
   probe: Probe
 ): ProbeInterfaceProbe | null {
-  return experiment.probeInterfaceProbes[probe.probeIdentifier] ?? null;
+  return (
+    experiment.probeInterfaceProbes[probe.probeInterfaceIdentifier] ?? null
+  );
 }
 
 /**
@@ -183,5 +186,8 @@ export function removeProbe(experiment: Experiment, probe: Probe) {
   if (probeIndex === -1) return;
   const [removed] = experiment.probes.splice(probeIndex, 1);
 
-  removeInternProbeInterfaceProbe(experiment, removed!.probeIdentifier);
+  removeInternProbeInterfaceProbe(
+    experiment,
+    removed!.probeInterfaceIdentifier
+  );
 }

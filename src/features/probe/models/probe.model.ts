@@ -14,7 +14,7 @@ export interface Probe {
    * Key into `Experiment.probeInterfaceProbes`, as produced by
    * `getProbeIdentifier`.
    */
-  probeIdentifier: string;
+  probeInterfaceIdentifier: string;
 
   /**
    * Internal position representation of the probe tip.

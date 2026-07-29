@@ -2,7 +2,7 @@
 import { useQuasar } from "quasar";
 import {
   buildProbe,
-  getProbeIdentifier,
+  getProbeInterfaceIdentifier,
   Probe,
   ProbeInterfaceProbe,
   ProbeLibraryDialog,
@@ -73,14 +73,14 @@ function removeProbeAndDeselect(probe: Probe) {
       <q-list>
         <q-item
           v-for="probeInterfaceProbe of probeLibrary.library"
-          :key="getProbeIdentifier(probeInterfaceProbe)"
+          :key="getProbeInterfaceIdentifier(probeInterfaceProbe)"
           v-close-popup
           v-ripple
           clickable
           @click="addProbeAndSelect(probeInterfaceProbe)"
         >
           <q-item-section>
-            {{ getProbeIdentifier(probeInterfaceProbe) }}
+            {{ getProbeInterfaceIdentifier(probeInterfaceProbe) }}
           </q-item-section>
         </q-item>
         <q-separator />

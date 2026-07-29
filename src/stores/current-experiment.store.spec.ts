@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, isReactive, nextTick, watch } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
@@ -6,7 +6,7 @@ import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { addProbe, internProbeInterfaceProbe } from "@/features/experiment";
-import { buildProbe, getProbeIdentifier } from "@/features/probe";
+import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
 import {
   makeManifest,
   makeProbe,
@@ -187,7 +187,7 @@ describe("useCurrentExperimentStore", () => {
 
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
-      const identifier = getProbeIdentifier(spec);
+      const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
       addProbe(store.experiment, buildProbe(spec));
       await nextTick();
@@ -196,7 +196,9 @@ describe("useCurrentExperimentStore", () => {
       expect(persisted.experiment.probeInterfaceProbes).toEqual({
         [identifier]: spec
       });
-      expect(persisted.experiment.probes[0].probeIdentifier).toBe(identifier);
+      expect(persisted.experiment.probes[0].probeInterfaceIdentifier).toBe(
+        identifier
+      );
     });
 
     it("re-detaches definitions from reactivity after hydrating from storage", async () => {
@@ -205,7 +207,7 @@ describe("useCurrentExperimentStore", () => {
 
       const firstStore = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
-      const identifier = getProbeIdentifier(spec);
+      const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(firstStore.experiment, spec);
       addProbe(firstStore.experiment, buildProbe(spec));
       await nextTick();

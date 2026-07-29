@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { type ValidationRule } from "quasar";
 import {
   findProbeInterfaceProbeByIdentifier,
-  getProbeIdentifier,
+  getProbeInterfaceIdentifier,
   Probe
 } from "@/features/probe";
 import { STANDARD_COLORS } from "@/features/scene";
@@ -27,7 +27,7 @@ const { t } = useI18n();
  * definition after switching.
  */
 const probeIdentifier = computed({
-  get: () => probe.probeIdentifier,
+  get: () => probe.probeInterfaceIdentifier,
   set: (value: string) => {
     const probeInterfaceProbe = findProbeInterfaceProbeByIdentifier(
       probeLibraryStore.library,
@@ -44,7 +44,7 @@ const probeIdentifier = computed({
 });
 
 const probeIdentifiers = computed<string[]>(() =>
-  probeLibraryStore.library.map(getProbeIdentifier)
+  probeLibraryStore.library.map(getProbeInterfaceIdentifier)
 );
 
 const name = computed({

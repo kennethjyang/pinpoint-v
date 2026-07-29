@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ProbeInspector from "./ProbeInspector.vue";
@@ -8,7 +8,7 @@ import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
-import { getProbeIdentifier } from "@/features/probe";
+import { getProbeInterfaceIdentifier } from "@/features/probe";
 import enUS from "@/i18n/en-US";
 
 const t = enUS.probeInspector;
@@ -245,7 +245,7 @@ describe("ProbeInspector", () => {
       probeLibrary.add(newSpec);
       const store = useCurrentExperimentStore(pinia);
       const probe = makeProbe({
-        probeIdentifier: getProbeIdentifier(oldSpec)
+        probeInterfaceIdentifier: getProbeInterfaceIdentifier(oldSpec)
       });
       store.experiment.probes = [probe];
       internProbeInterfaceProbe(store.experiment, oldSpec);
@@ -256,12 +256,14 @@ describe("ProbeInspector", () => {
 
       wrapper
         .findComponent({ name: "QSelect" })
-        .vm.$emit("update:modelValue", getProbeIdentifier(newSpec));
+        .vm.$emit("update:modelValue", getProbeInterfaceIdentifier(newSpec));
       await wrapper.vm.$nextTick();
 
-      expect(probe.probeIdentifier).toBe(getProbeIdentifier(newSpec));
+      expect(probe.probeInterfaceIdentifier).toBe(
+        getProbeInterfaceIdentifier(newSpec)
+      );
       expect(store.experiment.probeInterfaceProbes).toEqual({
-        [getProbeIdentifier(newSpec)]: newSpec
+        [getProbeInterfaceIdentifier(newSpec)]: newSpec
       });
     });
 
@@ -272,7 +274,7 @@ describe("ProbeInspector", () => {
       useProbeLibraryStore(pinia).add(oldSpec);
       const store = useCurrentExperimentStore(pinia);
       const probe = makeProbe({
-        probeIdentifier: getProbeIdentifier(oldSpec)
+        probeInterfaceIdentifier: getProbeInterfaceIdentifier(oldSpec)
       });
       store.experiment.probes = [probe];
       internProbeInterfaceProbe(store.experiment, oldSpec);
@@ -286,9 +288,11 @@ describe("ProbeInspector", () => {
         .vm.$emit("update:modelValue", "unknown manufacturer unknown-model");
       await wrapper.vm.$nextTick();
 
-      expect(probe.probeIdentifier).toBe(getProbeIdentifier(oldSpec));
+      expect(probe.probeInterfaceIdentifier).toBe(
+        getProbeInterfaceIdentifier(oldSpec)
+      );
       expect(store.experiment.probeInterfaceProbes).toEqual({
-        [getProbeIdentifier(oldSpec)]: oldSpec
+        [getProbeInterfaceIdentifier(oldSpec)]: oldSpec
       });
     });
   });
