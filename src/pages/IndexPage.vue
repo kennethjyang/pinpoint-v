@@ -157,7 +157,7 @@ onMounted(() => {
         <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
-      <q-tab-panels v-model="tab" animated class="col">
+      <q-tab-panels v-model="tab" animated keep-alive class="col">
         <q-tab-panel name="scene">{{ $t("layout.scene") }}</q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")

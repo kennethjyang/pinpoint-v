@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { defineComponent, h } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { flushPromises } from "@vue/test-utils";
@@ -6,6 +6,7 @@ import AtlasHierarchy from "./AtlasHierarchy.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getManifest, getTerminologyRows } from "../api/source.api";
+import { HierarchyModel } from "../api/hierarchy.api";
 import { makeManifest, makeTerminologyRows } from "@/test/fixtures";
 
 /**
@@ -40,6 +41,20 @@ vi.mock("../api/source.api", async () => {
   return { ...actual, getManifest: vi.fn(), getTerminologyRows: vi.fn() };
 });
 
+/**
+ * Run every animation frame the reveal loop has scheduled, until it stops
+ * scheduling more - i.e. until the hierarchy is fully revealed. The fixture
+ * used throughout this file is only 5 rows, so this is always a handful of
+ * frames.
+ */
+async function flushRevealFrames() {
+  for (let i = 0; i < 20; i++) {
+    await flushPromises();
+    vi.advanceTimersToNextFrame();
+  }
+  await flushPromises();
+}
+
 async function mountHierarchy() {
   const pinia = createPinia();
   setActivePinia(pinia);
@@ -52,15 +67,21 @@ async function mountHierarchy() {
   await flushPromises();
   await flushPromises();
   await wrapper.vm.$nextTick();
+  await flushRevealFrames();
   return wrapper;
 }
 
 describe("AtlasHierarchy", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.mocked(getManifest).mockReset();
     vi.mocked(getManifest).mockResolvedValue(makeManifest());
     vi.mocked(getTerminologyRows).mockReset();
     vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders the q-tree (not the virtual scroll) when the filter is empty", async () => {
@@ -162,7 +183,38 @@ describe("AtlasHierarchy", () => {
     await flushPromises();
     await flushPromises();
     await wrapper.vm.$nextTick();
+    await flushRevealFrames();
 
     expect(wrapper.findComponent({ name: "QTree" }).props("nodes")).toEqual([]);
+  });
+
+  it("renders no nodes before the first reveal frame runs", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mountWithQuasar(AtlasHierarchy, {
+      pinia,
+      global: { stubs: { QVirtualScroll: QVirtualScrollStub } }
+    });
+    await flushPromises();
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent({ name: "QTree" }).props("nodes")).toEqual([]);
+  });
+
+  it("reveals the full tree, fully expanded, once the reveal loop finishes", async () => {
+    const wrapper = await mountHierarchy();
+
+    const tree = wrapper.findComponent({ name: "QTree" });
+    const flatten = (nodes: HierarchyModel[]): number[] =>
+      nodes.flatMap(n => [n.identifier, ...flatten(n.children)]);
+    expect(
+      flatten(tree.props("nodes") as HierarchyModel[]).sort((a, b) => a - b)
+    ).toEqual([8, 567, 688, 700]);
+    // Every parent (grey, CH) should be expanded; the leaves have nothing to
+    // expand.
+    expect(
+      tree.props("expanded").sort((a: number, b: number) => a - b)
+    ).toEqual([8, 567]);
   });
 });

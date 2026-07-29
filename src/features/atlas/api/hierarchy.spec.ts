@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHierarchy,
+  flattenHierarchy,
   getDefaultStructureIdentifiers,
   toTitleCase
 } from "./hierarchy.api";
@@ -97,6 +98,51 @@ describe("buildHierarchy", () => {
     expect(flatten(node!).sort(numericSort)).toEqual(
       rows.map(r => r.identifier).sort(numericSort)
     );
+  });
+});
+
+describe("flattenHierarchy", () => {
+  function hierarchyRoots() {
+    return buildHierarchy(makeTerminologyRows())?.children ?? [];
+  }
+
+  it("returns an empty list for an empty list", () => {
+    expect(flattenHierarchy([])).toEqual([]);
+  });
+
+  it("lists every node exactly once", () => {
+    const flattened = flattenHierarchy(hierarchyRoots());
+
+    expect(flattened.map(f => f.node.identifier).sort((a, b) => a - b)).toEqual(
+      [8, 567, 688, 700]
+    );
+  });
+
+  it("lists a root with a null parentIdentifier", () => {
+    const flattened = flattenHierarchy(hierarchyRoots());
+
+    expect(flattened[0]).toMatchObject({
+      node: { identifier: 8 },
+      parentIdentifier: null
+    });
+  });
+
+  it("lists every node after its parent", () => {
+    const flattened = flattenHierarchy(hierarchyRoots());
+    const indexOf = (identifier: number) =>
+      flattened.findIndex(f => f.node.identifier === identifier);
+
+    expect(indexOf(567)).toBeGreaterThan(indexOf(8));
+    expect(indexOf(688)).toBeGreaterThan(indexOf(567));
+    expect(indexOf(700)).toBeGreaterThan(indexOf(8));
+  });
+
+  it("empties each node's children, leaving the source tree untouched", () => {
+    const roots = hierarchyRoots();
+    const flattened = flattenHierarchy(roots);
+
+    expect(flattened.every(f => f.node.children.length === 0)).toBe(true);
+    expect(roots[0]?.children.length).toBeGreaterThan(0);
   });
 });
 
