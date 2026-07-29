@@ -12,7 +12,7 @@ import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService"
 import {
   removeAllStructures,
   setAtlasCenterOffset,
-  syncStructureVisibility
+  syncStructuresVisibility
 } from "../api/structures.api";
 import { setInitialZoom } from "../api/camera.api";
 import { StructureEntity } from "../models/structure-entity.model";
@@ -84,7 +84,7 @@ watchEffect(async () => {
 
   isLoadingStructures.value = true;
   try {
-    await syncStructureVisibility(
+    await syncStructuresVisibility(
       scene,
       alwaysPresentStructures.value,
       visibleStructureEntities.value

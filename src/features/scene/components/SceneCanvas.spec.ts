@@ -10,7 +10,7 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   removeAllStructures,
   setAtlasCenterOffset,
-  syncStructureVisibility
+  syncStructuresVisibility
 } from "../api/structures.api";
 import { setInitialZoom } from "../api/camera.api";
 import {
@@ -30,7 +30,7 @@ vi.mock("../api/structures.api", async () => {
   );
   return {
     ...actual,
-    syncStructureVisibility: vi.fn(),
+    syncStructuresVisibility: vi.fn(),
     setAtlasCenterOffset: vi.fn(),
     removeAllStructures: vi.fn()
   };
@@ -126,8 +126,8 @@ describe("SceneCanvas", () => {
     vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
     vi.mocked(structureEntitiesFromIdentifiers).mockReset();
     vi.mocked(structureEntitiesFromIdentifiers).mockReturnValue([]);
-    vi.mocked(syncStructureVisibility).mockReset();
-    vi.mocked(syncStructureVisibility).mockResolvedValue(undefined);
+    vi.mocked(syncStructuresVisibility).mockReset();
+    vi.mocked(syncStructuresVisibility).mockResolvedValue(undefined);
     vi.mocked(setAtlasCenterOffset).mockReset();
     vi.mocked(removeAllStructures).mockReset();
     vi.mocked(setInitialZoom).mockReset();
@@ -158,7 +158,7 @@ describe("SceneCanvas", () => {
       terminologyRows,
       expect.anything()
     );
-    expect(syncStructureVisibility).toHaveBeenCalled();
+    expect(syncStructuresVisibility).toHaveBeenCalled();
   });
 
   it("syncs empty structure lists while the atlas components are still evaluating", async () => {
@@ -168,7 +168,7 @@ describe("SceneCanvas", () => {
 
     await mountCanvas();
 
-    expect(syncStructureVisibility).toHaveBeenCalledWith(
+    expect(syncStructuresVisibility).toHaveBeenCalledWith(
       expect.anything(),
       [],
       []
@@ -178,7 +178,7 @@ describe("SceneCanvas", () => {
 
   it("shows the loading bar while a sync is in flight and hides it after", async () => {
     let resolveSync!: () => void;
-    vi.mocked(syncStructureVisibility).mockReturnValue(
+    vi.mocked(syncStructuresVisibility).mockReturnValue(
       new Promise(resolve => (resolveSync = () => resolve(undefined)))
     );
 
@@ -202,7 +202,7 @@ describe("SceneCanvas", () => {
     // rejected mock would fire the `watchEffect`'s `catch` during
     // `mountCanvas`'s own flushes, before there's anything to spy on.
     let rejectSync!: (error: Error) => void;
-    vi.mocked(syncStructureVisibility).mockReturnValue(
+    vi.mocked(syncStructuresVisibility).mockReturnValue(
       new Promise((_, reject) => (rejectSync = reject))
     );
 

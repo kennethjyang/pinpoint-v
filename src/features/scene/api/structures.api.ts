@@ -65,7 +65,7 @@ export function setAtlasCenterOffset(
  * @param alwaysPresentStructures Structures to keep in the scene at all times.
  * @param visibleStructures Structures that should be fully visible.
  */
-export async function syncStructureVisibility(
+export async function syncStructuresVisibility(
   scene: Scene,
   alwaysPresentStructures: StructureEntity[],
   visibleStructures: StructureEntity[]
