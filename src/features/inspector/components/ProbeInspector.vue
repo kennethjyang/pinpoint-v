@@ -97,7 +97,7 @@ const numberRules: ValidationRule<string>[] = [
 </script>
 
 <template>
-  <div class="column q-gutter-y-md">
+  <div class="column">
     <CommittedInput
       v-model="name"
       :label="t('probeInspector.name')"
@@ -112,62 +112,57 @@ const numberRules: ValidationRule<string>[] = [
       outlined
     />
 
-    <div>
-      <p class="text-h6">{{ t("probeInspector.tipPosition") }}</p>
-      <div class="row q-gutter-x-sm">
-        <CommittedInput
-          v-model="ap"
-          class="col"
-          :label="t('probeInspector.ap')"
-          outlined
-          :rules="numberRules"
-        />
-        <CommittedInput
-          v-model="dv"
-          class="col"
-          :label="t('probeInspector.dv')"
-          outlined
-          :rules="numberRules"
-        />
-        <CommittedInput
-          v-model="ml"
-          class="col"
-          :label="t('probeInspector.ml')"
-          outlined
-          :rules="numberRules"
-        />
-      </div>
+    <br />
+
+    <div class="row q-gutter-x-sm">
+      <CommittedInput
+        v-model="ap"
+        :label="t('probeInspector.ap')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="dv"
+        :label="t('probeInspector.dv')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="ml"
+        :label="t('probeInspector.ml')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
+    </div>
+
+    <div class="row q-gutter-x-sm">
+      <CommittedInput
+        v-model="roll"
+        :label="t('probeInspector.roll')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="yaw"
+        :label="t('probeInspector.yaw')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="pitch"
+        :label="t('probeInspector.pitch')"
+        :rules="numberRules"
+        class="col"
+        outlined
+      />
     </div>
 
     <div>
-      <p class="text-h6">{{ t("probeInspector.orientation") }}</p>
-      <div class="row q-gutter-x-sm">
-        <CommittedInput
-          v-model="roll"
-          class="col"
-          :label="t('probeInspector.roll')"
-          outlined
-          :rules="numberRules"
-        />
-        <CommittedInput
-          v-model="yaw"
-          class="col"
-          :label="t('probeInspector.yaw')"
-          outlined
-          :rules="numberRules"
-        />
-        <CommittedInput
-          v-model="pitch"
-          class="col"
-          :label="t('probeInspector.pitch')"
-          outlined
-          :rules="numberRules"
-        />
-      </div>
-    </div>
-
-    <div>
-      <p class="text-h6">{{ t("probeInspector.color") }}</p>
       <q-color
         v-model="probe.color"
         :palette="STANDARD_COLORS"
