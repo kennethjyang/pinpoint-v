@@ -11,7 +11,7 @@ import type { Probe } from "@/features/probe";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
 import { makeAtlas, makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { makeTestScene } from "@/test/mount-helper";
-import { buildProbe } from "./probe.api";
+import { buildProbe, disposeProbe } from "./probe.api";
 
 /** Single-shank contour (imec NP1000), in micrometers. */
 const NP1000_CONTOUR = [
@@ -138,6 +138,16 @@ describe("buildProbe", () => {
     );
   });
 
+  it("parents the probe node to the reference coordinate node under the atlas root", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+
+    const node = buildProbe(scene, probe, experiment);
+
+    expect(node!.parent!.name).toBe("referenceCoordinate_node");
+    expect(node!.parent!.parent!.name).toBe("atlasRoot_node");
+  });
+
   it("extrudes the shank standing tip-first at the probe's center tip", () => {
     const scene = makeTestScene();
     const { experiment, probe } = makeExperimentWithProbe();
@@ -145,8 +155,8 @@ describe("buildProbe", () => {
     buildProbe(scene, probe, experiment);
 
     const bounds = roundedBounds(scene, probeMeshNames(probe.id).shank);
-    expect(bounds.min).toEqual([-0.035, 0, -0.005]);
-    expect(bounds.max).toEqual([0.035, 10.209, 0.005]);
+    expect(bounds.min).toEqual([-0.035, -10.209, -0.005]);
+    expect(bounds.max).toEqual([0.035, 0, 0.005]);
   });
 
   it("places the head stage cone above the shank, as wide as the contour", () => {
@@ -156,8 +166,8 @@ describe("buildProbe", () => {
     buildProbe(scene, probe, experiment);
 
     const bounds = roundedBounds(scene, probeMeshNames(probe.id).headStage);
-    expect(bounds.min).toEqual([-8, 10.209, -8]);
-    expect(bounds.max).toEqual([8, 30.209, 8]);
+    expect(bounds.min).toEqual([-8, -30.209, -8]);
+    expect(bounds.max).toEqual([8, -10.209, 8]);
   });
 
   it("places the rod above the head stage", () => {
@@ -167,8 +177,8 @@ describe("buildProbe", () => {
     buildProbe(scene, probe, experiment);
 
     const bounds = roundedBounds(scene, probeMeshNames(probe.id).rod);
-    expect(bounds.min).toEqual([-8, 30.209, -8]);
-    expect(bounds.max).toEqual([8, 230.209, 8]);
+    expect(bounds.min).toEqual([-8, -230.209, -8]);
+    expect(bounds.max).toEqual([8, -30.209, 8]);
   });
 
   it("centers a multi-shank contour on the mean of its shanks and preserves its area", () => {
@@ -184,7 +194,7 @@ describe("buildProbe", () => {
     const bounds = roundedBounds(scene, names.shank);
     expect(bounds.min[0]).toBeCloseTo(-0.41, 6);
     expect(bounds.max[0]).toBeCloseTo(0.41, 6);
-    expect(bounds.max[1]).toBeCloseTo(10.206, 6);
+    expect(bounds.min[1]).toBeCloseTo(-10.206, 6);
   });
 
   it("triangulates the shank's cap to match the contour's true area, including a multi-shank comb", () => {
@@ -251,7 +261,7 @@ describe("buildProbe", () => {
     ).toHaveLength(1);
   });
 
-  it("rebuilds idempotently, leaving one node, three meshes, and one material", () => {
+  it("returns the existing entity on a second call, leaving one node, three meshes, and one material", () => {
     const scene = makeTestScene();
     const { experiment, probe } = makeExperimentWithProbe();
 
@@ -269,12 +279,31 @@ describe("buildProbe", () => {
     ).toHaveLength(1);
   });
 
-  it("reflects a changed probe color on rebuild", () => {
+  it("returns the same node and meshes on a second call, ignoring a color changed in between", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe({ color: "#ff0000" });
+
+    const node = buildProbe(scene, probe, experiment);
+    const shankMesh = scene.getMeshByName(probeMeshNames(probe.id).shank);
+
+    probe.color = "#00ff00";
+    const rebuiltNode = buildProbe(scene, probe, experiment);
+
+    expect(rebuiltNode).toBe(node);
+    expect(scene.getMeshByName(probeMeshNames(probe.id).shank)).toBe(shankMesh);
+    const material = shankMesh!.material as StandardMaterial;
+    expect(material.diffuseColor.equals(Color3.FromHexString("#ff0000"))).toBe(
+      true
+    );
+  });
+
+  it("reflects a changed probe color after an explicit dispose and rebuild", () => {
     const scene = makeTestScene();
     const { experiment, probe } = makeExperimentWithProbe({ color: "#ff0000" });
 
     buildProbe(scene, probe, experiment);
     probe.color = "#00ff00";
+    disposeProbe(scene, probe);
     buildProbe(scene, probe, experiment);
 
     const material = scene.getMeshByName(probeMeshNames(probe.id).shank)!
@@ -291,6 +320,7 @@ describe("buildProbe", () => {
 
     buildProbe(scene, a.probe, a.experiment);
     buildProbe(scene, b.probe, b.experiment);
+    disposeProbe(scene, a.probe);
     buildProbe(scene, a.probe, a.experiment);
 
     const rodMaterialB = scene.getMeshByName(
