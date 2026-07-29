@@ -9,9 +9,11 @@ import { STANDARD_COLORS } from "@/features/scene";
  * @param probeInterfaceProbe Probe interface definition for the probe.
  */
 export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
-  const uniqueName = crypto.randomUUID().slice(0, 8);
+  const uuid = crypto.randomUUID();
+  const uniqueName = uuid.slice(0, 8);
   return {
     inspectableKind: "probe",
+    id: uuid,
     name: `Probe ${uniqueName}`,
     color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
     visibility: "visible",

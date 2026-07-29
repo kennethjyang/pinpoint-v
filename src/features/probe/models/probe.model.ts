@@ -3,7 +3,8 @@ import type { ProbeVisibility } from "../models/visibility.model";
 export interface Probe {
   inspectableKind: "probe";
 
-  // Unique identifier.
+  id: string;
+
   name: string;
 
   color: string;
