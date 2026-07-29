@@ -26,6 +26,8 @@ interface SimplifiedGeometry {
   indices: Uint32Array;
 }
 
+const ATLAS_ROOT_NODE_NAME = "atlasRoot_node";
+
 /** BrainGlobe v3 Draco meshes store positions in nanometers. */
 const NANOMETERS_TO_MILLIMETERS = 1e-6;
 
@@ -43,6 +45,20 @@ const STRUCTURE_MESH_SUFFIX = "_structure";
 
 /** Suffix applied to a structure's identifier to name its Babylon material. */
 const STRUCTURE_MATERIAL_SUFFIX = "_material";
+
+/**
+ * Build the atlas root node or return the existing one.
+ * @param scene Babylon scene to get the atlas root node from.
+ */
+export function buildAtlasRootNode(scene: Scene): TransformNode {
+  let atlasRootNode = scene.getTransformNodeByName(ATLAS_ROOT_NODE_NAME);
+  if (!atlasRootNode) {
+    atlasRootNode = new TransformNode(ATLAS_ROOT_NODE_NAME, scene);
+    atlasRootNode.rotation = new Vector3(Math.PI, 0, 0);
+  }
+
+  return atlasRootNode;
+}
 
 /**
  * Offset the atlas root node so the atlas is centered on the origin.
@@ -133,20 +149,6 @@ export function removeAllStructures(scene: Scene) {
   for (const [_, mesh] of children) {
     mesh.dispose(false, true);
   }
-}
-
-/**
- * Build the atlas root node or return the existing one.
- * @param scene Babylon scene to get the atlas root node from.
- */
-function buildAtlasRootNode(scene: Scene): TransformNode {
-  let atlasRootNode = scene.getTransformNodeByName("atlasRoot_node");
-  if (!atlasRootNode) {
-    atlasRootNode = new TransformNode("atlasRoot_node", scene);
-    atlasRootNode.rotation = new Vector3(Math.PI, 0, 0);
-  }
-
-  return atlasRootNode;
 }
 
 /**

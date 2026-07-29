@@ -15,3 +15,13 @@ export function buildProbe(scene: Scene, probe: Probe, experiment: Experiment) {
   console.log(probe);
   console.log(experiment);
 }
+
+/**
+ * Sync each probe entity to the visibility model.
+ * @param scene Scene to modify entities in.
+ * @param experiment Experiment with probe models to get visibility from.
+ */
+export function syncProbeVisibility(scene: Scene, experiment: Experiment) {
+  console.log(scene);
+  console.log(experiment);
+}
