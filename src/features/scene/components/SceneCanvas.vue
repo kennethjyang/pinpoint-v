@@ -24,6 +24,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import { buildProbe } from "../api/probe.api";
 
 const $q = useQuasar();
 const { t } = useI18n();
@@ -129,6 +130,15 @@ watch(
     removeAllStructures(newScene);
   }
 );
+
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  if (!scene) return;
+
+  for (const probe of currentExperiment.experiment.probes) {
+    buildProbe(scene, probe, currentExperiment.experiment);
+  }
+});
 
 onMounted(async () => {
   if (!canvas.value) {
