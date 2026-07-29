@@ -127,7 +127,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="ap"
           class="col"
-          dense
           :label="t('probeInspector.ap')"
           outlined
           :rules="numberRules"
@@ -135,7 +134,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="dv"
           class="col"
-          dense
           :label="t('probeInspector.dv')"
           outlined
           :rules="numberRules"
@@ -143,7 +141,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="ml"
           class="col"
-          dense
           :label="t('probeInspector.ml')"
           outlined
           :rules="numberRules"
@@ -157,7 +154,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="roll"
           class="col"
-          dense
           :label="t('probeInspector.roll')"
           outlined
           :rules="numberRules"
@@ -165,7 +161,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="yaw"
           class="col"
-          dense
           :label="t('probeInspector.yaw')"
           outlined
           :rules="numberRules"
@@ -173,7 +168,6 @@ const numberRules: ValidationRule<string>[] = [
         <CommittedInput
           v-model="pitch"
           class="col"
-          dense
           :label="t('probeInspector.pitch')"
           outlined
           :rules="numberRules"
