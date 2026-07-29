@@ -6,6 +6,7 @@ import { NewExperimentDialog } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
+import { Inspector } from "@/features/inspector";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -178,7 +179,7 @@ onMounted(() => {
       show-if-above
       side="right"
     >
-      <!-- drawer content -->
+      <Inspector />
       <div
         v-touch-pan.horizontal.prevent.mouse="resizeRightDrawer"
         class="q-drawer__resizer q-drawer__resizer--right"
