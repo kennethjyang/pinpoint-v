@@ -252,7 +252,6 @@ function buildShankMesh(
     scene,
     earcut
   );
-  mesh.rotation = new Vector3(-Math.PI / 2, 0, 0);
   mesh.position = new Vector3(0, 0, -SHANK_THICKNESS_MILLIMETERS / 2);
   return mesh;
 }
@@ -279,10 +278,11 @@ function buildHeadStageMesh(
     },
     scene
   );
+  mesh.rotation = new Vector3(Math.PI / 2, 0, 0);
   mesh.position = new Vector3(
     0,
-    contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2,
-    0
+    0,
+    contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
   );
   return mesh;
 }
@@ -302,10 +302,11 @@ function buildRodMesh(scene: Scene, contour: ProbeContour, name: string): Mesh {
     },
     scene
   );
+  mesh.rotation = new Vector3(Math.PI / 2, 0, 0);
   mesh.position = new Vector3(
     0,
-    contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS + ROD_LENGTH_MILLIMETERS / 2,
-    0
+    0,
+    contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS + ROD_LENGTH_MILLIMETERS / 2
   );
   return mesh;
 }
