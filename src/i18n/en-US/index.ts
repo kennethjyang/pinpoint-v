@@ -70,6 +70,22 @@ export default {
     installProbe: "Install Probe",
     close: "Close"
   },
+  probeInspector: {
+    name: "Name",
+    probeType: "Probe Type",
+    tipPosition: "Tip Position",
+    orientation: "Orientation",
+    color: "Color",
+    ap: "AP",
+    dv: "DV",
+    ml: "ML",
+    roll: "Roll",
+    yaw: "Yaw",
+    pitch: "Pitch",
+    nameRequired: "Name is required.",
+    nameTaken: "Another probe already uses this name.",
+    mustBeNumber: "Must be a number."
+  },
   errorNotFound: {
     code: "404",
     message: "Oops. Nothing here...",

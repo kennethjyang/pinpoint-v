@@ -6,6 +6,7 @@ import {
   clearVisibleStructures,
   getInternedProbeInterfaceProbe,
   internProbeInterfaceProbe,
+  isProbeNameAvailable,
   isStructureVisible,
   removeProbe,
   setStructureVisibility
@@ -202,6 +203,60 @@ describe("addProbe", () => {
 
     expect(experiment.probes).toHaveLength(1);
     expect(experiment.probes[0]!.color).toBe(probe.color);
+  });
+});
+
+describe("isProbeNameAvailable", () => {
+  it("returns true when no probe uses the candidate name", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    addProbe(experiment, makeExperimentProbe({ name: "a" }));
+
+    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "b")).toBe(
+      true
+    );
+  });
+
+  it("returns true for the probe's own current name", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const probe = makeExperimentProbe({ name: "a" });
+    addProbe(experiment, probe);
+
+    expect(isProbeNameAvailable(experiment, probe, "a")).toBe(true);
+  });
+
+  it("returns false when another probe already uses the name", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    addProbe(experiment, makeExperimentProbe({ name: "a" }));
+    const other = makeExperimentProbe({ name: "b" });
+    addProbe(experiment, other);
+
+    expect(isProbeNameAvailable(experiment, other, "a")).toBe(false);
+  });
+
+  it("trims the candidate before comparing", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    addProbe(experiment, makeExperimentProbe({ name: "b" }));
+    const other = makeExperimentProbe({ name: "a" });
+    addProbe(experiment, other);
+
+    expect(isProbeNameAvailable(experiment, other, " b ")).toBe(false);
+  });
+
+  it("returns true on an experiment with no probes", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+
+    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "a")).toBe(
+      true
+    );
+  });
+
+  it("returns true for an empty candidate when no probe is named that", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    addProbe(experiment, makeExperimentProbe({ name: "a" }));
+
+    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "")).toBe(
+      true
+    );
   });
 });
 

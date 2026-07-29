@@ -9,6 +9,7 @@ export {
   internProbeInterfaceProbe,
   removeInternProbeInterfaceProbe,
   getInternedProbeInterfaceProbe,
+  isProbeNameAvailable,
   addProbe,
   removeProbe
 } from "./api/experiment.api";
