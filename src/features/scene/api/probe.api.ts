@@ -12,6 +12,7 @@ import earcut from "earcut";
 import type { Experiment } from "@/features/experiment";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
+import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
 interface ProbeContour {
@@ -68,8 +69,9 @@ const MICROMETERS_TO_MILLIMETERS = 1e-3;
 
 /**
  * Build a probe's shank, head stage, and rod meshes under a transform node
- * placed at the probe's center tip, replacing any entity already built for
- * it. Returns null if the probe has no usable contour to build from.
+ * placed at the probe's center tip and parented to the reference coordinate
+ * node, or return the existing entity if the probe was already built.
+ * Returns null if the probe has no usable contour to build from.
  * @param scene Scene to add the probe to.
  * @param probe Probe to build.
  * @param experiment Experiment this probe belongs to (to extract probe interface definition).
@@ -79,18 +81,22 @@ export function buildProbe(
   probe: Probe,
   experiment: Experiment
 ): TransformNode | null {
+  const existing = scene.getTransformNodeByName(
+    probeEntityName(probe.id, PROBE_NODE_SUFFIX)
+  );
+  if (existing) return existing;
+
   const probeInterfaceProbe = getInternedProbeInterfaceProbe(experiment, probe);
   if (!probeInterfaceProbe) return null;
 
   const contour = buildProbeContour(probeInterfaceProbe);
   if (!contour) return null;
 
-  disposeProbe(scene, probe);
-
   const node = new TransformNode(
     probeEntityName(probe.id, PROBE_NODE_SUFFIX),
     scene
   );
+  node.parent = buildReferenceCoordinateNode(scene, experiment);
 
   const material = buildProbeMaterial(scene, probe);
   const shankMesh = buildShankMesh(
