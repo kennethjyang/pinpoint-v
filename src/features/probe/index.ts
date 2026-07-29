@@ -5,5 +5,6 @@ export {
   buildProbe,
   getProbeIdentifier,
   detachProbeInterfaceProbe,
-  rotateProbeVisibility
+  rotateProbeVisibility,
+  findProbeInterfaceProbeByIdentifier
 } from "./api/probe.api";

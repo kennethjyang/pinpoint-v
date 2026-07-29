@@ -23,6 +23,7 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Do not export implementation details solely to enable testing; test through public APIs.
 - Put all user-visible strings in i18n resources.
 - Add TSDoc to every function. Keep it to 1-2 concise lines describing the function and its inputs/outputs. Avoid implementation details, extended rationale, performance explanations, and narrative comments. Use brief block comments only for non-obvious code. Surface notable tradeoffs, concerns, or implementation context in your response to the user, not in code comments.
+- Keep `@param` tags even when they restate the parameter name; omit `@returns` (the summary line already describes the output).
 - When modifying Pinia stores, do not try to engineer for backwards compatibility.
 - Pure functions that mutate or use some object should have the object be the first argument.
 
@@ -32,7 +33,7 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - After TypeScript or Vue changes: `pnpm lint && pnpm typecheck`.
 - After behavior changes: `pnpm test`.
 - Use `pnpm coverage` to find meaningful gaps; do not optimize for 100% coverage.
-- Tests must mock and patch all external dependencies (stores, composables, services, BabylonJS, network, i18n). Isolate the unit under test completely — a functional API design makes this natural since dependencies are passed as arguments rather than imported implicitly.
+- Prefer a lightweight real instance over a mock when a dependency ships a test-grade one (vue-i18n with the real `en-US` messages, a fresh Pinia instance per mount, BabylonJS's `NullEngine`) — this exercises real integration points without the cost of the real backing service. Mock only what is slow, non-deterministic, or external I/O (network/axios, Draco workers, the filesystem). Isolate the unit under test completely — a functional API design makes this natural since dependencies are passed as arguments rather than imported implicitly.
 - Skip unrelated checks for documentation-only changes.
 - Fix all lint, type, and test failures introduced by the change.
 
@@ -60,6 +61,8 @@ In every `<script setup lang="ts">`, declare in this order:
 10. `defineExpose`
 
 Declare values before their consumers within each group. Verify and fix this ordering before completing any edited SFC.
+
+Exception: a composable whose arguments are derived state (e.g. `useFuse(searchQuery, items, ...)` taking `computed` refs) may be declared alongside those inputs instead of strictly in group 4, since "declare values before their consumers" otherwise conflicts with the group ordering.
 
 ## TypeScript module order
 

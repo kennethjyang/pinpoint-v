@@ -1,4 +1,4 @@
-import { ProbeVisibility } from "../models/visibility.model";
+import type { ProbeVisibility } from "../models/visibility.model";
 
 export interface Probe {
   inspectableKind: "probe";

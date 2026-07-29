@@ -1,10 +1,9 @@
-import { Atlas } from "@/features/atlas";
-import { Experiment } from "../models/experiment.model";
+import type { Atlas } from "@/features/atlas";
+import type { Experiment } from "../models/experiment.model";
+import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import {
   detachProbeInterfaceProbe,
-  getProbeIdentifier,
-  Probe,
-  ProbeInterfaceProbe
+  getProbeIdentifier
 } from "@/features/probe";
 
 /**
@@ -101,6 +100,26 @@ export function removeInternProbeInterfaceProbe(
   if (stillReferenced) return;
 
   delete experiment.probeInterfaceProbes[probeIdentifier];
+}
+
+/**
+ * Repoint a probe to a new interface definition: intern the new definition,
+ * update the probe, then drop the old definition if nothing else uses it.
+ * @param experiment Experiment the probe and definitions belong to.
+ * @param probe Probe to repoint.
+ * @param probeInterfaceProbe New probe interface definition for the probe.
+ */
+export function setProbeInterface(
+  experiment: Experiment,
+  probe: Probe,
+  probeInterfaceProbe: ProbeInterfaceProbe
+) {
+  const oldIdentifier = probe.probeIdentifier;
+  const newIdentifier = getProbeIdentifier(probeInterfaceProbe);
+
+  internProbeInterfaceProbe(experiment, probeInterfaceProbe);
+  probe.probeIdentifier = newIdentifier;
+  removeInternProbeInterfaceProbe(experiment, oldIdentifier);
 }
 
 /**

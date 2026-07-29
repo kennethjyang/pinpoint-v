@@ -1,16 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { reactive, isReactive, isProxy, toRaw } from "vue";
+import type { Probe } from "../models/probe.model";
 import {
   buildProbe,
   detachProbeInterfaceProbe,
+  findProbeInterfaceProbeByIdentifier,
   getProbeIdentifier,
   rotateProbeVisibility
 } from "./probe.api";
-import { makeExperimentProbe, makeProbe } from "@/test/fixtures";
+import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 
 describe("buildProbe", () => {
   it("references the given probe identifier", () => {
-    const spec = makeProbe({
+    const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     const probe = buildProbe(spec);
@@ -18,7 +20,7 @@ describe("buildProbe", () => {
   });
 
   it("builds a probe with sensible defaults", () => {
-    const probe = buildProbe(makeProbe());
+    const probe = buildProbe(makeProbeInterfaceProbe());
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
@@ -29,36 +31,36 @@ describe("buildProbe", () => {
   });
 
   it("gives each probe a unique name", () => {
-    const a = buildProbe(makeProbe());
-    const b = buildProbe(makeProbe());
+    const a = buildProbe(makeProbeInterfaceProbe());
+    const b = buildProbe(makeProbeInterfaceProbe());
     expect(a.name).not.toBe(b.name);
   });
 });
 
 describe("getProbeIdentifier", () => {
   it("returns the manufacturer and model name", () => {
-    const spec = makeProbe({
+    const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     expect(getProbeIdentifier(spec)).toBe("imec np1");
   });
 
   it("returns the same identifier for definitions differing only in geometry", () => {
-    const a = makeProbe({ si_units: "um" });
-    const b = makeProbe({ si_units: "mm" });
+    const a = makeProbeInterfaceProbe({ si_units: "um" });
+    const b = makeProbeInterfaceProbe({ si_units: "mm" });
     expect(getProbeIdentifier(a)).toBe(getProbeIdentifier(b));
   });
 });
 
 describe("detachProbeInterfaceProbe", () => {
   it("returns a structurally equal copy", () => {
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
     const detached = detachProbeInterfaceProbe(spec);
     expect(detached).toEqual(spec);
   });
 
   it("returns an object independent of the source", () => {
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
     const detached = detachProbeInterfaceProbe(spec);
 
     expect(detached).not.toBe(spec);
@@ -71,14 +73,14 @@ describe("detachProbeInterfaceProbe", () => {
   });
 
   it("opts the returned object out of Vue's reactivity", () => {
-    const detached = detachProbeInterfaceProbe(makeProbe());
+    const detached = detachProbeInterfaceProbe(makeProbeInterfaceProbe());
     const holder = reactive({ spec: detached });
 
     expect(isReactive(holder.spec)).toBe(false);
   });
 
   it("accepts a reactive proxy without throwing, and does not mark the source raw", () => {
-    const source = reactive(makeProbe());
+    const source = reactive(makeProbeInterfaceProbe());
 
     const detached = detachProbeInterfaceProbe(source);
 
@@ -92,7 +94,7 @@ describe("detachProbeInterfaceProbe", () => {
 
 describe("rotateProbeVisibility", () => {
   it("cycles visible -> shanks -> hidden -> visible", () => {
-    const probe = makeExperimentProbe({ visibility: "visible" });
+    const probe = makeProbe({ visibility: "visible" });
 
     rotateProbeVisibility(probe);
     expect(probe.visibility).toBe("shanks");
@@ -102,5 +104,36 @@ describe("rotateProbeVisibility", () => {
 
     rotateProbeVisibility(probe);
     expect(probe.visibility).toBe("visible");
+  });
+
+  it("falls back to hidden for an unrecognized visibility value", () => {
+    const probe = makeProbe({
+      visibility: "unknown" as unknown as Probe["visibility"]
+    });
+
+    rotateProbeVisibility(probe);
+
+    expect(probe.visibility).toBe("hidden");
+  });
+});
+
+describe("findProbeInterfaceProbeByIdentifier", () => {
+  it("returns the definition matching the identifier", () => {
+    const spec = makeProbeInterfaceProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+
+    expect(
+      findProbeInterfaceProbeByIdentifier([spec], getProbeIdentifier(spec))
+    ).toEqual(spec);
+  });
+
+  it("returns null when no definition matches", () => {
+    expect(
+      findProbeInterfaceProbeByIdentifier(
+        [makeProbeInterfaceProbe()],
+        "missing identifier"
+      )
+    ).toBeNull();
   });
 });

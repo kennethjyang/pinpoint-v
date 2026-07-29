@@ -3,6 +3,7 @@ import type { Component } from "vue";
 import { Notify, Quasar } from "quasar";
 import { createI18n } from "vue-i18n";
 import { createPinia, type Pinia, setActivePinia } from "pinia";
+import { DracoDecoder, NullEngine, Scene, WorkerPool } from "@babylonjs/core";
 import messages from "@/i18n";
 
 /**
@@ -15,6 +16,25 @@ function createTestI18n() {
     legacy: false,
     messages
   });
+}
+
+/**
+ * Build a real Babylon `Scene` backed by a `NullEngine`, for tests that need
+ * actual mesh geometry without a real GPU context.
+ */
+export function makeTestScene(): Scene {
+  return new Scene(new NullEngine());
+}
+
+/**
+ * Short-circuit `DracoDecoder`'s lazy worker pool construction with an
+ * (unused) empty pool, so merely accessing `DracoDecoder.Default` doesn't
+ * fetch the real wasm binary from cdn.babylonjs.com. Call once per file that
+ * spies on `decodeMeshToGeometryAsync` directly.
+ */
+export function stubDracoDecoder(): void {
+  DracoDecoder.ResetDefault(true);
+  DracoDecoder.DefaultConfiguration = { workerPool: new WorkerPool([]) };
 }
 
 /**

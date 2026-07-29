@@ -10,10 +10,11 @@ import {
   isStructureVisible,
   removeInternProbeInterfaceProbe,
   removeProbe,
+  setProbeInterface,
   setStructureVisibility
 } from "./experiment.api";
 import { buildProbe, getProbeIdentifier } from "@/features/probe";
-import { makeAtlas, makeExperimentProbe, makeProbe } from "@/test/fixtures";
+import { makeAtlas, makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 
 describe("buildExperiment", () => {
   it("returns a new experiment with the given name, atlas, and reference coordinate", () => {
@@ -96,7 +97,7 @@ describe("clearVisibleStructures", () => {
 describe("internProbeInterfaceProbe", () => {
   it("stores the definition under the probe's identifier", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
 
     internProbeInterfaceProbe(experiment, spec);
 
@@ -107,11 +108,11 @@ describe("internProbeInterfaceProbe", () => {
 
   it("does not replace the existing entry when the same definition is interned twice", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const identifier = getProbeIdentifier(makeProbe());
+    const identifier = getProbeIdentifier(makeProbeInterfaceProbe());
 
-    internProbeInterfaceProbe(experiment, makeProbe());
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
     const first = experiment.probeInterfaceProbes[identifier];
-    internProbeInterfaceProbe(experiment, makeProbe());
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
 
     expect(experiment.probeInterfaceProbes[identifier]).toBe(first);
     expect(Object.keys(experiment.probeInterfaceProbes)).toHaveLength(1);
@@ -122,9 +123,11 @@ describe("internProbeInterfaceProbe", () => {
 
     internProbeInterfaceProbe(
       experiment,
-      makeProbe({ annotations: { manufacturer: "imec", model_name: "np1" } })
+      makeProbeInterfaceProbe({
+        annotations: { manufacturer: "imec", model_name: "np1" }
+      })
     );
-    internProbeInterfaceProbe(experiment, makeProbe());
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
 
     expect(Object.keys(experiment.probeInterfaceProbes)).toEqual([
       "imec np1",
@@ -134,10 +137,16 @@ describe("internProbeInterfaceProbe", () => {
 
   it("keeps the first definition when another shares its identifier", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const identifier = getProbeIdentifier(makeProbe());
+    const identifier = getProbeIdentifier(makeProbeInterfaceProbe());
 
-    internProbeInterfaceProbe(experiment, makeProbe({ si_units: "um" }));
-    internProbeInterfaceProbe(experiment, makeProbe({ si_units: "mm" }));
+    internProbeInterfaceProbe(
+      experiment,
+      makeProbeInterfaceProbe({ si_units: "um" })
+    );
+    internProbeInterfaceProbe(
+      experiment,
+      makeProbeInterfaceProbe({ si_units: "mm" })
+    );
 
     expect(Object.keys(experiment.probeInterfaceProbes)).toHaveLength(1);
     expect(experiment.probeInterfaceProbes[identifier]!.si_units).toBe("um");
@@ -145,7 +154,7 @@ describe("internProbeInterfaceProbe", () => {
 
   it("detaches the interned definition from Vue's reactivity", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
 
     internProbeInterfaceProbe(experiment, spec);
     const interned = experiment.probeInterfaceProbes[getProbeIdentifier(spec)];
@@ -156,7 +165,7 @@ describe("internProbeInterfaceProbe", () => {
 
   it("does not reflect later mutations of the source definition", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
 
     internProbeInterfaceProbe(experiment, spec);
     spec.contact_positions.push([9, 9]);
@@ -171,7 +180,7 @@ describe("internProbeInterfaceProbe", () => {
 describe("removeInternProbeInterfaceProbe", () => {
   it("removes the definition when no probe references it", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(experiment, spec);
 
     removeInternProbeInterfaceProbe(experiment, getProbeIdentifier(spec));
@@ -181,9 +190,9 @@ describe("removeInternProbeInterfaceProbe", () => {
 
   it("keeps the definition while a probe still references it", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe();
+    const spec = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(experiment, spec);
-    const probe = makeExperimentProbe();
+    const probe = makeProbe();
     addProbe(experiment, probe);
 
     removeInternProbeInterfaceProbe(experiment, probe.probeIdentifier);
@@ -193,7 +202,7 @@ describe("removeInternProbeInterfaceProbe", () => {
 
   it("is a no-op when the identifier isn't interned", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
 
     removeInternProbeInterfaceProbe(experiment, "imec np1");
 
@@ -204,10 +213,10 @@ describe("removeInternProbeInterfaceProbe", () => {
 
   it("leaves other interned definitions in place", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const imec = makeProbe({
+    const imec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
-    internProbeInterfaceProbe(experiment, makeProbe());
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
     internProbeInterfaceProbe(experiment, imec);
 
     removeInternProbeInterfaceProbe(experiment, getProbeIdentifier(imec));
@@ -216,32 +225,80 @@ describe("removeInternProbeInterfaceProbe", () => {
       "cambridgeneurotech ASSY-1"
     ]);
   });
+});
 
-  it("drops the previous definition when a probe switches to another one", () => {
+describe("setProbeInterface", () => {
+  it("repoints the probe to the new definition's identifier", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const oldSpec = makeProbe();
-    const newSpec = makeProbe({
-      annotations: { manufacturer: "imec", model_name: "np1" }
-    });
+    const oldSpec = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(experiment, oldSpec);
-    const probe = makeExperimentProbe();
+    const probe = makeProbe();
     addProbe(experiment, probe);
 
-    // Mirrors ProbeInspector's identifier-swap order: intern the new
-    // definition, repoint the probe, then collect the old one.
-    internProbeInterfaceProbe(experiment, newSpec);
-    probe.probeIdentifier = getProbeIdentifier(newSpec);
-    removeInternProbeInterfaceProbe(experiment, getProbeIdentifier(oldSpec));
+    const newSpec = makeProbeInterfaceProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    setProbeInterface(experiment, probe, newSpec);
 
-    expect(experiment.probeInterfaceProbes).toEqual({ "imec np1": newSpec });
+    expect(probe.probeIdentifier).toBe(getProbeIdentifier(newSpec));
+  });
+
+  it("interns the new definition", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSpec = makeProbeInterfaceProbe();
+    internProbeInterfaceProbe(experiment, oldSpec);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    const newSpec = makeProbeInterfaceProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    setProbeInterface(experiment, probe, newSpec);
+
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toEqual(newSpec);
+  });
+
+  it("drops the old definition once nothing else references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSpec = makeProbeInterfaceProbe();
+    internProbeInterfaceProbe(experiment, oldSpec);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    const newSpec = makeProbeInterfaceProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    setProbeInterface(experiment, probe, newSpec);
+
+    expect(experiment.probeInterfaceProbes).toEqual({
+      [getProbeIdentifier(newSpec)]: newSpec
+    });
+  });
+
+  it("keeps the old definition if another probe still references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSpec = makeProbeInterfaceProbe();
+    internProbeInterfaceProbe(experiment, oldSpec);
+    const probe = makeProbe({ name: "A" });
+    const otherProbe = makeProbe({ name: "B" });
+    addProbe(experiment, probe);
+    addProbe(experiment, otherProbe);
+
+    const newSpec = makeProbeInterfaceProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    setProbeInterface(experiment, probe, newSpec);
+
+    expect(
+      experiment.probeInterfaceProbes[getProbeIdentifier(oldSpec)]
+    ).toEqual(oldSpec);
   });
 });
 
 describe("getInternedProbeInterfaceProbe", () => {
   it("resolves a probe's interned definition", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const spec = makeProbe({ si_units: "mm" });
+    const spec = makeProbeInterfaceProbe({ si_units: "mm" });
     internProbeInterfaceProbe(experiment, spec);
     const probe = buildProbe(spec);
 
@@ -250,7 +307,7 @@ describe("getInternedProbeInterfaceProbe", () => {
 
   it("returns null when the probe's definition isn't in the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const probe = makeExperimentProbe({ probeIdentifier: "missing probe" });
+    const probe = makeProbe({ probeIdentifier: "missing probe" });
 
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toBeNull();
   });
@@ -259,8 +316,8 @@ describe("getInternedProbeInterfaceProbe", () => {
 describe("addProbe", () => {
   it("adds the probe to the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
-    const probe = makeExperimentProbe();
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const probe = makeProbe();
 
     addProbe(experiment, probe);
 
@@ -269,8 +326,8 @@ describe("addProbe", () => {
 
   it("does nothing when a probe with the same name already exists", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
-    const probe = makeExperimentProbe({ name: "dup" });
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const probe = makeProbe({ name: "dup" });
     addProbe(experiment, probe);
 
     addProbe(experiment, { ...probe, color: "#000000" });
@@ -283,16 +340,14 @@ describe("addProbe", () => {
 describe("isProbeNameAvailable", () => {
   it("returns true when no probe uses the candidate name", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeExperimentProbe({ name: "a" }));
+    addProbe(experiment, makeProbe({ name: "a" }));
 
-    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "b")).toBe(
-      true
-    );
+    expect(isProbeNameAvailable(experiment, makeProbe(), "b")).toBe(true);
   });
 
   it("returns true for the probe's own current name", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const probe = makeExperimentProbe({ name: "a" });
+    const probe = makeProbe({ name: "a" });
     addProbe(experiment, probe);
 
     expect(isProbeNameAvailable(experiment, probe, "a")).toBe(true);
@@ -300,8 +355,8 @@ describe("isProbeNameAvailable", () => {
 
   it("returns false when another probe already uses the name", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeExperimentProbe({ name: "a" }));
-    const other = makeExperimentProbe({ name: "b" });
+    addProbe(experiment, makeProbe({ name: "a" }));
+    const other = makeProbe({ name: "b" });
     addProbe(experiment, other);
 
     expect(isProbeNameAvailable(experiment, other, "a")).toBe(false);
@@ -309,8 +364,8 @@ describe("isProbeNameAvailable", () => {
 
   it("trims the candidate before comparing", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeExperimentProbe({ name: "b" }));
-    const other = makeExperimentProbe({ name: "a" });
+    addProbe(experiment, makeProbe({ name: "b" }));
+    const other = makeProbe({ name: "a" });
     addProbe(experiment, other);
 
     expect(isProbeNameAvailable(experiment, other, " b ")).toBe(false);
@@ -319,26 +374,22 @@ describe("isProbeNameAvailable", () => {
   it("returns true on an experiment with no probes", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
 
-    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "a")).toBe(
-      true
-    );
+    expect(isProbeNameAvailable(experiment, makeProbe(), "a")).toBe(true);
   });
 
   it("returns true for an empty candidate when no probe is named that", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeExperimentProbe({ name: "a" }));
+    addProbe(experiment, makeProbe({ name: "a" }));
 
-    expect(isProbeNameAvailable(experiment, makeExperimentProbe(), "")).toBe(
-      true
-    );
+    expect(isProbeNameAvailable(experiment, makeProbe(), "")).toBe(true);
   });
 });
 
 describe("removeProbe", () => {
   it("removes the probe from the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
-    const probe = makeExperimentProbe();
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const probe = makeProbe();
     addProbe(experiment, probe);
 
     removeProbe(experiment, probe);
@@ -348,19 +399,19 @@ describe("removeProbe", () => {
 
   it("is a no-op when the probe isn't in the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
-    const kept = makeExperimentProbe({ name: "kept" });
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const kept = makeProbe({ name: "kept" });
     addProbe(experiment, kept);
 
-    removeProbe(experiment, makeExperimentProbe({ name: "never-added" }));
+    removeProbe(experiment, makeProbe({ name: "never-added" }));
 
     expect(experiment.probes).toEqual([kept]);
   });
 
   it("drops the probe's definition once no probe references it anymore", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    internProbeInterfaceProbe(experiment, makeProbe());
-    const probe = makeExperimentProbe();
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const probe = makeProbe();
     addProbe(experiment, probe);
 
     removeProbe(experiment, probe);

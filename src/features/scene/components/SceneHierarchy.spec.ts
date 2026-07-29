@@ -11,7 +11,7 @@ import {
   getTerminologyRows
 } from "@/features/atlas";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
-import { makeProbe } from "@/test/fixtures";
+import { makeProbeInterfaceProbe } from "@/test/fixtures";
 
 // `useCurrentExperimentStore`'s `manifest`/`terminologyRows` are
 // `computedAsync` and fetch on store creation -- mock the leaf module (not
@@ -77,7 +77,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    const spec = makeProbe({
+    const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     probeLibrary.add(spec);
@@ -97,7 +97,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
 
     await mountHierarchy(pinia);
     await pickFirstLibraryProbe();
@@ -114,7 +114,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
 
     const wrapper = await mountHierarchy(pinia);
     await pickFirstLibraryProbe();
@@ -133,7 +133,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
 
     await mountHierarchy(pinia);
     await pickFirstLibraryProbe();
@@ -147,7 +147,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
 
     const wrapper = await mountHierarchy(pinia);
     await pickFirstLibraryProbe();
@@ -165,7 +165,7 @@ describe("SceneHierarchy", () => {
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
     const currentExperiment = useCurrentExperimentStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
 
     const wrapper = await mountHierarchy(pinia);
     await pickFirstLibraryProbe();
@@ -189,7 +189,9 @@ describe("SceneHierarchy", () => {
     const probeLibrary = useProbeLibraryStore(pinia);
     useCurrentExperimentStore(pinia);
     probeLibrary.add(
-      makeProbe({ annotations: { manufacturer: "imec", model_name: "np1" } })
+      makeProbeInterfaceProbe({
+        annotations: { manufacturer: "imec", model_name: "np1" }
+      })
     );
 
     await mountHierarchy(pinia);

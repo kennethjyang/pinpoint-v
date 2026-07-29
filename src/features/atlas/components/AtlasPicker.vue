@@ -11,23 +11,12 @@ import { computedAsync } from "@vueuse/core";
  */
 type SourceToggle = "brainglobe" | "custom";
 
-// Props.
 const selectedAtlas = defineModel<Atlas | null>({ required: true });
 
-// Composables.
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
-// State.
 const sourceToggle = ref<SourceToggle>("brainglobe");
-
-/**
- * Custom HTTP host URL.
- */
 const customHTTPHost = ref<string | null>("http://localhost:3000");
-
-/**
- * Filter string.
- */
 const searchQuery = ref<string | null>(null);
 
 const atlasesEvaluating = ref(false);
@@ -48,24 +37,17 @@ const atlases = computedAsync<Atlas[]>(
   atlasesEvaluating
 );
 
-// Getters.
-
-/**
- * Null unwrapped search query.
- */
 const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
 
 /**
  * Favorites for this source as a set for fast lookup.
  */
 const favoritesSet = computed(() => {
-  // Return the source if there are atlases.
   if (atlases.value[0]) {
     const source = atlases.value[0].source;
     return new Set(favoriteAtlasesStore.favorites[source]);
   }
 
-  // Otherwise, return the empty set.
   return new Set<string>();
 });
 

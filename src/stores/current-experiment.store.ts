@@ -1,15 +1,17 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { computedAsync } from "@vueuse/core";
-import { Experiment } from "@/features/experiment";
+import { i18n } from "@/services/i18n.service";
+import type { Experiment } from "@/features/experiment";
+import type { Manifest } from "@/features/atlas";
 import {
   BRAINGLOBE_BASE_URL,
   getManifest,
-  getTerminologyRows,
-  Manifest
+  getTerminologyRows
 } from "@/features/atlas";
 import { detachProbeInterfaceProbe } from "@/features/probe";
-import { Inspectable } from "@/features/scene";
+import type { Inspectable } from "@/features/scene";
+import { isSameInspectable } from "@/features/scene";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
@@ -18,7 +20,7 @@ export const useCurrentExperimentStore = defineStore(
      * Current experiment instance.
      */
     const experiment = ref<Experiment>({
-      name: "My First Experiment",
+      name: i18n.global.t("currentExperiment.defaultName"),
       atlas: {
         source: BRAINGLOBE_BASE_URL,
         name: "allen_mouse"
@@ -40,13 +42,6 @@ export const useCurrentExperimentStore = defineStore(
      * Flag for when the terminology rows are being updated to match the new atlas.
      */
     const isTerminologyRowsEvaluating = ref(false);
-
-    /**
-     * Are the getters into the current atlas still evaluating.
-     */
-    const areAtlasComponentsEvaluating = computed(
-      () => isManifestEvaluating.value || isTerminologyRowsEvaluating.value
-    );
 
     /**
      * Get the current experiment name.
@@ -78,6 +73,13 @@ export const useCurrentExperimentStore = defineStore(
     );
 
     /**
+     * Are the getters into the current atlas still evaluating.
+     */
+    const areAtlasComponentsEvaluating = computed(
+      () => isManifestEvaluating.value || isTerminologyRowsEvaluating.value
+    );
+
+    /**
      * Get the current experiment's reference coordinate.
      */
     const referenceCoordinate = computed(
@@ -103,38 +105,30 @@ export const useCurrentExperimentStore = defineStore(
     const probes = computed(() => experiment.value.probes);
 
     /**
-     * Helper to determine if the passed entity is the actively selected one.
-     * @param entity
+     * Is the passed entity the actively selected one.
+     * @param entity Entity to compare against the current selection.
      */
     function isInspectableSelected(entity: Inspectable): boolean {
-      if (!selectedInspectable.value) return false;
-
-      if (selectedInspectable.value.inspectableKind !== entity.inspectableKind)
-        return false;
-
-      switch (selectedInspectable.value.inspectableKind) {
-        case "probe":
-          return selectedInspectable.value.name === entity.name;
-        default:
-          return false;
-      }
+      return (
+        !!selectedInspectable.value &&
+        isSameInspectable(selectedInspectable.value, entity)
+      );
     }
 
-    return {
-      experiment,
-      selectedInspectable,
-      isManifestEvaluating,
-      visibleStructures,
+    const state = { experiment, selectedInspectable, isManifestEvaluating };
+    const getters = {
       name,
       atlas,
       manifest,
       terminologyRows,
       areAtlasComponentsEvaluating,
       referenceCoordinate,
-      probes,
+      visibleStructures,
       probeInterfaceProbes,
-      isInspectableSelected
+      probes
     };
+    const actions = { isInspectableSelected };
+    return { ...state, ...getters, ...actions };
   },
   {
     persist: {

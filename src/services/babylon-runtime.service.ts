@@ -1,4 +1,5 @@
-import { InjectionKey, markRaw, shallowReadonly, shallowRef } from "vue";
+import type { InjectionKey } from "vue";
+import { markRaw, type ShallowRef, shallowReadonly, shallowRef } from "vue";
 import {
   ArcRotateCamera,
   GizmoManager,
@@ -9,31 +10,44 @@ import {
 } from "@babylonjs/core";
 
 /**
- * Service creator. Hosts the references to the engine and scene.
+ * Service holding the Babylon engine, scene, camera, and gizmo manager
+ * references for one runtime.
  */
-export function createBabylonRuntimeService() {
+export interface BabylonRuntimeService {
+  engine: Readonly<ShallowRef<WebGPUEngine | null>>;
+  scene: Readonly<ShallowRef<Scene | null>>;
+  camera: Readonly<ShallowRef<ArcRotateCamera | null>>;
+  gizmoManager: Readonly<ShallowRef<GizmoManager | null>>;
+  init: (canvas: HTMLCanvasElement) => Promise<void>;
+  dispose: () => void;
+}
+
+export const BabylonRuntimeServiceKey: InjectionKey<BabylonRuntimeService> =
+  Symbol("BabylonRuntimeService");
+
+/**
+ * Create a service holding the Babylon engine, scene, camera, and gizmo
+ * manager references for one runtime.
+ */
+export function createBabylonRuntimeService(): BabylonRuntimeService {
   const engine = shallowRef<WebGPUEngine | null>(null);
   const scene = shallowRef<Scene | null>(null);
   const camera = shallowRef<ArcRotateCamera | null>(null);
   const gizmoManager = shallowRef<GizmoManager | null>(null);
 
   /**
-   * Create the runtime from a canvas.
+   * Create the runtime from a canvas. Does nothing if already initialized.
    * @param canvas HTML canvas to attach the runtime to.
    */
   async function init(canvas: HTMLCanvasElement) {
-    // Cancel if already initialized.
     if (engine.value) return;
 
-    // Initialize engine.
     const e = markRaw(new WebGPUEngine(canvas));
     e.compatibilityMode = false;
     await e.initAsync();
 
-    // Attach scene.
     const s = markRaw(new Scene(e));
 
-    // Attach camera.
     const c = new ArcRotateCamera(
       "main_camera",
       -Math.PI / 2,
@@ -44,20 +58,16 @@ export function createBabylonRuntimeService() {
     );
     c.attachControl(canvas, true);
 
-    // Attach gizmo manager.
     const gm = new GizmoManager(s);
     gm.positionGizmoEnabled = true;
     gm.rotationGizmoEnabled = true;
 
-    // Add lights.
     new HemisphericLight("main_light", Vector3.Up(), s);
 
-    // Start render loop.
     e.runRenderLoop(() => {
       s.render();
     });
 
-    // Set refs.
     engine.value = e;
     scene.value = s;
     camera.value = c;
@@ -88,10 +98,3 @@ export function createBabylonRuntimeService() {
     dispose
   };
 }
-
-export type BabylonRuntimeService = ReturnType<
-  typeof createBabylonRuntimeService
->;
-
-export const BabylonRuntimeServiceKey: InjectionKey<BabylonRuntimeService> =
-  Symbol("BabylonRuntimeService");

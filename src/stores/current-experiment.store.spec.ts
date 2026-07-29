@@ -7,7 +7,12 @@ import { useCurrentExperimentStore } from "./current-experiment.store";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { addProbe, internProbeInterfaceProbe } from "@/features/experiment";
 import { buildProbe, getProbeIdentifier } from "@/features/probe";
-import { makeManifest, makeProbe, makeTerminologyRows } from "@/test/fixtures";
+import {
+  makeManifest,
+  makeProbe,
+  makeProbeInterfaceProbe,
+  makeTerminologyRows
+} from "@/test/fixtures";
 
 /**
  * Build a Pinia instance with the persistence plugin actually wired up (as
@@ -24,12 +29,19 @@ function usePersistedPinia() {
   return pinia;
 }
 
-vi.mock("@/features/atlas", () => ({
-  BRAINGLOBE_BASE_URL:
-    "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
-  getManifest: vi.fn(),
-  getTerminologyRows: vi.fn()
-}));
+// Mock the leaf module (not the `@/features/atlas` barrel) -- the store's
+// `manifest`/`terminologyRows` are `computedAsync` and fetch on store
+// creation, so mounting would trigger real network calls otherwise.
+vi.mock("@/features/atlas/api/source.api", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/atlas/api/source.api")
+  >("@/features/atlas/api/source.api");
+  return {
+    ...actual,
+    getManifest: vi.fn(),
+    getTerminologyRows: vi.fn()
+  };
+});
 
 describe("useCurrentExperimentStore", () => {
   beforeEach(() => {
@@ -131,8 +143,7 @@ describe("useCurrentExperimentStore", () => {
       setActivePinia(pinia);
 
       const store = useCurrentExperimentStore();
-      // terminologyRows now depends on manifest resolving first - see the
-      // defaultStructureIdentifiers test above.
+      // terminologyRows depends on manifest resolving first.
       await flushPromises();
       await flushPromises();
 
@@ -145,13 +156,37 @@ describe("useCurrentExperimentStore", () => {
     });
   });
 
+  describe("isInspectableSelected", () => {
+    it("returns false when nothing is selected", () => {
+      const store = useCurrentExperimentStore();
+      const probe = makeProbe();
+
+      expect(store.isInspectableSelected(probe)).toBe(false);
+    });
+
+    it("returns true when the entity matches the current selection", () => {
+      const store = useCurrentExperimentStore();
+      const probe = makeProbe({ name: "A" });
+      store.selectedInspectable = probe;
+
+      expect(store.isInspectableSelected(probe)).toBe(true);
+    });
+
+    it("returns false when the entity does not match the current selection", () => {
+      const store = useCurrentExperimentStore();
+      store.selectedInspectable = makeProbe({ name: "A" });
+
+      expect(store.isInspectableSelected(makeProbe({ name: "B" }))).toBe(false);
+    });
+  });
+
   describe("probe persistence and reactivity", () => {
     it("persists interned definitions as part of the experiment", async () => {
       usePersistedPinia();
       localStorage.removeItem("current-experiment");
 
       const store = useCurrentExperimentStore();
-      const spec = makeProbe();
+      const spec = makeProbeInterfaceProbe();
       const identifier = getProbeIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
       addProbe(store.experiment, buildProbe(spec));
@@ -169,7 +204,7 @@ describe("useCurrentExperimentStore", () => {
       localStorage.removeItem("current-experiment");
 
       const firstStore = useCurrentExperimentStore();
-      const spec = makeProbe();
+      const spec = makeProbeInterfaceProbe();
       const identifier = getProbeIdentifier(spec);
       internProbeInterfaceProbe(firstStore.experiment, spec);
       addProbe(firstStore.experiment, buildProbe(spec));
@@ -182,7 +217,7 @@ describe("useCurrentExperimentStore", () => {
       expect(Object.keys(rehydratedStore.probeInterfaceProbes)).toHaveLength(1);
       const rehydratedDefinition =
         rehydratedStore.probeInterfaceProbes[identifier]!;
-      expect(rehydratedDefinition).toEqual(makeProbe());
+      expect(rehydratedDefinition).toEqual(makeProbeInterfaceProbe());
       // `markRaw` doesn't survive the JSON round-trip on its own -- this
       // guards the `afterHydrate` hook that re-applies it.
       expect(isReactive(rehydratedDefinition)).toBe(false);
@@ -190,7 +225,7 @@ describe("useCurrentExperimentStore", () => {
 
     it("keeps the probe itself reactive even though its definition is not", async () => {
       const store = useCurrentExperimentStore();
-      const spec = makeProbe();
+      const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
       addProbe(store.experiment, buildProbe(spec));
 

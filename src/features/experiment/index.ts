@@ -11,5 +11,6 @@ export {
   getInternedProbeInterfaceProbe,
   isProbeNameAvailable,
   addProbe,
-  removeProbe
+  removeProbe,
+  setProbeInterface
 } from "./api/experiment.api";

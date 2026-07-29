@@ -19,7 +19,7 @@ import { StructureEntity } from "../models/structure-entity.model";
 import {
   getAtlasCenter,
   getDefaultStructureIdentifiers,
-  structureEntityFromIdentifier
+  structureEntitiesFromIdentifiers
 } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
@@ -47,14 +47,11 @@ const alwaysPresentStructures = computed<StructureEntity[]>(() => {
     currentExperiment;
   if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
 
-  return getDefaultStructureIdentifiers(terminologyRows).flatMap(identifier => {
-    const structureEntity = structureEntityFromIdentifier(
-      manifest,
-      terminologyRows,
-      identifier
-    );
-    return structureEntity ? [structureEntity] : [];
-  });
+  return structureEntitiesFromIdentifiers(
+    manifest,
+    terminologyRows,
+    getDefaultStructureIdentifiers(terminologyRows)
+  );
 });
 
 /**
@@ -65,14 +62,11 @@ const visibleStructureEntities = computed<StructureEntity[]>(() => {
     currentExperiment;
   if (!manifest || !terminologyRows || areAtlasComponentsEvaluating) return [];
 
-  return currentExperiment.visibleStructures.flatMap(identifier => {
-    const structureEntity = structureEntityFromIdentifier(
-      manifest,
-      terminologyRows,
-      identifier
-    );
-    return structureEntity ? [structureEntity] : [];
-  });
+  return structureEntitiesFromIdentifiers(
+    manifest,
+    terminologyRows,
+    currentExperiment.visibleStructures
+  );
 });
 
 /**
@@ -82,67 +76,66 @@ function onResize() {
   runtime.engine.value?.resize();
 }
 
+// Keep the scene in sync with the current atlas's default structures and the
+// experiment's visible structure selection.
+watchEffect(async () => {
+  const scene = runtime.scene.value;
+  if (!scene) return;
+
+  isLoadingStructures.value = true;
+  try {
+    await syncStructureVisibility(
+      scene,
+      alwaysPresentStructures.value,
+      visibleStructureEntities.value
+    );
+  } catch {
+    $q.notify({
+      message: t("sceneCanvas.problemLoadingAtlasMeshes"),
+      caption: t("sceneCanvas.atlasLikelyNotSupportedYet"),
+      color: "warning",
+      icon: "warning"
+    });
+  } finally {
+    isLoadingStructures.value = false;
+  }
+});
+
+// Keep the atlas root positioned so the atlas center sits at the scene origin.
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  const { manifest } = currentExperiment;
+  if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
+
+  setAtlasCenterOffset(scene, getAtlasCenter(manifest));
+});
+
+// Set the camera's initial zoom relative to the AP length of the atlas.
+watchEffect(() => {
+  const camera = runtime.camera.value;
+  const { manifest, areAtlasComponentsEvaluating } = currentExperiment;
+  if (!camera || !manifest || areAtlasComponentsEvaluating) return;
+
+  setInitialZoom(camera, manifest);
+});
+
+// Clear the scene whenever the atlas changes, but not when the scene itself
+// has just become available for the first time.
+watch(
+  [() => runtime.scene.value, () => currentExperiment.atlas],
+  ([newScene], [oldScene]) => {
+    if (!newScene || !oldScene) return;
+
+    removeAllStructures(newScene);
+  }
+);
+
 onMounted(async () => {
-  // Exit if no canvas.
   if (!canvas.value) {
     throw new Error("Scene canvas not found in DOM!");
   }
 
-  // Initialize Babylon runtime.
   await runtime.init(canvas.value);
-
-  // Keep the scene in sync with the current atlas's default structures and the
-  // experiment's visible structure selection.
-  watchEffect(async () => {
-    const scene = runtime.scene.value;
-    if (!scene) return;
-
-    isLoadingStructures.value = true;
-    try {
-      await syncStructureVisibility(
-        scene,
-        alwaysPresentStructures.value,
-        visibleStructureEntities.value
-      );
-    } catch {
-      $q.notify({
-        message: t("sceneCanvas.problemLoadingAtlasMeshes"),
-        caption: t("sceneCanvas.atlasLikelyNotSupportedYet"),
-        color: "warning",
-        icon: "warning"
-      });
-    } finally {
-      isLoadingStructures.value = false;
-    }
-  });
-
-  // Keep the atlas root positioned so the atlas center sits at the scene origin.
-  watchEffect(() => {
-    const scene = runtime.scene.value;
-    const { manifest } = currentExperiment;
-    if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
-
-    setAtlasCenterOffset(scene, getAtlasCenter(manifest));
-  });
-
-  // Set the camera's initial zoom relative to the AP length of the atlas.
-  watchEffect(() => {
-    const camera = runtime.camera.value;
-    const { manifest, areAtlasComponentsEvaluating } = currentExperiment;
-    if (!camera || !manifest || areAtlasComponentsEvaluating) return;
-
-    setInitialZoom(manifest, camera);
-  });
-
-  // Clear the scene whenever the atlas changes.
-  watch(
-    [() => runtime.scene.value, () => currentExperiment.atlas],
-    ([newScene]) => {
-      if (!newScene) return;
-
-      removeAllStructures(newScene);
-    }
-  );
 });
 
 onUnmounted(() => {

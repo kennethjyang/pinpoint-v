@@ -5,8 +5,13 @@ import ProbeInspector from "./ProbeInspector.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
-import { makeExperimentProbe, makeProbe } from "@/test/fixtures";
+import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
+import { internProbeInterfaceProbe } from "@/features/experiment";
+import { getProbeIdentifier } from "@/features/probe";
+import enUS from "@/i18n/en-US";
+
+const t = enUS.probeInspector;
 
 // `useCurrentExperimentStore`'s `manifest`/`terminologyRows` are
 // `computedAsync` and fetch on store creation -- mock the leaf module (not
@@ -54,11 +59,11 @@ describe("ProbeInspector", () => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
   });
 
-  function mountInspector(probe = makeExperimentProbe()) {
+  function mountInspector(probe = makeProbe()) {
     const pinia = createPinia();
     setActivePinia(pinia);
     const probeLibrary = useProbeLibraryStore(pinia);
-    probeLibrary.add(makeProbe());
+    probeLibrary.add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
     store.experiment.probes = [probe];
 
@@ -70,11 +75,9 @@ describe("ProbeInspector", () => {
   }
 
   it("does not mutate the name while typing, before blur or enter", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    const name = fieldByLabel(wrapper, "Name");
+    const name = fieldByLabel(wrapper, t.name);
     await name.find("input").trigger("focusin");
     await name.find("input").setValue("B");
 
@@ -82,76 +85,64 @@ describe("ProbeInspector", () => {
   });
 
   it("commits the name on blur when valid", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    await editAndBlur(fieldByLabel(wrapper, "Name"), "B");
+    await editAndBlur(fieldByLabel(wrapper, t.name), "B");
 
     expect(probe.name).toBe("B");
   });
 
   it("commits the name on Enter when valid", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    await editAndEnter(fieldByLabel(wrapper, "Name"), "B");
+    await editAndEnter(fieldByLabel(wrapper, t.name), "B");
 
     expect(probe.name).toBe("B");
   });
 
   it("rejects a whitespace-only name and leaves the probe's name unchanged", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    const name = fieldByLabel(wrapper, "Name");
+    const name = fieldByLabel(wrapper, t.name);
     await editAndBlur(name, "   ");
 
     expect(probe.name).toBe("A");
-    expect(name.find("[role='alert']").text()).toBe("Name is required.");
+    expect(name.find("[role='alert']").text()).toBe(t.nameRequired);
   });
 
   it("rejects a name already used by another probe in the experiment", async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
-    useProbeLibraryStore(pinia).add(makeProbe());
+    useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
     store.experiment.probes = [
-      makeExperimentProbe({ name: "A" }),
-      makeExperimentProbe({ name: "B" })
+      makeProbe({ name: "A" }),
+      makeProbe({ name: "B" })
     ];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
       props: { probe: store.experiment.probes[0]! }
     });
 
-    const name = fieldByLabel(wrapper, "Name");
+    const name = fieldByLabel(wrapper, t.name);
     await editAndBlur(name, "B");
 
     expect(store.experiment.probes[0]!.name).toBe("A");
-    expect(name.find("[role='alert']").text()).toBe(
-      "Another probe already uses this name."
-    );
+    expect(name.find("[role='alert']").text()).toBe(t.nameTaken);
   });
 
   it("trims whitespace when committing a name", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    await editAndBlur(fieldByLabel(wrapper, "Name"), "  Renamed  ");
+    await editAndBlur(fieldByLabel(wrapper, t.name), "  Renamed  ");
 
     expect(probe.name).toBe("Renamed");
   });
 
   it("accepts re-committing the probe's own unchanged name", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 
-    const name = fieldByLabel(wrapper, "Name");
+    const name = fieldByLabel(wrapper, t.name);
     await editAndBlur(name, "A");
 
     expect(probe.name).toBe("A");
@@ -161,9 +152,9 @@ describe("ProbeInspector", () => {
   it("commits AP/DV/ML into tipPosition as real numbers", async () => {
     const { wrapper, probe } = mountInspector();
 
-    await editAndBlur(fieldByLabel(wrapper, "AP"), "-2.5");
-    await editAndBlur(fieldByLabel(wrapper, "DV"), "1");
-    await editAndBlur(fieldByLabel(wrapper, "ML"), "0");
+    await editAndBlur(fieldByLabel(wrapper, t.ap), "-2.5");
+    await editAndBlur(fieldByLabel(wrapper, t.dv), "1");
+    await editAndBlur(fieldByLabel(wrapper, t.ml), "0");
 
     expect(probe.tipPosition).toEqual([-2.5, 1, 0]);
     expect(probe.tipPosition.every(value => typeof value === "number")).toBe(
@@ -174,9 +165,9 @@ describe("ProbeInspector", () => {
   it("commits Roll/Yaw/Pitch into orientation as real numbers", async () => {
     const { wrapper, probe } = mountInspector();
 
-    await editAndBlur(fieldByLabel(wrapper, "Roll"), "0.1");
-    await editAndBlur(fieldByLabel(wrapper, "Yaw"), "0.2");
-    await editAndBlur(fieldByLabel(wrapper, "Pitch"), "0.3");
+    await editAndBlur(fieldByLabel(wrapper, t.roll), "0.1");
+    await editAndBlur(fieldByLabel(wrapper, t.yaw), "0.2");
+    await editAndBlur(fieldByLabel(wrapper, t.pitch), "0.3");
 
     expect(probe.orientation).toEqual([0.1, 0.2, 0.3]);
   });
@@ -184,29 +175,29 @@ describe("ProbeInspector", () => {
   it("rejects a non-numeric value in a numeric field", async () => {
     const { wrapper, probe } = mountInspector();
 
-    const ap = fieldByLabel(wrapper, "AP");
+    const ap = fieldByLabel(wrapper, t.ap);
     await editAndBlur(ap, "abc");
 
     expect(probe.tipPosition[0]).toBe(0);
-    expect(ap.find("[role='alert']").text()).toBe("Must be a number.");
+    expect(ap.find("[role='alert']").text()).toBe(t.mustBeNumber);
   });
 
   it("rejects an empty numeric field", async () => {
     const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ tipPosition: [5, 0, 0] })
+      makeProbe({ tipPosition: [5, 0, 0] })
     );
 
-    await editAndBlur(fieldByLabel(wrapper, "AP"), "");
+    await editAndBlur(fieldByLabel(wrapper, t.ap), "");
 
     expect(probe.tipPosition[0]).toBe(5);
   });
 
   it("accepts zero in a numeric field", async () => {
     const { wrapper, probe } = mountInspector(
-      makeExperimentProbe({ tipPosition: [5, 0, 0] })
+      makeProbe({ tipPosition: [5, 0, 0] })
     );
 
-    await editAndBlur(fieldByLabel(wrapper, "AP"), "0");
+    await editAndBlur(fieldByLabel(wrapper, t.ap), "0");
 
     expect(probe.tipPosition[0]).toBe(0);
   });
@@ -214,10 +205,10 @@ describe("ProbeInspector", () => {
   it("re-seeds every field when the probe prop changes", async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
-    useProbeLibraryStore(pinia).add(makeProbe());
+    useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
-    const a = makeExperimentProbe({ name: "A", tipPosition: [1, 2, 3] });
-    const b = makeExperimentProbe({ name: "B", tipPosition: [4, 5, 6] });
+    const a = makeProbe({ name: "A", tipPosition: [1, 2, 3] });
+    const b = makeProbe({ name: "B", tipPosition: [4, 5, 6] });
     store.experiment.probes = [a, b];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
@@ -227,19 +218,78 @@ describe("ProbeInspector", () => {
     // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
     await wrapper.setProps({ probe: b } as Record<string, unknown>);
 
-    expect(fieldByLabel(wrapper, "Name").props("modelValue")).toBe("B");
-    expect(fieldByLabel(wrapper, "AP").props("modelValue")).toBe("4");
+    expect(fieldByLabel(wrapper, t.name).props("modelValue")).toBe("B");
+    expect(fieldByLabel(wrapper, t.ap).props("modelValue")).toBe("4");
   });
 
   it("keeps the renamed probe selected and in sync with the store", async () => {
-    const { wrapper, store, probe } = mountInspector(
-      makeExperimentProbe({ name: "A" })
-    );
+    const { wrapper, store, probe } = mountInspector(makeProbe({ name: "A" }));
     store.selectedInspectable = probe;
 
-    await editAndBlur(fieldByLabel(wrapper, "Name"), "B");
+    await editAndBlur(fieldByLabel(wrapper, t.name), "B");
 
     expect(store.isInspectableSelected(probe)).toBe(true);
     expect(store.selectedInspectable?.name).toBe("B");
+  });
+
+  describe("switching probe type", () => {
+    it("interns the new definition, repoints the probe, and drops the old definition", async () => {
+      const pinia = createPinia();
+      setActivePinia(pinia);
+      const oldSpec = makeProbeInterfaceProbe();
+      const newSpec = makeProbeInterfaceProbe({
+        annotations: { manufacturer: "imec", model_name: "np1" }
+      });
+      const probeLibrary = useProbeLibraryStore(pinia);
+      probeLibrary.add(oldSpec);
+      probeLibrary.add(newSpec);
+      const store = useCurrentExperimentStore(pinia);
+      const probe = makeProbe({
+        probeIdentifier: getProbeIdentifier(oldSpec)
+      });
+      store.experiment.probes = [probe];
+      internProbeInterfaceProbe(store.experiment, oldSpec);
+      const wrapper = mountWithQuasar(ProbeInspector, {
+        pinia,
+        props: { probe }
+      });
+
+      wrapper
+        .findComponent({ name: "QSelect" })
+        .vm.$emit("update:modelValue", getProbeIdentifier(newSpec));
+      await wrapper.vm.$nextTick();
+
+      expect(probe.probeIdentifier).toBe(getProbeIdentifier(newSpec));
+      expect(store.experiment.probeInterfaceProbes).toEqual({
+        [getProbeIdentifier(newSpec)]: newSpec
+      });
+    });
+
+    it("does nothing when the selected identifier isn't in the library", async () => {
+      const pinia = createPinia();
+      setActivePinia(pinia);
+      const oldSpec = makeProbeInterfaceProbe();
+      useProbeLibraryStore(pinia).add(oldSpec);
+      const store = useCurrentExperimentStore(pinia);
+      const probe = makeProbe({
+        probeIdentifier: getProbeIdentifier(oldSpec)
+      });
+      store.experiment.probes = [probe];
+      internProbeInterfaceProbe(store.experiment, oldSpec);
+      const wrapper = mountWithQuasar(ProbeInspector, {
+        pinia,
+        props: { probe }
+      });
+
+      wrapper
+        .findComponent({ name: "QSelect" })
+        .vm.$emit("update:modelValue", "unknown manufacturer unknown-model");
+      await wrapper.vm.$nextTick();
+
+      expect(probe.probeIdentifier).toBe(getProbeIdentifier(oldSpec));
+      expect(store.experiment.probeInterfaceProbes).toEqual({
+        [getProbeIdentifier(oldSpec)]: oldSpec
+      });
+    });
   });
 });
