@@ -24,6 +24,18 @@ export function buildProbe(probeInterfaceProbeId: string): Probe {
 }
 
 /**
+ * Returns the probe's manufacturer and name as a string.
+ *
+ * These are known but hidden keys in the interface that are used to identify the probe.
+ * @param probeInterfaceProbe Probe interface definition to extract identifier from.
+ */
+export function getProbeIdentifier(
+  probeInterfaceProbe: ProbeInterfaceProbe
+): string {
+  return `${probeInterfaceProbe.annotations!.manufacturer} ${probeInterfaceProbe.annotations!.model_name}`;
+}
+
+/**
  * Detach a probe interface definition from Vue's reactivity.
  *
  * The definition is static reference data (contact positions, shapes, etc.)
