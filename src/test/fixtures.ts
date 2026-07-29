@@ -1,5 +1,6 @@
 import type { Atlas, Manifest, TerminologyRow } from "@/features/atlas";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
+import { getProbeIdentifier } from "@/features/probe";
 
 /**
  * Test fixture factories.
@@ -50,7 +51,7 @@ export function makeExperimentProbe(overrides: Partial<Probe> = {}): Probe {
     name: "Probe abc123",
     color: "#ffffff",
     visibility: "visible",
-    probeInterfaceProbeId: "spec-1",
+    probeIdentifier: getProbeIdentifier(makeProbe()),
     tipPosition: [0, 0, 0],
     orientation: [0, 0, 0],
     ...overrides

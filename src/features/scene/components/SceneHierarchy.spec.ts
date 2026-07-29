@@ -101,9 +101,9 @@ describe("SceneHierarchy", () => {
     await pickFirstLibraryProbe();
 
     expect(currentExperiment.probes).toHaveLength(2);
-    expect(currentExperiment.probeInterfaceProbes).toHaveLength(1);
+    expect(Object.keys(currentExperiment.probeInterfaceProbes)).toHaveLength(1);
     const [a, b] = currentExperiment.probes;
-    expect(a!.probeInterfaceProbeId).toBe(b!.probeInterfaceProbeId);
+    expect(a!.probeIdentifier).toBe(b!.probeIdentifier);
   });
 
   it("removes a probe's definition from the experiment along with the probe", async () => {
@@ -122,6 +122,26 @@ describe("SceneHierarchy", () => {
     await deleteButton.trigger("click");
 
     expect(currentExperiment.probes).toEqual([]);
-    expect(currentExperiment.probeInterfaceProbes).toEqual([]);
+    expect(currentExperiment.probeInterfaceProbes).toEqual({});
+  });
+
+  it("labels the dropdown entry with the probe's identifier", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const probeLibrary = useProbeLibraryStore(pinia);
+    useCurrentExperimentStore(pinia);
+    probeLibrary.add(
+      makeProbe({ annotations: { manufacturer: "imec", model_name: "np1" } })
+    );
+
+    await mountHierarchy(pinia);
+    document
+      .querySelector<HTMLButtonElement>(".q-btn-dropdown__arrow-container")
+      ?.closest("button")
+      ?.click();
+    await new Promise(resolve => setTimeout(resolve));
+
+    const entry = document.querySelector<HTMLElement>("[role='menu'] .q-item");
+    expect(entry?.textContent?.trim()).toBe("imec np1");
   });
 });

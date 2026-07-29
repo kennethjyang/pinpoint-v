@@ -3,18 +3,19 @@ import { reactive, isReactive, isProxy, toRaw } from "vue";
 import {
   buildProbe,
   detachProbeInterfaceProbe,
+  getProbeIdentifier,
   rotateProbeVisibility
 } from "./probe.api";
 import { makeExperimentProbe, makeProbe } from "@/test/fixtures";
 
 describe("buildProbe", () => {
-  it("references the given probe interface definition id", () => {
-    const probe = buildProbe("spec-1");
-    expect(probe.probeInterfaceProbeId).toBe("spec-1");
+  it("references the given probe identifier", () => {
+    const probe = buildProbe("imec np1");
+    expect(probe.probeIdentifier).toBe("imec np1");
   });
 
   it("builds a probe with sensible defaults", () => {
-    const probe = buildProbe("spec-1");
+    const probe = buildProbe("imec np1");
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
@@ -25,9 +26,24 @@ describe("buildProbe", () => {
   });
 
   it("gives each probe a unique name", () => {
-    const a = buildProbe("spec-1");
-    const b = buildProbe("spec-1");
+    const a = buildProbe("imec np1");
+    const b = buildProbe("imec np1");
     expect(a.name).not.toBe(b.name);
+  });
+});
+
+describe("getProbeIdentifier", () => {
+  it("returns the manufacturer and model name", () => {
+    const spec = makeProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    expect(getProbeIdentifier(spec)).toBe("imec np1");
+  });
+
+  it("returns the same identifier for definitions differing only in geometry", () => {
+    const a = makeProbe({ si_units: "um" });
+    const b = makeProbe({ si_units: "mm" });
+    expect(getProbeIdentifier(a)).toBe(getProbeIdentifier(b));
   });
 });
 
