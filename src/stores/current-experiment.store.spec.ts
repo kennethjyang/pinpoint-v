@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createApp } from "vue";
+import { createApp, isReactive, nextTick, watch } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { flushPromises } from "@vue/test-utils";
@@ -10,7 +10,29 @@ import {
   getManifest,
   getTerminologyRows
 } from "@/features/atlas";
-import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
+import { buildProbe } from "@/features/probe";
+import {
+  makeAtlas,
+  makeExperimentProbe,
+  makeManifest,
+  makeProbe,
+  makeTerminologyRows
+} from "@/test/fixtures";
+
+/**
+ * Build a Pinia instance with the persistence plugin actually wired up (as
+ * in the running app), rather than the bare `setActivePinia(createPinia())`
+ * most of this file uses. Needed for tests that assert on `localStorage` or
+ * on `$subscribe`-driven behavior, since Pinia only activates plugins
+ * registered before an app installs it.
+ */
+function usePersistedPinia() {
+  const pinia = createPinia();
+  pinia.use(piniaPluginPersistedstate);
+  createApp({}).use(pinia);
+  setActivePinia(pinia);
+  return pinia;
+}
 
 vi.mock("@/features/atlas", () => ({
   BRAINGLOBE_BASE_URL:
@@ -326,6 +348,242 @@ describe("useCurrentExperimentStore", () => {
       expect(store.terminologyRows).toEqual(terminologyRows);
       const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
       expect(Object.keys(persisted)).toEqual(["experiment"]);
+    });
+  });
+
+  describe("internProbeInterfaceProbe", () => {
+    it("stores a new definition and returns an id for it", () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbe();
+
+      const id = store.internProbeInterfaceProbe(spec);
+
+      expect(store.probeInterfaceProbes).toEqual([
+        { id, probeInterfaceProbe: spec }
+      ]);
+    });
+
+    it("dedups structurally equal definitions, returning the existing id", () => {
+      const store = useCurrentExperimentStore();
+
+      const firstId = store.internProbeInterfaceProbe(makeProbe());
+      const secondId = store.internProbeInterfaceProbe(makeProbe());
+
+      expect(secondId).toBe(firstId);
+      expect(store.probeInterfaceProbes).toHaveLength(1);
+    });
+
+    it("keeps structurally distinct definitions separate", () => {
+      const store = useCurrentExperimentStore();
+
+      const npId = store.internProbeInterfaceProbe(
+        makeProbe({ si_units: "um" })
+      );
+      const mmId = store.internProbeInterfaceProbe(
+        makeProbe({ si_units: "mm" })
+      );
+
+      expect(npId).not.toBe(mmId);
+      expect(store.probeInterfaceProbes).toHaveLength(2);
+    });
+
+    it("detaches the interned definition from Vue's reactivity", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+
+      const entry = store.probeInterfaceProbes.find(e => e.id === id)!;
+      expect(isReactive(entry.probeInterfaceProbe)).toBe(false);
+    });
+
+    it("does not mutate or reactively couple to the source object", () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbe();
+
+      const id = store.internProbeInterfaceProbe(spec);
+      spec.contact_positions.push([9, 9]);
+
+      const entry = store.probeInterfaceProbes.find(e => e.id === id)!;
+      expect(entry.probeInterfaceProbe.contact_positions).toEqual([[0, 0]]);
+    });
+  });
+
+  describe("probeInterfaceProbeFor", () => {
+    it("resolves a probe's interned definition", () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbe({ si_units: "mm" });
+      const id = store.internProbeInterfaceProbe(spec);
+      const probe = buildProbe(id);
+
+      expect(store.probeInterfaceProbeFor(probe)).toEqual(spec);
+    });
+
+    it("returns null when the probe's definition isn't in the experiment", () => {
+      const store = useCurrentExperimentStore();
+      const probe = makeExperimentProbe({ probeInterfaceProbeId: "missing" });
+
+      expect(store.probeInterfaceProbeFor(probe)).toBeNull();
+    });
+  });
+
+  describe("addProbe", () => {
+    it("adds the probe and selects it", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = buildProbe(id);
+
+      store.addProbe(probe);
+
+      expect(store.probes).toEqual([probe]);
+      expect(store.isInspectableSelected(probe)).toBe(true);
+    });
+
+    it("does nothing when a probe with the same name already exists", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = makeExperimentProbe({
+        name: "dup",
+        probeInterfaceProbeId: id
+      });
+      store.addProbe(probe);
+
+      store.addProbe({ ...probe, color: "#000000" });
+
+      expect(store.probes).toHaveLength(1);
+      expect(store.probes[0]!.color).toBe(probe.color);
+    });
+  });
+
+  describe("removeProbe", () => {
+    it("removes the probe from the experiment", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = buildProbe(id);
+      store.addProbe(probe);
+
+      store.removeProbe(probe);
+
+      expect(store.probes).toEqual([]);
+    });
+
+    it("is a no-op when the probe isn't in the experiment", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const kept = buildProbe(id);
+      store.addProbe(kept);
+
+      store.removeProbe(makeExperimentProbe({ name: "never-added" }));
+
+      expect(store.probes).toEqual([kept]);
+    });
+
+    it("deselects the probe if it was selected", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = buildProbe(id);
+      store.addProbe(probe);
+
+      store.removeProbe(probe);
+
+      expect(store.selectedInspectable).toBeNull();
+    });
+
+    it("leaves a different, still-selected probe alone", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const kept = buildProbe(id);
+      const removed = buildProbe(id);
+      store.addProbe(kept);
+      store.addProbe(removed); // addProbe selects the most recently added
+
+      store.removeProbe(kept);
+
+      expect(store.selectedInspectable).toEqual(removed);
+    });
+
+    it("drops the probe's definition once no probe references it anymore", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = buildProbe(id);
+      store.addProbe(probe);
+
+      store.removeProbe(probe);
+
+      expect(store.probeInterfaceProbes).toEqual([]);
+    });
+
+    it("keeps a definition still referenced by another probe", () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const a = buildProbe(id);
+      const b = buildProbe(id);
+      store.addProbe(a);
+      store.addProbe(b);
+
+      store.removeProbe(a);
+
+      expect(store.probeInterfaceProbes).toHaveLength(1);
+      expect(store.probeInterfaceProbeFor(b)).not.toBeNull();
+    });
+  });
+
+  describe("probe persistence and reactivity", () => {
+    it("persists interned definitions as part of the experiment", async () => {
+      usePersistedPinia();
+      localStorage.removeItem("current-experiment");
+
+      const store = useCurrentExperimentStore();
+      const spec = makeProbe();
+      const id = store.internProbeInterfaceProbe(spec);
+      store.addProbe(buildProbe(id));
+      await nextTick();
+
+      const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
+      expect(persisted.experiment.probeInterfaceProbes).toEqual([
+        { id, probeInterfaceProbe: spec }
+      ]);
+      expect(persisted.experiment.probes[0].probeInterfaceProbeId).toBe(id);
+    });
+
+    it("re-detaches definitions from reactivity after hydrating from storage", async () => {
+      usePersistedPinia();
+      localStorage.removeItem("current-experiment");
+
+      const firstStore = useCurrentExperimentStore();
+      const id = firstStore.internProbeInterfaceProbe(makeProbe());
+      firstStore.addProbe(buildProbe(id));
+      await nextTick();
+
+      // A fresh store over the same storage simulates a page reload.
+      usePersistedPinia();
+      const rehydratedStore = useCurrentExperimentStore();
+
+      expect(rehydratedStore.probeInterfaceProbes).toHaveLength(1);
+      const rehydratedEntry = rehydratedStore.probeInterfaceProbes[0]!;
+      expect(rehydratedEntry.probeInterfaceProbe).toEqual(makeProbe());
+      // `markRaw` doesn't survive the JSON round-trip on its own -- this
+      // guards the `afterHydrate` hook that re-applies it.
+      expect(isReactive(rehydratedEntry.probeInterfaceProbe)).toBe(false);
+    });
+
+    it("keeps the probe itself reactive even though its definition is not", async () => {
+      const store = useCurrentExperimentStore();
+      const id = store.internProbeInterfaceProbe(makeProbe());
+      const probe = buildProbe(id);
+      store.addProbe(probe);
+
+      let visibilityChanges = 0;
+      // `store.probes[0]` is the reactive proxy Pinia hands back, unlike the
+      // raw `probe` object passed into `addProbe`.
+      const stored = store.probes[0]!;
+      const stop = watch(
+        () => stored.visibility,
+        () => visibilityChanges++
+      );
+      stored.visibility = "hidden";
+      await nextTick();
+      stop();
+
+      expect(visibilityChanges).toBe(1);
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Atlas } from "@/features/atlas";
-import { Probe } from "@/features/probe";
+import { ExperimentProbeInterfaceProbe, Probe } from "@/features/probe";
 
 export interface Experiment {
   name: string;
@@ -16,6 +16,14 @@ export interface Experiment {
    * Identifiers of the atlas structures currently marked visible.
    */
   visibleStructures: number[];
+
+  /**
+   * Probe interface definitions used by this experiment's probes, stored
+   * once each (deduped) and referenced by id from `Probe.probeInterfaceProbeId`.
+   * Carrying these here (rather than only in the probe library) is what
+   * makes an experiment self-contained and portable across machines.
+   */
+  probeInterfaceProbes: ExperimentProbeInterfaceProbe[];
 
   probes: Probe[];
 }
