@@ -4,20 +4,10 @@ import { createPinia, setActivePinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
-import {
-  getAtlasCenter,
-  getDefaultStructureIdentifiers,
-  getManifest,
-  getTerminologyRows
-} from "@/features/atlas";
+import { getManifest, getTerminologyRows } from "@/features/atlas";
+import { addProbe, internProbeInterfaceProbe } from "@/features/experiment";
 import { buildProbe } from "@/features/probe";
-import {
-  makeAtlas,
-  makeExperimentProbe,
-  makeManifest,
-  makeProbe,
-  makeTerminologyRows
-} from "@/test/fixtures";
+import { makeManifest, makeProbe, makeTerminologyRows } from "@/test/fixtures";
 
 /**
  * Build a Pinia instance with the persistence plugin actually wired up (as
@@ -37,8 +27,6 @@ function usePersistedPinia() {
 vi.mock("@/features/atlas", () => ({
   BRAINGLOBE_BASE_URL:
     "https://brainglobe.s3.us-west-2.amazonaws.com/atlas-rc2/",
-  getAtlasCenter: vi.fn(),
-  getDefaultStructureIdentifiers: vi.fn(),
   getManifest: vi.fn(),
   getTerminologyRows: vi.fn()
 }));
@@ -46,41 +34,8 @@ vi.mock("@/features/atlas", () => ({
 describe("useCurrentExperimentStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    vi.mocked(getAtlasCenter).mockReset();
-    vi.mocked(getDefaultStructureIdentifiers).mockReset();
-    vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([]);
     vi.mocked(getManifest).mockReset();
     vi.mocked(getTerminologyRows).mockReset();
-  });
-
-  describe("create", () => {
-    it("replaces the experiment and resets visibleStructures", () => {
-      const store = useCurrentExperimentStore();
-      const atlas = makeAtlas({ name: "allen_human" });
-
-      store.create("New Experiment", atlas, [1, 2, 3]);
-
-      expect(store.name).toBe("New Experiment");
-      expect(store.atlas).toEqual(atlas);
-      expect(store.referenceCoordinate).toEqual([1, 2, 3]);
-      expect(store.visibleStructures).toEqual([]);
-    });
-  });
-
-  describe("setName", () => {
-    it("updates the experiment's name", () => {
-      const store = useCurrentExperimentStore();
-      store.setName("Renamed");
-      expect(store.name).toBe("Renamed");
-    });
-  });
-
-  describe("setReferenceCoordinate", () => {
-    it("updates the experiment's reference coordinate", () => {
-      const store = useCurrentExperimentStore();
-      store.setReferenceCoordinate([1, 1, 1]);
-      expect(store.referenceCoordinate).toEqual([1, 1, 1]);
-    });
   });
 
   describe("visibleStructures", () => {
@@ -93,167 +48,6 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       store.visibleStructures = [1, 2];
       expect(store.experiment.visibleStructures).toEqual([1, 2]);
-    });
-  });
-
-  describe("isStructureVisible", () => {
-    it("returns true when the identifier is in visibleStructures", () => {
-      const store = useCurrentExperimentStore();
-      store.visibleStructures = [5];
-      expect(store.isStructureVisible(5)).toBe(true);
-    });
-
-    it("returns false when the identifier is not in visibleStructures", () => {
-      const store = useCurrentExperimentStore();
-      expect(store.isStructureVisible(5)).toBe(false);
-    });
-  });
-
-  describe("setStructureVisibility", () => {
-    it("adds the identifier when setting visible and not already present", () => {
-      const store = useCurrentExperimentStore();
-      store.setStructureVisibility(5, true);
-      expect(store.visibleStructures).toEqual([5]);
-    });
-
-    it("does not duplicate the identifier when already visible", () => {
-      const store = useCurrentExperimentStore();
-      store.visibleStructures = [5];
-      store.setStructureVisibility(5, true);
-      expect(store.visibleStructures).toEqual([5]);
-    });
-
-    it("removes the identifier when setting invisible and present", () => {
-      const store = useCurrentExperimentStore();
-      store.visibleStructures = [5, 6];
-      store.setStructureVisibility(5, false);
-      expect(store.visibleStructures).toEqual([6]);
-    });
-
-    it("is a no-op when setting invisible and not present", () => {
-      const store = useCurrentExperimentStore();
-      store.visibleStructures = [6];
-      store.setStructureVisibility(5, false);
-      expect(store.visibleStructures).toEqual([6]);
-    });
-  });
-
-  describe("clearVisibleStructures", () => {
-    it("resets visibleStructures to []", () => {
-      const store = useCurrentExperimentStore();
-      store.visibleStructures = [1, 2, 3];
-      store.clearVisibleStructures();
-      expect(store.visibleStructures).toEqual([]);
-    });
-  });
-
-  describe("defaultStructureIdentifiers", () => {
-    it("is [] while terminologyRows hasn't resolved", async () => {
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-      expect(store.defaultStructureIdentifiers).toEqual([]);
-    });
-
-    it("delegates to getDefaultStructureIdentifiers once terminologyRows resolves", async () => {
-      const terminologyRows = makeTerminologyRows();
-      vi.mocked(getManifest).mockResolvedValue(makeManifest());
-      vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
-      vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([7, 8]);
-
-      const store = useCurrentExperimentStore();
-      // terminologyRows now depends on manifest, which resolves through its
-      // own computedAsync first, so flush an extra microtask round for that
-      // hop to settle before terminologyRows's callback re-runs.
-      await flushPromises();
-      await flushPromises();
-
-      expect(store.terminologyRows).toEqual(terminologyRows);
-      // defaultStructureIdentifiers is a lazy computed - read it before
-      // asserting on the mock it delegates to.
-      expect(store.defaultStructureIdentifiers).toEqual([7, 8]);
-      expect(getDefaultStructureIdentifiers).toHaveBeenCalledWith(
-        terminologyRows
-      );
-    });
-
-    it("is [] while the manifest is still evaluating, even once terminologyRows has rows", async () => {
-      const terminologyRows = makeTerminologyRows();
-      vi.mocked(getManifest).mockResolvedValue(makeManifest());
-      vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
-      vi.mocked(getDefaultStructureIdentifiers).mockReturnValue([7, 8]);
-
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-      await flushPromises();
-      // terminologyRows has resolved with rows, but re-trigger evaluation by
-      // switching the atlas -- the guard must hold even once rows were
-      // previously populated, not just before their first resolution.
-      vi.mocked(getManifest).mockReturnValue(new Promise(() => {}));
-      store.create(
-        "New Experiment",
-        makeAtlas({ name: "allen_human" }),
-        [0, 0, 0]
-      );
-      await flushPromises();
-
-      expect(store.terminologyRows).toEqual(terminologyRows);
-      expect(store.areAtlasComponentsEvaluating).toBe(true);
-      expect(store.defaultStructureIdentifiers).toEqual([]);
-    });
-  });
-
-  describe("atlasCenter", () => {
-    it("is [0, 0, 0] before the manifest resolves", async () => {
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-      expect(store.atlasCenter).toEqual([0, 0, 0]);
-    });
-
-    it("delegates to getAtlasCenter with the resolved manifest", async () => {
-      const manifest = makeManifest();
-      vi.mocked(getManifest).mockResolvedValue(manifest);
-      vi.mocked(getAtlasCenter).mockReturnValue([1, 2, 3]);
-
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-
-      // atlasCenter is a lazy computed - read it before asserting on the
-      // mock it delegates to.
-      expect(store.atlasCenter).toEqual([1, 2, 3]);
-      expect(getAtlasCenter).toHaveBeenCalledWith(manifest);
-    });
-
-    it("uses the resolved atlas center even while terminologyRows is still evaluating", async () => {
-      vi.mocked(getManifest).mockResolvedValue(makeManifest());
-      vi.mocked(getTerminologyRows).mockReturnValue(new Promise(() => {}));
-      vi.mocked(getAtlasCenter).mockReturnValue([1, 2, 3]);
-
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-
-      expect(store.areAtlasComponentsEvaluating).toBe(true);
-      expect(store.atlasCenter).toEqual([1, 2, 3]);
-    });
-
-    it("is [0, 0, 0] while a newly-selected atlas's manifest is still evaluating", async () => {
-      vi.mocked(getManifest).mockResolvedValue(makeManifest());
-      vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
-      vi.mocked(getAtlasCenter).mockReturnValue([1, 2, 3]);
-
-      const store = useCurrentExperimentStore();
-      await flushPromises();
-      await flushPromises();
-      expect(store.atlasCenter).toEqual([1, 2, 3]);
-
-      vi.mocked(getManifest).mockReturnValue(new Promise(() => {}));
-      store.create(
-        "New Experiment",
-        makeAtlas({ name: "allen_human" }),
-        [0, 0, 0]
-      );
-      await flushPromises();
-
-      expect(store.atlasCenter).toEqual([0, 0, 0]);
     });
   });
 
@@ -351,192 +145,6 @@ describe("useCurrentExperimentStore", () => {
     });
   });
 
-  describe("internProbeInterfaceProbe", () => {
-    it("stores a new definition and returns its identifier", () => {
-      const store = useCurrentExperimentStore();
-      const spec = makeProbe();
-
-      const identifier = store.internProbeInterfaceProbe(spec);
-
-      expect(identifier).toBe("cambridgeneurotech ASSY-1");
-      expect(store.probeInterfaceProbes).toEqual({
-        "cambridgeneurotech ASSY-1": spec
-      });
-    });
-
-    it("returns the existing identifier when the definition is already interned", () => {
-      const store = useCurrentExperimentStore();
-
-      const firstIdentifier = store.internProbeInterfaceProbe(makeProbe());
-      const secondIdentifier = store.internProbeInterfaceProbe(makeProbe());
-
-      expect(secondIdentifier).toBe(firstIdentifier);
-      expect(Object.keys(store.probeInterfaceProbes)).toHaveLength(1);
-    });
-
-    it("keeps definitions with different identifiers separate", () => {
-      const store = useCurrentExperimentStore();
-
-      const npIdentifier = store.internProbeInterfaceProbe(
-        makeProbe({ annotations: { manufacturer: "imec", model_name: "np1" } })
-      );
-      const cnIdentifier = store.internProbeInterfaceProbe(makeProbe());
-
-      expect(npIdentifier).not.toBe(cnIdentifier);
-      expect(Object.keys(store.probeInterfaceProbes)).toHaveLength(2);
-    });
-
-    it("keeps the first definition when another shares its identifier", () => {
-      const store = useCurrentExperimentStore();
-
-      const identifier = store.internProbeInterfaceProbe(
-        makeProbe({ si_units: "um" })
-      );
-      store.internProbeInterfaceProbe(makeProbe({ si_units: "mm" }));
-
-      expect(Object.keys(store.probeInterfaceProbes)).toHaveLength(1);
-      expect(store.probeInterfaceProbes[identifier]!.si_units).toBe("um");
-    });
-
-    it("detaches the interned definition from Vue's reactivity", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-
-      expect(isReactive(store.probeInterfaceProbes[identifier])).toBe(false);
-    });
-
-    it("does not mutate or reactively couple to the source object", () => {
-      const store = useCurrentExperimentStore();
-      const spec = makeProbe();
-
-      const identifier = store.internProbeInterfaceProbe(spec);
-      spec.contact_positions.push([9, 9]);
-
-      expect(store.probeInterfaceProbes[identifier]!.contact_positions).toEqual(
-        [[0, 0]]
-      );
-    });
-  });
-
-  describe("probeInterfaceProbeFor", () => {
-    it("resolves a probe's interned definition", () => {
-      const store = useCurrentExperimentStore();
-      const spec = makeProbe({ si_units: "mm" });
-      const identifier = store.internProbeInterfaceProbe(spec);
-      const probe = buildProbe(identifier);
-
-      expect(store.probeInterfaceProbeFor(probe)).toEqual(spec);
-    });
-
-    it("returns null when the probe's definition isn't in the experiment", () => {
-      const store = useCurrentExperimentStore();
-      const probe = makeExperimentProbe({ probeIdentifier: "missing probe" });
-
-      expect(store.probeInterfaceProbeFor(probe)).toBeNull();
-    });
-  });
-
-  describe("addProbe", () => {
-    it("adds the probe and selects it", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = buildProbe(identifier);
-
-      store.addProbe(probe);
-
-      expect(store.probes).toEqual([probe]);
-      expect(store.isInspectableSelected(probe)).toBe(true);
-    });
-
-    it("does nothing when a probe with the same name already exists", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = makeExperimentProbe({
-        name: "dup",
-        probeIdentifier: identifier
-      });
-      store.addProbe(probe);
-
-      store.addProbe({ ...probe, color: "#000000" });
-
-      expect(store.probes).toHaveLength(1);
-      expect(store.probes[0]!.color).toBe(probe.color);
-    });
-  });
-
-  describe("removeProbe", () => {
-    it("removes the probe from the experiment", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = buildProbe(identifier);
-      store.addProbe(probe);
-
-      store.removeProbe(probe);
-
-      expect(store.probes).toEqual([]);
-    });
-
-    it("is a no-op when the probe isn't in the experiment", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const kept = buildProbe(identifier);
-      store.addProbe(kept);
-
-      store.removeProbe(makeExperimentProbe({ name: "never-added" }));
-
-      expect(store.probes).toEqual([kept]);
-    });
-
-    it("deselects the probe if it was selected", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = buildProbe(identifier);
-      store.addProbe(probe);
-
-      store.removeProbe(probe);
-
-      expect(store.selectedInspectable).toBeNull();
-    });
-
-    it("leaves a different, still-selected probe alone", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const kept = buildProbe(identifier);
-      const removed = buildProbe(identifier);
-      store.addProbe(kept);
-      store.addProbe(removed); // addProbe selects the most recently added
-
-      store.removeProbe(kept);
-
-      expect(store.selectedInspectable).toEqual(removed);
-    });
-
-    it("drops the probe's definition once no probe references it anymore", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = buildProbe(identifier);
-      store.addProbe(probe);
-
-      store.removeProbe(probe);
-
-      expect(store.probeInterfaceProbes).toEqual({});
-    });
-
-    it("keeps a definition still referenced by another probe", () => {
-      const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const a = buildProbe(identifier);
-      const b = buildProbe(identifier);
-      store.addProbe(a);
-      store.addProbe(b);
-
-      store.removeProbe(a);
-
-      expect(Object.keys(store.probeInterfaceProbes)).toHaveLength(1);
-      expect(store.probeInterfaceProbeFor(b)).not.toBeNull();
-    });
-  });
-
   describe("probe persistence and reactivity", () => {
     it("persists interned definitions as part of the experiment", async () => {
       usePersistedPinia();
@@ -544,8 +152,8 @@ describe("useCurrentExperimentStore", () => {
 
       const store = useCurrentExperimentStore();
       const spec = makeProbe();
-      const identifier = store.internProbeInterfaceProbe(spec);
-      store.addProbe(buildProbe(identifier));
+      const identifier = internProbeInterfaceProbe(store.experiment, spec);
+      addProbe(store.experiment, buildProbe(spec));
       await nextTick();
 
       const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
@@ -560,8 +168,9 @@ describe("useCurrentExperimentStore", () => {
       localStorage.removeItem("current-experiment");
 
       const firstStore = useCurrentExperimentStore();
-      const identifier = firstStore.internProbeInterfaceProbe(makeProbe());
-      firstStore.addProbe(buildProbe(identifier));
+      const spec = makeProbe();
+      const identifier = internProbeInterfaceProbe(firstStore.experiment, spec);
+      addProbe(firstStore.experiment, buildProbe(spec));
       await nextTick();
 
       // A fresh store over the same storage simulates a page reload.
@@ -579,13 +188,13 @@ describe("useCurrentExperimentStore", () => {
 
     it("keeps the probe itself reactive even though its definition is not", async () => {
       const store = useCurrentExperimentStore();
-      const identifier = store.internProbeInterfaceProbe(makeProbe());
-      const probe = buildProbe(identifier);
-      store.addProbe(probe);
+      const spec = makeProbe();
+      internProbeInterfaceProbe(store.experiment, spec);
+      addProbe(store.experiment, buildProbe(spec));
 
       let visibilityChanges = 0;
       // `store.probes[0]` is the reactive proxy Pinia hands back, unlike the
-      // raw `probe` object passed into `addProbe`.
+      // raw probe object passed into `addProbe`.
       const stored = store.probes[0]!;
       const stop = watch(
         () => stored.visibility,

@@ -10,6 +10,7 @@ import {
   getManifest,
   getTerminologyRows
 } from "@/features/atlas";
+import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import { makeProbe } from "@/test/fixtures";
 
 // `useCurrentExperimentStore`'s `manifest`/`terminologyRows` are
@@ -86,7 +87,9 @@ describe("SceneHierarchy", () => {
 
     expect(currentExperiment.probes).toHaveLength(1);
     const [probe] = currentExperiment.probes;
-    expect(currentExperiment.probeInterfaceProbeFor(probe!)).toEqual(spec);
+    expect(
+      getInternedProbeInterfaceProbe(currentExperiment.experiment, probe!)
+    ).toEqual(spec);
   });
 
   it("reuses the same definition id when the same probe is added twice", async () => {
@@ -123,6 +126,61 @@ describe("SceneHierarchy", () => {
 
     expect(currentExperiment.probes).toEqual([]);
     expect(currentExperiment.probeInterfaceProbes).toEqual({});
+  });
+
+  it("selects the newly added probe", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const probeLibrary = useProbeLibraryStore(pinia);
+    const currentExperiment = useCurrentExperimentStore(pinia);
+    probeLibrary.add(makeProbe());
+
+    await mountHierarchy(pinia);
+    await pickFirstLibraryProbe();
+
+    const [probe] = currentExperiment.probes;
+    expect(currentExperiment.selectedInspectable).toEqual(probe);
+  });
+
+  it("deselects the probe once it's removed", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const probeLibrary = useProbeLibraryStore(pinia);
+    const currentExperiment = useCurrentExperimentStore(pinia);
+    probeLibrary.add(makeProbe());
+
+    const wrapper = await mountHierarchy(pinia);
+    await pickFirstLibraryProbe();
+
+    const deleteButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(btn => btn.props("icon") === "delete")!;
+    await deleteButton.trigger("click");
+
+    expect(currentExperiment.selectedInspectable).toBeNull();
+  });
+
+  it("leaves a different, still-selected probe alone when another is removed", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const probeLibrary = useProbeLibraryStore(pinia);
+    const currentExperiment = useCurrentExperimentStore(pinia);
+    probeLibrary.add(makeProbe());
+
+    const wrapper = await mountHierarchy(pinia);
+    await pickFirstLibraryProbe();
+    await pickFirstLibraryProbe(); // addProbeAndSelect selects the most recently added
+    const [, kept] = currentExperiment.probes;
+
+    const deleteButtons = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .filter(btn => btn.props("icon") === "delete");
+    // Probes render in the same order as `currentExperiment.probes`; remove
+    // the first (unselected) one and leave the second (selected) one alone.
+    await deleteButtons[0]!.trigger("click");
+
+    expect(currentExperiment.probes).toEqual([kept]);
+    expect(currentExperiment.selectedInspectable).toEqual(kept);
   });
 
   it("labels the dropdown entry with the probe's identifier", async () => {
