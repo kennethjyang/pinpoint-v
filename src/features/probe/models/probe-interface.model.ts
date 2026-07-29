@@ -41,13 +41,3 @@ export interface ProbeInterfaceFile {
   version: string;
   probes: ProbeInterfaceProbe[];
 }
-
-/**
- * A probe interface definition carried by an experiment, addressed by a
- * stable id so the file stays self-contained and portable, and so probes
- * can reference it without duplicating or reactively wrapping its data.
- */
-export interface ExperimentProbeInterfaceProbe {
-  id: string;
-  probeInterfaceProbe: ProbeInterfaceProbe;
-}

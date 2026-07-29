@@ -1,5 +1,15 @@
 import { Atlas } from "@/features/atlas";
-import { ExperimentProbeInterfaceProbe, Probe } from "@/features/probe";
+import { Probe, ProbeInterfaceProbe } from "@/features/probe";
+
+/**
+ * A probe interface definition carried by an experiment, addressed by a
+ * stable id so the file stays self-contained and portable, and so probes
+ * can reference it without duplicating or reactively wrapping its data.
+ */
+export interface ExperimentProbeInterfaceProbe {
+  id: string;
+  probeInterfaceProbe: ProbeInterfaceProbe;
+}
 
 export interface Experiment {
   name: string;

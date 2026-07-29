@@ -1,2 +1,5 @@
 export { default as NewExperimentDialog } from "./components/NewExperimentDialog.vue";
-export type { Experiment } from "./models/experiment.model";
+export type {
+  ExperimentProbeInterfaceProbe,
+  Experiment
+} from "./models/experiment.model";
