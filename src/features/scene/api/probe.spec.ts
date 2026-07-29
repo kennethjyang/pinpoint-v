@@ -72,12 +72,13 @@ function makeExperimentWithProbe(
   return { experiment, probe };
 }
 
-/** Shank, head stage, and rod mesh names for a probe. */
+/** Shank, head stage, rod, and contacts mesh names for a probe. */
 function probeMeshNames(probeId: string) {
   return {
     shank: `${probeId}_shank_mesh`,
     headStage: `${probeId}_headStage_mesh`,
-    rod: `${probeId}_rod_mesh`
+    rod: `${probeId}_rod_mesh`,
+    contacts: `${probeId}_contacts_mesh`
   };
 }
 
@@ -121,7 +122,7 @@ function capTriangleArea(scene: Scene, meshName: string): number {
 }
 
 describe("buildProbe", () => {
-  it("builds a transform node with the shank, head stage, and rod meshes parented under it", () => {
+  it("builds a transform node with the shank, head stage, rod, and contacts meshes parented under it", () => {
     const scene = makeTestScene();
     const { experiment, probe } = makeExperimentWithProbe();
 
@@ -132,9 +133,14 @@ describe("buildProbe", () => {
 
     const names = probeMeshNames(probe.id);
     const children = node!.getChildMeshes().map(mesh => mesh.name);
-    expect(children).toHaveLength(3);
+    expect(children).toHaveLength(4);
     expect(children).toEqual(
-      expect.arrayContaining([names.shank, names.headStage, names.rod])
+      expect.arrayContaining([
+        names.shank,
+        names.headStage,
+        names.rod,
+        names.contacts
+      ])
     );
   });
 
@@ -261,7 +267,7 @@ describe("buildProbe", () => {
     ).toHaveLength(1);
   });
 
-  it("returns the existing entity on a second call, leaving one node, three meshes, and one material", () => {
+  it("returns the existing entity on a second call, leaving one node, four meshes, and one material", () => {
     const scene = makeTestScene();
     const { experiment, probe } = makeExperimentWithProbe();
 
@@ -271,7 +277,7 @@ describe("buildProbe", () => {
     expect(
       scene.transformNodes.filter(node => node.name === `${probe.id}_probe`)
     ).toHaveLength(1);
-    expect(scene.meshes).toHaveLength(3);
+    expect(scene.meshes).toHaveLength(4);
     expect(
       scene.materials.filter(
         material => material.name === `${probe.id}_material`
@@ -423,5 +429,213 @@ describe("buildProbe", () => {
     );
 
     expect(unknownBounds).toEqual(knownBounds);
+  });
+});
+
+describe("buildProbe contacts mesh", () => {
+  it("covers the bounding box of square contacts, including their width", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe(
+      {},
+      {
+        probe_planar_contour: NP2020_CONTOUR,
+        contact_positions: [
+          [0, 0],
+          [782, 9585]
+        ],
+        contact_shapes: ["square", "square"],
+        contact_shape_params: [{ width: 12 }, { width: 12 }]
+      }
+    );
+
+    buildProbe(scene, probe, experiment);
+
+    const bounds = roundedBounds(scene, probeMeshNames(probe.id).contacts);
+    expect(bounds.min).toEqual([-0.389, -9.808, -0.006]);
+    expect(bounds.max).toEqual([0.405, -0.211, -0.006]);
+  });
+
+  it("covers the same box for circle contacts using radius", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe(
+      {},
+      {
+        probe_planar_contour: NP2020_CONTOUR,
+        contact_positions: [
+          [0, 0],
+          [782, 9585]
+        ],
+        contact_shapes: ["circle", "circle"],
+        contact_shape_params: [{ radius: 6 }, { radius: 6 }]
+      }
+    );
+
+    buildProbe(scene, probe, experiment);
+
+    const bounds = roundedBounds(scene, probeMeshNames(probe.id).contacts);
+    expect(bounds.min).toEqual([-0.389, -9.808, -0.006]);
+    expect(bounds.max).toEqual([0.405, -0.211, -0.006]);
+  });
+
+  it("uses width and height independently for rect contacts", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe(
+      {},
+      {
+        probe_planar_contour: NP2020_CONTOUR,
+        contact_positions: [
+          [0, 0],
+          [782, 9585]
+        ],
+        contact_shapes: ["rect", "rect"],
+        contact_shape_params: [
+          { width: 12, height: 8 },
+          { width: 12, height: 8 }
+        ]
+      }
+    );
+
+    buildProbe(scene, probe, experiment);
+
+    const bounds = roundedBounds(scene, probeMeshNames(probe.id).contacts);
+    expect(bounds.min).toEqual([-0.389, -9.806, -0.006]);
+    expect(bounds.max).toEqual([0.405, -0.213, -0.006]);
+  });
+
+  it("falls back to the raw contact positions when shapes are not usable", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe(
+      {},
+      {
+        probe_planar_contour: NP2020_CONTOUR,
+        contact_positions: [
+          [0, 0],
+          [782, 9585]
+        ]
+      }
+    );
+
+    buildProbe(scene, probe, experiment);
+
+    const bounds = roundedBounds(scene, probeMeshNames(probe.id).contacts);
+    expect(bounds.min).toEqual([-0.383, -9.802, -0.006]);
+    expect(bounds.max).toEqual([0.399, -0.217, -0.006]);
+  });
+
+  it("falls back to the contour's own box when there are no usable contacts", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe(
+      {},
+      {
+        probe_planar_contour: NP2020_CONTOUR,
+        contact_positions: []
+      }
+    );
+
+    buildProbe(scene, probe, experiment);
+
+    const bounds = roundedBounds(scene, probeMeshNames(probe.id).contacts);
+    expect(bounds.min).toEqual([-0.41, -10.206, -0.006]);
+    expect(bounds.max).toEqual([0.41, 0, -0.006]);
+  });
+
+  it("falls back to the contour's own box for a single, extent-less contact", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+
+    buildProbe(scene, probe, experiment);
+
+    const shankBounds = roundedBounds(scene, probeMeshNames(probe.id).shank);
+    const contactsBounds = roundedBounds(
+      scene,
+      probeMeshNames(probe.id).contacts
+    );
+    expect(contactsBounds.min[0]).toBeCloseTo(shankBounds.min[0]!, 6);
+    expect(contactsBounds.max[0]).toBeCloseTo(shankBounds.max[0]!, 6);
+    expect(contactsBounds.max[1]).toBeCloseTo(0, 6);
+  });
+
+  it("is a single-sided quad facing the shank's front (local +z)", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+
+    buildProbe(scene, probe, experiment);
+
+    const mesh = scene.getMeshByName(probeMeshNames(probe.id).contacts)!;
+    expect(mesh.getVerticesData("position")).toHaveLength(12);
+    const normals = mesh.getVerticesData("normal")!;
+    for (let i = 0; i < normals.length; i += 3) {
+      expect(normals[i]).toBeCloseTo(0, 6);
+      expect(normals[i + 1]).toBeCloseTo(0, 6);
+      expect(normals[i + 2]).toBeCloseTo(1, 6);
+    }
+    expect((mesh.material as StandardMaterial).backFaceCulling).toBe(true);
+  });
+
+  it("colors the contacts material from the probe at 10% of its saturation", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#336699"
+    });
+
+    buildProbe(scene, probe, experiment);
+
+    const shankMaterial = scene.getMeshByName(probeMeshNames(probe.id).shank)!
+      .material as StandardMaterial;
+    const contactsMaterial = scene.getMeshByName(
+      probeMeshNames(probe.id).contacts
+    )!.material as StandardMaterial;
+
+    expect(contactsMaterial).not.toBe(shankMaterial);
+    expect(contactsMaterial.name).toBe(`${probe.id}_contacts_material`);
+
+    const [hue, saturation, value] = Color3.FromHexString("#336699")
+      .toHSV()
+      .asArray();
+    const expectedColor = Color3.FromHSV(hue, saturation * 0.1, value);
+    expect(contactsMaterial.diffuseColor.equals(expectedColor)).toBe(true);
+  });
+
+  it("does not tint an already-neutral probe's contacts material", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#ffffff"
+    });
+
+    buildProbe(scene, probe, experiment);
+
+    const contactsMaterial = scene.getMeshByName(
+      probeMeshNames(probe.id).contacts
+    )!.material as StandardMaterial;
+    expect(contactsMaterial.diffuseColor.equals(Color3.White())).toBe(true);
+  });
+
+  it("disposes the contacts material along with the probe", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+
+    buildProbe(scene, probe, experiment);
+    disposeProbe(scene, probe);
+
+    expect(
+      scene.materials.filter(
+        material => material.name === `${probe.id}_contacts_material`
+      )
+    ).toHaveLength(0);
+  });
+
+  it("does not dispose another probe's contacts material", () => {
+    const scene = makeTestScene();
+    const a = makeExperimentWithProbe();
+    const b = makeExperimentWithProbe();
+
+    buildProbe(scene, a.probe, a.experiment);
+    buildProbe(scene, b.probe, b.experiment);
+    disposeProbe(scene, a.probe);
+
+    const contactsMaterialB = scene.getMeshByName(
+      probeMeshNames(b.probe.id).contacts
+    )!.material!;
+    expect(scene.materials).toContain(contactsMaterialB);
   });
 });
