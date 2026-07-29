@@ -6,7 +6,7 @@ import { flushPromises } from "@vue/test-utils";
 import { useCurrentExperimentStore } from "./current-experiment.store";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { addProbe, internProbeInterfaceProbe } from "@/features/experiment";
-import { buildProbe } from "@/features/probe";
+import { buildProbe, getProbeIdentifier } from "@/features/probe";
 import { makeManifest, makeProbe, makeTerminologyRows } from "@/test/fixtures";
 
 /**
@@ -152,7 +152,8 @@ describe("useCurrentExperimentStore", () => {
 
       const store = useCurrentExperimentStore();
       const spec = makeProbe();
-      const identifier = internProbeInterfaceProbe(store.experiment, spec);
+      const identifier = getProbeIdentifier(spec);
+      internProbeInterfaceProbe(store.experiment, spec);
       addProbe(store.experiment, buildProbe(spec));
       await nextTick();
 
@@ -169,7 +170,8 @@ describe("useCurrentExperimentStore", () => {
 
       const firstStore = useCurrentExperimentStore();
       const spec = makeProbe();
-      const identifier = internProbeInterfaceProbe(firstStore.experiment, spec);
+      const identifier = getProbeIdentifier(spec);
+      internProbeInterfaceProbe(firstStore.experiment, spec);
       addProbe(firstStore.experiment, buildProbe(spec));
       await nextTick();
 
