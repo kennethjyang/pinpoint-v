@@ -11,7 +11,6 @@ import { Inspector } from "@/features/inspector";
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
 
-// Layout state.
 const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);

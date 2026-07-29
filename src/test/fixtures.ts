@@ -29,7 +29,7 @@ export function makeManifest(overrides: Partial<Manifest> = {}): Manifest {
   };
 }
 
-export function makeProbe(
+export function makeProbeInterfaceProbe(
   overrides: Partial<ProbeInterfaceProbe> = {}
 ): ProbeInterfaceProbe {
   return {
@@ -41,17 +41,13 @@ export function makeProbe(
   };
 }
 
-/**
- * Build an experiment-level `Probe` (as stored in `Experiment.probes`), not
- * to be confused with {@link makeProbe}'s `ProbeInterfaceProbe`.
- */
-export function makeExperimentProbe(overrides: Partial<Probe> = {}): Probe {
+export function makeProbe(overrides: Partial<Probe> = {}): Probe {
   return {
     inspectableKind: "probe",
     name: "Probe abc123",
     color: "#ffffff",
     visibility: "visible",
-    probeIdentifier: getProbeIdentifier(makeProbe()),
+    probeIdentifier: getProbeIdentifier(makeProbeInterfaceProbe()),
     tipPosition: [0, 0, 0],
     orientation: [0, 0, 0],
     ...overrides

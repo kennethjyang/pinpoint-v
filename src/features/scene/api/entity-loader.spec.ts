@@ -1,18 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
+import type { Scene, StandardMaterial } from "@babylonjs/core";
 import {
   Color3,
   DracoDecoder,
   Geometry,
   Mesh,
   MeshBuilder,
-  NullEngine,
-  Scene,
-  StandardMaterial,
   Vector3,
   VertexBuffer,
-  VertexData,
-  WorkerPool
+  VertexData
 } from "@babylonjs/core";
 import {
   removeAllStructures,
@@ -21,17 +18,13 @@ import {
 } from "./entity-loader.api";
 import type { StructureEntity } from "../models/structure-entity.model";
 import { asrToBabylon } from "./coordinate-transforms.api";
+import { makeTestScene, stubDracoDecoder } from "@/test/mount-helper";
 
 vi.mock("axios");
 
 // Every test spies on `decodeMeshToGeometryAsync` directly, so the codec's
-// own worker pool is never exercised -- but merely accessing
-// `DracoDecoder.Default` still lazily constructs it, and its default
-// configuration would fetch the real wasm binary from
-// cdn.babylonjs.com. Supplying an (unused) empty worker pool short-circuits
-// that construction with no network access.
-DracoDecoder.ResetDefault(true);
-DracoDecoder.DefaultConfiguration = { workerPool: new WorkerPool([]) };
+// own worker pool is never exercised.
+stubDracoDecoder();
 
 function makeStructureEntity(
   overrides: Partial<StructureEntity> = {}
@@ -42,11 +35,6 @@ function makeStructureEntity(
     color: Color3.FromInts(255, 0, 0),
     ...overrides
   };
-}
-
-/** Build a real Babylon scene for tests that need actual mesh geometry. */
-function makeScene(): Scene {
-  return new Scene(new NullEngine());
 }
 
 /**
@@ -153,7 +141,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("imports a new structure, parented to the atlas root and colored", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -185,7 +173,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("scales a structure's decoded geometry from nanometers to millimeters", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     // A single triangle at (1_000_000, 2_000_000, 3_000_000) nm, mirroring a
     // Draco-decoded structure mesh, so the resulting mesh should sit at
     // (1, 2, 3) mm.
@@ -216,7 +204,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("caps a structure's simplified vertex count at 8000", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     // A sphere with well over 8000 * 20 vertices, so the 5%-of-original
     // budget alone would exceed the hard cap and only the cap applies.
     const denseSphere = MeshBuilder.CreateSphere(
@@ -252,7 +240,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("corrects a right-handed-wound mesh so its normals face outward", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     // BrainGlobe Draco meshes are wound for a right-handed system; decodeMesh
     // must flip that internally so the scene's (left-handed) lighting sees
     // outward-facing normals instead of backface-culled, inward-facing ones.
@@ -275,7 +263,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("fades an always-present structure that isn't visible to alpha 0.1", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -291,7 +279,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("does not re-import a structure that's already present", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -305,7 +293,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("removes structures that are no longer desired", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -321,7 +309,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("disposes a removed structure's material rather than leaking it, and its alpha is correct once re-imported", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -347,7 +335,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("gives each structure its own alpha rather than collapsing on a shared key", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const alwaysPresent = makeStructureEntity({ identifier: 1 });
     const visible = makeStructureEntity({ identifier: 2 });
@@ -366,7 +354,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("rejects on a failed mesh fetch and adds nothing to the scene", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     mockedGet.mockRejectedValue(new Error("network error"));
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -382,7 +370,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("rejects on a failed decode and adds nothing to the scene", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = vi
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
       .mockRejectedValue(new Error("bad draco data"));
@@ -400,7 +388,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("rejects with the original error so the caller can surface it", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeError = new Error("bad draco data");
     const decodeSpy = vi
       .spyOn(DracoDecoder.Default, "decodeMeshToGeometryAsync")
@@ -415,7 +403,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("finishes and disposes every failing structure's placeholder even when a sibling also fails, so a later sync retries them", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     stubDecode(scene);
     const failing = makeStructureEntity({
       identifier: 1,
@@ -474,7 +462,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("imports missing structures concurrently rather than one at a time", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     stubDecode(scene);
     const structures = [
       makeStructureEntity({ identifier: 1 }),
@@ -512,7 +500,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("imports a structure only once when two syncs overlap for it", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -542,7 +530,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("sets a faded structure's alpha before its geometry has loaded", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -570,7 +558,7 @@ describe("syncStructureVisibility", () => {
   });
 
   it("does not resurrect a structure that a later sync removed while its import was in flight", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
 
@@ -609,7 +597,7 @@ describe("removeAllStructures", () => {
   });
 
   it("disposes every structure mesh and its material", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structures = [
       makeStructureEntity({ identifier: 1 }),
@@ -626,7 +614,7 @@ describe("removeAllStructures", () => {
   });
 
   it("leaves the atlas root node itself in place", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
     await syncStructureVisibility(scene, [], [structure]);
@@ -638,7 +626,7 @@ describe("removeAllStructures", () => {
   });
 
   it("leaves a non-structure child of the atlas root alone", async () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
     await syncStructureVisibility(scene, [], [structure]);
@@ -653,7 +641,7 @@ describe("removeAllStructures", () => {
   });
 
   it("creates the atlas root node and no-ops on a scene with no structures", () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
 
     removeAllStructures(scene);
 
@@ -665,7 +653,7 @@ describe("removeAllStructures", () => {
 
 describe("setAtlasCenterOffset", () => {
   it("creates the atlas root node with the expected rotation", () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
 
     setAtlasCenterOffset(scene, [0, 0, 0]);
 
@@ -676,7 +664,7 @@ describe("setAtlasCenterOffset", () => {
   });
 
   it("offsets the atlas root so the atlas center sits at the origin", () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
     const center: [number, number, number] = [5.7, 0.44, 5.4];
 
     setAtlasCenterOffset(scene, center);
@@ -688,7 +676,7 @@ describe("setAtlasCenterOffset", () => {
   });
 
   it("reuses the existing atlas root node on a second call", () => {
-    const scene = makeScene();
+    const scene = makeTestScene();
 
     setAtlasCenterOffset(scene, [1, 2, 3]);
     const first = scene.getTransformNodeByName("atlasRoot_node");

@@ -65,7 +65,11 @@ function removeProbeAndDeselect(probe: Probe) {
 
 <template>
   <div class="column">
-    <q-btn-dropdown color="primary" dropdown-icon="add" label="Add Probe">
+    <q-btn-dropdown
+      color="primary"
+      dropdown-icon="add"
+      :label="$t('sceneHierarchy.addProbe')"
+    >
       <q-list>
         <q-item
           v-for="probeInterfaceProbe of probeLibrary.library"
@@ -86,7 +90,9 @@ function removeProbeAndDeselect(probe: Probe) {
           @click="$q.dialog({ component: ProbeLibraryDialog })"
         >
           <q-item-section>
-            <q-item-label><b>Manage probes...</b></q-item-label>
+            <q-item-label
+              ><b>{{ $t("sceneHierarchy.manageProbes") }}</b></q-item-label
+            >
           </q-item-section>
         </q-item>
       </q-list>

@@ -15,6 +15,9 @@ export default {
     search: "Search",
     clear: "Clear"
   },
+  currentExperiment: {
+    defaultName: "My First Experiment"
+  },
   newExperiment: {
     title: "New Experiment",
     experimentName: "Experiment name",
@@ -69,6 +72,13 @@ export default {
     title: "Probe Library",
     installProbe: "Install Probe",
     close: "Close"
+  },
+  sceneHierarchy: {
+    addProbe: "Add Probe",
+    manageProbes: "Manage probes..."
+  },
+  inspector: {
+    emptyHint: "Pick something from the scene to inspect."
   },
   probeInspector: {
     name: "Name",

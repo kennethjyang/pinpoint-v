@@ -2,11 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import type { ArcRotateCamera } from "@babylonjs/core";
-import { NullEngine, Scene } from "@babylonjs/core";
+import type { ArcRotateCamera, Scene } from "@babylonjs/core";
 import { shallowRef } from "vue";
 import SceneCanvas from "./SceneCanvas.vue";
-import { mountWithQuasar } from "@/test/mount-helper";
+import { makeTestScene, mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   removeAllStructures,
@@ -18,7 +17,7 @@ import {
   getAtlasCenter,
   getManifest,
   getTerminologyRows,
-  structureEntityFromIdentifier
+  structureEntitiesFromIdentifiers
 } from "@/features/atlas";
 import { buildExperiment } from "@/features/experiment";
 import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
@@ -60,7 +59,7 @@ vi.mock("@/features/atlas/api/source.api", async () => {
     ...actual,
     getManifest: vi.fn(),
     getTerminologyRows: vi.fn(),
-    structureEntityFromIdentifier: vi.fn()
+    structureEntitiesFromIdentifiers: vi.fn()
   };
 });
 
@@ -86,7 +85,7 @@ function makeRuntimeStub() {
 
   const init = vi.fn(async () => {
     engine.value = { resize };
-    scene.value = new Scene(new NullEngine());
+    scene.value = makeTestScene();
     camera.value = { radius: 0 } as ArcRotateCamera;
   });
 
@@ -125,8 +124,8 @@ describe("SceneCanvas", () => {
     vi.mocked(getManifest).mockResolvedValue(makeManifest());
     vi.mocked(getTerminologyRows).mockReset();
     vi.mocked(getTerminologyRows).mockResolvedValue(makeTerminologyRows());
-    vi.mocked(structureEntityFromIdentifier).mockReset();
-    vi.mocked(structureEntityFromIdentifier).mockReturnValue(null);
+    vi.mocked(structureEntitiesFromIdentifiers).mockReset();
+    vi.mocked(structureEntitiesFromIdentifiers).mockReturnValue([]);
     vi.mocked(syncStructureVisibility).mockReset();
     vi.mocked(syncStructureVisibility).mockResolvedValue(undefined);
     vi.mocked(setAtlasCenterOffset).mockReset();
@@ -154,13 +153,10 @@ describe("SceneCanvas", () => {
 
     await mountCanvas();
 
-    // `structureEntityFromIdentifier`'s signature changed from taking the
-    // atlas to taking the manifest -- assert the manifest itself was passed,
-    // not `manifest.atlas`.
-    expect(structureEntityFromIdentifier).toHaveBeenCalledWith(
+    expect(structureEntitiesFromIdentifiers).toHaveBeenCalledWith(
       manifest,
       terminologyRows,
-      expect.any(Number)
+      expect.anything()
     );
     expect(syncStructureVisibility).toHaveBeenCalled();
   });
@@ -177,7 +173,7 @@ describe("SceneCanvas", () => {
       [],
       []
     );
-    expect(structureEntityFromIdentifier).not.toHaveBeenCalled();
+    expect(structureEntitiesFromIdentifiers).not.toHaveBeenCalled();
   });
 
   it("shows the loading bar while a sync is in flight and hides it after", async () => {
@@ -281,7 +277,7 @@ describe("SceneCanvas", () => {
 
     const { runtime } = await mountCanvas();
 
-    expect(setInitialZoom).toHaveBeenCalledWith(manifest, runtime.camera.value);
+    expect(setInitialZoom).toHaveBeenCalledWith(runtime.camera.value, manifest);
   });
 
   it("does not set the camera's initial zoom while the atlas components are evaluating", async () => {

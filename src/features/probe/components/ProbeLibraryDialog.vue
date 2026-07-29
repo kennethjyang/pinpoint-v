@@ -4,13 +4,15 @@ import InstallProbeDialog from "./InstallProbeDialog.vue";
 import { getProbeIdentifier } from "../api/probe.api";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 
-// Setup dialog.
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 
 const $q = useQuasar();
 const probeLibraryStore = useProbeLibraryStore();
 
+/**
+ * Open the install-probe dialog and add its result to the library.
+ */
 function installProbe() {
   $q.dialog({ component: InstallProbeDialog }).onOk(probe => {
     probeLibraryStore.add(probe);

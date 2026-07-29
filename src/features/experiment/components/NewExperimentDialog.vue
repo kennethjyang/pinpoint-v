@@ -29,10 +29,7 @@ const isCreateDisabled = computed(() => !name.value || !atlas.value);
 async function create() {
   if (!name.value || !atlas.value) return;
 
-  // Fetch the manifest.
   const manifest = await getManifest(atlas.value);
-
-  // Stop creation if manifest doesn't exist.
   if (!manifest) {
     $q.notify({
       message: t("newExperiment.failedToFetchAtlas"),
@@ -43,17 +40,13 @@ async function create() {
     return;
   }
 
-  // Build initial reference coordinate.
   const referenceCoordinate = buildInitialReferenceCoordinate(manifest);
-
-  // Build experiment and set current.
   currentExperimentStore.experiment = buildExperiment(
     name.value,
     atlas.value,
     referenceCoordinate
   );
 
-  // Close.
   onDialogOK();
 }
 </script>

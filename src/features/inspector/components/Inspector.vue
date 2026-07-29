@@ -13,7 +13,7 @@ const currentExperiment = useCurrentExperimentStore();
     />
     <div v-else class="col flex flex-center text-center">
       <p class="text-weight-light">
-        <i>Pick something from the scene to inspect.</i>
+        <i>{{ $t("inspector.emptyHint") }}</i>
       </p>
     </div>
   </div>

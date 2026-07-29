@@ -1,5 +1,5 @@
-import { Atlas } from "@/features/atlas";
-import { Probe, ProbeInterfaceProbe } from "@/features/probe";
+import type { Atlas } from "@/features/atlas";
+import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 
 export interface Experiment {
   name: string;

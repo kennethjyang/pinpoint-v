@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
-import { ProbeInterfaceProbe } from "@/features/probe";
 import { ref } from "vue";
+import type { ProbeInterfaceProbe } from "@/features/probe";
+import { getProbeIdentifier } from "@/features/probe";
 
 export const useProbeLibraryStore = defineStore(
   "probe-library",
@@ -8,34 +9,36 @@ export const useProbeLibraryStore = defineStore(
     const library = ref<ProbeInterfaceProbe[]>([]);
 
     /**
-     * Probes are plain data with no id, so equality is structural rather
-     * than by reference.
-     */
-    function isEqual(a: ProbeInterfaceProbe, b: ProbeInterfaceProbe) {
-      return JSON.stringify(a) === JSON.stringify(b);
-    }
-
-    /**
      * Add a probe to the library. Does nothing if it already exists.
      * @param probe Probe to add.
      */
     function add(probe: ProbeInterfaceProbe) {
-      if (library.value.some(libraryProbe => isEqual(libraryProbe, probe)))
+      if (
+        library.value.some(
+          libraryProbe =>
+            getProbeIdentifier(libraryProbe) === getProbeIdentifier(probe)
+        )
+      )
         return;
       library.value.push(probe);
     }
 
     /**
-     * Removes all instances of a probe from the library.
+     * Remove all instances of a probe from the library.
      * @param probe Probe to remove.
      */
     function remove(probe: ProbeInterfaceProbe) {
-      library.value = library.value.filter(
-        libraryProbe => !isEqual(libraryProbe, probe)
-      );
+      const identifier = getProbeIdentifier(probe);
+      for (let i = library.value.length - 1; i >= 0; i--) {
+        if (getProbeIdentifier(library.value[i]!) === identifier) {
+          library.value.splice(i, 1);
+        }
+      }
     }
 
-    return { library, add, remove };
+    const state = { library };
+    const actions = { add, remove };
+    return { ...state, ...actions };
   },
   { persist: true }
 );

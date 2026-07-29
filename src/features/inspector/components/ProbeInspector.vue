@@ -2,14 +2,14 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { type ValidationRule } from "quasar";
-import { getProbeIdentifier, Probe } from "@/features/probe";
+import {
+  findProbeInterfaceProbeByIdentifier,
+  getProbeIdentifier,
+  Probe
+} from "@/features/probe";
 import { STANDARD_COLORS } from "@/features/scene";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
-import {
-  internProbeInterfaceProbe,
-  isProbeNameAvailable,
-  removeInternProbeInterfaceProbe
-} from "@/features/experiment";
+import { isProbeNameAvailable, setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import CommittedInput from "./CommittedInput.vue";
 
@@ -23,31 +23,22 @@ const currentExperimentStore = useCurrentExperimentStore();
 const { t } = useI18n();
 
 /**
- * Link to the probe identifier that also checks to remove interned interfaces after switching.
+ * Link to the probe identifier that also repoints its interned interface
+ * definition after switching.
  */
 const probeIdentifier = computed({
   get: () => probe.probeIdentifier,
   set: (value: string) => {
-    // Remember old identifier for removal.
-    const oldIdentifier = probeIdentifier.value;
-
-    // Get the new probe interface definition and intern it. Exit if not found.
-    const newProbeInterfaceProbe = probeLibraryStore.library.find(
-      probeInterfaceProbe => getProbeIdentifier(probeInterfaceProbe) === value
+    const probeInterfaceProbe = findProbeInterfaceProbeByIdentifier(
+      probeLibraryStore.library,
+      value
     );
-    if (!newProbeInterfaceProbe) return;
-    internProbeInterfaceProbe(
-      currentExperimentStore.experiment,
-      newProbeInterfaceProbe
-    );
+    if (!probeInterfaceProbe) return;
 
-    // Set the new value.
-    probe.probeIdentifier = value;
-
-    // Ensure the old one is removed.
-    removeInternProbeInterfaceProbe(
+    setProbeInterface(
       currentExperimentStore.experiment,
-      oldIdentifier
+      probe,
+      probeInterfaceProbe
     );
   }
 });
