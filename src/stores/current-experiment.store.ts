@@ -89,9 +89,7 @@ export const useCurrentExperimentStore = defineStore(
      */
     const visibleStructures = computed({
       get: () => experiment.value.visibleStructures,
-      set: (value: number[]) => {
-        experiment.value.visibleStructures = value;
-      }
+      set: (value: number[]) => (experiment.value.visibleStructures = value)
     });
 
     /**

@@ -8,6 +8,7 @@ const currentExperiment = useCurrentExperimentStore();
 <template>
   <ProbeInspector
     v-if="currentExperiment.selectedInspectable?.inspectableKind === 'probe'"
+    :probe="currentExperiment.selectedInspectable"
   />
 </template>
 

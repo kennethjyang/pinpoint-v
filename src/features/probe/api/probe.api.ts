@@ -3,17 +3,6 @@ import { Probe } from "../models/probe.model";
 import { ProbeInterfaceProbe } from "../models/probe-interface.model";
 import { STANDARD_COLORS } from "@/features/scene";
 
-/**
- * Returns the probe's manufacturer and name as a string.
- *
- * These are known but hidden keys in the interface that are used to identify the probe.
- * @param probeInterfaceProbe Probe interface definition to extract identifier from.
- */
-export function getProbeIdentifier(
-  probeInterfaceProbe: ProbeInterfaceProbe
-): string {
-  return `${String(probeInterfaceProbe.annotations!.manufacturer)} ${String(probeInterfaceProbe.annotations!.model_name)}`;
-}
 
 /**
  * Returns a probe referencing the given probe interface definition.
@@ -80,4 +69,16 @@ export function rotateProbeVisibility(probe: Probe) {
       probe.visibility = "hidden";
       break;
   }
+}
+
+/**
+ * Returns the probe's manufacturer and name as a string.
+ *
+ * These are known but hidden keys in the interface that are used to identify the probe.
+ * @param probeInterfaceProbe Probe interface definition to extract identifier from.
+ */
+export function getProbeIdentifier(
+  probeInterfaceProbe: ProbeInterfaceProbe
+): string {
+  return `${String(probeInterfaceProbe.annotations!.manufacturer)} ${String(probeInterfaceProbe.annotations!.model_name)}`;
 }
