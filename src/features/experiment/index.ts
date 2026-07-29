@@ -5,5 +5,9 @@ export {
   buildExperiment,
   isStructureVisible,
   setStructureVisibility,
-  clearVisibleStructures
+  clearVisibleStructures,
+  internProbeInterfaceProbe,
+  getInternedProbeInterfaceProbe,
+  addProbe,
+  removeProbe
 } from "./api/experiment.api";

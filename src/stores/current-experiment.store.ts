@@ -8,12 +8,7 @@ import {
   getTerminologyRows,
   Manifest
 } from "@/features/atlas";
-import {
-  detachProbeInterfaceProbe,
-  getProbeIdentifier,
-  Probe,
-  ProbeInterfaceProbe
-} from "@/features/probe";
+import { detachProbeInterfaceProbe } from "@/features/probe";
 import { Inspectable } from "@/features/scene";
 
 export const useCurrentExperimentStore = defineStore(
@@ -99,8 +94,6 @@ export const useCurrentExperimentStore = defineStore(
       }
     });
 
-    const probes = computed<Probe[]>(() => experiment.value.probes);
-
     /**
      * Probe interface definitions used by this experiment's probes, keyed by
      * probe identifier.
@@ -109,80 +102,7 @@ export const useCurrentExperimentStore = defineStore(
       () => experiment.value.probeInterfaceProbes
     );
 
-    /**
-     * Intern a probe interface definition into the experiment and return its
-     * identifier, keeping the existing definition if one is already interned
-     * under that identifier.
-     * @param probeInterfaceProbe Probe interface definition to intern, e.g.
-     * from the probe library.
-     */
-    function internProbeInterfaceProbe(
-      probeInterfaceProbe: ProbeInterfaceProbe
-    ): string {
-      const identifier = getProbeIdentifier(probeInterfaceProbe);
-      if (!experiment.value.probeInterfaceProbes[identifier]) {
-        experiment.value.probeInterfaceProbes[identifier] =
-          detachProbeInterfaceProbe(probeInterfaceProbe);
-      }
-      return identifier;
-    }
-
-    /**
-     * Resolve a probe's interface definition, or null if it isn't interned.
-     * @param probe Probe to resolve the definition of.
-     */
-    function probeInterfaceProbeFor(probe: Probe): ProbeInterfaceProbe | null {
-      return (
-        experiment.value.probeInterfaceProbes[probe.probeIdentifier] ?? null
-      );
-    }
-
-    /**
-     * Add a probe to the experiment and select it.
-     *
-     * Do nothing if a probe with the same name already exists.
-     * @param probe Probe to add.
-     */
-    function addProbe(probe: Probe) {
-      if (
-        experiment.value.probes.find(
-          existingProbe => existingProbe.name === probe.name
-        )
-      )
-        return;
-
-      experiment.value.probes.push(probe);
-      selectedInspectable.value = probe;
-    }
-
-    /**
-     * Remove probe from experiment.
-     *
-     * Do nothing if the probe is not in the experiment. Deselects it as
-     * well, and drops its interface definition if no other probe still
-     * references it.
-     * @param probe Probe to remove.
-     */
-    function removeProbe(probe: Probe) {
-      const probeIndex = experiment.value.probes.findIndex(
-        experimentProbe => experimentProbe.name === probe.name
-      );
-      if (probeIndex === -1) return;
-      const [removed] = experiment.value.probes.splice(probeIndex, 1);
-
-      const stillReferenced = experiment.value.probes.some(
-        experimentProbe =>
-          experimentProbe.probeIdentifier === removed!.probeIdentifier
-      );
-      if (!stillReferenced) {
-        delete experiment.value.probeInterfaceProbes[removed!.probeIdentifier];
-      }
-
-      // Deselects it.
-      if (isInspectableSelected(probe)) {
-        selectedInspectable.value = null;
-      }
-    }
+    const probes = computed(() => experiment.value.probes);
 
     /**
      * Helper to determine if the passed entity is the actively selected one.
@@ -215,10 +135,6 @@ export const useCurrentExperimentStore = defineStore(
       referenceCoordinate,
       probes,
       probeInterfaceProbes,
-      internProbeInterfaceProbe,
-      probeInterfaceProbeFor,
-      addProbe,
-      removeProbe,
       isInspectableSelected
     };
   },

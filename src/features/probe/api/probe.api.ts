@@ -4,26 +4,6 @@ import { ProbeInterfaceProbe } from "../models/probe-interface.model";
 import { STANDARD_COLORS } from "@/features/scene";
 
 /**
- * Returns a probe referencing the given probe interface definition, which
- * must already be interned into the experiment (see
- * `useCurrentExperimentStore().internProbeInterfaceProbe`).
- * @param probeIdentifier Identifier of the definition, as interned into the
- * experiment's `probeInterfaceProbes`.
- */
-export function buildProbe(probeIdentifier: string): Probe {
-  const uniqueName = crypto.randomUUID().slice(0, 8);
-  return {
-    inspectableKind: "probe",
-    name: `Probe ${uniqueName}`,
-    color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
-    visibility: "visible",
-    probeIdentifier,
-    tipPosition: [0, 0, 0],
-    orientation: [0, 0, 0]
-  };
-}
-
-/**
  * Returns the probe's manufacturer and name as a string.
  *
  * These are known but hidden keys in the interface that are used to identify the probe.
@@ -33,6 +13,27 @@ export function getProbeIdentifier(
   probeInterfaceProbe: ProbeInterfaceProbe
 ): string {
   return `${String(probeInterfaceProbe.annotations!.manufacturer)} ${String(probeInterfaceProbe.annotations!.model_name)}`;
+}
+
+/**
+ * Returns a probe referencing the given probe interface definition.
+ *
+ * Assigns a random color, random name, and sets the position and orientation to zero.
+ *
+ * @remarks Probe interface definition must be interned into the experiment for this probe to be usable.
+ * @param probeInterfaceProbe Probe interface definition for the probe.
+ */
+export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
+  const uniqueName = crypto.randomUUID().slice(0, 8);
+  return {
+    inspectableKind: "probe",
+    name: `Probe ${uniqueName}`,
+    color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
+    visibility: "visible",
+    probeIdentifier: getProbeIdentifier(probeInterfaceProbe),
+    tipPosition: [0, 0, 0],
+    orientation: [0, 0, 0]
+  };
 }
 
 /**

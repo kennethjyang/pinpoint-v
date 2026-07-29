@@ -4,15 +4,21 @@ import {
   buildProbe,
   getProbeIdentifier,
   Probe,
+  ProbeInterfaceProbe,
   ProbeLibraryDialog,
   rotateProbeVisibility
 } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import {
+  addProbe,
+  internProbeInterfaceProbe,
+  removeProbe
+} from "@/features/experiment";
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
-const currentExperiment = useCurrentExperimentStore();
+const currentExperimentStore = useCurrentExperimentStore();
 
 /**
  * Convert probe visibility state to icon name.
@@ -30,6 +36,31 @@ function probeVisibilityIcon(probe: Probe): string {
       return "sym_o_visibility";
   }
 }
+
+/**
+ * Build probe, add it to the scene, and select it.
+ * @param probeInterfaceProbe Probe interface definition for the probe to create.
+ */
+function addProbeAndSelect(probeInterfaceProbe: ProbeInterfaceProbe) {
+  internProbeInterfaceProbe(
+    currentExperimentStore.experiment,
+    probeInterfaceProbe
+  );
+  const probe = buildProbe(probeInterfaceProbe);
+  addProbe(currentExperimentStore.experiment, probe);
+  currentExperimentStore.selectedInspectable = probe;
+}
+
+/**
+ * Remove a probe from the scene and ensure it is not selected.
+ * @param probe Probe to remove.
+ */
+function removeProbeAndDeselect(probe: Probe) {
+  removeProbe(currentExperimentStore.experiment, probe);
+  if (currentExperimentStore.isInspectableSelected(probe)) {
+    currentExperimentStore.selectedInspectable = null;
+  }
+}
 </script>
 
 <template>
@@ -42,13 +73,7 @@ function probeVisibilityIcon(probe: Probe): string {
           v-close-popup
           v-ripple
           clickable
-          @click="
-            currentExperiment.addProbe(
-              buildProbe(
-                currentExperiment.internProbeInterfaceProbe(probeInterfaceProbe)
-              )
-            )
-          "
+          @click="addProbeAndSelect(probeInterfaceProbe)"
         >
           <q-item-section>
             {{ getProbeIdentifier(probeInterfaceProbe) }}
@@ -68,12 +93,12 @@ function probeVisibilityIcon(probe: Probe): string {
     </q-btn-dropdown>
     <q-list separator>
       <q-item
-        v-for="probe of currentExperiment.probes"
+        v-for="probe of currentExperimentStore.probes"
         :key="probe.name"
         v-ripple
-        :active="currentExperiment.isInspectableSelected(probe)"
+        :active="currentExperimentStore.isInspectableSelected(probe)"
         clickable
-        @click="currentExperiment.selectedInspectable = probe"
+        @click="currentExperimentStore.selectedInspectable = probe"
       >
         <q-item-section side>
           <q-icon :style="{ color: probe.color }" name="radio_button_checked" />
@@ -92,7 +117,7 @@ function probeVisibilityIcon(probe: Probe): string {
               flat
               round
               icon="delete"
-              @click.stop="currentExperiment.removeProbe(probe)"
+              @click.stop="removeProbeAndDeselect(probe)"
             />
           </div>
         </q-item-section>

@@ -1,5 +1,11 @@
 import { Atlas } from "@/features/atlas";
 import { Experiment } from "../models/experiment.model";
+import {
+  detachProbeInterfaceProbe,
+  getProbeIdentifier,
+  Probe,
+  ProbeInterfaceProbe
+} from "@/features/probe";
 
 /**
  * Returns a new experiment with the given name, atlas, and reference coordinate.
@@ -58,4 +64,75 @@ export function setStructureVisibility(
  */
 export function clearVisibleStructures(experiment: Experiment) {
   experiment.visibleStructures = [];
+}
+
+/**
+ * Intern a probe interface definition into the experiment and return its
+ * identifier, keeping the existing definition if one is already interned
+ * under that identifier.
+ * @param experiment Experiment to intern a probe into.
+ * @param probeInterfaceProbe Probe interface definition to intern.
+ */
+export function internProbeInterfaceProbe(
+  experiment: Experiment,
+  probeInterfaceProbe: ProbeInterfaceProbe
+): string {
+  const identifier = getProbeIdentifier(probeInterfaceProbe);
+  if (!experiment.probeInterfaceProbes[identifier]) {
+    experiment.probeInterfaceProbes[identifier] =
+      detachProbeInterfaceProbe(probeInterfaceProbe);
+  }
+  return identifier;
+}
+
+/**
+ * Resolve a probe's interface definition, or null if it isn't interned.
+ * @param experiment Experiment to extract the probe interface definition from.
+ * @param probe Probe to resolve the definition of.
+ */
+export function getInternedProbeInterfaceProbe(
+  experiment: Experiment,
+  probe: Probe
+): ProbeInterfaceProbe | null {
+  return experiment.probeInterfaceProbes[probe.probeIdentifier] ?? null;
+}
+
+/**
+ * Add a probe to the experiment.
+ *
+ * Do nothing if a probe with the same name already exists.
+ * @param experiment Experiment to add a probe to.
+ * @param probe Probe to add.
+ */
+export function addProbe(experiment: Experiment, probe: Probe) {
+  if (
+    experiment.probes.find(existingProbe => existingProbe.name === probe.name)
+  )
+    return;
+
+  experiment.probes.push(probe);
+}
+
+/**
+ * Remove probe from experiment.
+ *
+ * Do nothing if the probe is not in the experiment. Drop interface definition
+ * if no other probe references it.
+ * @param experiment Experiment to remove this probe from.
+ * @param probe Probe to remove.
+ */
+export function removeProbe(experiment: Experiment, probe: Probe) {
+  const probeIndex = experiment.probes.findIndex(
+    experimentProbe => experimentProbe.name === probe.name
+  );
+  if (probeIndex === -1) return;
+  const [removed] = experiment.probes.splice(probeIndex, 1);
+
+  const stillReferenced = experiment.probes.some(
+    experimentProbe =>
+      experimentProbe.probeIdentifier === removed!.probeIdentifier
+  );
+  if (!stillReferenced) {
+    delete experiment.probeInterfaceProbes[removed!.probeIdentifier];
+  }
 }
