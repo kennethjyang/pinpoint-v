@@ -3,8 +3,14 @@ import type { ProbeVisibility } from "../models/visibility.model";
 export interface Probe {
   inspectableKind: "probe";
 
+  /**
+   * Internal unique identifier. A UUID, not user facing.
+   */
   id: string;
 
+  /**
+   * User-facing label. Need not be unique.
+   */
   name: string;
 
   color: string;
@@ -12,7 +18,7 @@ export interface Probe {
 
   /**
    * Key into `Experiment.probeInterfaceProbes`, as produced by
-   * `getProbeIdentifier`.
+   * `getProbeInterfaceIdentifier`.
    */
   probeInterfaceIdentifier: string;
 

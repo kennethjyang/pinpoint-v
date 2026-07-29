@@ -110,7 +110,7 @@ describe("ProbeInspector", () => {
     expect(name.find("[role='alert']").text()).toBe(t.nameRequired);
   });
 
-  it("rejects a name already used by another probe in the experiment", async () => {
+  it("accepts a name already used by another probe in the experiment", async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
@@ -127,8 +127,8 @@ describe("ProbeInspector", () => {
     const name = fieldByLabel(wrapper, t.name);
     await editAndBlur(name, "B");
 
-    expect(store.experiment.probes[0]!.name).toBe("A");
-    expect(name.find("[role='alert']").text()).toBe(t.nameTaken);
+    expect(store.experiment.probes[0]!.name).toBe("B");
+    expect(name.find("[role='alert']").exists()).toBe(false);
   });
 
   it("trims whitespace when committing a name", async () => {
@@ -223,6 +223,7 @@ describe("ProbeInspector", () => {
   });
 
   it("keeps the renamed probe selected and in sync with the store", async () => {
+    // Selection is tracked by id, so a rename must not affect it.
     const { wrapper, store, probe } = mountInspector(makeProbe({ name: "A" }));
     store.selectedInspectable = probe;
 

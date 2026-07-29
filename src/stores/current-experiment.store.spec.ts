@@ -166,17 +166,27 @@ describe("useCurrentExperimentStore", () => {
 
     it("returns true when the entity matches the current selection", () => {
       const store = useCurrentExperimentStore();
-      const probe = makeProbe({ name: "A" });
+      const probe = makeProbe({ id: "A" });
       store.selectedInspectable = probe;
 
       expect(store.isInspectableSelected(probe)).toBe(true);
     });
 
-    it("returns false when the entity does not match the current selection", () => {
+    it("returns false when the entity's id does not match the current selection", () => {
       const store = useCurrentExperimentStore();
-      store.selectedInspectable = makeProbe({ name: "A" });
+      store.selectedInspectable = makeProbe({ id: "A" });
 
-      expect(store.isInspectableSelected(makeProbe({ name: "B" }))).toBe(false);
+      expect(store.isInspectableSelected(makeProbe({ id: "B" }))).toBe(false);
+    });
+
+    it("returns true for a renamed probe with the same id", () => {
+      const store = useCurrentExperimentStore();
+      const probe = makeProbe({ id: "A", name: "Before" });
+      store.selectedInspectable = probe;
+
+      probe.name = "After";
+
+      expect(store.isInspectableSelected(probe)).toBe(true);
     });
   });
 

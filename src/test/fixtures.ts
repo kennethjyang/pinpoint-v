@@ -44,7 +44,7 @@ export function makeProbeInterfaceProbe(
 export function makeProbe(overrides: Partial<Probe> = {}): Probe {
   return {
     inspectableKind: "probe",
-    id: "abc123",
+    id: crypto.randomUUID(),
     name: "Probe abc123",
     color: "#ffffff",
     visibility: "visible",

@@ -10,7 +10,7 @@ export function isSameInspectable(a: Inspectable, b: Inspectable): boolean {
 
   switch (a.inspectableKind) {
     case "probe":
-      return a.name === b.name;
+      return a.id === b.id;
     default:
       return false;
   }

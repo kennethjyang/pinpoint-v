@@ -26,14 +26,17 @@ describe("buildProbe", () => {
     expect(probe.visibility).toBe("visible");
     expect(probe.tipPosition).toEqual([0, 0, 0]);
     expect(probe.orientation).toEqual([0, 0, 0]);
+    expect(probe.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
     expect(probe.name).toMatch(/^Probe /);
     expect(probe.color).toMatch(/^#/);
   });
 
-  it("gives each probe a unique name", () => {
+  it("gives each probe a unique id", () => {
     const a = buildProbe(makeProbeInterfaceProbe());
     const b = buildProbe(makeProbeInterfaceProbe());
-    expect(a.name).not.toBe(b.name);
+    expect(a.id).not.toBe(b.id);
   });
 });
 

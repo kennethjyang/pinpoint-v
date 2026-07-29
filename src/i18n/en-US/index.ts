@@ -93,7 +93,6 @@ export default {
     yaw: "Yaw",
     pitch: "Pitch",
     nameRequired: "Name is required.",
-    nameTaken: "Another probe already uses this name.",
     mustBeNumber: "Must be a number."
   },
   errorNotFound: {

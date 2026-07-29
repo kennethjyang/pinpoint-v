@@ -138,34 +138,14 @@ export function getInternedProbeInterfaceProbe(
 }
 
 /**
- * Is the candidate name free for this probe, ignoring the probe's own name.
- * @param experiment Experiment whose probes the name must be unique within.
- * @param probe Probe being renamed, excluded from the collision check.
- * @param name Candidate name; compared after trimming.
- */
-export function isProbeNameAvailable(
-  experiment: Experiment,
-  probe: Probe,
-  name: string
-): boolean {
-  const candidate = name.trim();
-  return !experiment.probes.some(
-    experimentProbe =>
-      experimentProbe.name !== probe.name && experimentProbe.name === candidate
-  );
-}
-
-/**
  * Add a probe to the experiment.
  *
- * Do nothing if a probe with the same name already exists.
+ * Do nothing if a probe with the same id already exists.
  * @param experiment Experiment to add a probe to.
  * @param probe Probe to add.
  */
 export function addProbe(experiment: Experiment, probe: Probe) {
-  if (
-    experiment.probes.find(existingProbe => existingProbe.name === probe.name)
-  )
+  if (experiment.probes.find(existingProbe => existingProbe.id === probe.id))
     return;
 
   experiment.probes.push(probe);
@@ -181,7 +161,7 @@ export function addProbe(experiment: Experiment, probe: Probe) {
  */
 export function removeProbe(experiment: Experiment, probe: Probe) {
   const probeIndex = experiment.probes.findIndex(
-    experimentProbe => experimentProbe.name === probe.name
+    experimentProbe => experimentProbe.id === probe.id
   );
   if (probeIndex === -1) return;
   const [removed] = experiment.probes.splice(probeIndex, 1);

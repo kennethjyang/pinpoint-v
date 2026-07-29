@@ -9,7 +9,7 @@ import {
 } from "@/features/probe";
 import { STANDARD_COLORS } from "@/features/scene";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
-import { isProbeNameAvailable, setProbeInterface } from "@/features/experiment";
+import { setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import CommittedInput from "./CommittedInput.vue";
 
@@ -83,10 +83,7 @@ const pitch = computed({
 });
 
 const nameRules: ValidationRule<string>[] = [
-  value => value.trim().length > 0 || t("probeInspector.nameRequired"),
-  value =>
-    isProbeNameAvailable(currentExperimentStore.experiment, probe, value) ||
-    t("probeInspector.nameTaken")
+  value => value.trim().length > 0 || t("probeInspector.nameRequired")
 ];
 
 const numberRules: ValidationRule<string>[] = [

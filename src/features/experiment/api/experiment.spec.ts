@@ -6,7 +6,6 @@ import {
   clearVisibleStructures,
   getInternedProbeInterfaceProbe,
   internProbeInterfaceProbe,
-  isProbeNameAvailable,
   isStructureVisible,
   removeInternProbeInterfaceProbe,
   removeProbe,
@@ -288,8 +287,8 @@ describe("setProbeInterface", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
     const oldSpec = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(experiment, oldSpec);
-    const probe = makeProbe({ name: "A" });
-    const otherProbe = makeProbe({ name: "B" });
+    const probe = makeProbe({ id: "A" });
+    const otherProbe = makeProbe({ id: "B" });
     addProbe(experiment, probe);
     addProbe(experiment, otherProbe);
 
@@ -333,10 +332,10 @@ describe("addProbe", () => {
     expect(experiment.probes).toEqual([probe]);
   });
 
-  it("does nothing when a probe with the same name already exists", () => {
+  it("does nothing when a probe with the same id already exists", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
     internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
-    const probe = makeProbe({ name: "dup" });
+    const probe = makeProbe({ id: "dup" });
     addProbe(experiment, probe);
 
     addProbe(experiment, { ...probe, color: "#000000" });
@@ -344,53 +343,15 @@ describe("addProbe", () => {
     expect(experiment.probes).toHaveLength(1);
     expect(experiment.probes[0]!.color).toBe(probe.color);
   });
-});
 
-describe("isProbeNameAvailable", () => {
-  it("returns true when no probe uses the candidate name", () => {
+  it("adds probes that share a name but have different ids", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeProbe({ name: "a" }));
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
 
-    expect(isProbeNameAvailable(experiment, makeProbe(), "b")).toBe(true);
-  });
+    addProbe(experiment, makeProbe({ id: "a", name: "Probe" }));
+    addProbe(experiment, makeProbe({ id: "b", name: "Probe" }));
 
-  it("returns true for the probe's own current name", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const probe = makeProbe({ name: "a" });
-    addProbe(experiment, probe);
-
-    expect(isProbeNameAvailable(experiment, probe, "a")).toBe(true);
-  });
-
-  it("returns false when another probe already uses the name", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeProbe({ name: "a" }));
-    const other = makeProbe({ name: "b" });
-    addProbe(experiment, other);
-
-    expect(isProbeNameAvailable(experiment, other, "a")).toBe(false);
-  });
-
-  it("trims the candidate before comparing", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeProbe({ name: "b" }));
-    const other = makeProbe({ name: "a" });
-    addProbe(experiment, other);
-
-    expect(isProbeNameAvailable(experiment, other, " b ")).toBe(false);
-  });
-
-  it("returns true on an experiment with no probes", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-
-    expect(isProbeNameAvailable(experiment, makeProbe(), "a")).toBe(true);
-  });
-
-  it("returns true for an empty candidate when no probe is named that", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    addProbe(experiment, makeProbe({ name: "a" }));
-
-    expect(isProbeNameAvailable(experiment, makeProbe(), "")).toBe(true);
+    expect(experiment.probes).toHaveLength(2);
   });
 });
 
@@ -406,13 +367,13 @@ describe("removeProbe", () => {
     expect(experiment.probes).toEqual([]);
   });
 
-  it("is a no-op when the probe isn't in the experiment", () => {
+  it("is a no-op when the probe's id isn't in the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
     internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
-    const kept = makeProbe({ name: "kept" });
+    const kept = makeProbe({ id: "kept" });
     addProbe(experiment, kept);
 
-    removeProbe(experiment, makeProbe({ name: "never-added" }));
+    removeProbe(experiment, makeProbe({ id: "never-added" }));
 
     expect(experiment.probes).toEqual([kept]);
   });

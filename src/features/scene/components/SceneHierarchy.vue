@@ -100,7 +100,7 @@ function removeProbeAndDeselect(probe: Probe) {
     <q-list separator>
       <q-item
         v-for="probe of currentExperimentStore.probes"
-        :key="probe.name"
+        :key="probe.id"
         v-ripple
         :active="currentExperimentStore.isInspectableSelected(probe)"
         clickable

@@ -9,7 +9,6 @@ export {
   internProbeInterfaceProbe,
   removeInternProbeInterfaceProbe,
   getInternedProbeInterfaceProbe,
-  isProbeNameAvailable,
   addProbe,
   removeProbe,
   setProbeInterface
