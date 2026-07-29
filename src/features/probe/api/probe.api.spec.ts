@@ -10,12 +10,15 @@ import { makeExperimentProbe, makeProbe } from "@/test/fixtures";
 
 describe("buildProbe", () => {
   it("references the given probe identifier", () => {
-    const probe = buildProbe("imec np1");
+    const spec = makeProbe({
+      annotations: { manufacturer: "imec", model_name: "np1" }
+    });
+    const probe = buildProbe(spec);
     expect(probe.probeIdentifier).toBe("imec np1");
   });
 
   it("builds a probe with sensible defaults", () => {
-    const probe = buildProbe("imec np1");
+    const probe = buildProbe(makeProbe());
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
@@ -26,8 +29,8 @@ describe("buildProbe", () => {
   });
 
   it("gives each probe a unique name", () => {
-    const a = buildProbe("imec np1");
-    const b = buildProbe("imec np1");
+    const a = buildProbe(makeProbe());
+    const b = buildProbe(makeProbe());
     expect(a.name).not.toBe(b.name);
   });
 });

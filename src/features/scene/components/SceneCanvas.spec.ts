@@ -15,10 +15,12 @@ import {
 } from "../api/entity-loader.api";
 import { setInitialZoom } from "../api/camera.api";
 import {
+  getAtlasCenter,
   getManifest,
   getTerminologyRows,
   structureEntityFromIdentifier
 } from "@/features/atlas";
+import { buildExperiment } from "@/features/experiment";
 import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
@@ -225,10 +227,9 @@ describe("SceneCanvas", () => {
   it("offsets the atlas root by the atlas center once the manifest resolves", async () => {
     await mountCanvas();
 
-    const store = useCurrentExperimentStore();
     expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
-      store.atlasCenter
+      getAtlasCenter(makeManifest())
     );
   });
 
@@ -243,7 +244,7 @@ describe("SceneCanvas", () => {
     vi.mocked(getManifest).mockResolvedValue(manifest);
 
     const store = useCurrentExperimentStore();
-    store.create(
+    store.experiment = buildExperiment(
       "New Experiment",
       makeAtlas({ name: "allen_human" }),
       [0, 0, 0]
@@ -296,7 +297,7 @@ describe("SceneCanvas", () => {
     expect(removeAllStructures).not.toHaveBeenCalled();
 
     const store = useCurrentExperimentStore();
-    store.create(
+    store.experiment = buildExperiment(
       "New Experiment",
       makeAtlas({ name: "allen_human" }),
       [0, 0, 0]

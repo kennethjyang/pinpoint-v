@@ -128,7 +128,7 @@ describe("NewExperimentDialog", () => {
 
       const wrapper = await mountDialog();
       const store = useCurrentExperimentStore();
-      const createSpy = vi.spyOn(store, "create");
+      const experimentBeforeClick = store.experiment;
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.findComponent({ name: "QInput" }).setValue("My Experiment");
       await wrapper
@@ -141,19 +141,19 @@ describe("NewExperimentDialog", () => {
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({ color: "negative" })
       );
-      expect(createSpy).not.toHaveBeenCalled();
+      expect(store.experiment).toBe(experimentBeforeClick);
       expect(wrapper.emitted("ok")).toBeFalsy();
     });
 
     it("does nothing when name or atlas is missing", async () => {
       const wrapper = await mountDialog();
       const store = useCurrentExperimentStore();
-      const createSpy = vi.spyOn(store, "create");
+      const experimentBeforeClick = store.experiment;
 
       await createButton(wrapper).trigger("click");
       await flush();
 
-      expect(createSpy).not.toHaveBeenCalled();
+      expect(store.experiment).toBe(experimentBeforeClick);
       expect(wrapper.emitted("ok")).toBeFalsy();
     });
   });

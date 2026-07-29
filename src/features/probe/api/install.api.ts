@@ -104,8 +104,9 @@ export async function getProbeInterfaceProbe(
     // Exit if no probes exist.
     if (!data.probes[0]) return null;
 
-    // Extract first one.
-    return data.probes[0];
+    // Same minimal validation the upload path applies, so a definition
+    // missing annotations can't reach getProbeIdentifier.
+    return isProbeInterfaceProbe(data.probes[0]) ? data.probes[0] : null;
   } catch {
     return null;
   }

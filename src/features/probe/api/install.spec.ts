@@ -201,6 +201,18 @@ describe("getProbeInterfaceProbe", () => {
 
     expect(await getProbeInterfaceProbe("neuropixels", "1.0")).toBeNull();
   });
+
+  it("returns null when the fetched probe is missing annotations", async () => {
+    mockedGet.mockResolvedValue({
+      data: {
+        specification: "probeinterface",
+        version: "0.2.24",
+        probes: [makeProbe({ annotations: undefined })]
+      }
+    });
+
+    expect(await getProbeInterfaceProbe("neuropixels", "1.0")).toBeNull();
+  });
 });
 
 describe("parseProbeInterfaceFile", () => {
