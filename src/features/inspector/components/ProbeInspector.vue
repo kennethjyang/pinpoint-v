@@ -40,7 +40,7 @@ const pitch = computed({
 
 <template>
   <div class="column q-gutter-y-md">
-    <q-input v-model="probe.name" label="Name" outlined />
+    <q-input v-model="probe.name" clearable label="Name" outlined />
 
     <div>
       <p class="text-h6">Tip Position</p>

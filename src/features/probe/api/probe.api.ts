@@ -3,7 +3,6 @@ import { Probe } from "../models/probe.model";
 import { ProbeInterfaceProbe } from "../models/probe-interface.model";
 import { STANDARD_COLORS } from "@/features/scene";
 
-
 /**
  * Returns a probe referencing the given probe interface definition.
  *
