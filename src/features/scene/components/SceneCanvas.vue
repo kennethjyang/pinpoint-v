@@ -13,7 +13,7 @@ import {
   removeAllStructures,
   setAtlasCenterOffset,
   syncStructureVisibility
-} from "../api/entity-loader.api";
+} from "../api/atlas-structures.api";
 import { setInitialZoom } from "../api/camera.api";
 import { StructureEntity } from "../models/structure-entity.model";
 import {

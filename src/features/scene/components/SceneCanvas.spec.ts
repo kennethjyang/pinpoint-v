@@ -11,7 +11,7 @@ import {
   removeAllStructures,
   setAtlasCenterOffset,
   syncStructureVisibility
-} from "../api/entity-loader.api";
+} from "../api/atlas-structures.api";
 import { setInitialZoom } from "../api/camera.api";
 import {
   getAtlasCenter,
@@ -24,10 +24,10 @@ import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
 
-vi.mock("../api/entity-loader.api", async () => {
+vi.mock("../api/atlas-structures.api", async () => {
   const actual = await vi.importActual<
-    typeof import("../api/entity-loader.api")
-  >("../api/entity-loader.api");
+    typeof import("../api/atlas-structures.api")
+  >("../api/atlas-structures.api");
   return {
     ...actual,
     syncStructureVisibility: vi.fn(),

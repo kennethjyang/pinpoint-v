@@ -15,7 +15,7 @@ import {
   removeAllStructures,
   setAtlasCenterOffset,
   syncStructureVisibility
-} from "./entity-loader.api";
+} from "./atlas-structures.api";
 import type { StructureEntity } from "../models/structure-entity.model";
 import { asrToBabylon } from "./coordinate-transforms.api";
 import { makeTestScene, stubDracoDecoder } from "@/test/mount-helper";
