@@ -19,7 +19,7 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     visibility: "visible",
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     tipPosition: [0, 0, 0],
-    orientation: [0, 0, 0]
+    orientation: [0, 0, Math.PI / 2]
   };
 }
 

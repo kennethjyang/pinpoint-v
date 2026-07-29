@@ -24,7 +24,8 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { buildProbe } from "../api/probe.api";
+import { syncProbes } from "../api/probe.api";
+import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 
 const $q = useQuasar();
 const { t } = useI18n();
@@ -131,14 +132,22 @@ watch(
   }
 );
 
+// Sync the reference coordinate node position.
 watchEffect(() => {
   const scene = runtime.scene.value;
   if (!scene) return;
-
-  for (const probe of currentExperiment.experiment.probes) {
-    buildProbe(scene, probe, currentExperiment.experiment);
-  }
+  setReferenceCoordinateNodePosition(scene, currentExperiment.experiment);
 });
+
+// Sync probes.
+watch(
+  [() => runtime.scene.value, () => currentExperiment.probes],
+  ([newScene]) => {
+    if (!newScene) return;
+
+    syncProbes(newScene, currentExperiment.experiment);
+  }
+);
 
 onMounted(async () => {
   if (!canvas.value) {

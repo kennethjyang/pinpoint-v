@@ -8,12 +8,8 @@ const REFERENCE_COORDINATE_NODE_NAME = "referenceCoordinate_node";
 /**
  * Build the reference coordinate node or return the existing one.
  * @param scene Scene to get or add the reference coordinate node.
- * @param experiment Experiment to base the reference coordinate location on.
  */
-export function buildReferenceCoordinateNode(
-  scene: Scene,
-  experiment: Experiment
-): TransformNode {
+export function buildReferenceCoordinateNode(scene: Scene): TransformNode {
   // Get the existing node or create it and add it to the atlas root.
   const atlasRootNode = buildAtlasRootNode(scene);
   let referenceCoordinateNode = scene.getTransformNodeByName(
@@ -27,7 +23,19 @@ export function buildReferenceCoordinateNode(
     referenceCoordinateNode.parent = atlasRootNode;
   }
 
-  // Set position to experiment preference.
+  return referenceCoordinateNode;
+}
+
+/**
+ * Set the position of the reference coordinate node.
+ * @param scene Scene to set the reference coordinate of.
+ * @param experiment Experiment to get reference coordinate info from.
+ */
+export function setReferenceCoordinateNodePosition(
+  scene: Scene,
+  experiment: Experiment
+) {
+  const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   referenceCoordinateNode.setPositionWithLocalVector(
     new Vector3(
       experiment.referenceCoordinate[0],
@@ -35,6 +43,4 @@ export function buildReferenceCoordinateNode(
       experiment.referenceCoordinate[2]
     )
   );
-
-  return referenceCoordinateNode;
 }

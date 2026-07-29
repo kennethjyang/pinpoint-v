@@ -96,7 +96,7 @@ export function buildProbe(
     probeEntityName(probe.id, PROBE_NODE_SUFFIX),
     scene
   );
-  node.parent = buildReferenceCoordinateNode(scene, experiment);
+  node.parent = buildReferenceCoordinateNode(scene);
 
   const material = buildProbeMaterial(scene, probe);
   const shankMesh = buildShankMesh(
@@ -129,26 +129,47 @@ export function buildProbe(
  * Dispose a probe's transform node, its meshes, and its own material,
  * leaving shared materials (e.g. `rod_material`) untouched.
  * @param scene Scene the probe was built in.
- * @param probe Probe to remove any existing entity for.
+ * @param probeId Probe ID to remove any existing entity for.
  */
-export function disposeProbe(scene: Scene, probe: Probe): void {
+export function disposeProbe(scene: Scene, probeId: string): void {
   scene
-    .getTransformNodeByName(probeEntityName(probe.id, PROBE_NODE_SUFFIX))
+    .getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
     ?.dispose(false, false);
   scene
-    .getMaterialByName(probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX))
+    .getMaterialByName(probeEntityName(probeId, PROBE_MATERIAL_SUFFIX))
     ?.dispose();
 }
 
 /**
- * Synchronize the probe entity with its states.
+ * Synchronize the probe entities with their states.
  * @param scene Scene to sync the probes of.
- * @param probe Probe state to use.
+ * @param experiment Experiment to pull probe data to sync from.
  */
-export function syncProbe(scene: Scene, probe: Probe) {
+export function syncProbes(scene: Scene, experiment: Experiment) {
   console.log(scene);
-  console.log(probe);
-  // Sync existence.
+  console.log(experiment);
+  // 1. Sync existence.
+  const presentProbeIds = new Set(
+    buildReferenceCoordinateNode(scene)
+      .getChildren(node => node.name.endsWith(PROBE_NODE_SUFFIX))
+      .map(node => node.name.slice(0, -PROBE_NODE_SUFFIX.length))
+  );
+  const experimentProbeIds = new Set(experiment.probes.map(probe => probe.id));
+
+  // Dispose removed probes.
+  for (const presentProbeId of presentProbeIds) {
+    if (!experimentProbeIds.has(presentProbeId)) {
+      disposeProbe(scene, presentProbeId);
+    }
+  }
+
+  // Add new probes.
+  for (const probe of experiment.probes) {
+    if (!presentProbeIds.has(probe.id)) {
+      buildProbe(scene, probe, experiment);
+    }
+  }
+
   // Sync materials.
   // Sync visibility.
 }
