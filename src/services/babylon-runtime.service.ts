@@ -4,10 +4,13 @@ import {
   ArcRotateCamera,
   GizmoManager,
   HemisphericLight,
+  InitializeCSG2Async,
+  IsCSG2Ready,
   Scene,
   Vector3,
   WebGPUEngine
 } from "@babylonjs/core";
+import Module from "manifold-3d";
 
 /**
  * Service holding the Babylon engine, scene, camera, and gizmo manager
@@ -24,6 +27,21 @@ export interface BabylonRuntimeService {
 
 export const BabylonRuntimeServiceKey: InjectionKey<BabylonRuntimeService> =
   Symbol("BabylonRuntimeService");
+
+/**
+ * Initialize Babylon's CSG2 from the bundled `manifold-3d` package, so its
+ * wasm loads from this app's own origin instead of Babylon's default CDN.
+ */
+async function initializeCSG2(): Promise<void> {
+  if (IsCSG2Ready()) return;
+
+  const manifold = await Module();
+  manifold.setup();
+  await InitializeCSG2Async({
+    manifoldInstance: manifold.Manifold,
+    manifoldMeshInstance: manifold.Mesh
+  });
+}
 
 /**
  * Create a service holding the Babylon engine, scene, camera, and gizmo
@@ -44,7 +62,7 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
 
     const e = markRaw(new WebGPUEngine(canvas));
     e.compatibilityMode = false;
-    await e.initAsync();
+    await Promise.all([e.initAsync(), initializeCSG2()]);
 
     const s = markRaw(new Scene(e));
 
