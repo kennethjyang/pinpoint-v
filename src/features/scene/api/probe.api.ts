@@ -13,6 +13,7 @@ import type { Experiment } from "@/features/experiment";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
+import { asrToVector3 } from "../api/coordinate-transforms.api";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
 interface ProbeContour {
@@ -212,6 +213,16 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
         rodMesh?.setEnabled(false);
         break;
     }
+
+    // Update transform.
+    const probeTransformNode = scene.getTransformNodeByName(
+      probeEntityName(probe.id, PROBE_NODE_SUFFIX)
+    );
+    if (!probeTransformNode) continue;
+    probeTransformNode.setPositionWithLocalVector(
+      asrToVector3(probe.tipPosition)
+    );
+    probeTransformNode.rotation = asrToVector3(probe.orientation);
   }
 }
 
