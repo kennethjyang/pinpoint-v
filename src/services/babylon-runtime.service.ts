@@ -1,5 +1,5 @@
 import type { InjectionKey } from "vue";
-import { markRaw, type ShallowRef, shallowReadonly, shallowRef } from "vue";
+import { markRaw, shallowReadonly, type ShallowRef, shallowRef } from "vue";
 import {
   ArcRotateCamera,
   GizmoManager,
@@ -60,12 +60,15 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
   async function init(canvas: HTMLCanvasElement) {
     if (engine.value) return;
 
+    // Setup engine and CSG2.
     const e = markRaw(new WebGPUEngine(canvas));
     e.compatibilityMode = false;
     await Promise.all([e.initAsync(), initializeCSG2()]);
 
+    // Setup scene.
     const s = markRaw(new Scene(e));
 
+    // Setup camera.
     const c = new ArcRotateCamera(
       "main_camera",
       -Math.PI / 2,
@@ -76,6 +79,7 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
     );
     c.attachControl(canvas, true);
 
+    // Setup gizmo manager.
     const gm = new GizmoManager(s);
     gm.positionGizmoEnabled = true;
     gm.rotationGizmoEnabled = true;

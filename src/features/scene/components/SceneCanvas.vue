@@ -139,9 +139,10 @@ watchEffect(() => {
 // Sync probes.
 watchEffect(() => {
   const scene = runtime.scene.value;
-  if (!scene) return;
+  const gizmoManager = runtime.gizmoManager.value;
+  if (!scene || !gizmoManager) return;
 
-  syncProbes(scene, currentExperiment.experiment);
+  syncProbes(scene, currentExperiment.experiment, gizmoManager);
 });
 
 onMounted(async () => {

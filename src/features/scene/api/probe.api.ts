@@ -1,4 +1,4 @@
-import type { Scene } from "@babylonjs/core";
+import type { GizmoManager, Scene } from "@babylonjs/core";
 import {
   Color3,
   CSG2,
@@ -85,11 +85,13 @@ const MICROMETERS_TO_MILLIMETERS = 1e-3;
  * @param scene Scene to add the probe to.
  * @param probe Probe to build.
  * @param experiment Experiment this probe belongs to (to extract probe interface definition).
+ * @param gizmoManager Gizmo manager to add probe meshes to.
  */
 export function buildProbe(
   scene: Scene,
   probe: Probe,
-  experiment: Experiment
+  experiment: Experiment,
+  gizmoManager: GizmoManager
 ): TransformNode | null {
   const existing = scene.getTransformNodeByName(
     probeEntityName(probe.id, PROBE_NODE_SUFFIX)
@@ -137,6 +139,12 @@ export function buildProbe(
   rodMesh.material = buildRodMaterial(scene);
   rodMesh.parent = node;
 
+  // Enable gizmo picking.
+  if (!gizmoManager.attachableMeshes) {
+    gizmoManager.attachableMeshes = [];
+  }
+  gizmoManager.attachableMeshes.push(shankMesh, headStageMesh, rodMesh);
+
   return node;
 }
 
@@ -145,8 +153,13 @@ export function buildProbe(
  * leaving shared materials (e.g. `rod_material`) untouched.
  * @param scene Scene the probe was built in.
  * @param probeId Probe ID to remove any existing entity for.
+ * @param gizmoManager Gizmo manager to remove probe meshes from.
  */
-export function disposeProbe(scene: Scene, probeId: string): void {
+export function disposeProbe(
+  scene: Scene,
+  probeId: string,
+  gizmoManager: GizmoManager
+): void {
   scene
     .getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
     ?.dispose(false, false);
@@ -156,14 +169,22 @@ export function disposeProbe(scene: Scene, probeId: string): void {
   scene
     .getMaterialByName(probeEntityName(probeId, CONTACTS_MATERIAL_SUFFIX))
     ?.dispose();
+  gizmoManager.attachableMeshes = gizmoManager.attachableMeshes!.filter(
+    mesh => !mesh.name.includes(probeId)
+  );
 }
 
 /**
  * Synchronize the probe entities with their states.
  * @param scene Scene to sync the probes of.
  * @param experiment Experiment to pull probe data to sync from.
+ * @param gizmoManager Gizmo manager for controlling probes.
  */
-export function syncProbes(scene: Scene, experiment: Experiment) {
+export function syncProbes(
+  scene: Scene,
+  experiment: Experiment,
+  gizmoManager: GizmoManager
+) {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const experimentProbesById = new Map(
     experiment.probes.map(probe => [probe.id, probe])
@@ -179,7 +200,7 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
     const { probeInterfaceIdentifier } = node.metadata as ProbeMetadata;
     const probe = experimentProbesById.get(id);
     if (!probe || probe.probeInterfaceIdentifier !== probeInterfaceIdentifier) {
-      disposeProbe(scene, id);
+      disposeProbe(scene, id, gizmoManager);
       continue;
     }
     nodesById.set(id, node);
@@ -189,7 +210,8 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
   for (const probe of experiment.probes) {
     // Get or build probe.
     const node =
-      nodesById.get(probe.id) ?? buildProbe(scene, probe, experiment);
+      nodesById.get(probe.id) ??
+      buildProbe(scene, probe, experiment, gizmoManager);
     if (!node) continue;
 
     const meshes = node.getChildMeshes(false);
