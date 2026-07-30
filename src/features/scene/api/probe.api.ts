@@ -53,7 +53,7 @@ const CONTACTS_MATERIAL_SUFFIX = "_contacts_material";
 const ROD_MATERIAL_NAME = "rod_material";
 
 /** Thickness of the extruded shank mesh, in mm. */
-const SHANK_THICKNESS_MILLIMETERS = 0.01;
+const SHANK_THICKNESS_MILLIMETERS = 0.05;
 
 /** Height of the head stage cone, in mm. */
 const HEAD_STAGE_HEIGHT_MILLIMETERS = 20;
@@ -345,7 +345,7 @@ function buildShankMesh(
     scene,
     earcut
   );
-  mesh.position = new Vector3(0, 0, -SHANK_THICKNESS_MILLIMETERS / 2);
+  mesh.position = new Vector3(0, SHANK_THICKNESS_MILLIMETERS / 2, 0);
   return mesh;
 }
 
@@ -384,7 +384,7 @@ function buildHeadStageMesh(
   cutterMesh.position = new Vector3(
     0,
     -HEAD_STAGE_HEIGHT_MILLIMETERS / 8,
-    HEAD_STAGE_TOP_DIAMETER_MILLIMETERS / 2
+    HEAD_STAGE_TOP_DIAMETER_MILLIMETERS / 2 + SHANK_THICKNESS_MILLIMETERS / 2
   );
   cutterMesh.parent = baseMesh;
 
