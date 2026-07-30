@@ -26,7 +26,7 @@ Load multiple skills when a task spans domains (e.g. a new feature touches a sto
 - Keep `@param` tags even when they restate the parameter name; omit `@returns` (the summary line already describes the output).
 - When modifying Pinia stores, do not try to engineer for backwards compatibility.
 - Pure functions that mutate or use some object should have the object be the first argument.
-- When working in a worktree, commit work on completion.
+- When in a worktree, use `git commit` on modified files.
 
 ## Tooling
 
