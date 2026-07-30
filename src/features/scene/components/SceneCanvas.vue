@@ -123,14 +123,11 @@ watchEffect(() => {
 
 // Clear the scene whenever the atlas changes, but not when the scene itself
 // has just become available for the first time.
-watch(
-  [() => runtime.scene.value, () => currentExperiment.atlas],
-  ([newScene], [oldScene]) => {
-    if (!newScene || !oldScene) return;
+watch([runtime.scene, currentExperiment.atlas], ([newScene], [oldScene]) => {
+  if (!newScene || !oldScene) return;
 
-    removeAllStructures(newScene);
-  }
-);
+  removeAllStructures(newScene);
+});
 
 // Sync the reference coordinate node position.
 watchEffect(() => {
@@ -140,14 +137,12 @@ watchEffect(() => {
 });
 
 // Sync probes.
-watch(
-  [() => runtime.scene.value, () => currentExperiment.probes],
-  ([newScene]) => {
-    if (!newScene) return;
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  if (!scene) return;
 
-    syncProbes(newScene, currentExperiment.experiment);
-  }
-);
+  syncProbes(scene, currentExperiment.experiment);
+});
 
 onMounted(async () => {
   if (!canvas.value) {
