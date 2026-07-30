@@ -11,11 +11,7 @@ import {
 import earcut from "earcut";
 import type { Experiment } from "@/features/experiment";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
-import type {
-  ContactShapeParams,
-  Probe,
-  ProbeInterfaceProbe
-} from "@/features/probe";
+import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
@@ -28,14 +24,6 @@ interface ProbeContour {
   height: number;
   /** Offset subtracted from scaled probe-definition coordinates to reach local space, in mm. */
   origin: { x: number; y: number };
-}
-
-/** A probe's contacts bounding box in local mm, including their shape extents. */
-interface ContactsBox {
-  centerX: number;
-  centerY: number;
-  width: number;
-  height: number;
 }
 
 /** Suffix applied to a probe's id to name its parenting transform node. */
@@ -53,9 +41,6 @@ const HEAD_STAGE_MESH_SUFFIX = "_headStage_mesh";
 /** Suffix applied to a probe's id to name its rod mesh. */
 const ROD_MESH_SUFFIX = "_rod_mesh";
 
-/** Suffix applied to a probe's id to name its contacts mesh. */
-const CONTACTS_MESH_SUFFIX = "_contacts_mesh";
-
 /** Suffix applied to a probe's id to name its contacts material. */
 const CONTACTS_MATERIAL_SUFFIX = "_contacts_material";
 
@@ -65,23 +50,17 @@ const ROD_MATERIAL_NAME = "rod_material";
 /** Thickness of the extruded shank mesh, in mm. */
 const SHANK_THICKNESS_MILLIMETERS = 0.01;
 
-/** Fraction of the probe color's saturation kept by the contacts material. */
-const CONTACTS_SATURATION_SCALE = 0.1;
-
-/** Clearance of the contacts plane in front of the shank's front face, in mm. */
-const CONTACTS_CLEARANCE_MILLIMETERS = 0.001;
-
 /** Height of the head stage cone, in mm. */
 const HEAD_STAGE_HEIGHT_MILLIMETERS = 20;
 
 /** Top radius of the head stage cone, in mm. */
-const HEAD_STAGE_TOP_RADIUS_MILLIMETERS = 8;
+const HEAD_STAGE_TOP_DIAMETER_MILLIMETERS = 8;
 
 /** Length of the rod, in mm. */
 const ROD_LENGTH_MILLIMETERS = 200;
 
 /** Radius of the rod, in mm. */
-const ROD_RADIUS_MILLIMETERS = 8;
+const ROD_DIAMETER_MILLIMETERS = 8;
 
 /** Conversion factor to millimeters, keyed by `ProbeInterfaceProbe.si_units`. */
 const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
@@ -148,13 +127,13 @@ export function buildProbe(
   rodMesh.material = buildRodMaterial(scene);
   rodMesh.parent = node;
 
-  const contactsMesh = buildContactsMesh(
-    scene,
-    buildContactsBox(probeInterfaceProbe, contour),
-    probeEntityName(probe.id, CONTACTS_MESH_SUFFIX)
-  );
-  contactsMesh.material = buildContactsMaterial(scene, probe);
-  contactsMesh.parent = node;
+  // const contactsMesh = buildContactsMesh(
+  //   scene,
+  //   buildContactsBox(probeInterfaceProbe, contour),
+  //   probeEntityName(probe.id, CONTACTS_MESH_SUFFIX)
+  // );
+  // contactsMesh.material = buildContactsMaterial(scene, probe);
+  // contactsMesh.parent = node;
 
   return node;
 }
@@ -183,8 +162,6 @@ export function disposeProbe(scene: Scene, probeId: string): void {
  * @param experiment Experiment to pull probe data to sync from.
  */
 export function syncProbes(scene: Scene, experiment: Experiment) {
-  console.log(scene);
-  console.log(experiment);
   // 1. Sync existence.
   const presentProbeIds = new Set(
     buildReferenceCoordinateNode(scene)
@@ -342,7 +319,7 @@ function buildHeadStageMesh(
     {
       height: HEAD_STAGE_HEIGHT_MILLIMETERS,
       diameterBottom: contour.width,
-      diameterTop: HEAD_STAGE_TOP_RADIUS_MILLIMETERS * 2
+      diameterTop: HEAD_STAGE_TOP_DIAMETER_MILLIMETERS
     },
     scene
   );
@@ -366,7 +343,7 @@ function buildRodMesh(scene: Scene, contour: ProbeContour, name: string): Mesh {
     name,
     {
       height: ROD_LENGTH_MILLIMETERS,
-      diameter: ROD_RADIUS_MILLIMETERS * 2
+      diameter: ROD_DIAMETER_MILLIMETERS
     },
     scene
   );
@@ -389,139 +366,5 @@ function buildRodMaterial(scene: Scene): StandardMaterial {
 
   const material = new StandardMaterial(ROD_MATERIAL_NAME, scene);
   material.diffuseColor = Color3.Gray();
-  return material;
-}
-
-/**
- * Compute a probe's contacts bounding box in local mm, including each
- * contact's shape extent. Falls back to the raw positions if shapes are
- * unusable, and to the contour's own box if no contacts are usable at all.
- * @param probeInterfaceProbe Probe interface definition to extract contacts from.
- * @param contour Probe contour to fall back to and to re-origin contacts on.
- */
-function buildContactsBox(
-  probeInterfaceProbe: ProbeInterfaceProbe,
-  contour: ProbeContour
-): ContactsBox {
-  const scale = millimetersPerUnit(probeInterfaceProbe);
-
-  let minimumX = Infinity;
-  let maximumX = -Infinity;
-  let minimumY = Infinity;
-  let maximumY = -Infinity;
-  probeInterfaceProbe.contact_positions.forEach((position, index) => {
-    const [x, y] = position;
-    if (typeof x !== "number" || typeof y !== "number") return;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-
-    const { halfWidth, halfHeight } = contactHalfExtent(
-      probeInterfaceProbe.contact_shapes?.[index],
-      probeInterfaceProbe.contact_shape_params?.[index]
-    );
-    minimumX = Math.min(minimumX, (x - halfWidth) * scale);
-    maximumX = Math.max(maximumX, (x + halfWidth) * scale);
-    minimumY = Math.min(minimumY, (y - halfHeight) * scale);
-    maximumY = Math.max(maximumY, (y + halfHeight) * scale);
-  });
-
-  const width = maximumX - minimumX;
-  const height = maximumY - minimumY;
-  if (!(width > 0) || !(height > 0)) {
-    return {
-      centerX: 0,
-      centerY: contour.height / 2,
-      width: contour.width,
-      height: contour.height
-    };
-  }
-
-  return {
-    centerX: (minimumX + maximumX) / 2 - contour.origin.x,
-    centerY: (minimumY + maximumY) / 2 - contour.origin.y,
-    width,
-    height
-  };
-}
-
-/**
- * Half-extent of a contact's shape along x and y, in probe-definition units.
- * Unrecognized or missing shapes/params fall back to a zero extent.
- * @param shape Contact's shape kind, e.g. "circle", "square", or "rect".
- * @param shapeParams Contact's shape parameters (radius, width, height).
- */
-function contactHalfExtent(
-  shape: string | undefined,
-  shapeParams: ContactShapeParams | undefined
-): { halfWidth: number; halfHeight: number } {
-  switch (shape) {
-    case "circle": {
-      const radius = shapeParams?.radius;
-      if (typeof radius !== "number" || !Number.isFinite(radius)) break;
-      return { halfWidth: radius, halfHeight: radius };
-    }
-    case "square": {
-      const width = shapeParams?.width;
-      if (typeof width !== "number" || !Number.isFinite(width)) break;
-      return { halfWidth: width / 2, halfHeight: width / 2 };
-    }
-    case "rect": {
-      const { width, height } = shapeParams ?? {};
-      if (typeof width !== "number" || !Number.isFinite(width)) break;
-      if (typeof height !== "number" || !Number.isFinite(height)) break;
-      return { halfWidth: width / 2, halfHeight: height / 2 };
-    }
-  }
-  return { halfWidth: 0, halfHeight: 0 };
-}
-
-/**
- * Build a single-sided plane covering a probe's contacts, sitting just
- * proud of the front (local +z) face of its shanks.
- * @param scene Scene to build the mesh in.
- * @param contactsBox Contacts bounding box to cover.
- * @param name Name for the mesh.
- */
-function buildContactsMesh(
-  scene: Scene,
-  contactsBox: ContactsBox,
-  name: string
-): Mesh {
-  const mesh = MeshBuilder.CreatePlane(
-    name,
-    {
-      width: contactsBox.width,
-      height: contactsBox.height,
-      sideOrientation: Mesh.BACKSIDE
-    },
-    scene
-  );
-  mesh.rotation = new Vector3(Math.PI / 2, 0, 0);
-  mesh.position = new Vector3(
-    contactsBox.centerX,
-    SHANK_THICKNESS_MILLIMETERS / 2 + CONTACTS_CLEARANCE_MILLIMETERS,
-    contactsBox.centerY,
-  );
-  return mesh;
-}
-
-/**
- * Build a probe's contacts material, colored from the probe at a fraction
- * of its saturation.
- * @param scene Scene to build the material in.
- * @param probe Probe to derive the material's color from.
- */
-function buildContactsMaterial(scene: Scene, probe: Probe): StandardMaterial {
-  const material = new StandardMaterial(
-    probeEntityName(probe.id, CONTACTS_MATERIAL_SUFFIX),
-    scene
-  );
-  const [hue, saturation, value] = Color3.FromHexString(probe.color)
-    .toHSV()
-    .asArray();
-  material.diffuseColor = Color3.FromHSV(
-    hue,
-    saturation * CONTACTS_SATURATION_SCALE,
-    value
-  );
   return material;
 }
