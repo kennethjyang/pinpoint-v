@@ -102,6 +102,7 @@ export function buildProbe(
   if (!contour) return null;
 
   const probeMetadata: ProbeMetadata = {
+    id: probe.id,
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
   };
 
@@ -164,19 +165,30 @@ export function disposeProbe(scene: Scene, probeId: string): void {
  */
 export function syncProbes(scene: Scene, experiment: Experiment) {
   // Sync existence.
+  const presentProbeNodes = buildReferenceCoordinateNode(scene).getChildren(
+    node => node.name.endsWith(PROBE_NODE_SUFFIX)
+  );
+  const experimentProbeIds = new Set(experiment.probes.map(probe => probe.id));
+  const experimentProbeInterfaceIdentifiers = new Map(
+    experiment.probes.map(probe => [probe.id, probe.probeInterfaceIdentifier])
+  );
+
+  // Dispose removed probes or probes that need to change types.
+  for (const presentProbeNode of presentProbeNodes) {
+    const { id, probeInterfaceIdentifier } =
+      presentProbeNode.metadata as ProbeMetadata;
+    if (
+      !experimentProbeIds.has(id) ||
+      experimentProbeInterfaceIdentifiers.get(id) !== probeInterfaceIdentifier
+    ) {
+      disposeProbe(scene, id);
+    }
+  }
   const presentProbeIds = new Set(
     buildReferenceCoordinateNode(scene)
       .getChildren(node => node.name.endsWith(PROBE_NODE_SUFFIX))
-      .map(node => node.name.slice(0, -PROBE_NODE_SUFFIX.length))
+      .map(node => (node.metadata as ProbeMetadata).id)
   );
-  const experimentProbeIds = new Set(experiment.probes.map(probe => probe.id));
-
-  // Dispose removed probes or probes that need to change types.
-  for (const presentProbeId of presentProbeIds) {
-    if (!experimentProbeIds.has(presentProbeId)) {
-      disposeProbe(scene, presentProbeId);
-    }
-  }
 
   // Sync experiment probes.
   for (const probe of experiment.probes) {
