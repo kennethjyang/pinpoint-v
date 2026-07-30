@@ -557,6 +557,89 @@ describe("syncStructuresVisibility", () => {
     expect(mesh.isVisible).toBe(true);
   });
 
+  it("freezes an imported structure's material", async () => {
+    const scene = makeTestScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructuresVisibility(scene, [], [structure]);
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.material!.isFrozen).toBe(true);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("freezes a structure's material before its geometry has loaded", async () => {
+    const scene = makeTestScene();
+    stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    let resolveFetch!: (value: { data: ArrayBuffer }) => void;
+    mockedGet.mockImplementation(
+      () => new Promise(resolve => (resolveFetch = resolve))
+    );
+
+    const syncPromise = syncStructuresVisibility(scene, [], [structure]);
+    await Promise.resolve();
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    expect(mesh.material!.isFrozen).toBe(true);
+    expect(mesh.isVisible).toBe(false);
+
+    resolveFetch({ data: new ArrayBuffer(0) });
+    await syncPromise;
+  });
+
+  it("applies a changed alpha to a frozen material and forces it to rebind", async () => {
+    const scene = makeTestScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructuresVisibility(scene, [], [structure]);
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    const material = mesh.material!;
+    const markDirtySpy = vi.spyOn(material, "markDirty");
+
+    await syncStructuresVisibility(scene, [structure], []);
+
+    expect(material.alpha).toBe(0.1);
+    expect(material.isFrozen).toBe(true);
+    expect(markDirtySpy).toHaveBeenCalledWith(true);
+
+    decodeSpy.mockRestore();
+  });
+
+  it("leaves a frozen material untouched when its alpha is unchanged", async () => {
+    const scene = makeTestScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+
+    await syncStructuresVisibility(scene, [], [structure]);
+
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure") as Mesh;
+    const markDirtySpy = vi.spyOn(mesh.material!, "markDirty");
+
+    await syncStructuresVisibility(scene, [], [structure]);
+
+    expect(markDirtySpy).not.toHaveBeenCalled();
+
+    decodeSpy.mockRestore();
+  });
+
   it("does not resurrect a structure that a later sync removed while its import was in flight", async () => {
     const scene = makeTestScene();
     stubDecode(scene);

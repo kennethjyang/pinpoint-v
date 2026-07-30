@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Scene, StandardMaterial } from "@babylonjs/core";
 import { Color3 } from "@babylonjs/core";
 import type { Experiment } from "@/features/experiment";
@@ -11,7 +11,7 @@ import type { Probe } from "@/features/probe";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
 import { makeAtlas, makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { makeTestScene } from "@/test/mount-helper";
-import { buildProbe, disposeProbe } from "./probe.api";
+import { buildProbe, disposeProbe, syncProbes } from "./probe.api";
 
 /** Single-shank contour (imec NP1000), in micrometers. */
 const NP1000_CONTOUR = [
@@ -637,5 +637,85 @@ describe("buildProbe contacts mesh", () => {
       probeMeshNames(b.probe.id).contacts
     )!.material!;
     expect(scene.materials).toContain(contactsMaterialB);
+  });
+});
+
+describe("syncProbes", () => {
+  it("freezes a probe's material and the shared rod material", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+
+    syncProbes(scene, experiment);
+
+    expect(scene.getMaterialByName(`${probe.id}_material`)!.isFrozen).toBe(
+      true
+    );
+    expect(scene.getMaterialByName("rod_material")!.isFrozen).toBe(true);
+  });
+
+  it("applies a changed probe color to its frozen material", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#ff0000"
+    });
+    syncProbes(scene, experiment);
+
+    probe.color = "#00ff00";
+    syncProbes(scene, experiment);
+
+    const material = scene.getMaterialByName(
+      `${probe.id}_material`
+    ) as StandardMaterial;
+    expect(material.diffuseColor.equals(Color3.FromHexString("#00ff00"))).toBe(
+      true
+    );
+    expect(material.isFrozen).toBe(true);
+  });
+
+  it("forces a probe's frozen material to rebind when its color changes", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#ff0000"
+    });
+    syncProbes(scene, experiment);
+
+    const material = scene.getMaterialByName(`${probe.id}_material`)!;
+    const markDirtySpy = vi.spyOn(material, "markDirty");
+
+    probe.color = "#00ff00";
+    syncProbes(scene, experiment);
+
+    expect(markDirtySpy).toHaveBeenCalledWith(true);
+  });
+
+  it("leaves a frozen probe material untouched when nothing changed", () => {
+    const scene = makeTestScene();
+    const { experiment, probe } = makeExperimentWithProbe();
+    syncProbes(scene, experiment);
+
+    const material = scene.getMaterialByName(`${probe.id}_material`)!;
+    const markDirtySpy = vi.spyOn(material, "markDirty");
+
+    syncProbes(scene, experiment);
+
+    expect(markDirtySpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps the shared rod material frozen without re-freezing it when another probe is added", () => {
+    const scene = makeTestScene();
+    const { experiment } = makeExperimentWithProbe();
+    syncProbes(scene, experiment);
+
+    const rodMaterial = scene.getMaterialByName("rod_material")!;
+    const markDirtySpy = vi.spyOn(rodMaterial, "markDirty");
+
+    const other = makeProbe({
+      probeInterfaceIdentifier: experiment.probes[0]!.probeInterfaceIdentifier
+    });
+    addProbe(experiment, other);
+    syncProbes(scene, experiment);
+
+    expect(rodMaterial.isFrozen).toBe(true);
+    expect(markDirtySpy).not.toHaveBeenCalled();
   });
 });
