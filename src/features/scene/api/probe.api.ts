@@ -391,15 +391,19 @@ function buildHeadStageMesh(
   // Subtract cutter.
   const baseCSG = CSG2.FromMesh(baseMesh);
   const cutterCSG = CSG2.FromMesh(cutterMesh);
-  const mesh = baseCSG.subtract(cutterCSG).toMesh(name);
+  const resultCSG = baseCSG.subtract(cutterCSG);
+  const mesh = resultCSG.toMesh(name, scene, { rebuildNormals: true });
   mesh.position = new Vector3(
     0,
     0,
     contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
   );
 
-  // Cleanup base mesh.
+  // Cleanup base mesh and CSG manifolds (not GC'd; wrap native WASM memory).
   baseMesh.dispose();
+  baseCSG.dispose();
+  cutterCSG.dispose();
+  resultCSG.dispose();
 
   return mesh;
 }
