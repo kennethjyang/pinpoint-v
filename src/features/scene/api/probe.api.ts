@@ -102,7 +102,6 @@ export function buildProbe(
   if (!contour) return null;
 
   const probeMetadata: ProbeMetadata = {
-    id: probe.id,
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
   };
 
@@ -164,57 +163,50 @@ export function disposeProbe(scene: Scene, probeId: string): void {
  * @param experiment Experiment to pull probe data to sync from.
  */
 export function syncProbes(scene: Scene, experiment: Experiment) {
-  // Sync existence.
-  const presentProbeNodes = buildReferenceCoordinateNode(scene).getChildren(
-    node => node.name.endsWith(PROBE_NODE_SUFFIX)
-  );
-  const experimentProbeIds = new Set(experiment.probes.map(probe => probe.id));
-  const experimentProbeInterfaceIdentifiers = new Map(
-    experiment.probes.map(probe => [probe.id, probe.probeInterfaceIdentifier])
+  const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
+  const experimentProbesById = new Map(
+    experiment.probes.map(probe => [probe.id, probe])
   );
 
-  // Dispose removed probes or probes that need to change types.
-  for (const presentProbeNode of presentProbeNodes) {
-    const { id, probeInterfaceIdentifier } =
-      presentProbeNode.metadata as ProbeMetadata;
-    if (
-      !experimentProbeIds.has(id) ||
-      experimentProbeInterfaceIdentifiers.get(id) !== probeInterfaceIdentifier
-    ) {
+  // Reconcile existence and type in a single pass: keep nodes that still
+  // match a probe, dispose removed or stale-typed ones.
+  const nodesById = new Map<string, TransformNode>();
+  for (const node of referenceCoordinateNode.getChildren(child =>
+    child.name.endsWith(PROBE_NODE_SUFFIX)
+  ) as TransformNode[]) {
+    const id = probeIdFromEntityName(node.name, PROBE_NODE_SUFFIX);
+    const { probeInterfaceIdentifier } = node.metadata as ProbeMetadata;
+    const probe = experimentProbesById.get(id);
+    if (!probe || probe.probeInterfaceIdentifier !== probeInterfaceIdentifier) {
       disposeProbe(scene, id);
+      continue;
     }
+    nodesById.set(id, node);
   }
-  const presentProbeIds = new Set(
-    buildReferenceCoordinateNode(scene)
-      .getChildren(node => node.name.endsWith(PROBE_NODE_SUFFIX))
-      .map(node => (node.metadata as ProbeMetadata).id)
-  );
 
   // Sync experiment probes.
   for (const probe of experiment.probes) {
-    // Add new probes.
-    if (!presentProbeIds.has(probe.id)) {
-      buildProbe(scene, probe, experiment);
-    }
+    // Get or build probe.
+    const node =
+      nodesById.get(probe.id) ?? buildProbe(scene, probe, experiment);
+    if (!node) continue;
 
-    // Update material colors.
-    const material = scene.getMaterialByName(
-      probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX)
+    const meshes = node.getChildMeshes(false);
+    const shankMesh = meshes.find(mesh =>
+      mesh.name.endsWith(SHANK_MESH_SUFFIX)
     );
+    const headStageMesh = meshes.find(mesh =>
+      mesh.name.endsWith(HEAD_STAGE_MESH_SUFFIX)
+    );
+    const rodMesh = meshes.find(mesh => mesh.name.endsWith(ROD_MESH_SUFFIX));
+
+    // Update material color.
+    const material = shankMesh?.material;
     if (material instanceof StandardMaterial) {
       setMaterialDiffuseColor(material, Color3.FromHexString(probe.color));
     }
 
     // Update visibility.
-    const shankMesh = scene.getMeshByName(
-      probeEntityName(probe.id, SHANK_MESH_SUFFIX)
-    );
-    const headStageMesh = scene.getMeshByName(
-      probeEntityName(probe.id, HEAD_STAGE_MESH_SUFFIX)
-    );
-    const rodMesh = scene.getMeshByName(
-      probeEntityName(probe.id, ROD_MESH_SUFFIX)
-    );
     switch (probe.visibility) {
       case "visible":
         shankMesh?.setEnabled(true);
@@ -235,14 +227,8 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
     }
 
     // Update transform.
-    const probeTransformNode = scene.getTransformNodeByName(
-      probeEntityName(probe.id, PROBE_NODE_SUFFIX)
-    );
-    if (!probeTransformNode) continue;
-    probeTransformNode.setPositionWithLocalVector(
-      asrToVector3(probe.tipPosition)
-    );
-    probeTransformNode.rotation = asrToVector3(probe.orientation);
+    node.setPositionWithLocalVector(asrToVector3(probe.tipPosition));
+    node.rotation = asrToVector3(probe.orientation);
   }
 }
 
@@ -307,6 +293,15 @@ function millimetersPerUnit(probeInterfaceProbe: ProbeInterfaceProbe): number {
  */
 function probeEntityName(probeId: string, suffix: string): string {
   return `${probeId}${suffix}`;
+}
+
+/**
+ * Recover a probe's id from one of its entity names.
+ * @param entityName Entity name produced by {@link probeEntityName}.
+ * @param suffix Suffix the entity name was built with.
+ */
+function probeIdFromEntityName(entityName: string, suffix: string): string {
+  return entityName.slice(0, -suffix.length);
 }
 
 /**
@@ -381,6 +376,11 @@ function buildHeadStageMesh(
     0,
     contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
   );
+  const cutter = MeshBuilder.CreateBox(`${name}_cutter`, {
+    size: 1,
+    height: HEAD_STAGE_HEIGHT_MILLIMETERS
+  });
+  cutter.parent = mesh;
   return mesh;
 }
 
