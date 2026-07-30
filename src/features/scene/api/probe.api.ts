@@ -12,9 +12,11 @@ import earcut from "earcut";
 import type { Experiment } from "@/features/experiment";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
+import { getProbeInterfaceIdentifier } from "@/features/probe";
 import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 import { asrToVector3 } from "../api/coordinate-transforms.api";
+import type { ProbeMetadata } from "../models/probe-metadata.model";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
 interface ProbeContour {
@@ -99,10 +101,15 @@ export function buildProbe(
   const contour = buildProbeContour(probeInterfaceProbe);
   if (!contour) return null;
 
+  const probeMetadata: ProbeMetadata = {
+    probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+  };
+
   const node = new TransformNode(
     probeEntityName(probe.id, PROBE_NODE_SUFFIX),
     scene
   );
+  node.metadata = probeMetadata;
   node.parent = buildReferenceCoordinateNode(scene);
 
   const material = buildProbeMaterial(scene, probe);
@@ -164,7 +171,7 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
   );
   const experimentProbeIds = new Set(experiment.probes.map(probe => probe.id));
 
-  // Dispose removed probes.
+  // Dispose removed probes or probes that need to change types.
   for (const presentProbeId of presentProbeIds) {
     if (!experimentProbeIds.has(presentProbeId)) {
       disposeProbe(scene, presentProbeId);

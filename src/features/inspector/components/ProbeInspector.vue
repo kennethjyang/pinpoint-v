@@ -94,7 +94,7 @@ const numberRules: ValidationRule<string>[] = [
 </script>
 
 <template>
-  <div class="column">
+  <div class="column q q-gutter-y-md">
     <CommittedInput
       v-model="name"
       :label="t('probeInspector.name')"
