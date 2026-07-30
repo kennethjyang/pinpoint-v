@@ -32,25 +32,22 @@ interface ProbeContour {
 }
 
 /** Suffix applied to a probe's id to name its parenting transform node. */
-const PROBE_NODE_SUFFIX = "_probe";
+const PROBE_NODE_SUFFIX = "_probe_node";
 
 /** Suffix applied to a probe's id to name its shank/head-stage material. */
-const PROBE_MATERIAL_SUFFIX = "_material";
+const PROBE_MATERIAL_SUFFIX = "_probe_material";
 
 /** Suffix applied to a probe's id to name its shank mesh. */
-const SHANK_MESH_SUFFIX = "_shank_mesh";
+const SHANK_MESH_SUFFIX = "_probe_shank_mesh";
 
 /** Suffix applied to a probe's id to name its head stage mesh. */
-const HEAD_STAGE_MESH_SUFFIX = "_headStage_mesh";
+const HEAD_STAGE_MESH_SUFFIX = "_probe_head-stage_mesh";
 
 /** Suffix applied to a probe's id to name its rod mesh. */
-const ROD_MESH_SUFFIX = "_rod_mesh";
-
-/** Suffix applied to a probe's id to name its contacts material. */
-const CONTACTS_MATERIAL_SUFFIX = "_contacts_material";
+const ROD_MESH_SUFFIX = "_probe_rod_mesh";
 
 /** Name of the shared gray material used by every probe's rod mesh. */
-const ROD_MATERIAL_NAME = "rod_material";
+const ROD_MATERIAL_NAME = "probe_rod_material";
 
 /** Thickness of the extruded shank mesh, in mm. */
 const SHANK_THICKNESS_MILLIMETERS = 0.05;
@@ -166,11 +163,8 @@ export function disposeProbe(
   scene
     .getMaterialByName(probeEntityName(probeId, PROBE_MATERIAL_SUFFIX))
     ?.dispose();
-  scene
-    .getMaterialByName(probeEntityName(probeId, CONTACTS_MATERIAL_SUFFIX))
-    ?.dispose();
   gizmoManager.attachableMeshes = gizmoManager.attachableMeshes!.filter(
-    mesh => !mesh.name.includes(probeId)
+    mesh => !mesh.name.startsWith(probeId)
   );
 }
 
@@ -196,7 +190,7 @@ export function syncProbes(
   for (const node of referenceCoordinateNode.getChildren(child =>
     child.name.endsWith(PROBE_NODE_SUFFIX)
   ) as TransformNode[]) {
-    const id = probeIdFromEntityName(node.name, PROBE_NODE_SUFFIX);
+    const id = probeIdFromEntityName(node.name);
     const { probeInterfaceIdentifier } = node.metadata as ProbeMetadata;
     const probe = experimentProbesById.get(id);
     if (!probe || probe.probeInterfaceIdentifier !== probeInterfaceIdentifier) {
@@ -253,6 +247,27 @@ export function syncProbes(
     node.setPositionWithLocalVector(asrToVector3(probe.tipPosition));
     node.rotation = asrToVector3(probe.orientation);
   }
+}
+
+/**
+ * Add a callback to the attachment observable that will transfer a selection to the probe transform node.
+ *
+ * Does nothing if the attached mesh was not a probe.
+ * @param scene Scene with probes.
+ * @param gizmoManager Gizmo manager to update.
+ */
+export function transferGizmoToProbeTransformNode(
+  scene: Scene,
+  gizmoManager: GizmoManager
+) {
+  gizmoManager.onAttachedToMeshObservable.add(mesh => {
+    if (!mesh) return;
+    if (!mesh.name.includes("probe")) return;
+    const probeId = probeIdFromEntityName(mesh.name);
+    gizmoManager.attachToNode(
+      scene.getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
+    );
+  });
 }
 
 /**
@@ -321,10 +336,9 @@ function probeEntityName(probeId: string, suffix: string): string {
 /**
  * Recover a probe's id from one of its entity names.
  * @param entityName Entity name produced by {@link probeEntityName}.
- * @param suffix Suffix the entity name was built with.
  */
-function probeIdFromEntityName(entityName: string, suffix: string): string {
-  return entityName.slice(0, -suffix.length);
+function probeIdFromEntityName(entityName: string): string {
+  return entityName.slice(0, 36);
 }
 
 /**
