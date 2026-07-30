@@ -12,6 +12,7 @@ import {
 import axios from "axios";
 import type { StructureEntity } from "../models/structure-entity.model";
 import { asrToBabylon } from "./coordinate-transforms.api";
+import { setMaterialAlpha } from "./material.api";
 
 /** Decoded structure geometry, ready to hand off to {@link simplifyGeometry}. */
 interface DecodedMeshData {
@@ -45,6 +46,12 @@ const STRUCTURE_MESH_SUFFIX = "_structure";
 
 /** Suffix applied to a structure's identifier to name its Babylon material. */
 const STRUCTURE_MATERIAL_SUFFIX = "_material";
+
+/** Alpha applied to a visible structure's material. */
+const STRUCTURE_VISIBLE_ALPHA = 1;
+
+/** Alpha applied to an always-present structure's material when faded out. */
+const STRUCTURE_FADED_ALPHA = 0.1;
 
 /**
  * Build the atlas root node or return the existing one.
@@ -125,7 +132,12 @@ export async function syncStructuresVisibility(
   for (const [meshName, structure] of desiredStructures) {
     const material = desiredMeshes.get(meshName)?.material;
     if (material) {
-      material.alpha = visibleIdentifiers.has(structure.identifier) ? 1 : 0.1;
+      setMaterialAlpha(
+        material,
+        visibleIdentifiers.has(structure.identifier)
+          ? STRUCTURE_VISIBLE_ALPHA
+          : STRUCTURE_FADED_ALPHA
+      );
     }
   }
 
@@ -183,7 +195,12 @@ function structureMaterialName(identifier: number): string {
 
 /**
  * Synchronously create a structure's hidden placeholder mesh and material,
- * parented under the atlas root, ready for {@link loadStructureGeometry}.
+ * parented under the atlas root, ready for {@link loadStructureGeometry}. The
+ * material is frozen immediately, before it has any geometry: its draw
+ * wrappers don't exist yet, so freezing now can't clear the forced-rebind
+ * default they're created with once {@link loadStructureGeometry} applies
+ * geometry to the mesh, which is what makes its first real render correct
+ * despite being frozen from birth.
  * @param scene Scene to add the structure to.
  * @param atlasRootNode Atlas root node to parent the structure under.
  * @param structure Entity information for the structure.
@@ -203,6 +220,7 @@ function buildStructureMesh(
   );
   material.diffuseColor = structure.color;
   mesh.material = material;
+  material.freeze();
 
   return mesh;
 }

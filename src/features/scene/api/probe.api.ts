@@ -12,6 +12,7 @@ import earcut from "earcut";
 import type { Experiment } from "@/features/experiment";
 import { getInternedProbeInterfaceProbe } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
+import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
@@ -181,7 +182,7 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
       probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX)
     );
     if (material instanceof StandardMaterial) {
-      material.diffuseColor = Color3.FromHexString(probe.color);
+      setMaterialDiffuseColor(material, Color3.FromHexString(probe.color));
     }
 
     // Update visibility.
@@ -280,6 +281,9 @@ function probeEntityName(probeId: string, suffix: string): string {
 
 /**
  * Build a probe's shank-and-head-stage material, colored from the probe.
+ * Frozen immediately, before any mesh uses it, so its later color updates
+ * (via {@link setMaterialDiffuseColor}) rely on being forced through rather
+ * than on the material being unfrozen.
  * @param scene Scene to build the material in.
  * @param probe Probe to derive the material's color from.
  */
@@ -289,6 +293,7 @@ function buildProbeMaterial(scene: Scene, probe: Probe): StandardMaterial {
     scene
   );
   material.diffuseColor = Color3.FromHexString(probe.color);
+  material.freeze();
   return material;
 }
 
@@ -375,6 +380,9 @@ function buildRodMesh(scene: Scene, contour: ProbeContour, name: string): Mesh {
 
 /**
  * Build the scene's shared grey rod material, or return the existing one.
+ * Frozen once, only on creation: nothing ever mutates it afterward, and
+ * re-freezing an already-frozen shared material on every reuse would clear
+ * a pending forced rebind on every rod mesh in the scene.
  * @param scene Scene to get the rod material from.
  */
 function buildRodMaterial(scene: Scene): StandardMaterial {
@@ -383,5 +391,6 @@ function buildRodMaterial(scene: Scene): StandardMaterial {
 
   const material = new StandardMaterial(ROD_MATERIAL_NAME, scene);
   material.diffuseColor = Color3.Gray();
+  material.freeze();
   return material;
 }
