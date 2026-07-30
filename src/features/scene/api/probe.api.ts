@@ -1,6 +1,7 @@
 import type { Scene } from "@babylonjs/core";
 import {
   Color3,
+  CSG2,
   ExtrudePolygon,
   Mesh,
   MeshBuilder,
@@ -361,8 +362,8 @@ function buildHeadStageMesh(
   name: string
 ): Mesh {
   // noinspection JSSuspiciousNameCombination
-  const mesh = MeshBuilder.CreateCylinder(
-    name,
+  const baseMesh = MeshBuilder.CreateCylinder(
+    `${name}_base`,
     {
       height: HEAD_STAGE_HEIGHT_MILLIMETERS,
       diameterBottom: contour.width,
@@ -370,17 +371,36 @@ function buildHeadStageMesh(
     },
     scene
   );
-  mesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+  baseMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+  baseMesh.position = new Vector3(
+    0,
+    0,
+    contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
+  );
+  const cutterMesh = MeshBuilder.CreateBox(`${name}_cutter`, {
+    size: HEAD_STAGE_TOP_DIAMETER_MILLIMETERS,
+    height: HEAD_STAGE_HEIGHT_MILLIMETERS
+  });
+  cutterMesh.position = new Vector3(
+    0,
+    -HEAD_STAGE_HEIGHT_MILLIMETERS / 8,
+    HEAD_STAGE_TOP_DIAMETER_MILLIMETERS / 2
+  );
+  cutterMesh.parent = baseMesh;
+
+  // Subtract cutter.
+  const baseCSG = CSG2.FromMesh(baseMesh);
+  const cutterCSG = CSG2.FromMesh(cutterMesh);
+  const mesh = baseCSG.subtract(cutterCSG).toMesh(name);
   mesh.position = new Vector3(
     0,
     0,
     contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
   );
-  const cutter = MeshBuilder.CreateBox(`${name}_cutter`, {
-    size: 1,
-    height: HEAD_STAGE_HEIGHT_MILLIMETERS
-  });
-  cutter.parent = mesh;
+
+  // Cleanup base mesh.
+  baseMesh.dispose();
+
   return mesh;
 }
 
