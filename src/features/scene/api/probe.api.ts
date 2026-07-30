@@ -154,7 +154,7 @@ export function disposeProbe(scene: Scene, probeId: string): void {
  * @param experiment Experiment to pull probe data to sync from.
  */
 export function syncProbes(scene: Scene, experiment: Experiment) {
-  // 1. Sync existence.
+  // Sync existence.
   const presentProbeIds = new Set(
     buildReferenceCoordinateNode(scene)
       .getChildren(node => node.name.endsWith(PROBE_NODE_SUFFIX))
@@ -169,15 +169,50 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
     }
   }
 
-  // Add new probes.
+  // Sync experiment probes.
   for (const probe of experiment.probes) {
+    // Add new probes.
     if (!presentProbeIds.has(probe.id)) {
       buildProbe(scene, probe, experiment);
     }
-  }
 
-  // Sync materials.
-  // Sync visibility.
+    // Update material colors.
+    const material = scene.getMaterialByName(
+      probeEntityName(probe.id, PROBE_MATERIAL_SUFFIX)
+    );
+    if (material instanceof StandardMaterial) {
+      material.diffuseColor = Color3.FromHexString(probe.color);
+    }
+
+    // Update visibility.
+    const shankMesh = scene.getMeshByName(
+      probeEntityName(probe.id, SHANK_MESH_SUFFIX)
+    );
+    const headStageMesh = scene.getMeshByName(
+      probeEntityName(probe.id, HEAD_STAGE_MESH_SUFFIX)
+    );
+    const rodMesh = scene.getMeshByName(
+      probeEntityName(probe.id, ROD_MESH_SUFFIX)
+    );
+    switch (probe.visibility) {
+      case "visible":
+        shankMesh?.setEnabled(true);
+        headStageMesh?.setEnabled(true);
+        rodMesh?.setEnabled(true);
+        break;
+      case "shanks":
+        shankMesh?.setEnabled(true);
+        headStageMesh?.setEnabled(false);
+        rodMesh?.setEnabled(false);
+        break;
+      case "hidden":
+      default:
+        shankMesh?.setEnabled(false);
+        headStageMesh?.setEnabled(false);
+        rodMesh?.setEnabled(false);
+        break;
+    }
+  }
 }
 
 /**
