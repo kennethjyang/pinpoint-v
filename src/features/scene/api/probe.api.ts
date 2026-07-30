@@ -44,7 +44,7 @@ const ROD_MESH_SUFFIX = "_rod_mesh";
 /** Suffix applied to a probe's id to name its contacts material. */
 const CONTACTS_MATERIAL_SUFFIX = "_contacts_material";
 
-/** Name of the shared grey material used by every probe's rod mesh. */
+/** Name of the shared gray material used by every probe's rod mesh. */
 const ROD_MATERIAL_NAME = "rod_material";
 
 /** Thickness of the extruded shank mesh, in mm. */
@@ -213,16 +213,6 @@ export function syncProbes(scene: Scene, experiment: Experiment) {
         break;
     }
   }
-}
-
-/**
- * Sync each probe entity to the visibility model.
- * @param scene Scene to modify entities in.
- * @param experiment Experiment with probe models to get visibility from.
- */
-export function syncProbeVisibility(scene: Scene, experiment: Experiment) {
-  console.log(scene);
-  console.log(experiment);
 }
 
 /**
