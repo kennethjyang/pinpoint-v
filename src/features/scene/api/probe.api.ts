@@ -127,14 +127,6 @@ export function buildProbe(
   rodMesh.material = buildRodMaterial(scene);
   rodMesh.parent = node;
 
-  // const contactsMesh = buildContactsMesh(
-  //   scene,
-  //   buildContactsBox(probeInterfaceProbe, contour),
-  //   probeEntityName(probe.id, CONTACTS_MESH_SUFFIX)
-  // );
-  // contactsMesh.material = buildContactsMaterial(scene, probe);
-  // contactsMesh.parent = node;
-
   return node;
 }
 
