@@ -1,5 +1,8 @@
 import type {
+  AbstractMesh,
   GizmoManager,
+  Nullable,
+  Observer,
   Scene,
   SelectionOutlineLayer
 } from "@babylonjs/core";
@@ -254,8 +257,7 @@ export function syncProbes(
 }
 
 /**
- * Add a callback to the Gizmo attachment observable that will transfer a
- * selection to the probe transform node and report the selected probe.
+ * Select a probe in the scene based on the Gizmo's pick.
  *
  * Does nothing if the attached mesh was not a probe.
  * @param scene Scene with probes.
@@ -270,8 +272,8 @@ export function selectProbeFromGizmoAttach(
   selectionOutlineLayer: SelectionOutlineLayer,
   experiment: Experiment,
   onSelect: (probe: Probe) => void
-) {
-  gizmoManager.onAttachedToMeshObservable.add(mesh => {
+): Observer<Nullable<AbstractMesh>> {
+  return gizmoManager.onAttachedToMeshObservable.add(mesh => {
     // Exit if not selecting a probe.
     if (!mesh) return;
     if (!mesh.name.includes("probe")) return;

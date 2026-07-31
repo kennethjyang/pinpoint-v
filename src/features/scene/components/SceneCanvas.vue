@@ -3,6 +3,7 @@ import {
   computed,
   onMounted,
   onUnmounted,
+  onWatcherCleanup,
   ref,
   useTemplateRef,
   watch,
@@ -26,6 +27,7 @@ import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { selectProbeFromGizmoAttach, syncProbes } from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
+import { deselectFromPointerDown } from "../api/scene.api";
 
 const $q = useQuasar();
 const { t } = useI18n();
@@ -145,14 +147,14 @@ watchEffect(() => {
   syncProbes(scene, currentExperiment.experiment, gizmoManager);
 });
 
-// Use gizmo manager to select probes.
+// Handle selection and deselection.
 watchEffect(() => {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
   const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
   if (!scene || !gizmoManager || !selectionOutlineLayer) return;
 
-  selectProbeFromGizmoAttach(
+  const probeSelectionObserver = selectProbeFromGizmoAttach(
     scene,
     gizmoManager,
     selectionOutlineLayer,
@@ -161,6 +163,20 @@ watchEffect(() => {
       currentExperiment.selectedInspectable = probe;
     }
   );
+
+  const sceneDeselectObserver = deselectFromPointerDown(
+    scene,
+    gizmoManager,
+    selectionOutlineLayer,
+    () => {
+      currentExperiment.selectedInspectable = null;
+    }
+  );
+
+  onWatcherCleanup(() => {
+    probeSelectionObserver.remove();
+    sceneDeselectObserver.remove();
+  });
 });
 
 onMounted(async () => {

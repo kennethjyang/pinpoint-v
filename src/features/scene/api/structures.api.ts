@@ -42,10 +42,10 @@ const MESH_MAX_VERTICES = 8000;
 const SIMPLIFY_SYNC_ITERATIONS = 20000;
 
 /** Suffix applied to a structure's identifier to name its Babylon mesh. */
-const STRUCTURE_MESH_SUFFIX = "_structure";
+const STRUCTURE_MESH_SUFFIX = "_structure_mesh";
 
 /** Suffix applied to a structure's identifier to name its Babylon material. */
-const STRUCTURE_MATERIAL_SUFFIX = "_material";
+const STRUCTURE_MATERIAL_SUFFIX = "_structure_material";
 
 /** Alpha applied to a visible structure's material. */
 const STRUCTURE_VISIBLE_ALPHA = 1;
