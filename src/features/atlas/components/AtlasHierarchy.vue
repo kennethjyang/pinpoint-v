@@ -4,6 +4,11 @@ import { useFuse } from "@vueuse/integrations/useFuse";
 import { QScrollArea } from "quasar";
 import { flattenHierarchy } from "../api/hierarchy.api";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import {
+  clearVisibleStructures,
+  isStructureVisible,
+  setStructureVisibility
+} from "@/features/experiment";
 
 const currentExperiment = useCurrentExperimentStore();
 
@@ -64,12 +69,16 @@ const displayedItems = computed(() =>
             <div class="row q-gutter-x-xs items-center">
               <q-checkbox
                 :model-value="
-                  currentExperiment.isStructureVisible(item.identifier)
+                  isStructureVisible(
+                    currentExperiment.experiment,
+                    item.identifier
+                  )
                 "
                 dense
                 @update:model-value="
                   visible =>
-                    currentExperiment.setStructureVisibility(
+                    setStructureVisibility(
+                      currentExperiment.experiment,
                       item.identifier,
                       visible
                     )
@@ -92,7 +101,7 @@ const displayedItems = computed(() =>
       <q-btn
         icon="clear_all"
         :label="$t('atlasHierarchy.clear')"
-        @click="currentExperiment.clearVisibleStructures"
+        @click="clearVisibleStructures(currentExperiment.experiment)"
       />
     </template>
   </div>

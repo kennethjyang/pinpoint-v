@@ -3,31 +3,32 @@ import { computed, ref } from "vue";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
 import { Atlas } from "../models/atlas.model";
+import { atlasDisplayName } from "../api/hierarchy.api";
 import { listAtlases, listAtlasesHTTP } from "../api/source.api";
 import { computedAsync } from "@vueuse/core";
 
-enum SourceToggle {
-  BrainGlobe,
-  Custom
+/**
+ * Atlas source the picker lists atlases from.
+ */
+type SourceToggle = "brainglobe" | "custom";
+
+/**
+ * An atlas paired with its human-readable display name, for sorting, fuzzy
+ * search and rendering. The underlying {@link Atlas.name} stays snake_case,
+ * since it's what source URLs, favorites and selection identity use.
+ */
+interface AtlasOption {
+  atlas: Atlas;
+  displayName: string;
 }
 
 // Props.
 const selectedAtlas = defineModel<Atlas | null>({ required: true });
 
-// Composables.
 const favoriteAtlasesStore = useFavoriteAtlasesStore();
 
-// State.
-const sourceToggle = ref<SourceToggle>(SourceToggle.BrainGlobe);
-
-/**
- * Custom HTTP host URL.
- */
+const sourceToggle = ref<SourceToggle>("brainglobe");
 const customHTTPHost = ref<string | null>("http://localhost:3000");
-
-/**
- * Filter string.
- */
 const searchQuery = ref<string | null>(null);
 
 const atlasesEvaluating = ref(false);
@@ -37,7 +38,7 @@ const atlasesEvaluating = ref(false);
  */
 const atlases = computedAsync<Atlas[]>(
   async () => {
-    if (sourceToggle.value == SourceToggle.BrainGlobe) {
+    if (sourceToggle.value === "brainglobe") {
       return (await listAtlases()) ?? [];
     } else {
       if (!customHTTPHost.value) return [];
@@ -48,32 +49,35 @@ const atlases = computedAsync<Atlas[]>(
   atlasesEvaluating
 );
 
-// Getters.
-
-/**
- * Null unwrapped search query.
- */
 const unwrappedSearchQuery = computed(() => searchQuery.value ?? "");
 
 /**
  * Favorites for this source as a set for fast lookup.
  */
 const favoritesSet = computed(() => {
-  // Return the source if there are atlases.
   if (atlases.value[0]) {
     const source = atlases.value[0].source;
     return new Set(favoriteAtlasesStore.favorites[source]);
   }
 
-  // Otherwise, return the empty set.
   return new Set<string>();
 });
 
 /**
+ * Atlases paired with their human-readable display name.
+ */
+const atlasOptions = computed<AtlasOption[]>(() =>
+  atlases.value.map(atlas => ({
+    atlas,
+    displayName: atlasDisplayName(atlas.name)
+  }))
+);
+
+/**
  * Fuzzy finding results.
  */
-const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases, {
-  fuseOptions: { keys: ["name"] }
+const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlasOptions, {
+  fuseOptions: { keys: ["displayName"] }
 });
 
 /**
@@ -82,27 +86,33 @@ const { results: atlasFuse } = useFuse(unwrappedSearchQuery, atlases, {
 const filteredAtlases = computed(() =>
   searchQuery.value
     ? atlasFuse.value.map(result => result.item)
-    : [...atlases.value].sort((a, b) => a.name.localeCompare(b.name))
+    : [...atlasOptions.value].sort((a, b) =>
+        a.displayName.localeCompare(b.displayName)
+      )
 );
 
 /**
  * Favorites from this source.
  */
 const filteredFavorites = computed(() =>
-  filteredAtlases.value.filter(atlas => favoritesSet.value.has(atlas.name))
+  filteredAtlases.value.filter(option =>
+    favoritesSet.value.has(option.atlas.name)
+  )
 );
 
 /**
  * Non-favorite atlases from this source.
  */
 const filteredNonFavorites = computed(() =>
-  filteredAtlases.value.filter(atlas => !favoritesSet.value.has(atlas.name))
+  filteredAtlases.value.filter(
+    option => !favoritesSet.value.has(option.atlas.name)
+  )
 );
 
 /**
  * Compare atlases by identity fields, since instances are not stable references.
  */
-function isSelected(atlas: Atlas) {
+function isSelected(atlas: Atlas): boolean {
   return (
     selectedAtlas.value?.source === atlas.source &&
     selectedAtlas.value?.name === atlas.name
@@ -117,18 +127,15 @@ function isSelected(atlas: Atlas) {
     <q-btn-toggle
       v-model="sourceToggle"
       :options="[
-        {
-          label: $t('atlasPicker.brainglobeHosted'),
-          value: SourceToggle.BrainGlobe
-        },
-        { label: $t('atlasPicker.customHTTPHost'), value: SourceToggle.Custom }
+        { label: $t('atlasPicker.brainglobeHosted'), value: 'brainglobe' },
+        { label: $t('atlasPicker.customHTTPHost'), value: 'custom' }
       ]"
       spread
       toggle-color="primary"
     />
 
     <q-input
-      v-if="sourceToggle === SourceToggle.Custom"
+      v-if="sourceToggle === 'custom'"
       v-model="customHTTPHost"
       :label="$t('atlasPicker.sourceUrl')"
       class="col"
@@ -156,14 +163,14 @@ function isSelected(atlas: Atlas) {
 
         <q-list class="dialog-list" separator>
           <q-item
-            v-for="atlas in filteredFavorites"
-            :key="`${atlas.source}-${atlas.name}`"
+            v-for="option in filteredFavorites"
+            :key="`${option.atlas.source}-${option.atlas.name}`"
             v-ripple
-            :active="isSelected(atlas)"
+            :active="isSelected(option.atlas)"
             clickable
-            @click="selectedAtlas = atlas"
+            @click="selectedAtlas = option.atlas"
           >
-            <q-item-section>{{ atlas.name }}</q-item-section>
+            <q-item-section>{{ option.displayName }}</q-item-section>
             <q-item-section side>
               <q-btn
                 :aria-label="$t('atlasPicker.removeFavorite')"
@@ -171,27 +178,27 @@ function isSelected(atlas: Atlas) {
                 flat
                 icon="favorite"
                 round
-                @click.stop="favoriteAtlasesStore.remove(atlas)"
+                @click.stop="favoriteAtlasesStore.remove(option.atlas)"
               />
             </q-item-section>
           </q-item>
 
           <q-item
-            v-for="atlas in filteredNonFavorites"
-            :key="`${atlas.source}-${atlas.name}`"
+            v-for="option in filteredNonFavorites"
+            :key="`${option.atlas.source}-${option.atlas.name}`"
             v-ripple
-            :active="isSelected(atlas)"
+            :active="isSelected(option.atlas)"
             clickable
-            @click="selectedAtlas = atlas"
+            @click="selectedAtlas = option.atlas"
           >
-            <q-item-section>{{ atlas.name }}</q-item-section>
+            <q-item-section>{{ option.displayName }}</q-item-section>
             <q-item-section side>
               <q-btn
                 :aria-label="$t('atlasPicker.addFavorite')"
                 flat
                 icon="favorite_border"
                 round
-                @click.stop="favoriteAtlasesStore.add(atlas)"
+                @click.stop="favoriteAtlasesStore.add(option.atlas)"
               />
             </q-item-section>
           </q-item>
