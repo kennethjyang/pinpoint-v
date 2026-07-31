@@ -1,11 +1,28 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import type { ArcRotateCamera, Scene } from "@babylonjs/core";
+import type {
+  ArcRotateCamera,
+  GizmoManager,
+  Scene,
+  SelectionOutlineLayer
+} from "@babylonjs/core";
 import { shallowRef } from "vue";
 import SceneCanvas from "./SceneCanvas.vue";
-import { makeTestScene, mountWithQuasar } from "@/test/mount-helper";
+import {
+  initializeTestCSG2,
+  makeTestSceneWithGizmo,
+  mountWithQuasar
+} from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   removeAllStructures,
@@ -19,10 +36,23 @@ import {
   getTerminologyRows,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
-import { buildExperiment } from "@/features/experiment";
+import {
+  addProbe,
+  buildExperiment,
+  internProbeInterfaceProbe,
+  setProbeInterface
+} from "@/features/experiment";
+import { getProbeInterfaceIdentifier } from "@/features/probe";
 import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
-import { makeAtlas, makeManifest, makeTerminologyRows } from "@/test/fixtures";
+import {
+  makeAtlas,
+  makeManifest,
+  makeProbe,
+  makeProbeInterfaceProbe,
+  makeTerminologyRows
+} from "@/test/fixtures";
+import { getProbeTransformNode } from "../api/probe.api";
 
 vi.mock("../api/structures.api", async () => {
   const actual = await vi.importActual<typeof import("../api/structures.api")>(
@@ -72,28 +102,36 @@ const mountedWrappers: CanvasWrapper[] = [];
 
 /**
  * Build a `BabylonRuntimeService`-shaped stub whose `init` synchronously
- * assigns a real `NullEngine`-backed `Scene` and a bare camera object, so
- * `SceneCanvas`'s `watchEffect`s have something to react to without a real
- * WebGPU context.
+ * assigns a real `NullEngine`-backed `Scene`, a real `GizmoManager` and
+ * `SelectionOutlineLayer` (both construct fine under `NullEngine`), and a
+ * bare camera object, so `SceneCanvas`'s `watchEffect`s -- including probe
+ * sync, gizmo drag, and selection -- have something to react to without a
+ * real WebGPU context.
  */
 function makeRuntimeStub() {
   const engine = shallowRef<{ resize: () => void } | null>(null);
   const scene = shallowRef<Scene | null>(null);
   const camera = shallowRef<ArcRotateCamera | null>(null);
+  const gizmoManager = shallowRef<GizmoManager | null>(null);
+  const selectionOutlineLayer = shallowRef<SelectionOutlineLayer | null>(null);
   const resize = vi.fn();
   const dispose = vi.fn();
 
   const init = vi.fn(async () => {
+    const built = makeTestSceneWithGizmo();
     engine.value = { resize };
-    scene.value = makeTestScene();
+    scene.value = built.scene;
     camera.value = { radius: 0 } as ArcRotateCamera;
+    gizmoManager.value = built.gizmoManager;
+    selectionOutlineLayer.value = built.selectionOutlineLayer;
   });
 
   return {
     engine,
     scene,
     camera,
-    gizmoManager: shallowRef(null),
+    gizmoManager,
+    selectionOutlineLayer,
     init,
     dispose,
     resize
@@ -118,6 +156,10 @@ async function mountCanvas(runtime = makeRuntimeStub()) {
 }
 
 describe("SceneCanvas", () => {
+  beforeAll(async () => {
+    await initializeTestCSG2();
+  });
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(getManifest).mockReset();
@@ -318,4 +360,69 @@ describe("SceneCanvas", () => {
 
     expect(runtime.dispose).toHaveBeenCalledTimes(1);
   });
+
+  it(
+    "reattaches the gizmo and selection outline to a selected probe's new " +
+      "entity when its type change disposes and rebuilds it",
+    async () => {
+      const { runtime } = await mountCanvas();
+      const store = useCurrentExperimentStore();
+
+      const oldProbeInterfaceProbe = makeProbeInterfaceProbe({
+        probe_planar_contour: [
+          [-11, 9989],
+          [-11, -11],
+          [24, -220],
+          [59, -11],
+          [59, 9989]
+        ]
+      });
+      internProbeInterfaceProbe(store.experiment, oldProbeInterfaceProbe);
+      const builtProbe = makeProbe({
+        probeInterfaceIdentifier: getProbeInterfaceIdentifier(
+          oldProbeInterfaceProbe
+        )
+      });
+      addProbe(store.experiment, builtProbe);
+      // Re-fetch through the store: `store.experiment` is deeply reactive,
+      // so mutations must go through its own proxied element for
+      // `watchEffect` to react -- mutating the plain `builtProbe` reference
+      // directly (bypassing the proxy) would silently do nothing.
+      const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
+      await flushPromises();
+
+      const scene = runtime.scene.value!;
+      const gizmoManager = runtime.gizmoManager.value!;
+      const selectionOutlineLayer = runtime.selectionOutlineLayer.value!;
+      const oldNode = getProbeTransformNode(scene, probe.id)!;
+      const oldShankMesh = oldNode.getChildMeshes()[0]!;
+      store.selectedInspectable = probe;
+      await flushPromises();
+
+      expect(gizmoManager.attachedNode).toBe(oldNode);
+
+      const newProbeInterfaceProbe = makeProbeInterfaceProbe({
+        annotations: { manufacturer: "imec", model_name: "np2020" },
+        probe_planar_contour: [
+          [-27, 9989],
+          [-27, -11],
+          [8, -217],
+          [43, -11],
+          [43, 9989]
+        ]
+      });
+      setProbeInterface(store.experiment, probe, newProbeInterfaceProbe);
+      await flushPromises();
+
+      const newNode = getProbeTransformNode(scene, probe.id)!;
+      expect(oldNode.isDisposed()).toBe(true);
+      expect(newNode).not.toBe(oldNode);
+      expect(gizmoManager.attachedNode).toBe(newNode);
+      for (const mesh of newNode.getChildMeshes()) {
+        expect(selectionOutlineLayer.hasMesh(mesh)).toBe(true);
+      }
+      expect(selectionOutlineLayer.hasMesh(oldShankMesh)).toBe(false);
+    },
+    30000
+  );
 });

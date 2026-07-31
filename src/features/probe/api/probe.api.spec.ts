@@ -19,13 +19,15 @@ describe("buildProbe", () => {
     expect(probe.probeInterfaceIdentifier).toBe("imec np1");
   });
 
-  it("builds a probe with sensible defaults", () => {
+  it("builds a probe with sensible defaults, starting pitched inferiorly", () => {
     const probe = buildProbe(makeProbeInterfaceProbe());
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
     expect(probe.tipPosition).toEqual([0, 0, 0]);
-    expect(probe.rotation).toEqual([0, 0, 0]);
+    // A pitch of 0 would lie flat, pointing anteriorly; PI/2 is the intended
+    // starting default so a new probe points inferiorly.
+    expect(probe.rotation).toEqual([0, 0, Math.PI / 2]);
     expect(probe.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );

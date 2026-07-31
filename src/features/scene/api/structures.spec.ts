@@ -150,7 +150,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh).toBeDefined();
     expect(mesh.isVisible).toBe(true);
     expect(mesh.isVerticesDataPresent(VertexBuffer.NormalKind)).toBe(true);
@@ -159,7 +159,7 @@ describe("syncStructuresVisibility", () => {
     );
 
     const material = mesh.material as StandardMaterial;
-    expect(material.name).toBe("1_material");
+    expect(material.name).toBe("1_structure_material");
     expect(material.diffuseColor.equals(structure.color)).toBe(true);
     expect(material.alpha).toBe(1);
 
@@ -191,7 +191,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     // Positions are float32, so allow for the usual float32 rounding error.
     const [x, y, z] = Array.from(
       mesh.getVerticesData(VertexBuffer.PositionKind)!
@@ -232,7 +232,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.getTotalVertices()).toBeLessThanOrEqual(8000);
     expect(mesh.getTotalVertices()).toBeLessThan(originalVertexCount);
 
@@ -256,7 +256,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(outwardNormalFraction(mesh)).toBeGreaterThan(0.9);
 
     decodeSpy.mockRestore();
@@ -272,7 +272,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.material!.alpha).toBe(0.1);
 
     decodeSpy.mockRestore();
@@ -302,7 +302,7 @@ describe("syncStructuresVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(
-      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+      atlasRootNode.getChildren().some(c => c.name === "1_structure_mesh")
     ).toBe(false);
 
     decodeSpy.mockRestore();
@@ -319,16 +319,16 @@ describe("syncStructuresVisibility", () => {
     await syncStructuresVisibility(scene, [], []);
     await syncStructuresVisibility(scene, [structure], []);
 
-    // The removed material must not linger: exactly one "1_material" should
+    // The removed material must not linger: exactly one "1_structure_material" should
     // exist, not an orphaned first one shadowing the live one.
-    expect(scene.materials.filter(m => m.name === "1_material")).toHaveLength(
-      1
-    );
+    expect(
+      scene.materials.filter(m => m.name === "1_structure_material")
+    ).toHaveLength(1);
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.material!.alpha).toBe(0.1);
 
     decodeSpy.mockRestore();
@@ -344,8 +344,8 @@ describe("syncStructuresVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const meshes = atlasRootNode.getChildren() as Mesh[];
-    const fadedMesh = meshes.find(m => m.name === "1_structure")!;
-    const visibleMesh = meshes.find(m => m.name === "2_structure")!;
+    const fadedMesh = meshes.find(m => m.name === "1_structure_mesh")!;
+    const visibleMesh = meshes.find(m => m.name === "2_structure_mesh")!;
 
     expect(fadedMesh.material!.alpha).toBe(0.1);
     expect(visibleMesh.material!.alpha).toBe(1);
@@ -438,12 +438,14 @@ describe("syncStructuresVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(
-      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+      atlasRootNode.getChildren().some(c => c.name === "1_structure_mesh")
     ).toBe(false);
-    expect(scene.materials.some(m => m.name === "1_material")).toBe(false);
+    expect(scene.materials.some(m => m.name === "1_structure_material")).toBe(
+      false
+    );
     const succeedingMesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "2_structure") as Mesh;
+      .find(c => c.name === "2_structure_mesh") as Mesh;
     expect(succeedingMesh).toBeDefined();
     expect(succeedingMesh.isVisible).toBe(true);
 
@@ -457,7 +459,7 @@ describe("syncStructuresVisibility", () => {
       responseType: "arraybuffer"
     });
     expect(
-      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+      atlasRootNode.getChildren().some(c => c.name === "1_structure_mesh")
     ).toBe(true);
   });
 
@@ -496,7 +498,7 @@ describe("syncStructuresVisibility", () => {
         .getChildren()
         .map(c => c.name)
         .sort()
-    ).toEqual(["1_structure", "2_structure"]);
+    ).toEqual(["1_structure_mesh", "2_structure_mesh"]);
   });
 
   it("imports a structure only once when two syncs overlap for it", async () => {
@@ -522,11 +524,11 @@ describe("syncStructuresVisibility", () => {
     expect(mockedGet).toHaveBeenCalledTimes(1);
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(
-      atlasRootNode.getChildren().filter(c => c.name === "1_structure")
+      atlasRootNode.getChildren().filter(c => c.name === "1_structure_mesh")
     ).toHaveLength(1);
-    expect(scene.materials.filter(m => m.name === "1_material")).toHaveLength(
-      1
-    );
+    expect(
+      scene.materials.filter(m => m.name === "1_structure_material")
+    ).toHaveLength(1);
   });
 
   it("sets a faded structure's alpha before its geometry has loaded", async () => {
@@ -548,7 +550,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.material!.alpha).toBe(0.1);
     expect(mesh.isVisible).toBe(false);
 
@@ -567,7 +569,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.material!.isFrozen).toBe(true);
 
     decodeSpy.mockRestore();
@@ -589,7 +591,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     expect(mesh.material!.isFrozen).toBe(true);
     expect(mesh.isVisible).toBe(false);
 
@@ -607,7 +609,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     const material = mesh.material!;
     const markDirtySpy = vi.spyOn(material, "markDirty");
 
@@ -630,7 +632,7 @@ describe("syncStructuresVisibility", () => {
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     const mesh = atlasRootNode
       .getChildren()
-      .find(c => c.name === "1_structure") as Mesh;
+      .find(c => c.name === "1_structure_mesh") as Mesh;
     const markDirtySpy = vi.spyOn(mesh.material!, "markDirty");
 
     await syncStructuresVisibility(scene, [], [structure]);
@@ -662,7 +664,7 @@ describe("syncStructuresVisibility", () => {
 
     const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
     expect(
-      atlasRootNode.getChildren().some(c => c.name === "1_structure")
+      atlasRootNode.getChildren().some(c => c.name === "1_structure_mesh")
     ).toBe(false);
     expect(scene.materials).toEqual([]);
   });
