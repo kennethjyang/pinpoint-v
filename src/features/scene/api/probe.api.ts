@@ -1,4 +1,8 @@
-import type { GizmoManager, Scene } from "@babylonjs/core";
+import type {
+  GizmoManager,
+  Scene,
+  SelectionOutlineLayer
+} from "@babylonjs/core";
 import {
   Color3,
   CSG2,
@@ -256,23 +260,37 @@ export function syncProbes(
  * Does nothing if the attached mesh was not a probe.
  * @param scene Scene with probes.
  * @param gizmoManager Gizmo manager to update.
+ * @param selectionOutlineLayer Selection outline layer to add probe to selection.
  * @param experiment Experiment to look up the selected probe from.
  * @param onSelect Callback invoked with the probe whose mesh was attached to.
  */
 export function selectProbe(
   scene: Scene,
   gizmoManager: GizmoManager,
+  selectionOutlineLayer: SelectionOutlineLayer,
   experiment: Experiment,
   onSelect: (probe: Probe) => void
 ) {
   gizmoManager.onAttachedToMeshObservable.add(mesh => {
+    // Exit if not selecting a probe.
     if (!mesh) return;
     if (!mesh.name.includes("probe")) return;
 
+    // Get node.
     const probeId = probeIdFromEntityName(mesh.name);
-    gizmoManager.attachToNode(
-      scene.getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
+    const probeTransformNode = scene.getTransformNodeByName(
+      probeEntityName(probeId, PROBE_NODE_SUFFIX)
     );
+
+    // Exit if the probe doesn't have a transform node.
+    if (!probeTransformNode) return;
+
+    // Transfer selection.
+    gizmoManager.attachToNode(probeTransformNode);
+
+    // Make selection.
+    selectionOutlineLayer.clearSelection();
+    selectionOutlineLayer.addSelection(probeTransformNode.getChildMeshes());
 
     const probe = experiment.probes.find(probe => probe.id === probeId);
     if (probe) onSelect(probe);

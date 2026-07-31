@@ -149,11 +149,18 @@ watchEffect(() => {
 watchEffect(() => {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
-  if (!scene || !gizmoManager) return;
+  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
+  if (!scene || !gizmoManager || !selectionOutlineLayer) return;
 
-  selectProbe(scene, gizmoManager, currentExperiment.experiment, probe => {
-    currentExperiment.selectedInspectable = probe;
-  });
+  selectProbe(
+    scene,
+    gizmoManager,
+    selectionOutlineLayer,
+    currentExperiment.experiment,
+    probe => {
+      currentExperiment.selectedInspectable = probe;
+    }
+  );
 });
 
 onMounted(async () => {

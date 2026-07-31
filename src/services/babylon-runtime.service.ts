@@ -7,6 +7,7 @@ import {
   InitializeCSG2Async,
   IsCSG2Ready,
   Scene,
+  SelectionOutlineLayer,
   Vector3,
   WebGPUEngine
 } from "@babylonjs/core";
@@ -21,6 +22,7 @@ export interface BabylonRuntimeService {
   scene: Readonly<ShallowRef<Scene | null>>;
   camera: Readonly<ShallowRef<ArcRotateCamera | null>>;
   gizmoManager: Readonly<ShallowRef<GizmoManager | null>>;
+  selectionOutlineLayer: Readonly<ShallowRef<SelectionOutlineLayer | null>>;
   init: (canvas: HTMLCanvasElement) => Promise<void>;
   dispose: () => void;
 }
@@ -52,6 +54,7 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
   const scene = shallowRef<Scene | null>(null);
   const camera = shallowRef<ArcRotateCamera | null>(null);
   const gizmoManager = shallowRef<GizmoManager | null>(null);
+  const selectionOutlineLayer = shallowRef<SelectionOutlineLayer | null>(null);
 
   /**
    * Create the runtime from a canvas. Does nothing if already initialized.
@@ -86,6 +89,8 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
 
     new HemisphericLight("main_light", Vector3.Up(), s);
 
+    const sol = new SelectionOutlineLayer("selection_outline_layer", s);
+
     e.runRenderLoop(() => {
       s.render();
     });
@@ -94,6 +99,7 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
     scene.value = s;
     camera.value = c;
     gizmoManager.value = gm;
+    selectionOutlineLayer.value = sol;
   }
 
   /**
@@ -116,6 +122,7 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
     scene: shallowReadonly(scene),
     camera: shallowReadonly(camera),
     gizmoManager: shallowReadonly(gizmoManager),
+    selectionOutlineLayer: shallowReadonly(selectionOutlineLayer),
     init,
     dispose
   };
