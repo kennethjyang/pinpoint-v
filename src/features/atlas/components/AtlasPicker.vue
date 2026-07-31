@@ -2,7 +2,8 @@
 import { computed, ref } from "vue";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
 import { useFuse } from "@vueuse/integrations/useFuse";
-import { Atlas, atlasDisplayName } from "../models/atlas.model";
+import { Atlas } from "../models/atlas.model";
+import { atlasDisplayName } from "../api/hierarchy.api";
 import { listAtlases, listAtlasesHTTP } from "../api/source.api";
 import { computedAsync } from "@vueuse/core";
 
