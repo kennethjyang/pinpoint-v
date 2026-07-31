@@ -264,7 +264,7 @@ export function syncProbes(
  * @param experiment Experiment to look up the selected probe from.
  * @param onSelect Callback invoked with the probe whose mesh was attached to.
  */
-export function selectProbe(
+export function selectProbeFromGizmoAttach(
   scene: Scene,
   gizmoManager: GizmoManager,
   selectionOutlineLayer: SelectionOutlineLayer,

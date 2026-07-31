@@ -24,7 +24,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { selectProbe, syncProbes } from "../api/probe.api";
+import { selectProbeFromGizmoAttach, syncProbes } from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 
 const $q = useQuasar();
@@ -152,7 +152,7 @@ watchEffect(() => {
   const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
   if (!scene || !gizmoManager || !selectionOutlineLayer) return;
 
-  selectProbe(
+  selectProbeFromGizmoAttach(
     scene,
     gizmoManager,
     selectionOutlineLayer,
