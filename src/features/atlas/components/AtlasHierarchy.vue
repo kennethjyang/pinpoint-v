@@ -61,26 +61,28 @@ const displayedItems = computed(() =>
                 :class="`guide--${guide}`"
               />
             </template>
-            <q-checkbox
-              :model-value="
-                currentExperiment.isStructureVisible(item.identifier)
-              "
-              dense
-              @update:model-value="
-                visible =>
-                  currentExperiment.setStructureVisibility(
-                    item.identifier,
-                    visible
-                  )
-              "
-            />
-            <q-icon
-              :style="{ color: item.color }"
-              name="radio_button_checked"
-              size="sm"
-            />
-            <b class="q-ml-xs">{{ item.abbreviation }}</b>
-            <span class="q-ml-xs text-no-wrap">{{ item.name }}</span>
+            <div class="row q-gutter-x-xs items-center">
+              <q-checkbox
+                :model-value="
+                  currentExperiment.isStructureVisible(item.identifier)
+                "
+                dense
+                @update:model-value="
+                  visible =>
+                    currentExperiment.setStructureVisibility(
+                      item.identifier,
+                      visible
+                    )
+                "
+              />
+              <q-icon
+                :style="{ color: item.color }"
+                name="radio_button_checked"
+                size="sm"
+              />
+              <b>{{ item.abbreviation }}</b>
+              <span class="text-no-wrap">{{ item.name }}</span>
+            </div>
           </div>
         </template>
       </q-virtual-scroll>
