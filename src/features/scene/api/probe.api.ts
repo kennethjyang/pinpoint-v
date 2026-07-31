@@ -83,7 +83,6 @@ const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
 /** Fallback conversion factor for an unrecognized `si_units` value. */
 const MICROMETERS_TO_MILLIMETERS = 1e-3;
 
-// TODO: find old usages of getTransformNodeByName that could be replaced with getProbeTransformNode
 /**
  * Get a probe's transform node by ID.
  * @param scene Scene to search for probe.
@@ -169,7 +168,9 @@ export function buildProbe(
 
 /**
  * Dispose a probe's transform node, its meshes, and its own materials,
- * leaving shared materials (e.g. `rod_material`) untouched.
+ * leaving shared materials (e.g. `rod_material`) untouched. Detaches the
+ * gizmo first if it was attached to this probe's node, so it's never left
+ * pointing at a disposed node.
  * @param scene Scene the probe was built in.
  * @param probeId Probe ID to remove any existing entity for.
  * @param gizmoManager Gizmo manager to remove probe meshes from.
@@ -179,13 +180,16 @@ export function disposeProbe(
   probeId: string,
   gizmoManager: GizmoManager
 ): void {
-  scene
-    .getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
-    ?.dispose(false, false);
+  const probeTransformNode = getProbeTransformNode(scene, probeId);
+  if (gizmoManager.attachedNode === probeTransformNode) {
+    gizmoManager.attachToNode(null);
+  }
+
+  probeTransformNode?.dispose(false, false);
   scene
     .getMaterialByName(probeEntityName(probeId, PROBE_MATERIAL_SUFFIX))
     ?.dispose();
-  gizmoManager.attachableMeshes = gizmoManager.attachableMeshes!.filter(
+  gizmoManager.attachableMeshes = (gizmoManager.attachableMeshes ?? []).filter(
     mesh => !mesh.name.startsWith(probeId)
   );
 }
@@ -196,13 +200,16 @@ export function disposeProbe(
  * @param experiment Experiment to pull probe data to sync from.
  * @param gizmoManager Gizmo manager for controlling probes.
  * @param draggedProbeId ID of the probe being dragged (if any). Ignore transform updates for this probe.
+ * @returns IDs of probes whose entity was disposed and rebuilt (e.g. from a
+ * type change), so a caller with a stale gizmo/selection reference to the
+ * old node knows to reattach to the new one.
  */
 export function syncProbes(
   scene: Scene,
   experiment: Experiment,
   gizmoManager: GizmoManager,
   draggedProbeId: string | null
-) {
+): string[] {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const experimentProbesById = new Map(
     experiment.probes.map(probe => [probe.id, probe])
@@ -211,6 +218,7 @@ export function syncProbes(
   // Reconcile existence and type in a single pass: keep nodes that still
   // match a probe, dispose removed or stale-typed ones.
   const nodesById = new Map<string, TransformNode>();
+  const rebuiltProbeIds: string[] = [];
   for (const node of referenceCoordinateNode.getChildren(child =>
     child.name.endsWith(PROBE_NODE_SUFFIX)
   ) as TransformNode[]) {
@@ -219,6 +227,7 @@ export function syncProbes(
     const probe = experimentProbesById.get(id);
     if (!probe || probe.probeInterfaceIdentifier !== probeInterfaceIdentifier) {
       disposeProbe(scene, id, gizmoManager);
+      if (probe) rebuiltProbeIds.push(id);
       continue;
     }
     nodesById.set(id, node);
@@ -269,9 +278,30 @@ export function syncProbes(
 
     // Update transform.
     if (probe.id === draggedProbeId) continue;
-    node.setPositionWithLocalVector(asrToVector3(probe.tipPosition));
+    node.position = asrToVector3(probe.tipPosition);
     node.rotation = asrToVector3(probe.rotation);
   }
+
+  return rebuiltProbeIds;
+}
+
+/**
+ * Attach the gizmo to a probe's transform node and put its meshes into the
+ * selection outline layer, replacing any prior selection. The single
+ * canonical path for attaching a probe's selection, shared by the gizmo-pick
+ * and select-from-state flows so they can't drift apart.
+ * @param gizmoManager Gizmo manager to attach to the probe's node.
+ * @param selectionOutlineLayer Selection outline layer to add the probe's meshes to.
+ * @param probeTransformNode Probe transform node to attach and select.
+ */
+export function attachProbeSelection(
+  gizmoManager: GizmoManager,
+  selectionOutlineLayer: SelectionOutlineLayer,
+  probeTransformNode: TransformNode
+): void {
+  gizmoManager.attachToNode(probeTransformNode);
+  selectionOutlineLayer.clearSelection();
+  selectionOutlineLayer.addSelection(probeTransformNode.getChildMeshes());
 }
 
 /**
@@ -298,19 +328,16 @@ export function selectProbeFromGizmoAttach(
 
     // Get node.
     const probeId = probeIdFromEntityName(mesh.name);
-    const probeTransformNode = scene.getTransformNodeByName(
-      probeEntityName(probeId, PROBE_NODE_SUFFIX)
-    );
+    const probeTransformNode = getProbeTransformNode(scene, probeId);
 
     // Exit if the probe doesn't have a transform node.
     if (!probeTransformNode) return;
 
-    // Transfer selection.
-    gizmoManager.attachToNode(probeTransformNode);
-
-    // Make selection.
-    selectionOutlineLayer.clearSelection();
-    selectionOutlineLayer.addSelection(probeTransformNode.getChildMeshes());
+    attachProbeSelection(
+      gizmoManager,
+      selectionOutlineLayer,
+      probeTransformNode
+    );
 
     const probe = experiment.probes.find(probe => probe.id === probeId);
     if (probe) onSelect(probe);
@@ -372,19 +399,27 @@ export function setProbeRotationFromGizmoDrag(
 }
 
 /**
- * Callback filter for when dragging finishes on a probe.
+ * Callback filter for when dragging finishes on a probe, from either the
+ * position or the rotation gizmo. Both must be watched: a rotation-only drag
+ * that never notified this callback would leave the dragged probe's ID
+ * stuck, permanently skipping its transform in {@link syncProbes}.
  * @param gizmoManager Gizmo manager to track dragging on.
  * @param onDragEnd Callback invoked to confirm probe drag ended.
  */
 export function endProbeGizmoDrag(
   gizmoManager: GizmoManager,
   onDragEnd: () => void
-): Observer<DragStartEndEvent> {
-  return gizmoManager.gizmos.positionGizmo!.onDragEndObservable.add(() => {
+): Observer<DragStartEndEvent>[] {
+  const onEnd = () => {
     // Exit if not dragging a probe.
     if (!gizmoManager.attachedNode?.name.includes("probe")) return;
     onDragEnd();
-  });
+  };
+
+  return [
+    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.add(onEnd),
+    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.add(onEnd)
+  ];
 }
 
 /**

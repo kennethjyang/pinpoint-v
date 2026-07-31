@@ -133,12 +133,18 @@ watchEffect(() => {
 });
 
 // Clear the scene whenever the atlas changes, but not when the scene itself
-// has just become available for the first time.
-watch([runtime.scene, currentExperiment.atlas], ([newScene], [oldScene]) => {
-  if (!newScene || !oldScene) return;
+// has just become available for the first time. `currentExperiment.atlas`
+// must be read through a getter, not passed as a snapshot value: reading a
+// Pinia store getter by property access unwraps it once at call time, so a
+// plain value here would never be tracked as a watch source.
+watch(
+  [runtime.scene, () => currentExperiment.atlas],
+  ([newScene], [oldScene]) => {
+    if (!newScene || !oldScene) return;
 
-  removeAllStructures(newScene);
-});
+    removeAllStructures(newScene);
+  }
+);
 
 // Sync the reference coordinate node position.
 watchEffect(() => {
@@ -147,18 +153,36 @@ watchEffect(() => {
   setReferenceCoordinateNodePosition(scene, currentExperiment.experiment);
 });
 
-// Sync probes from state.
+// Sync probes from state. If the currently selected probe's entity was
+// disposed and rebuilt (e.g. from a type change), reattach the gizmo and
+// selection outline to the new one -- otherwise they'd be left pointing at
+// the disposed node/meshes, desynced from the still-selected probe.
 watchEffect(() => {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
+  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
   if (!scene || !gizmoManager) return;
 
-  syncProbes(
+  const rebuiltProbeIds = syncProbes(
     scene,
     currentExperiment.experiment,
     gizmoManager,
     currentExperiment.draggedProbeId
   );
+
+  const selectedInspectable = currentExperiment.selectedInspectable;
+  if (
+    selectionOutlineLayer &&
+    selectedInspectable &&
+    rebuiltProbeIds.includes(selectedInspectable.id)
+  ) {
+    selectFromSelectedInspectableState(
+      selectedInspectable,
+      scene,
+      gizmoManager,
+      selectionOutlineLayer
+    );
+  }
 });
 
 // Sync state from probes.
@@ -180,14 +204,14 @@ watch([runtime.scene, runtime.gizmoManager], ([scene, gizmoManager]) => {
     }
   );
 
-  const probeDragEndObserver = endProbeGizmoDrag(gizmoManager, () => {
+  const probeDragEndObservers = endProbeGizmoDrag(gizmoManager, () => {
     currentExperiment.draggedProbeId = null;
   });
 
   onWatcherCleanup(() => {
     probePositionDraggingObserver.remove();
     probeRotationDraggingObserver.remove();
-    probeDragEndObserver.remove();
+    probeDragEndObservers.forEach(observer => observer.remove());
   });
 });
 

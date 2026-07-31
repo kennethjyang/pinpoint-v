@@ -7,7 +7,7 @@ import type {
 } from "@babylonjs/core";
 import { PointerEventTypes } from "@babylonjs/core";
 import type { Inspectable } from "@/features/scene";
-import { getProbeTransformNode } from "../api/probe.api";
+import { attachProbeSelection, getProbeTransformNode } from "../api/probe.api";
 
 /**
  * Select the entity in the scene based on the selected inspectable.
@@ -38,8 +38,11 @@ export function selectFromSelectedInspectableState(
         selectedInspectable.id
       );
       if (!probeTransformNode) return;
-      gizmoManager.attachToNode(probeTransformNode);
-      selectionOutlineLayer.addSelection(probeTransformNode.getChildMeshes());
+      attachProbeSelection(
+        gizmoManager,
+        selectionOutlineLayer,
+        probeTransformNode
+      );
       break;
     default:
       break;

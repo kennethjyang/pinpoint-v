@@ -1,7 +1,8 @@
 import type { Scene } from "@babylonjs/core";
-import { TransformNode, Vector3 } from "@babylonjs/core";
+import { TransformNode } from "@babylonjs/core";
 import type { Experiment } from "@/features/experiment";
 import { buildAtlasRootNode } from "./structures.api";
+import { asrToVector3 } from "./coordinate-transforms.api";
 
 const REFERENCE_COORDINATE_NODE_NAME = "referenceCoordinate_node";
 
@@ -36,11 +37,7 @@ export function setReferenceCoordinateNodePosition(
   experiment: Experiment
 ) {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
-  referenceCoordinateNode.setPositionWithLocalVector(
-    new Vector3(
-      experiment.referenceCoordinate[0],
-      experiment.referenceCoordinate[1],
-      experiment.referenceCoordinate[2]
-    )
+  referenceCoordinateNode.position = asrToVector3(
+    experiment.referenceCoordinate
   );
 }
