@@ -25,7 +25,12 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { selectProbeFromGizmoAttach, syncProbes } from "../api/probe.api";
+import {
+  endProbeGizmoDrag,
+  selectProbeFromGizmoAttach,
+  setProbeTransformFromGizmoDrag,
+  syncProbes
+} from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 import { deselectFromPointerDown } from "../api/scene.api";
 
@@ -138,46 +143,73 @@ watchEffect(() => {
   setReferenceCoordinateNodePosition(scene, currentExperiment.experiment);
 });
 
-// Sync probes.
+// Sync probes from state.
 watchEffect(() => {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
   if (!scene || !gizmoManager) return;
 
-  syncProbes(scene, currentExperiment.experiment, gizmoManager);
+  syncProbes(
+    scene,
+    currentExperiment.experiment,
+    gizmoManager,
+    currentExperiment.draggedProbeId
+  );
 });
 
-// Handle selection and deselection.
-watchEffect(() => {
-  const scene = runtime.scene.value;
-  const gizmoManager = runtime.gizmoManager.value;
-  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
-  if (!scene || !gizmoManager || !selectionOutlineLayer) return;
+// Sync state from probes.
+watch([runtime.scene, runtime.gizmoManager], ([scene, gizmoManager]) => {
+  if (!scene || !gizmoManager) return;
 
-  const probeSelectionObserver = selectProbeFromGizmoAttach(
-    scene,
+  const probeDraggingObserver = setProbeTransformFromGizmoDrag(
     gizmoManager,
-    selectionOutlineLayer,
     currentExperiment.experiment,
-    probe => {
-      currentExperiment.selectedInspectable = probe;
+    probeId => {
+      currentExperiment.draggedProbeId = probeId;
     }
   );
 
-  const sceneDeselectObserver = deselectFromPointerDown(
-    scene,
-    gizmoManager,
-    selectionOutlineLayer,
-    () => {
-      currentExperiment.selectedInspectable = null;
-    }
-  );
+  const probeDragEndObserver = endProbeGizmoDrag(gizmoManager, () => {
+    currentExperiment.draggedProbeId = null;
+  });
 
   onWatcherCleanup(() => {
-    probeSelectionObserver.remove();
-    sceneDeselectObserver.remove();
+    probeDraggingObserver.remove();
+    probeDragEndObserver.remove();
   });
 });
+
+// Register callbacks for selection and deselection.
+watch(
+  [runtime.scene, runtime.gizmoManager, runtime.selectionOutlineLayer],
+  ([scene, gizmoManager, selectionOutlineLayer]) => {
+    if (!scene || !gizmoManager || !selectionOutlineLayer) return;
+
+    const probeSelectionObserver = selectProbeFromGizmoAttach(
+      scene,
+      gizmoManager,
+      selectionOutlineLayer,
+      currentExperiment.experiment,
+      probe => {
+        currentExperiment.selectedInspectable = probe;
+      }
+    );
+
+    const sceneDeselectObserver = deselectFromPointerDown(
+      scene,
+      gizmoManager,
+      selectionOutlineLayer,
+      () => {
+        currentExperiment.selectedInspectable = null;
+      }
+    );
+
+    onWatcherCleanup(() => {
+      probeSelectionObserver.remove();
+      sceneDeselectObserver.remove();
+    });
+  }
+);
 
 onMounted(async () => {
   if (!canvas.value) {

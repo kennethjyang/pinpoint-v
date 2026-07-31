@@ -34,6 +34,13 @@ export const useCurrentExperimentStore = defineStore(
     const selectedInspectable = ref<Inspectable | null>(null);
 
     /**
+     * ID of the probe currently being dragged.
+     *
+     * Used to ignore updates from pinia going to writing the probe's location.
+     */
+    const draggedProbeId = ref<string | null>(null);
+
+    /**
      * Flag for when the manifest is being updated to match the new atlas.
      */
     const isManifestEvaluating = ref(false);
@@ -115,7 +122,12 @@ export const useCurrentExperimentStore = defineStore(
       );
     }
 
-    const state = { experiment, selectedInspectable, isManifestEvaluating };
+    const state = {
+      experiment,
+      selectedInspectable,
+      draggedProbeId,
+      isManifestEvaluating
+    };
     const getters = {
       name,
       atlas,

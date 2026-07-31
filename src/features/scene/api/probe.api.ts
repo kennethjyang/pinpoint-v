@@ -1,5 +1,7 @@
 import type {
   AbstractMesh,
+  DragEvent,
+  DragStartEndEvent,
   GizmoManager,
   Nullable,
   Observer,
@@ -23,7 +25,7 @@ import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
 import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
-import { asrToVector3 } from "../api/coordinate-transforms.api";
+import { asrToVector3, vector3ToAsr } from "../api/coordinate-transforms.api";
 import type { ProbeMetadata } from "../models/probe-metadata.model";
 
 /** A probe's planar contour in millimeters, re-origined on its center tip. */
@@ -180,11 +182,13 @@ export function disposeProbe(
  * @param scene Scene to sync the probes of.
  * @param experiment Experiment to pull probe data to sync from.
  * @param gizmoManager Gizmo manager for controlling probes.
+ * @param draggedProbeId ID of the probe being dragged (if any). Ignore transform updates for this probe.
  */
 export function syncProbes(
   scene: Scene,
   experiment: Experiment,
-  gizmoManager: GizmoManager
+  gizmoManager: GizmoManager,
+  draggedProbeId: string | null
 ) {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const experimentProbesById = new Map(
@@ -251,6 +255,7 @@ export function syncProbes(
     }
 
     // Update transform.
+    if (probe.id === draggedProbeId) continue;
     node.setPositionWithLocalVector(asrToVector3(probe.tipPosition));
     node.rotation = asrToVector3(probe.orientation);
   }
@@ -274,7 +279,7 @@ export function selectProbeFromGizmoAttach(
   onSelect: (probe: Probe) => void
 ): Observer<Nullable<AbstractMesh>> {
   return gizmoManager.onAttachedToMeshObservable.add(mesh => {
-    // Exit if not selecting a probe.
+    // Exit if not picking a probe mesh.
     if (!mesh) return;
     if (!mesh.name.includes("probe")) return;
 
@@ -296,6 +301,50 @@ export function selectProbeFromGizmoAttach(
 
     const probe = experiment.probes.find(probe => probe.id === probeId);
     if (probe) onSelect(probe);
+  });
+}
+
+/**
+ * Update a probe's state from a gizmo drag.
+ * @param gizmoManager Gizmo manager to track dragging on.
+ * @param experiment Experiment with probes to update.
+ * @param onDrag Callback invoked with probe ID the drag is happening to.
+ */
+export function setProbeTransformFromGizmoDrag(
+  gizmoManager: GizmoManager,
+  experiment: Experiment,
+  onDrag: (probeId: string) => void
+): Observer<DragEvent> {
+  return gizmoManager.gizmos.positionGizmo!.onDragObservable.add(() => {
+    // Exit if not dragging a probe.
+    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+
+    const probeTransformNode = gizmoManager.attachedNode as TransformNode;
+    if (!probeTransformNode) return;
+
+    const probeId = probeIdFromEntityName(probeTransformNode.name);
+    const probe = experiment.probes.find(probe => probe.id == probeId);
+    if (!probe) return;
+
+    probe.tipPosition = vector3ToAsr(probeTransformNode.position);
+    probe.orientation = vector3ToAsr(probeTransformNode.rotation);
+    onDrag(probe.id);
+  });
+}
+
+/**
+ * Callback filter for when dragging finishes on a probe.
+ * @param gizmoManager Gizmo manager to track dragging on.
+ * @param onDragEnd Callback invoked to confirm probe drag ended.
+ */
+export function endProbeGizmoDrag(
+  gizmoManager: GizmoManager,
+  onDragEnd: () => void
+): Observer<DragStartEndEvent> {
+  return gizmoManager.gizmos.positionGizmo!.onDragEndObservable.add(() => {
+    // Exit if not dragging a probe.
+    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+    onDragEnd();
   });
 }
 
