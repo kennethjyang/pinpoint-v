@@ -106,7 +106,7 @@ const numberRules: ValidationRule<string>[] = [
 </script>
 
 <template>
-  <div class="column q q-gutter-y-md">
+  <div class="column q q-gutter-y-md probe-inspector">
     <CommittedInput
       v-model="name"
       :label="t('probeInspector.name')"
@@ -183,4 +183,18 @@ const numberRules: ValidationRule<string>[] = [
   </div>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+// Without this, the long probe-type label's intrinsic content width forces
+// this flex item to grow past its drawer's width instead of wrapping/eliding.
+.probe-inspector
+  width: 100%
+
+  :deep(.q-select)
+    width: 100%
+    min-width: 0
+
+  :deep(.q-field__native > span)
+    overflow: hidden
+    text-overflow: ellipsis
+    white-space: nowrap
+</style>
