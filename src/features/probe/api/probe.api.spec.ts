@@ -25,7 +25,7 @@ describe("buildProbe", () => {
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
     expect(probe.tipPosition).toEqual([0, 0, 0]);
-    expect(probe.orientation).toEqual([0, 0, 0]);
+    expect(probe.rotation).toEqual([0, 0, 0]);
     expect(probe.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );

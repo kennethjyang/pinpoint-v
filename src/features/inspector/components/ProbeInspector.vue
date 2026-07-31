@@ -68,18 +68,18 @@ const ml = computed({
 });
 
 const roll = computed({
-  get: () => String(probe.orientation[0]),
-  set: (value: string) => (probe.orientation[0] = Number(value))
+  get: () => String(probe.rotation[0]),
+  set: (value: string) => (probe.rotation[0] = Number(value))
 });
 
 const yaw = computed({
-  get: () => String(probe.orientation[1]),
-  set: (value: string) => (probe.orientation[1] = Number(value))
+  get: () => String(probe.rotation[1]),
+  set: (value: string) => (probe.rotation[1] = Number(value))
 });
 
 const pitch = computed({
-  get: () => String(probe.orientation[2]),
-  set: (value: string) => (probe.orientation[2] = Number(value))
+  get: () => String(probe.rotation[2]),
+  set: (value: string) => (probe.rotation[2] = Number(value))
 });
 
 const nameRules: ValidationRule<string>[] = [

@@ -52,7 +52,7 @@ export function makeProbe(overrides: Partial<Probe> = {}): Probe {
       makeProbeInterfaceProbe()
     ),
     tipPosition: [0, 0, 0],
-    orientation: [0, 0, 0],
+    rotation: [0, 0, 0],
     ...overrides
   };
 }

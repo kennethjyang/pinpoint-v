@@ -169,7 +169,7 @@ describe("ProbeInspector", () => {
     await editAndBlur(fieldByLabel(wrapper, t.yaw), "0.2");
     await editAndBlur(fieldByLabel(wrapper, t.pitch), "0.3");
 
-    expect(probe.orientation).toEqual([0.1, 0.2, 0.3]);
+    expect(probe.rotation).toEqual([0.1, 0.2, 0.3]);
   });
 
   it("rejects a non-numeric value in a numeric field", async () => {

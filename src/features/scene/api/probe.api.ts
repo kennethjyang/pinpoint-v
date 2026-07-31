@@ -257,7 +257,7 @@ export function syncProbes(
     // Update transform.
     if (probe.id === draggedProbeId) continue;
     node.setPositionWithLocalVector(asrToVector3(probe.tipPosition));
-    node.rotation = asrToVector3(probe.orientation);
+    node.rotation = asrToVector3(probe.rotation);
   }
 }
 
@@ -305,12 +305,12 @@ export function selectProbeFromGizmoAttach(
 }
 
 /**
- * Update a probe's state from a gizmo drag.
+ * Update a probe's position from a gizmo drag.
  * @param gizmoManager Gizmo manager to track dragging on.
  * @param experiment Experiment with probes to update.
  * @param onDrag Callback invoked with probe ID the drag is happening to.
  */
-export function setProbeTransformFromGizmoDrag(
+export function setProbePositionFromGizmoDrag(
   gizmoManager: GizmoManager,
   experiment: Experiment,
   onDrag: (probeId: string) => void
@@ -327,7 +327,33 @@ export function setProbeTransformFromGizmoDrag(
     if (!probe) return;
 
     probe.tipPosition = vector3ToAsr(probeTransformNode.position);
-    probe.orientation = vector3ToAsr(probeTransformNode.rotation);
+    onDrag(probe.id);
+  });
+}
+
+/**
+ * Update a probe's orientation from a gizmo drag.
+ * @param gizmoManager Gizmo manager to track dragging on.
+ * @param experiment Experiment with probes to update.
+ * @param onDrag Callback invoked with probe ID the drag is happening to.
+ */
+export function setProbeRotationFromGizmoDrag(
+  gizmoManager: GizmoManager,
+  experiment: Experiment,
+  onDrag: (probeId: string) => void
+): Observer<DragEvent> {
+  return gizmoManager.gizmos.rotationGizmo!.onDragObservable.add(() => {
+    // Exit if not dragging a probe.
+    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+
+    const probeTransformNode = gizmoManager.attachedNode as TransformNode;
+    if (!probeTransformNode) return;
+
+    const probeId = probeIdFromEntityName(probeTransformNode.name);
+    const probe = experiment.probes.find(probe => probe.id == probeId);
+    if (!probe) return;
+
+    probe.rotation = vector3ToAsr(probeTransformNode.rotation);
     onDrag(probe.id);
   });
 }

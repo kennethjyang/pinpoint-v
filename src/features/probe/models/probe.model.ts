@@ -40,5 +40,5 @@ export interface Probe {
    * - Pivot on tip.
    * - In radians.
    */
-  orientation: [number, number, number];
+  rotation: [number, number, number];
 }

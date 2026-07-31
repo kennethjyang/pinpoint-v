@@ -28,7 +28,8 @@ import { useI18n } from "vue-i18n";
 import {
   endProbeGizmoDrag,
   selectProbeFromGizmoAttach,
-  setProbeTransformFromGizmoDrag,
+  setProbePositionFromGizmoDrag,
+  setProbeRotationFromGizmoDrag,
   syncProbes
 } from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
@@ -161,7 +162,14 @@ watchEffect(() => {
 watch([runtime.scene, runtime.gizmoManager], ([scene, gizmoManager]) => {
   if (!scene || !gizmoManager) return;
 
-  const probeDraggingObserver = setProbeTransformFromGizmoDrag(
+  const probePositionDraggingObserver = setProbePositionFromGizmoDrag(
+    gizmoManager,
+    currentExperiment.experiment,
+    probeId => {
+      currentExperiment.draggedProbeId = probeId;
+    }
+  );
+  const probeRotationDraggingObserver = setProbeRotationFromGizmoDrag(
     gizmoManager,
     currentExperiment.experiment,
     probeId => {
@@ -174,7 +182,8 @@ watch([runtime.scene, runtime.gizmoManager], ([scene, gizmoManager]) => {
   });
 
   onWatcherCleanup(() => {
-    probeDraggingObserver.remove();
+    probePositionDraggingObserver.remove();
+    probeRotationDraggingObserver.remove();
     probeDragEndObserver.remove();
   });
 });
