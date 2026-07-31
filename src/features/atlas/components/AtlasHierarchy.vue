@@ -15,7 +15,6 @@ const currentExperiment = useCurrentExperimentStore();
 // Components.
 const scrollArea = useTemplateRef<QScrollArea>("scroll-area");
 
-// Local state.
 const filter = ref<string | null>(null);
 
 // Expose scroll area target for the virtual scroll.

@@ -2,6 +2,7 @@
 import { useQuasar } from "quasar";
 import {
   buildProbe,
+  getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier,
   Probe,
   ProbeInterfaceProbe,
@@ -66,9 +67,9 @@ function removeProbeAndDeselect(probe: Probe) {
 <template>
   <div class="column">
     <q-btn-dropdown
-      :label="$t('sceneHierarchy.addProbe')"
       color="primary"
       dropdown-icon="add"
+      :label="$t('sceneHierarchy.addProbe')"
     >
       <q-list>
         <q-item
@@ -80,7 +81,7 @@ function removeProbeAndDeselect(probe: Probe) {
           @click="addProbeAndSelect(probeInterfaceProbe)"
         >
           <q-item-section>
-            {{ getProbeInterfaceIdentifier(probeInterfaceProbe) }}
+            {{ getProbeInterfaceDisplayName(probeInterfaceProbe) }}
           </q-item-section>
         </q-item>
         <q-separator />
@@ -121,8 +122,8 @@ function removeProbeAndDeselect(probe: Probe) {
             />
             <q-btn
               flat
-              icon="delete"
               round
+              icon="delete"
               @click.stop="removeProbeAndDeselect(probe)"
             />
           </div>
