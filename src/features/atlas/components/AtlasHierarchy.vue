@@ -129,7 +129,7 @@ $guide-width: 2px
   content: ''
   position: absolute
   top: 50%
-  left: 50%
+  left: calc(50% + $guide-width / 2)
   width: 50%
   margin-top: -($guide-width * 0.5)
   border-top: $guide-width solid $separator-color
