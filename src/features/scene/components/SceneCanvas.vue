@@ -24,10 +24,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import {
-  syncProbes,
-  transferGizmoToProbeTransformNode
-} from "../api/probe.api";
+import { selectProbe, syncProbes } from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 
 const $q = useQuasar();
@@ -148,13 +145,15 @@ watchEffect(() => {
   syncProbes(scene, currentExperiment.experiment, gizmoManager);
 });
 
-// Ensure probe transform nodes are selected.
+// Use gizmo manager to select probes.
 watchEffect(() => {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
   if (!scene || !gizmoManager) return;
 
-  transferGizmoToProbeTransformNode(scene, gizmoManager);
+  selectProbe(scene, gizmoManager, currentExperiment.experiment, probe => {
+    currentExperiment.selectedInspectable = probe;
+  });
 });
 
 onMounted(async () => {

@@ -250,23 +250,32 @@ export function syncProbes(
 }
 
 /**
- * Add a callback to the attachment observable that will transfer a selection to the probe transform node.
+ * Add a callback to the Gizmo attachment observable that will transfer a
+ * selection to the probe transform node and report the selected probe.
  *
  * Does nothing if the attached mesh was not a probe.
  * @param scene Scene with probes.
  * @param gizmoManager Gizmo manager to update.
+ * @param experiment Experiment to look up the selected probe from.
+ * @param onSelect Callback invoked with the probe whose mesh was attached to.
  */
-export function transferGizmoToProbeTransformNode(
+export function selectProbe(
   scene: Scene,
-  gizmoManager: GizmoManager
+  gizmoManager: GizmoManager,
+  experiment: Experiment,
+  onSelect: (probe: Probe) => void
 ) {
   gizmoManager.onAttachedToMeshObservable.add(mesh => {
     if (!mesh) return;
     if (!mesh.name.includes("probe")) return;
+
     const probeId = probeIdFromEntityName(mesh.name);
     gizmoManager.attachToNode(
       scene.getTransformNodeByName(probeEntityName(probeId, PROBE_NODE_SUFFIX))
     );
+
+    const probe = experiment.probes.find(probe => probe.id === probeId);
+    if (probe) onSelect(probe);
   });
 }
 
