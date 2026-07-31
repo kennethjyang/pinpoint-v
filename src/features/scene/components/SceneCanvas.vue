@@ -33,7 +33,10 @@ import {
   syncProbes
 } from "../api/probe.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
-import { deselectFromPointerDown } from "../api/scene.api";
+import {
+  deselectFromPointerDown,
+  selectFromSelectedInspectableState
+} from "../api/scene.api";
 
 const $q = useQuasar();
 const { t } = useI18n();
@@ -219,6 +222,21 @@ watch(
     });
   }
 );
+
+// Update selection as it propagates from state.
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  const gizmoManager = runtime.gizmoManager.value;
+  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
+  if (!scene || !gizmoManager || !selectionOutlineLayer) return;
+
+  selectFromSelectedInspectableState(
+    currentExperiment.selectedInspectable,
+    scene,
+    gizmoManager,
+    selectionOutlineLayer
+  );
+});
 
 onMounted(async () => {
   if (!canvas.value) {

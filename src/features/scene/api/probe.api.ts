@@ -83,6 +83,21 @@ const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
 /** Fallback conversion factor for an unrecognized `si_units` value. */
 const MICROMETERS_TO_MILLIMETERS = 1e-3;
 
+// TODO: find old usages of getTransformNodeByName that could be replaced with getProbeTransformNode
+/**
+ * Get a probe's transform node by ID.
+ * @param scene Scene to search for probe.
+ * @param probeId ID of the probe to get.
+ */
+export function getProbeTransformNode(
+  scene: Scene,
+  probeId: string
+): TransformNode | null {
+  return scene.getTransformNodeByName(
+    probeEntityName(probeId, PROBE_NODE_SUFFIX)
+  );
+}
+
 /**
  * Build a probe's shank, head stage, and rod meshes under a transform node
  * placed at the probe's center tip and parented to the reference coordinate
@@ -99,9 +114,7 @@ export function buildProbe(
   experiment: Experiment,
   gizmoManager: GizmoManager
 ): TransformNode | null {
-  const existing = scene.getTransformNodeByName(
-    probeEntityName(probe.id, PROBE_NODE_SUFFIX)
-  );
+  const existing = getProbeTransformNode(scene, probe.id);
   if (existing) return existing;
 
   const probeInterfaceProbe = getInternedProbeInterfaceProbe(experiment, probe);
