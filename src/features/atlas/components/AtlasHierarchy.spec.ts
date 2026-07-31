@@ -146,11 +146,11 @@ describe("AtlasHierarchy", () => {
     const firstGuideIndex = children.findIndex(child =>
       child.classList.contains("guide")
     );
-    const checkboxIndex = children.findIndex(child =>
-      child.classList.contains("q-checkbox")
+    const checkboxGroupIndex = children.findIndex(
+      child => child.querySelector(".q-checkbox") !== null
     );
     expect(firstGuideIndex).toBeGreaterThanOrEqual(0);
-    expect(firstGuideIndex).toBeLessThan(checkboxIndex);
+    expect(firstGuideIndex).toBeLessThan(checkboxGroupIndex);
   });
 
   it("colors each row's icon from color_hex_triplet", async () => {
