@@ -105,7 +105,7 @@ describe("ProbeLibraryDialog", () => {
       const wrapper = await mountDialog();
       const probeLibraryStore = useProbeLibraryStore();
       probeLibraryStore.add(
-        makeProbe({
+        makeProbeInterfaceProbe({
           annotations: { manufacturer: "imec", model_name: "NP2013" }
         })
       );
