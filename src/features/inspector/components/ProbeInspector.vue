@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { type ValidationRule } from "quasar";
 import {
   findProbeInterfaceProbeByIdentifier,
+  getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier,
   Probe
 } from "@/features/probe";
@@ -12,6 +13,14 @@ import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import CommittedInput from "./CommittedInput.vue";
+
+// A library probe's identifier paired with its display label. `emit-value`
+// keeps the model the identifier, which `findProbeInterfaceProbeByIdentifier`
+// needs.
+interface ProbeTypeOption {
+  label: string;
+  value: string;
+}
 
 const { probe } = defineProps<{
   probe: Probe;
@@ -43,8 +52,11 @@ const probeIdentifier = computed({
   }
 });
 
-const probeIdentifiers = computed<string[]>(() =>
-  probeLibraryStore.library.map(getProbeInterfaceIdentifier)
+const probeTypeOptions = computed<ProbeTypeOption[]>(() =>
+  probeLibraryStore.library.map(probeInterfaceProbe => ({
+    label: getProbeInterfaceDisplayName(probeInterfaceProbe),
+    value: getProbeInterfaceIdentifier(probeInterfaceProbe)
+  }))
 );
 
 const name = computed({
@@ -104,8 +116,10 @@ const numberRules: ValidationRule<string>[] = [
 
     <q-select
       v-model="probeIdentifier"
+      emit-value
       :label="t('probeInspector.probeType')"
-      :options="probeIdentifiers"
+      map-options
+      :options="probeTypeOptions"
       outlined
     />
 
