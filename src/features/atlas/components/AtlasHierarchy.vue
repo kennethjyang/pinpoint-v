@@ -1,13 +1,20 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, useTemplateRef } from "vue";
 import { useFuse } from "@vueuse/integrations/useFuse";
+import { QScrollArea } from "quasar";
 import { flattenHierarchy } from "../api/hierarchy.api";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const currentExperiment = useCurrentExperimentStore();
 
+// Components.
+const scrollArea = useTemplateRef<QScrollArea>("scroll-area");
+
 // Local state.
 const filter = ref<string | null>(null);
+
+// Expose scroll area target for the virtual scroll.
+const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
 // DFS-flattened hierarchy, carrying each row's indent guides.
 const items = computed(() =>
@@ -35,41 +42,49 @@ const displayedItems = computed(() =>
       </template>
     </q-input>
 
-    <q-virtual-scroll
-      :items="displayedItems"
-      :virtual-scroll-item-size="32"
-      class="col hierarchy-list"
-    >
-      <template #default="{ item }">
-        <div
-          :key="item.identifier"
-          class="hierarchy-row row items-center no-wrap"
-        >
-          <q-checkbox
-            :model-value="currentExperiment.isStructureVisible(item.identifier)"
-            dense
-            @update:model-value="
-              visible =>
-                currentExperiment.setStructureVisibility(
-                  item.identifier,
-                  visible
-                )
-            "
-          />
-          <template v-if="!isSearching">
-            <span
-              v-for="(guide, index) in item.guides"
-              :key="index"
-              class="guide"
-              :class="`guide--${guide}`"
+    <q-scroll-area ref="scroll-area" class="col">
+      <q-virtual-scroll
+        :items="displayedItems"
+        :virtual-scroll-item-size="32"
+        :scroll-target="scrollAreaTarget"
+      >
+        <template #default="{ item }">
+          <div
+            :key="item.identifier"
+            class="hierarchy-row row items-center no-wrap"
+          >
+            <template v-if="!isSearching">
+              <span
+                v-for="(guide, index) in item.guides"
+                :key="index"
+                class="guide"
+                :class="`guide--${guide}`"
+              />
+            </template>
+            <q-checkbox
+              :model-value="
+                currentExperiment.isStructureVisible(item.identifier)
+              "
+              dense
+              @update:model-value="
+                visible =>
+                  currentExperiment.setStructureVisibility(
+                    item.identifier,
+                    visible
+                  )
+              "
             />
-          </template>
-          <q-icon :style="{ color: item.color }" name="radio_button_checked" />
-          <b class="q-ml-xs">{{ item.abbreviation }}</b>
-          <span class="q-ml-xs text-no-wrap">{{ item.name }}</span>
-        </div>
-      </template>
-    </q-virtual-scroll>
+            <q-icon
+              :style="{ color: item.color }"
+              name="radio_button_checked"
+              size="sm"
+            />
+            <b class="q-ml-xs">{{ item.abbreviation }}</b>
+            <span class="q-ml-xs text-no-wrap">{{ item.name }}</span>
+          </div>
+        </template>
+      </q-virtual-scroll>
+    </q-scroll-area>
 
     <template v-if="currentExperiment.visibleStructures.length">
       <q-btn
@@ -82,9 +97,7 @@ const displayedItems = computed(() =>
 </template>
 
 <style lang="sass" scoped>
-.hierarchy-list
-  overflow: auto
-  min-height: 0
+$guide-width: 2px
 
 .hierarchy-row
   height: 32px
@@ -97,7 +110,7 @@ const displayedItems = computed(() =>
   position: relative
 
 .guide--line, .guide--tee
-  border-left: 1px solid $separator-color
+  border-left: $guide-width solid $separator-color
 
 .guide--elbow::before
   content: ''
@@ -105,7 +118,7 @@ const displayedItems = computed(() =>
   top: 0
   left: 0
   height: 50%
-  border-left: 1px solid $separator-color
+  border-left: $guide-width solid $separator-color
 
 .guide--tee::after, .guide--elbow::after
   content: ''
@@ -113,5 +126,16 @@ const displayedItems = computed(() =>
   top: 50%
   left: 0
   width: 100%
-  border-top: 1px solid $separator-color
+  margin-top: -($guide-width * 0.5)
+  border-top: $guide-width solid $separator-color
+
+body.body--dark
+  .guide--line, .guide--tee
+    border-left-color: $separator-dark-color
+
+  .guide--elbow::before
+    border-left-color: $separator-dark-color
+
+  .guide--tee::after, .guide--elbow::after
+    border-top-color: $separator-dark-color
 </style>

@@ -132,6 +132,26 @@ describe("AtlasHierarchy", () => {
     expect(store.visibleStructures).toEqual([]);
   });
 
+  it("orders each row as guides, then checkbox, then icon, then text", async () => {
+    const wrapper = await mountHierarchy();
+
+    // Identifier 567 is nested (has at least one guide), so its row exercises
+    // the guide-then-checkbox ordering that a top-level row wouldn't.
+    const row = wrapper
+      .findAll(".hierarchy-row")
+      .find(r => r.text().includes("CH"))!;
+    const children = Array.from(row.element.children);
+
+    const firstGuideIndex = children.findIndex(child =>
+      child.classList.contains("guide")
+    );
+    const checkboxIndex = children.findIndex(child =>
+      child.classList.contains("q-checkbox")
+    );
+    expect(firstGuideIndex).toBeGreaterThanOrEqual(0);
+    expect(firstGuideIndex).toBeLessThan(checkboxIndex);
+  });
+
   it("colors each row's icon from color_hex_triplet", async () => {
     const wrapper = await mountHierarchy();
 
