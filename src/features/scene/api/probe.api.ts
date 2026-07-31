@@ -40,20 +40,23 @@ interface ProbeContour {
   origin: { x: number; y: number };
 }
 
+/** Probe entity suffix start */
+const PROBE_ENTITY_SUFFIX = "_probe_";
+
 /** Suffix applied to a probe's id to name its parenting transform node. */
-const PROBE_NODE_SUFFIX = "_probe_node";
+const PROBE_NODE_SUFFIX = `${PROBE_ENTITY_SUFFIX}node`;
 
 /** Suffix applied to a probe's id to name its shank/head-stage material. */
-const PROBE_MATERIAL_SUFFIX = "_probe_material";
+const PROBE_MATERIAL_SUFFIX = `${PROBE_ENTITY_SUFFIX}material`;
 
 /** Suffix applied to a probe's id to name its shank mesh. */
-const SHANK_MESH_SUFFIX = "_probe_shank_mesh";
+const SHANK_MESH_SUFFIX = `${PROBE_ENTITY_SUFFIX}shank_mesh`;
 
 /** Suffix applied to a probe's id to name its head stage mesh. */
-const HEAD_STAGE_MESH_SUFFIX = "_probe_head-stage_mesh";
+const HEAD_STAGE_MESH_SUFFIX = `${PROBE_ENTITY_SUFFIX}head-stage_mesh`;
 
 /** Suffix applied to a probe's id to name its rod mesh. */
-const ROD_MESH_SUFFIX = "_probe_rod_mesh";
+const ROD_MESH_SUFFIX = `${PROBE_ENTITY_SUFFIX}rod_mesh`;
 
 /** Name of the shared gray material used by every probe's rod mesh. */
 const ROD_MATERIAL_NAME = "probe_rod_material";
@@ -485,7 +488,7 @@ function probeEntityName(probeId: string, suffix: string): string {
  * @param name Entity name to check.
  */
 function isProbeEntityName(name: string): boolean {
-  return name.includes("_probe_");
+  return name.includes(PROBE_ENTITY_SUFFIX);
 }
 
 /**
@@ -493,7 +496,7 @@ function isProbeEntityName(name: string): boolean {
  * @param entityName Entity name produced by {@link probeEntityName}.
  */
 function probeIdFromEntityName(entityName: string): string {
-  const suffixStart = entityName.indexOf("_probe_");
+  const suffixStart = entityName.indexOf(PROBE_ENTITY_SUFFIX);
   return suffixStart === -1 ? entityName : entityName.slice(0, suffixStart);
 }
 
