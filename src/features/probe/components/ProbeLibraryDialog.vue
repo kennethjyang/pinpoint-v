@@ -1,14 +1,37 @@
 <script lang="ts" setup>
+import { computed } from "vue";
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import InstallProbeDialog from "./InstallProbeDialog.vue";
 import { getProbeInterfaceIdentifier } from "../api/probe.api";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
+import { ProbeInterfaceProbe } from "../models/probe-interface.model";
+import { KNOWN_PROBES } from "../models/known-probes.model";
+
+// A library entry, pairing its probe with a human-readable label (falling
+// back to "<manufacturer> <model name>" when not in KNOWN_PROBES).
+interface ProbeOption {
+  probe: ProbeInterfaceProbe;
+  label: string;
+}
 
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 
 const $q = useQuasar();
 const probeLibraryStore = useProbeLibraryStore();
+
+const probeOptions = computed<ProbeOption[]>(() =>
+  probeLibraryStore.library.map(probe => {
+    const { manufacturer, model_name: modelName } = probe.annotations!;
+
+    return {
+      probe,
+      label:
+        KNOWN_PROBES[`${manufacturer} ${modelName}`]?.trim() ??
+        `${manufacturer} ${modelName}`
+    };
+  })
+);
 
 /**
  * Open the install-probe dialog and add its result to the library.
@@ -34,18 +57,16 @@ function installProbe() {
 
         <q-list class="dialog-list" separator>
           <q-item
-            v-for="probe in probeLibraryStore.library"
-            :key="getProbeInterfaceIdentifier(probe)"
+            v-for="probeOption in probeOptions"
+            :key="getProbeInterfaceIdentifier(probeOption.probe)"
           >
-            <q-item-section>{{
-              getProbeInterfaceIdentifier(probe)
-            }}</q-item-section>
+            <q-item-section>{{ probeOption.label }}</q-item-section>
             <q-item-section side>
               <q-btn
                 flat
                 icon="delete"
                 round
-                @click="probeLibraryStore.remove(probe)"
+                @click="probeLibraryStore.remove(probeOption.probe)"
               />
             </q-item-section>
           </q-item>

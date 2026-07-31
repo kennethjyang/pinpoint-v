@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import {
+  getManufacturers,
   getProbeInterfaceProbe,
   getProbeNames,
-  getVendors,
   parseProbeInterfaceFile
 } from "./install.api";
 
@@ -40,10 +40,9 @@ function probeInterfaceFileText(
   });
 }
 
-// Throughout this file, axios.get is only ever passed to vi.mocked() to
-// retrieve its mock, never called unbound.
-
-describe("getVendors", () => {
+describe("getManufacturers", () => {
+  // axios.get is only ever passed to vi.mocked() to retrieve its mock, never
+  // called unbound.
   // oxlint-disable-next-line typescript/unbound-method
   const mockedGet = vi.mocked(axios.get);
 
@@ -59,7 +58,10 @@ describe("getVendors", () => {
       ]
     });
 
-    expect(await getVendors()).toEqual(["neuropixels", "cambridgeneurotech"]);
+    expect(await getManufacturers()).toEqual([
+      "neuropixels",
+      "cambridgeneurotech"
+    ]);
   });
 
   it("excludes non-directory entries", async () => {
@@ -70,7 +72,7 @@ describe("getVendors", () => {
       ]
     });
 
-    expect(await getVendors()).toEqual(["neuropixels"]);
+    expect(await getManufacturers()).toEqual(["neuropixels"]);
   });
 
   it("excludes dotfile directories", async () => {
@@ -81,7 +83,7 @@ describe("getVendors", () => {
       ]
     });
 
-    expect(await getVendors()).toEqual(["neuropixels"]);
+    expect(await getManufacturers()).toEqual(["neuropixels"]);
   });
 
   it("excludes the apps and scripts directories", async () => {
@@ -93,25 +95,25 @@ describe("getVendors", () => {
       ]
     });
 
-    expect(await getVendors()).toEqual(["neuropixels"]);
+    expect(await getManufacturers()).toEqual(["neuropixels"]);
   });
 
   it("returns an empty list when the response is a GitHub 404", async () => {
     mockedGet.mockResolvedValue({ data: { status: "404" } });
 
-    expect(await getVendors()).toEqual([]);
+    expect(await getManufacturers()).toEqual([]);
   });
 
   it("returns an empty list when the response has no data", async () => {
     mockedGet.mockResolvedValue({ data: undefined });
 
-    expect(await getVendors()).toEqual([]);
+    expect(await getManufacturers()).toEqual([]);
   });
 
   it("returns an empty list when the request throws", async () => {
     mockedGet.mockRejectedValue(new Error("network error"));
 
-    expect(await getVendors()).toEqual([]);
+    expect(await getManufacturers()).toEqual([]);
   });
 });
 
@@ -123,7 +125,7 @@ describe("getProbeNames", () => {
     mockedGet.mockReset();
   });
 
-  it("returns the names of probe directories for a vendor", async () => {
+  it("returns the names of probe directories for a manufacturer", async () => {
     mockedGet.mockResolvedValue({
       data: [
         { name: "1.0", type: "dir" },
