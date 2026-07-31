@@ -195,12 +195,7 @@ function structureMaterialName(identifier: number): string {
 
 /**
  * Synchronously create a structure's hidden placeholder mesh and material,
- * parented under the atlas root, ready for {@link loadStructureGeometry}. The
- * material is frozen immediately, before it has any geometry: its draw
- * wrappers don't exist yet, so freezing now can't clear the forced-rebind
- * default they're created with once {@link loadStructureGeometry} applies
- * geometry to the mesh, which is what makes its first real render correct
- * despite being frozen from birth.
+ * parented under the atlas root, ready for {@link loadStructureGeometry}.
  * @param scene Scene to add the structure to.
  * @param atlasRootNode Atlas root node to parent the structure under.
  * @param structure Entity information for the structure.

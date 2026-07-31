@@ -98,10 +98,8 @@ export function getProbeTransformNode(
 }
 
 /**
- * Build a probe's shank, head stage, and rod meshes under a transform node
- * placed at the probe's center tip and parented to the reference coordinate
- * node, or return the existing entity if the probe was already built.
- * Returns null if the probe has no usable contour to build from.
+ * Build a probe's shank, head stage, and rod meshes, or return the existing
+ * entity if already built. Returns null if there's no usable contour.
  * @param scene Scene to add the probe to.
  * @param probe Probe to build.
  * @param experiment Experiment this probe belongs to (to extract probe interface definition).
@@ -167,10 +165,8 @@ export function buildProbe(
 }
 
 /**
- * Dispose a probe's transform node, its meshes, and its own materials,
- * leaving shared materials (e.g. `rod_material`) untouched. Detaches the
- * gizmo first if it was attached to this probe's node, so it's never left
- * pointing at a disposed node.
+ * Dispose a probe's transform node, its meshes, and its own materials.
+ * Detaches the gizmo first if it was attached to this probe's node.
  * @param scene Scene the probe was built in.
  * @param probeId Probe ID to remove any existing entity for.
  * @param gizmoManager Gizmo manager to remove probe meshes from.
@@ -200,9 +196,6 @@ export function disposeProbe(
  * @param experiment Experiment to pull probe data to sync from.
  * @param gizmoManager Gizmo manager for controlling probes.
  * @param draggedProbeId ID of the probe being dragged (if any). Ignore transform updates for this probe.
- * @returns IDs of probes whose entity was disposed and rebuilt (e.g. from a
- * type change), so a caller with a stale gizmo/selection reference to the
- * old node knows to reattach to the new one.
  */
 export function syncProbes(
   scene: Scene,
@@ -287,9 +280,7 @@ export function syncProbes(
 
 /**
  * Attach the gizmo to a probe's transform node and put its meshes into the
- * selection outline layer, replacing any prior selection. The single
- * canonical path for attaching a probe's selection, shared by the gizmo-pick
- * and select-from-state flows so they can't drift apart.
+ * selection outline layer, replacing any prior selection.
  * @param gizmoManager Gizmo manager to attach to the probe's node.
  * @param selectionOutlineLayer Selection outline layer to add the probe's meshes to.
  * @param probeTransformNode Probe transform node to attach and select.
@@ -324,7 +315,7 @@ export function selectProbeFromGizmoAttach(
   return gizmoManager.onAttachedToMeshObservable.add(mesh => {
     // Exit if not picking a probe mesh.
     if (!mesh) return;
-    if (!mesh.name.includes("probe")) return;
+    if (!isProbeEntityName(mesh.name)) return;
 
     // Get node.
     const probeId = probeIdFromEntityName(mesh.name);
@@ -356,18 +347,11 @@ export function setProbePositionFromGizmoDrag(
   onDrag: (probeId: string) => void
 ): Observer<DragEvent> {
   return gizmoManager.gizmos.positionGizmo!.onDragObservable.add(() => {
-    // Exit if not dragging a probe.
-    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+    const attached = attachedProbeFromGizmo(gizmoManager, experiment);
+    if (!attached) return;
 
-    const probeTransformNode = gizmoManager.attachedNode as TransformNode;
-    if (!probeTransformNode) return;
-
-    const probeId = probeIdFromEntityName(probeTransformNode.name);
-    const probe = experiment.probes.find(probe => probe.id == probeId);
-    if (!probe) return;
-
-    probe.tipPosition = vector3ToAsr(probeTransformNode.position);
-    onDrag(probe.id);
+    attached.probe.tipPosition = vector3ToAsr(attached.node.position);
+    onDrag(attached.probe.id);
   });
 }
 
@@ -383,26 +367,17 @@ export function setProbeRotationFromGizmoDrag(
   onDrag: (probeId: string) => void
 ): Observer<DragEvent> {
   return gizmoManager.gizmos.rotationGizmo!.onDragObservable.add(() => {
-    // Exit if not dragging a probe.
-    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+    const attached = attachedProbeFromGizmo(gizmoManager, experiment);
+    if (!attached) return;
 
-    const probeTransformNode = gizmoManager.attachedNode as TransformNode;
-    if (!probeTransformNode) return;
-
-    const probeId = probeIdFromEntityName(probeTransformNode.name);
-    const probe = experiment.probes.find(probe => probe.id == probeId);
-    if (!probe) return;
-
-    probe.rotation = vector3ToAsr(probeTransformNode.rotation);
-    onDrag(probe.id);
+    attached.probe.rotation = vector3ToAsr(attached.node.rotation);
+    onDrag(attached.probe.id);
   });
 }
 
 /**
  * Callback filter for when dragging finishes on a probe, from either the
- * position or the rotation gizmo. Both must be watched: a rotation-only drag
- * that never notified this callback would leave the dragged probe's ID
- * stuck, permanently skipping its transform in {@link syncProbes}.
+ * position or the rotation gizmo.
  * @param gizmoManager Gizmo manager to track dragging on.
  * @param onDragEnd Callback invoked to confirm probe drag ended.
  */
@@ -411,8 +386,8 @@ export function endProbeGizmoDrag(
   onDragEnd: () => void
 ): Observer<DragStartEndEvent>[] {
   const onEnd = () => {
-    // Exit if not dragging a probe.
-    if (!gizmoManager.attachedNode?.name.includes("probe")) return;
+    if (!gizmoManager.attachedNode) return;
+    if (!isProbeEntityName(gizmoManager.attachedNode.name)) return;
     onDragEnd();
   };
 
@@ -420,6 +395,26 @@ export function endProbeGizmoDrag(
     gizmoManager.gizmos.positionGizmo!.onDragEndObservable.add(onEnd),
     gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.add(onEnd)
   ];
+}
+
+/**
+ * Resolve the probe and transform node currently attached to the gizmo, or
+ * null if nothing (or a non-probe entity) is attached.
+ * @param gizmoManager Gizmo manager to read the attached node from.
+ * @param experiment Experiment to look up the attached probe in.
+ */
+function attachedProbeFromGizmo(
+  gizmoManager: GizmoManager,
+  experiment: Experiment
+): { probe: Probe; node: TransformNode } | null {
+  const node = gizmoManager.attachedNode;
+  if (!node || !isProbeEntityName(node.name)) return null;
+
+  const probeId = probeIdFromEntityName(node.name);
+  const probe = experiment.probes.find(probe => probe.id === probeId);
+  if (!probe) return null;
+
+  return { probe, node: node as TransformNode };
 }
 
 /**
@@ -486,18 +481,25 @@ function probeEntityName(probeId: string, suffix: string): string {
 }
 
 /**
+ * Is the given Babylon entity name one of a probe's entities.
+ * @param name Entity name to check.
+ */
+function isProbeEntityName(name: string): boolean {
+  return name.includes("_probe_");
+}
+
+/**
  * Recover a probe's id from one of its entity names.
  * @param entityName Entity name produced by {@link probeEntityName}.
  */
 function probeIdFromEntityName(entityName: string): string {
-  return entityName.slice(0, 36);
+  const suffixStart = entityName.indexOf("_probe_");
+  return suffixStart === -1 ? entityName : entityName.slice(0, suffixStart);
 }
 
 /**
- * Build a probe's shank-and-head-stage material, colored from the probe.
- * Frozen immediately, before any mesh uses it, so its later color updates
- * (via {@link setMaterialDiffuseColor}) rely on being forced through rather
- * than on the material being unfrozen.
+ * Build a probe's shank-and-head-stage material, colored from the probe and
+ * frozen immediately.
  * @param scene Scene to build the material in.
  * @param probe Probe to derive the material's color from.
  */
@@ -565,10 +567,14 @@ function buildHeadStageMesh(
     0,
     contour.height + HEAD_STAGE_HEIGHT_MILLIMETERS / 2
   );
-  const cutterMesh = MeshBuilder.CreateBox(`${name}_cutter`, {
-    size: HEAD_STAGE_TOP_DIAMETER_MILLIMETERS,
-    height: HEAD_STAGE_HEIGHT_MILLIMETERS
-  });
+  const cutterMesh = MeshBuilder.CreateBox(
+    `${name}_cutter`,
+    {
+      size: HEAD_STAGE_TOP_DIAMETER_MILLIMETERS,
+      height: HEAD_STAGE_HEIGHT_MILLIMETERS
+    },
+    scene
+  );
   cutterMesh.position = new Vector3(
     0,
     -HEAD_STAGE_HEIGHT_MILLIMETERS / 8,
@@ -622,9 +628,6 @@ function buildRodMesh(scene: Scene, contour: ProbeContour, name: string): Mesh {
 
 /**
  * Build the scene's shared grey rod material, or return the existing one.
- * Frozen once, only on creation: nothing ever mutates it afterward, and
- * re-freezing an already-frozen shared material on every reuse would clear
- * a pending forced rebind on every rod mesh in the scene.
  * @param scene Scene to get the rod material from.
  */
 function buildRodMaterial(scene: Scene): StandardMaterial {

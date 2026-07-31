@@ -39,11 +39,7 @@ export function makeTestScene(): Scene {
 
 /**
  * Initialize Babylon's CSG2 from the bundled `manifold-3d` package, mirroring
- * `initializeCSG2` in `babylon-runtime.service.ts`, so tests that build
- * probes (whose head stage is CSG2-subtracted) don't hit
- * `TypeError: ManifoldMesh is not a constructor`. Safe to call from every
- * test that needs it -- guarded on `IsCSG2Ready()`, and initialization is
- * process-wide, so a `beforeAll` in one spec file is enough for that file.
+ * `initializeCSG2` in `babylon-runtime.service.ts`.
  */
 export async function initializeTestCSG2(): Promise<void> {
   if (IsCSG2Ready()) return;
@@ -60,12 +56,6 @@ export async function initializeTestCSG2(): Promise<void> {
  * Build a real Babylon `Scene` backed by a `NullEngine`, along with a
  * `GizmoManager` (both gizmos enabled) and a `SelectionOutlineLayer`, for
  * tests that need to exercise probe gizmo attachment and selection.
- *
- * Passes explicit utility layers to the `GizmoManager`: its defaults are
- * global statics keyed off the last-created scene, so two managers built for
- * two different test scenes would otherwise share one layer still bound to
- * whichever scene was created first -- including one a prior test already
- * disposed.
  */
 export function makeTestSceneWithGizmo(): {
   scene: Scene;
@@ -91,9 +81,7 @@ export function makeTestSceneWithGizmo(): {
 
 /**
  * Short-circuit `DracoDecoder`'s lazy worker pool construction with an
- * (unused) empty pool, so merely accessing `DracoDecoder.Default` doesn't
- * fetch the real wasm binary from cdn.babylonjs.com. Call once per file that
- * spies on `decodeMeshToGeometryAsync` directly.
+ * (unused) empty pool, so it doesn't fetch the real wasm from a CDN.
  */
 export function stubDracoDecoder(): void {
   DracoDecoder.ResetDefault(true);
@@ -102,12 +90,9 @@ export function stubDracoDecoder(): void {
 
 /**
  * Mount a component wired up with the same global plugins the real app
- * installs (Quasar, vue-i18n, Pinia), so components using `$t`, Quasar
- * components/directives, or a store don't need bespoke per-test wiring.
- *
- * A fresh Pinia instance is created and activated for every mount unless one
- * is passed in via `options.pinia`, so store state never leaks between
- * tests.
+ * installs (Quasar, vue-i18n, Pinia).
+ * @param component Component to mount.
+ * @param options Mounting options, plus an optional `pinia` instance.
  */
 export function mountWithQuasar<T extends Component>(
   component: T,

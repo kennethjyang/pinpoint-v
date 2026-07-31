@@ -425,4 +425,65 @@ describe("SceneCanvas", () => {
     },
     30000
   );
+
+  it(
+    "drags and selects a probe in a new experiment after the old one is " +
+      "replaced, not the discarded one",
+    async () => {
+      const { runtime } = await mountCanvas();
+      const store = useCurrentExperimentStore();
+
+      const contour = [
+        [-11, 9989],
+        [-11, -11],
+        [24, -220],
+        [59, -11],
+        [59, 9989]
+      ];
+      const oldProbeInterfaceProbe = makeProbeInterfaceProbe({
+        probe_planar_contour: contour
+      });
+      internProbeInterfaceProbe(store.experiment, oldProbeInterfaceProbe);
+      const oldProbe = makeProbe({
+        probeInterfaceIdentifier: getProbeInterfaceIdentifier(
+          oldProbeInterfaceProbe
+        )
+      });
+      addProbe(store.experiment, oldProbe);
+      await flushPromises();
+
+      store.experiment = buildExperiment(
+        "New Experiment",
+        makeAtlas(),
+        [0, 0, 0]
+      );
+      const newProbeInterfaceProbe = makeProbeInterfaceProbe({
+        probe_planar_contour: contour
+      });
+      internProbeInterfaceProbe(store.experiment, newProbeInterfaceProbe);
+      const builtProbe = makeProbe({
+        probeInterfaceIdentifier: getProbeInterfaceIdentifier(
+          newProbeInterfaceProbe
+        )
+      });
+      addProbe(store.experiment, builtProbe);
+      const newProbe = store.experiment.probes.find(
+        p => p.id === builtProbe.id
+      )!;
+      await flushPromises();
+
+      const scene = runtime.scene.value!;
+      const gizmoManager = runtime.gizmoManager.value!;
+      const newNode = getProbeTransformNode(scene, newProbe.id)!;
+
+      gizmoManager.attachToNode(newNode);
+      newNode.position.set(1, 2, 3);
+      gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
+        {} as never
+      );
+
+      expect(newProbe.tipPosition).not.toEqual([0, 0, 0]);
+      expect(store.draggedProbeId).toBe(newProbe.id);
+    }
+  );
 });

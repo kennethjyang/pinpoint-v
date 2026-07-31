@@ -24,8 +24,7 @@ export function toTitleCase(name: string): string {
 
 /**
  * Build a tree hierarchy from parsed terminology rows, linking each row to
- * its parent via `parent_identifier` (not `root_identifier_path`, which
- * isn't reliably root-anchored across atlases).
+ * its parent via `parent_identifier`.
  * @param terminologyRows Parsed terminology rows.
  */
 export function buildHierarchy(

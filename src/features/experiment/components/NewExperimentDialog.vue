@@ -46,6 +46,8 @@ async function create() {
     atlas.value,
     referenceCoordinate
   );
+  currentExperimentStore.selectedInspectable = null;
+  currentExperimentStore.draggedProbeId = null;
 
   onDialogOK();
 }

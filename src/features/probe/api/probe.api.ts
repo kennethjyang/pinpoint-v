@@ -5,8 +5,7 @@ import { STANDARD_COLORS } from "@/features/scene";
 
 /**
  * Build a probe referencing the given probe interface definition, with a
- * random name and color, a zeroed position, and a starting pitch of PI/2 so
- * it points inferiorly (a pitch of 0 would lie flat, pointing anteriorly).
+ * random name and color, a zeroed position, and a pitch pointing inferiorly.
  * @param probeInterfaceProbe Probe interface definition for the probe.
  */
 export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {

@@ -5,7 +5,7 @@ import NewExperimentDialog from "./NewExperimentDialog.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
-import { makeAtlas, makeManifest } from "@/test/fixtures";
+import { makeAtlas, makeManifest, makeProbe } from "@/test/fixtures";
 
 // `useCurrentExperimentStore`'s `manifest` and `terminologyRows` are
 // `computedAsync`, refetching from the real atlas API whenever the atlas
@@ -120,6 +120,27 @@ describe("NewExperimentDialog", () => {
       // Closing is now driven by `onDialogOK` (so the splash dialog that
       // opened this one can close itself too), not `v-close-popup`.
       expect(wrapper.emitted("ok")).toBeTruthy();
+    });
+
+    it("clears the selected and dragged probe from the discarded experiment", async () => {
+      const atlas = makeAtlas();
+      vi.mocked(getManifest).mockResolvedValue(makeManifest());
+
+      const wrapper = await mountDialog();
+      const store = useCurrentExperimentStore();
+      const staleProbe = makeProbe();
+      store.selectedInspectable = staleProbe;
+      store.draggedProbeId = staleProbe.id;
+
+      await wrapper.findComponent({ name: "QInput" }).setValue("My Experiment");
+      await wrapper
+        .findComponent({ name: "AtlasPicker" })
+        .vm.$emit("update:modelValue", atlas);
+      await createButton(wrapper).trigger("click");
+      await flush();
+
+      expect(store.selectedInspectable).toBeNull();
+      expect(store.draggedProbeId).toBeNull();
     });
 
     it("notifies and doesn't create the experiment when the manifest can't be fetched", async () => {

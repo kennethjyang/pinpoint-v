@@ -185,47 +185,59 @@ watchEffect(() => {
   }
 });
 
-// Sync state from probes.
-watch([runtime.scene, runtime.gizmoManager], ([scene, gizmoManager]) => {
-  if (!scene || !gizmoManager) return;
-
-  const probePositionDraggingObserver = setProbePositionFromGizmoDrag(
-    gizmoManager,
-    currentExperiment.experiment,
-    probeId => {
-      currentExperiment.draggedProbeId = probeId;
-    }
-  );
-  const probeRotationDraggingObserver = setProbeRotationFromGizmoDrag(
-    gizmoManager,
-    currentExperiment.experiment,
-    probeId => {
-      currentExperiment.draggedProbeId = probeId;
-    }
-  );
-
-  const probeDragEndObservers = endProbeGizmoDrag(gizmoManager, () => {
-    currentExperiment.draggedProbeId = null;
-  });
-
-  onWatcherCleanup(() => {
-    probePositionDraggingObserver.remove();
-    probeRotationDraggingObserver.remove();
-    probeDragEndObservers.forEach(observer => observer.remove());
-  });
-});
-
-// Register callbacks for selection and deselection.
+// Sync state from probes. Re-registers whenever the experiment itself is
+// replaced (e.g. creating a new experiment), so the drag observers never
+// close over a discarded experiment's probes.
 watch(
-  [runtime.scene, runtime.gizmoManager, runtime.selectionOutlineLayer],
-  ([scene, gizmoManager, selectionOutlineLayer]) => {
+  [runtime.scene, runtime.gizmoManager, () => currentExperiment.experiment],
+  ([scene, gizmoManager, experiment]) => {
+    if (!scene || !gizmoManager) return;
+
+    const probePositionDraggingObserver = setProbePositionFromGizmoDrag(
+      gizmoManager,
+      experiment,
+      probeId => {
+        currentExperiment.draggedProbeId = probeId;
+      }
+    );
+    const probeRotationDraggingObserver = setProbeRotationFromGizmoDrag(
+      gizmoManager,
+      experiment,
+      probeId => {
+        currentExperiment.draggedProbeId = probeId;
+      }
+    );
+
+    const probeDragEndObservers = endProbeGizmoDrag(gizmoManager, () => {
+      currentExperiment.draggedProbeId = null;
+    });
+
+    onWatcherCleanup(() => {
+      probePositionDraggingObserver.remove();
+      probeRotationDraggingObserver.remove();
+      probeDragEndObservers.forEach(observer => observer.remove());
+    });
+  }
+);
+
+// Register callbacks for selection and deselection. Re-registers whenever
+// the experiment itself is replaced, so selection never resolves against a
+// discarded experiment's probes.
+watch(
+  [
+    runtime.scene,
+    runtime.gizmoManager,
+    runtime.selectionOutlineLayer,
+    () => currentExperiment.experiment
+  ],
+  ([scene, gizmoManager, selectionOutlineLayer, experiment]) => {
     if (!scene || !gizmoManager || !selectionOutlineLayer) return;
 
     const probeSelectionObserver = selectProbeFromGizmoAttach(
       scene,
       gizmoManager,
       selectionOutlineLayer,
-      currentExperiment.experiment,
+      experiment,
       probe => {
         currentExperiment.selectedInspectable = probe;
       }
