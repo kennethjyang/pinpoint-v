@@ -109,14 +109,19 @@ $guide-width: 2px
   align-self: stretch
   position: relative
 
-.guide--line, .guide--tee
+.guide--line::before, .guide--tee::before
+  content: ''
+  position: absolute
+  top: 0
+  left: 50%
+  height: 100%
   border-left: $guide-width solid $separator-color
 
 .guide--elbow::before
   content: ''
   position: absolute
   top: 0
-  left: 0
+  left: 50%
   height: 50%
   border-left: $guide-width solid $separator-color
 
@@ -124,13 +129,13 @@ $guide-width: 2px
   content: ''
   position: absolute
   top: 50%
-  left: 0
-  width: 100%
+  left: 50%
+  width: 50%
   margin-top: -($guide-width * 0.5)
   border-top: $guide-width solid $separator-color
 
 body.body--dark
-  .guide--line, .guide--tee
+  .guide--line::before, .guide--tee::before
     border-left-color: $separator-dark-color
 
   .guide--elbow::before
