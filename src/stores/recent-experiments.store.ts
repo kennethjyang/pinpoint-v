@@ -36,6 +36,175 @@ export const useRecentExperimentsStore = defineStore(
         visibleStructures: [],
         probeInterfaceProbes: {},
         probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
       }
     ]);
 
@@ -55,7 +224,7 @@ export const useRecentExperimentsStore = defineStore(
       const experimentIndex = recents.value.findIndex(
         recent => recent.id === id
       );
-      if (!experimentIndex) return null;
+      if (experimentIndex === -1) return null;
 
       return recents.value.splice(experimentIndex, 1)[0] ?? null;
     }
@@ -67,7 +236,7 @@ export const useRecentExperimentsStore = defineStore(
       recents.value = [];
     }
 
-    return { recents, add, open: remove, clear };
+    return { recents, add, remove, clear };
   },
   {
     persist: true

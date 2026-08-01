@@ -2,6 +2,7 @@
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
 import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
+import { ref } from "vue";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -11,6 +12,8 @@ const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
 const recentExperimentsStore = useRecentExperimentsStore();
 const { openExperiment, onOpened } = useExperimentFile();
+
+const hoveredRecent = ref<number | null>(null);
 
 onOpened(onDialogOK);
 </script>
@@ -68,9 +71,26 @@ onOpened(onDialogOK);
           v-slot="{ item, index }"
           :items="recentExperimentsStore.recents"
           separator
+          class="dialog-list"
         >
-          <q-item :key="index" v-ripple clickable>
+          <q-item
+            :key="index"
+            v-ripple
+            clickable
+            @mouseenter="hoveredRecent = index"
+            @mouseleave="hoveredRecent = null"
+          >
             <q-item-section> {{ item.name }} </q-item-section>
+            <q-item-section side>
+              <q-btn
+                v-if="index === hoveredRecent"
+                dense
+                flat
+                icon="delete"
+                round
+                @click.stop="recentExperimentsStore.remove(item.id)"
+              />
+            </q-item-section>
           </q-item>
         </q-virtual-scroll>
       </q-card-section>

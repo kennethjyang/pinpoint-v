@@ -70,7 +70,6 @@ export default {
     file: "File",
     new: "New",
     open: "Open",
-    openRecent: "Open Recent",
     download: "Download",
     edit: "Edit",
     preferences: "Preferences",
