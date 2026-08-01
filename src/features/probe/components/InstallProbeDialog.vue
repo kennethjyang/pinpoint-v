@@ -231,19 +231,20 @@ watch(selectedManufacturerName, () => {
         <q-card-actions align="right">
           <q-btn :label="$t('installProbe.cancel')" @click="onDialogCancel" />
 
-          <input
-            ref="file-input"
-            accept="application/json"
-            class="hidden"
-            type="file"
-            @change="onFileSelected"
-          />
           <q-btn
             :label="$t('installProbe.uploadCustom')"
             :loading="uploading"
             icon="upload"
             @click="openFilePicker"
-          />
+          >
+            <input
+              ref="file-input"
+              accept="application/json"
+              class="hidden"
+              type="file"
+              @change="onFileSelected"
+            />
+          </q-btn>
 
           <q-btn
             :disable="!selectedProbeName"
@@ -263,4 +264,7 @@ watch(selectedManufacturerName, () => {
   </q-dialog>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+.install-card
+  min-width: 50vw
+</style>
