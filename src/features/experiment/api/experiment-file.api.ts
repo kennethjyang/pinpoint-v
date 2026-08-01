@@ -1,9 +1,22 @@
+import parse from "semver/functions/parse";
 import type { Experiment } from "../models/experiment.model";
 import {
   getProbeInterfaceIdentifier,
   isProbe,
   isProbeInterfaceProbe
 } from "@/features/probe";
+
+/**
+ * How an experiment file's Pinpoint version relates to the running one, once
+ * patch and prerelease differences are ignored.
+ */
+export type ExperimentVersionRelation =
+  | "match"
+  | "unknown"
+  | "majorBehind"
+  | "minorBehind"
+  | "majorAhead"
+  | "minorAhead";
 
 /** Indentation for written experiment files, so they stay human-diffable. */
 const FILE_INDENT = 2;
@@ -39,6 +52,30 @@ export function parseExperimentFile(text: string): Experiment | null {
 }
 
 /**
+ * Compare an experiment file's Pinpoint version to the running one, ignoring
+ * patch and prerelease differences so dev builds don't flag their own
+ * release line.
+ * @param version Version recorded in the experiment file.
+ * @param appVersion Running Pinpoint version.
+ */
+export function compareExperimentVersion(
+  version: string,
+  appVersion: string
+): ExperimentVersionRelation {
+  const fileSemver = parse(version);
+  const appSemver = parse(appVersion);
+  if (!fileSemver || !appSemver) return "unknown";
+
+  if (fileSemver.major !== appSemver.major) {
+    return fileSemver.major < appSemver.major ? "majorBehind" : "majorAhead";
+  }
+  if (fileSemver.minor !== appSemver.minor) {
+    return fileSemver.minor < appSemver.minor ? "minorBehind" : "minorAhead";
+  }
+  return "match";
+}
+
+/**
  * Build a filesystem-safe `.json` file name from an experiment's name.
  * @param experiment Experiment to name the file after.
  */
@@ -62,6 +99,8 @@ function isExperiment(value: unknown): value is Experiment {
   if (!isRecord(value)) return false;
 
   const {
+    id,
+    version,
     name,
     atlas,
     referenceCoordinate,
@@ -70,6 +109,8 @@ function isExperiment(value: unknown): value is Experiment {
     probes
   } = value;
 
+  if (typeof id !== "string") return false;
+  if (typeof version !== "string") return false;
   if (typeof name !== "string") return false;
   if (
     !isRecord(atlas) ||
