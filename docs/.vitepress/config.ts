@@ -4,6 +4,7 @@ import { defineConfig } from "vitepress";
 export default defineConfig({
   title: "Pinpoint V Documentation",
   description: "Documentation, guides, and design notes for Pinpoint V",
+  base: "/pinpoint-v/docs/",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
