@@ -8,6 +8,7 @@ export {
   structureEntityFromIdentifier,
   structureEntitiesFromIdentifiers,
   getAtlasCenter,
+  getAtlasLongestDimensionMillimeters,
   getAnnotationVolumeUrl
 } from "./api/source.api";
 export type { TerminologyRow } from "./models/terminology-row.model";

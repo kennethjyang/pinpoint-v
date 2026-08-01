@@ -293,6 +293,69 @@ describe("useAnnotationSampler", () => {
     unmount();
   });
 
+  it("replans an isolated geometry change after the stream has settled, e.g. switching probes", async () => {
+    const store = makeAnnotationVolumeStore({
+      shapeVoxels: [4, 4, 4],
+      chunkShapeVoxels: [2, 2, 2],
+      chunks: {
+        "0/0/0": Uint32Array.from([1, 1, 1, 1, 1, 1, 1, 1]),
+        "0/0/1": Uint32Array.from([2, 2, 2, 2, 2, 2, 2, 2])
+      }
+    });
+    const workerFactory = () => makeFakeWorker(store);
+    const manifest = ref(makeManifest());
+    const terminologyRows = ref([
+      makeTerminologyRow({ annotation_value: 1 }),
+      makeTerminologyRow({ annotation_value: 2 })
+    ]);
+
+    const { result: sampler, unmount } = mountWithComposable(() =>
+      useAnnotationSampler(
+        { manifest, terminologyRows },
+        workerFactory,
+        () => store
+      )
+    );
+    await flushPromises();
+
+    const geometry = ref<PlaneGeometry | null>(
+      makePlane({ centerMillimeters: [0.01, 0.01, 0.01] })
+    );
+    const { result, unmount: unmountStream } = mountWithComposable(() =>
+      sampler.createStream(geometry)
+    );
+
+    await vi.waitFor(
+      () =>
+        expect(
+          Array.from(result.result.value?.annotationValues ?? [])
+        ).toContain(1),
+      { timeout: 2000 }
+    );
+    await vi.waitFor(() => expect(result.isLoading.value).toBe(false), {
+      timeout: 2000
+    });
+
+    // Wait well past a replan interval so the stream is fully settled - a
+    // plain `leading: false` throttle drops a change that arrives here,
+    // which is exactly what happens when switching to a probe whose
+    // geometry differs from the previously selected one.
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    geometry.value = makePlane({ centerMillimeters: [0.01, 0.01, 0.03] });
+
+    await vi.waitFor(
+      () =>
+        expect(
+          Array.from(result.result.value?.annotationValues ?? [])
+        ).toContain(2),
+      { timeout: 2000 }
+    );
+
+    unmountStream();
+    unmount();
+  });
+
   it("terminates every worker once the last stream disposes", async () => {
     const store = makeAnnotationVolumeStore();
     const terminateSpies: ReturnType<typeof vi.fn>[] = [];

@@ -13,10 +13,10 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getProbeFrame } from "../api/probe-frame.api";
 import { isSampleResultComplete } from "../api/sample-result.api";
 import {
-  MAXIMUM_SLICE_ZOOM_EXPONENT,
-  MINIMUM_SLICE_ZOOM_EXPONENT,
   clampSliceCenterHeight,
-  getProbeSlicePlane
+  clampSliceExtent,
+  getProbeSlicePlane,
+  getSliceZoomExponentRange
 } from "../api/slice-plane.api";
 import { findStructureByAnnotationValue } from "../api/structure-colors.api";
 import { useAnnotationSampler } from "../composable/useAnnotationSampler";
@@ -33,7 +33,7 @@ const { t } = useI18n();
 
 const square = useTemplateRef<HTMLDivElement>("square");
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const { width } = useElementSize(square);
+const { width, height: squareHeight } = useElementSize(square);
 const { pixelRatio } = useDevicePixelRatio();
 
 /** Annotation value currently under the pointer, or 0 for background/none. */
@@ -62,8 +62,21 @@ const centerHeightMillimeters = computed({
   }
 });
 
+/** Zoom range, as log2 mm exponents, scaled to the current atlas's size. */
+const zoomRange = computed(() =>
+  getSliceZoomExponentRange(currentExperiment.manifest)
+);
+
+/**
+ * Clamped slice extent, in mm - a persisted extent (or the 2mm default) can
+ * fall outside a given atlas's range, e.g. after switching atlases.
+ */
+const extentMillimeters = computed(() =>
+  clampSliceExtent(probe.sliceExtentMillimeters, zoomRange.value)
+);
+
 const zoomExponent = computed({
-  get: () => Math.log2(probe.sliceExtentMillimeters),
+  get: () => Math.log2(extentMillimeters.value),
   set: (value: number) => {
     probe.sliceExtentMillimeters = 2 ** value;
   }
@@ -87,7 +100,7 @@ const plane = computed(() => {
   return getProbeSlicePlane(
     frame,
     centerHeightMillimeters.value,
-    probe.sliceExtentMillimeters,
+    extentMillimeters.value,
     sizePixels.value
   );
 });
@@ -183,12 +196,30 @@ function onClick(): void {
   );
 }
 
+/** Id of the probe the canvas currently holds a painted (or in-progress) image for. */
+let paintedProbeId: string | null = null;
+
+/**
+ * Blank the canvas and forget which probe it was painted for, so a stale
+ * image from a previous probe (or atlas) is never mistaken for the current
+ * one's.
+ */
+function clearCanvas(): void {
+  const element = canvas.value;
+  paintedProbeId = null;
+  if (!element) return;
+
+  const context = element.getContext("2d");
+  context?.clearRect(0, 0, element.width, element.height);
+}
+
 /**
  * Paint the current result onto the canvas, unless it's a partial update at
- * a resolution the canvas already holds a complete image for - preserving
- * that image avoids a flicker to empty between geometry updates. A resize
- * (canvas resolution changing) has no prior image to protect, so partial
- * results are blitted as they stream instead of leaving the square blank.
+ * a resolution the canvas already holds a complete image for *and* for the
+ * same probe - preserving that image avoids a flicker to empty between
+ * geometry updates. A resize or a probe switch has no prior image to
+ * protect, so partial results are blitted as they stream instead of leaving
+ * the square blank or showing a previous probe's slice.
  */
 function drawSlice(): void {
   const element = canvas.value;
@@ -196,10 +227,10 @@ function drawSlice(): void {
   if (!element || !slice?.pixels) return;
 
   const size = Math.round(Math.sqrt(slice.sampleCount));
-  const isCanvasSized = element.width === size;
-  if (isCanvasSized && !isSampleResultComplete(slice)) return;
+  const isCanvasCurrent = element.width === size && paintedProbeId === probe.id;
+  if (isCanvasCurrent && !isSampleResultComplete(slice)) return;
 
-  if (!isCanvasSized) {
+  if (element.width !== size) {
     element.width = size;
     element.height = size;
   }
@@ -212,6 +243,7 @@ function drawSlice(): void {
   // narrower `ArrayBuffer`-backed variant, so this is a type-only mismatch.
   const pixels = slice.pixels as Uint8ClampedArray<ArrayBuffer>;
   context.putImageData(new ImageData(pixels, size, size), 0, 0);
+  paintedProbeId = probe.id;
 }
 
 // `flush: "post"` and the `onMounted` call both exist for the same reason:
@@ -219,27 +251,42 @@ function drawSlice(): void {
 // open volume persist across mounts) before this component's canvas ref is
 // set, e.g. right after switching the selected probe - without repainting
 // once mounted, that already-sampled result would never reach the screen.
-watch(result, drawSlice, { flush: "post" });
+watch(result, value => (value ? drawSlice() : clearCanvas()), {
+  flush: "post"
+});
 onMounted(drawSlice);
+
+// `SliceCanvas` is reused across probe switches (the `v-if` selecting it
+// lives one level up, on `ProbeInspector`), so the previous probe's image
+// must be explicitly invalidated - otherwise it would linger under the
+// newly selected probe until a new result streams in.
+watch(
+  () => probe.id,
+  () => {
+    hoveredAnnotationValue.value = 0;
+    clearCanvas();
+  }
+);
 </script>
 
 <template>
-  <div class="slice-canvas">
-    <div class="row items-stretch no-wrap slice-canvas__row">
-      <q-slider
-        v-if="contour"
-        v-model="centerHeightMillimeters"
-        vertical
-        reverse
-        :min="0"
-        :max="contour.heightMillimeters"
-        :step="0"
-        dense
-        class="slice-canvas__center-slider"
-        :aria-label="t('slice.center')"
-      />
+  <div class="row no-wrap items-start slice-canvas">
+    <q-slider
+      v-if="contour"
+      v-model="centerHeightMillimeters"
+      vertical
+      reverse
+      :min="0"
+      :max="contour.heightMillimeters"
+      :step="0"
+      dense
+      class="col-auto slice-canvas__center-slider"
+      :style="{ height: `${squareHeight}px` }"
+      :aria-label="t('slice.center')"
+    />
 
-      <div ref="square" class="slice-canvas__square col relative-position">
+    <div class="col column">
+      <div ref="square" class="slice-canvas__square relative-position">
         <canvas
           ref="canvas"
           class="fit slice-canvas__canvas"
@@ -250,7 +297,7 @@ onMounted(drawSlice);
         <svg
           v-if="contour"
           class="fit absolute-top slice-canvas__overlay"
-          :viewBox="`${-probe.sliceExtentMillimeters / 2} ${-probe.sliceExtentMillimeters / 2} ${probe.sliceExtentMillimeters} ${probe.sliceExtentMillimeters}`"
+          :viewBox="`${-extentMillimeters / 2} ${-extentMillimeters / 2} ${extentMillimeters} ${extentMillimeters}`"
           preserveAspectRatio="none"
         >
           <polygon
@@ -278,25 +325,23 @@ onMounted(drawSlice);
           {{ hoveredStructure.abbreviation }} - {{ hoveredStructure.name }}
         </q-tooltip>
       </div>
-    </div>
 
-    <q-slider
-      v-model="zoomExponent"
-      :min="MINIMUM_SLICE_ZOOM_EXPONENT"
-      :max="MAXIMUM_SLICE_ZOOM_EXPONENT"
-      :step="0"
-      :markers="1"
-      :marker-labels="zoomMarkerLabel"
-      dense
-      class="q-mt-md"
-      :aria-label="t('slice.zoom')"
-    />
-    <div class="row justify-center q-mt-xs">
-      <span class="text-caption">{{
-        t("slice.extent", {
-          extent: formatSliceExtent(probe.sliceExtentMillimeters)
-        })
-      }}</span>
+      <q-slider
+        v-model="zoomExponent"
+        :min="zoomRange.minimum"
+        :max="zoomRange.maximum"
+        :step="0"
+        :markers="1"
+        :marker-labels="zoomMarkerLabel"
+        dense
+        class="q-mt-md"
+        :aria-label="t('slice.zoom')"
+      />
+      <div class="row justify-center q-mt-xs">
+        <span class="text-caption">{{
+          t("slice.extent", { extent: formatSliceExtent(extentMillimeters) })
+        }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -305,17 +350,15 @@ onMounted(drawSlice);
 .slice-canvas
   width: 100%
 
-  &__row
-    width: 100%
-
   &__center-slider
-    height: auto
     margin-right: 8px
 
   &__square
     position: relative
     aspect-ratio: 1
-    background-color: $dark
+    border: 1px solid $separator-color
+    border-radius: $generic-border-radius
+    overflow: hidden
 
   &__canvas
     display: block
@@ -325,7 +368,14 @@ onMounted(drawSlice);
 
   &__contour
     fill: none
-    stroke: white
+    stroke: $dark
     stroke-width: 0.02
     opacity: 0.6
+
+body.body--dark
+  .slice-canvas__square
+    border-color: $separator-dark-color
+
+  .slice-canvas__contour
+    stroke: #fff
 </style>

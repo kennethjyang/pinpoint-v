@@ -1,5 +1,5 @@
 import { onScopeDispose, type Ref, shallowRef, watch } from "vue";
-import { createSharedComposable, watchThrottled } from "@vueuse/core";
+import { createSharedComposable, watchDebounced } from "@vueuse/core";
 import { FetchStore, type Readable, withByteCaching } from "zarrita";
 import type { Manifest, TerminologyRow } from "@/features/atlas";
 import { getAnnotationVolumeUrl } from "@/features/atlas";
@@ -18,8 +18,14 @@ import type {
   SampledMessage
 } from "../models/sampler-message.model";
 
-/** Milliseconds between geometry-change replans, capping the sampler to 24 fps. */
-const THROTTLE_MILLISECONDS = 1000 / 24;
+/**
+ * Milliseconds a geometry change is debounced before replanning, capped by
+ * an equal `maxWait` so a sustained drag still replans at ~24fps instead of
+ * only once it stops - trailing-only (no leading-edge sample), but unlike a
+ * plain throttle, never drops the final, settled value of an isolated change
+ * such as a probe switch.
+ */
+const REPLAN_INTERVAL_MILLISECONDS = 1000 / 24;
 
 /** Builds one sampler worker. Overridable in tests to avoid a real `Worker`. */
 export type SamplerWorkerFactory = () => SamplerWorker;
@@ -228,9 +234,9 @@ export const useAnnotationSampler = createSharedComposable(
 
       streamReplans.set(streamId, () => planAndSample(geometry.value));
 
-      watchThrottled(geometry, planAndSample, {
-        throttle: THROTTLE_MILLISECONDS,
-        leading: false,
+      watchDebounced(geometry, planAndSample, {
+        debounce: REPLAN_INTERVAL_MILLISECONDS,
+        maxWait: REPLAN_INTERVAL_MILLISECONDS,
         immediate: true
       });
 

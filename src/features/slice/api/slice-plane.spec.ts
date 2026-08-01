@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { getProbeContour } from "@/features/probe";
-import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  makeManifest,
+  makeProbe,
+  makeProbeInterfaceProbe
+} from "@/test/fixtures";
 import { getProbeFrame } from "./probe-frame.api";
-import { clampSliceCenterHeight, getProbeSlicePlane } from "./slice-plane.api";
+import {
+  clampSliceCenterHeight,
+  clampSliceExtent,
+  getProbeSlicePlane,
+  getSliceZoomExponentRange
+} from "./slice-plane.api";
 
 describe("getProbeSlicePlane", () => {
   it("centers on the given height up the contour from the tip", () => {
@@ -65,5 +74,68 @@ describe("clampSliceCenterHeight", () => {
 
   it("clamps a value above the contour's top down to the top", () => {
     expect(clampSliceCenterHeight(20, contour)).toBe(contour.heightMillimeters);
+  });
+});
+
+describe("getSliceZoomExponentRange", () => {
+  it("reproduces the Allen-mouse-tuned range for the mouse-scale fixture manifest", () => {
+    // makeManifest() defaults to Allen-mouse resolutions/shape (0.025mm/voxel,
+    // 528 voxels AP -> a 13.2mm longest dimension), which this formula must
+    // continue to map to the range the zoom slider originally shipped with.
+    const range = getSliceZoomExponentRange(makeManifest());
+
+    expect(range).toEqual({ minimum: -2, maximum: 4 });
+  });
+
+  it("widens for an atlas with a larger longest dimension, e.g. human-scale", () => {
+    const range = getSliceZoomExponentRange(
+      makeManifest({ resolutions: [[0.5, 0.5, 0.5]], shape: [[394, 394, 394]] })
+    );
+
+    // Longest dimension is 197mm; ceil(log2(197)) = 8.
+    expect(range).toEqual({ minimum: 2, maximum: 8 });
+  });
+
+  it("narrows for an atlas with a smaller longest dimension, e.g. fly-scale", () => {
+    const range = getSliceZoomExponentRange(
+      makeManifest({
+        resolutions: [[0.001, 0.001, 0.001]],
+        shape: [[500, 200, 200]]
+      })
+    );
+
+    // Longest dimension is 0.5mm; ceil(log2(0.5)) = -1.
+    expect(range).toEqual({ minimum: -7, maximum: -1 });
+  });
+
+  it("falls back to the Allen-mouse-scale range when the manifest is null", () => {
+    expect(getSliceZoomExponentRange(null)).toEqual({
+      minimum: -2,
+      maximum: 4
+    });
+  });
+
+  it("falls back when the manifest's dimensions are unknown", () => {
+    const range = getSliceZoomExponentRange(
+      makeManifest({ resolutions: [], shape: [] })
+    );
+
+    expect(range).toEqual({ minimum: -2, maximum: 4 });
+  });
+});
+
+describe("clampSliceExtent", () => {
+  const range = { minimum: -2, maximum: 4 };
+
+  it("passes through an extent already within the range", () => {
+    expect(clampSliceExtent(2, range)).toBe(2);
+  });
+
+  it("clamps an extent below the range's minimum up to it", () => {
+    expect(clampSliceExtent(0.001, range)).toBe(2 ** range.minimum);
+  });
+
+  it("clamps an extent above the range's maximum down to it", () => {
+    expect(clampSliceExtent(1000, range)).toBe(2 ** range.maximum);
   });
 });

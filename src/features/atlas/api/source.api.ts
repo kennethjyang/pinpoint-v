@@ -371,3 +371,22 @@ export function getAtlasCenter(manifest: Manifest): [number, number, number] {
     (mlResolution * mlShape) / 2
   ];
 }
+
+/**
+ * Computes the longest edge of the atlas volume's bounding box, in mm, e.g.
+ * to scale a zoom range to the atlas's own size. Returns 0 if unknown.
+ * @param manifest Atlas manifest to compute the longest dimension for.
+ */
+export function getAtlasLongestDimensionMillimeters(
+  manifest: Manifest
+): number {
+  if (!manifest.resolutions[0] || !manifest.shape[0]) return 0;
+
+  const [apResolution, dvResolution, mlResolution] = manifest.resolutions[0];
+  const [apShape, dvShape, mlShape] = manifest.shape[0];
+  return Math.max(
+    apResolution * apShape,
+    dvResolution * dvShape,
+    mlResolution * mlShape
+  );
+}

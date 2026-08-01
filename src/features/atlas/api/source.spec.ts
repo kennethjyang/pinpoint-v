@@ -6,6 +6,7 @@ import {
   BRAINGLOBE_BASE_URL,
   getAnnotationVolumeUrl,
   getAtlasCenter,
+  getAtlasLongestDimensionMillimeters,
   getManifest,
   getTerminologyRows,
   listAtlases,
@@ -854,5 +855,50 @@ describe("getAtlasCenter", () => {
     });
 
     expect(getAtlasCenter(manifest)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("getAtlasLongestDimensionMillimeters", () => {
+  it("picks the largest resolution * shape across axes, not just AP", () => {
+    const manifest = makeManifest({
+      resolutions: [[0.02, 0.04, 0.06]],
+      shape: [[100, 200, 300]]
+    });
+
+    // AP: 2, DV: 8, ML: 18 - ML is the longest, not the first axis.
+    expect(getAtlasLongestDimensionMillimeters(manifest)).toBe(18);
+  });
+
+  it("uses only the finest (first) size variant when several are present", () => {
+    const manifest = makeManifest({
+      resolutions: [
+        [0.02, 0.04, 0.06],
+        [0.2, 0.4, 0.6]
+      ],
+      shape: [
+        [100, 200, 300],
+        [10, 20, 30]
+      ]
+    });
+
+    expect(getAtlasLongestDimensionMillimeters(manifest)).toBe(18);
+  });
+
+  it("falls back to 0 when the manifest has no resolutions", () => {
+    const manifest = makeManifest({
+      resolutions: [],
+      shape: [[100, 200, 300]]
+    });
+
+    expect(getAtlasLongestDimensionMillimeters(manifest)).toBe(0);
+  });
+
+  it("falls back to 0 when the manifest has no shape", () => {
+    const manifest = makeManifest({
+      resolutions: [[0.02, 0.04, 0.06]],
+      shape: []
+    });
+
+    expect(getAtlasLongestDimensionMillimeters(manifest)).toBe(0);
   });
 });

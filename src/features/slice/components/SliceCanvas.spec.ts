@@ -348,4 +348,90 @@ describe("SliceCanvas", () => {
       true
     );
   });
+
+  it("clears the canvas when switching to a different probe, instead of holding the old image", async () => {
+    // happy-dom's canvas has no real 2D rendering backend (`getContext("2d")`
+    // resolves to null), so painting is observed through a stand-in context
+    // recording calls rather than by reading pixels back. The mock is global
+    // (every canvas in this file, including ones from prior specs still
+    // mounted in happy-dom, resolves to it), and `mockResult` is a shared
+    // module-level ref, so assertions below compare call-count deltas rather
+    // than absolute counts.
+    const context = {
+      clearRect: vi.fn(),
+      putImageData: vi.fn()
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context as unknown as CanvasRenderingContext2D
+    );
+
+    mockResult.value = makeSampleResult(2, [1, 1, 1, 1]);
+    const { wrapper, store } = mountSlice();
+    await flushPromises();
+
+    const paintedBeforeSwitch = context.putImageData.mock.calls.length;
+    expect(paintedBeforeSwitch).toBeGreaterThan(0);
+
+    const otherProbeInterfaceProbe = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: CONTOUR,
+      contact_positions: [[0, 2]]
+    });
+    internProbeInterfaceProbe(store.experiment, otherProbeInterfaceProbe);
+    const otherProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(
+        otherProbeInterfaceProbe
+      )
+    });
+    store.experiment.probes.push(otherProbe);
+
+    // The mock sampler never publishes a new result on its own, so the only
+    // way this wrapper's canvas can clear here is the component's own
+    // probe-switch handling.
+    // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
+    await wrapper.setProps({ probe: otherProbe } as Record<string, unknown>);
+
+    expect(context.clearRect).toHaveBeenCalled();
+
+    // The stale image must not still be considered current once a new
+    // result streams in for the new probe.
+    mockResult.value = makeSampleResult(2, [2, 2, 2, 2]);
+    await wrapper.vm.$nextTick();
+    expect(context.putImageData.mock.calls.length).toBeGreaterThan(
+      paintedBeforeSwitch
+    );
+  });
+
+  it("scales the zoom slider's range to the current atlas's longest dimension", async () => {
+    vi.mocked(getManifest).mockResolvedValue(
+      makeManifest({
+        resolutions: [[0.5, 0.5, 0.5]],
+        shape: [[394, 394, 394]]
+      })
+    );
+    const { wrapper } = mountSlice();
+    await flushPromises();
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    // Longest dimension is 197mm; ceil(log2(197)) = 8, spanning 6 octaves down.
+    expect(zoomSlider.props("min")).toBe(2);
+    expect(zoomSlider.props("max")).toBe(8);
+  });
+
+  it("clamps a persisted extent outside the current atlas's zoom range into range", async () => {
+    vi.mocked(getManifest).mockResolvedValue(
+      makeManifest({
+        resolutions: [[0.5, 0.5, 0.5]],
+        shape: [[394, 394, 394]]
+      })
+    );
+    const { wrapper } = mountSlice({ sliceExtentMillimeters: 2 });
+    await flushPromises();
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    // 2mm (log2 = 1) is below this atlas's range minimum (2), so it clamps up.
+    expect(zoomSlider.props("modelValue")).toBe(2);
+  });
 });
