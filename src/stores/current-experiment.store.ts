@@ -20,6 +20,8 @@ export const useCurrentExperimentStore = defineStore(
      * Current experiment instance.
      */
     const experiment = ref<Experiment>({
+      id: crypto.randomUUID(),
+      version: import.meta.env.APP_VERSION,
       name: i18n.global.t("currentExperiment.defaultName"),
       atlas: {
         source: BRAINGLOBE_BASE_URL,
