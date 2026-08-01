@@ -41,4 +41,15 @@ export interface Probe {
    * - In radians.
    */
   rotation: [number, number, number];
+
+  /**
+   * Edge length of the inspector's slice view, in mm.
+   */
+  sliceExtentMillimeters: number;
+
+  /**
+   * Height up the probe contour from the tip that the slice view centers on,
+   * in probe-local mm.
+   */
+  sliceCenterHeightMillimeters: number;
 }

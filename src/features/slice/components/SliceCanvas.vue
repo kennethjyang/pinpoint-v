@@ -1,27 +1,29 @@
 <script lang="ts" setup>
-import { computed, ref, useTemplateRef, watch } from "vue";
+import { computed, onMounted, ref, useTemplateRef, watch } from "vue";
 import { useDevicePixelRatio, useElementSize } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import type { TerminologyRow } from "@/features/atlas";
 import type { Probe } from "@/features/probe";
-import { getProbeContacts, getProbeContour } from "@/features/probe";
+import { getProbeContour } from "@/features/probe";
 import {
   isStructureVisible,
   setStructureVisibility
 } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getProbeFrame } from "../api/probe-frame.api";
-import { findStructureByAnnotationValue } from "../api/structure-colors.api";
+import { isSampleResultComplete } from "../api/sample-result.api";
 import {
-  SLICE_EXTENTS_MILLIMETERS,
-  getDefaultSliceExtentIndex,
+  MAXIMUM_SLICE_ZOOM_EXPONENT,
+  MINIMUM_SLICE_ZOOM_EXPONENT,
+  clampSliceCenterHeight,
   getProbeSlicePlane
 } from "../api/slice-plane.api";
+import { findStructureByAnnotationValue } from "../api/structure-colors.api";
 import { useAnnotationSampler } from "../composable/useAnnotationSampler";
 
 /** Device-pixel edge lengths the canvas is quantized to, to bound replan frequency. */
 const MINIMUM_SIZE_PIXELS = 128;
-const MAXIMUM_SIZE_PIXELS = 512;
+const MAXIMUM_SIZE_PIXELS = 1024;
 const SIZE_QUANTUM_PIXELS = 32;
 
 const { probe } = defineProps<{ probe: Probe }>();
@@ -29,9 +31,9 @@ const { probe } = defineProps<{ probe: Probe }>();
 const currentExperiment = useCurrentExperimentStore();
 const { t } = useI18n();
 
-const container = useTemplateRef<HTMLDivElement>("container");
+const square = useTemplateRef<HTMLDivElement>("square");
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const { width } = useElementSize(container);
+const { width } = useElementSize(square);
 const { pixelRatio } = useDevicePixelRatio();
 
 /** Annotation value currently under the pointer, or 0 for background/none. */
@@ -47,22 +49,29 @@ const contour = computed(() =>
   probeInterfaceProbe.value ? getProbeContour(probeInterfaceProbe.value) : null
 );
 
-const contacts = computed(() =>
-  probeInterfaceProbe.value ? getProbeContacts(probeInterfaceProbe.value) : null
-);
-
-/** Zoom ladder index: the store's explicit choice, or an auto-framed default. */
-const extentIndex = computed(() => {
-  const stored = currentExperiment.sliceExtentIndex;
-  return stored ?? getDefaultSliceExtentIndex(contacts.value);
+const centerHeightMillimeters = computed({
+  get: () =>
+    contour.value
+      ? clampSliceCenterHeight(
+          probe.sliceCenterHeightMillimeters,
+          contour.value
+        )
+      : probe.sliceCenterHeightMillimeters,
+  set: (value: number) => {
+    probe.sliceCenterHeightMillimeters = value;
+  }
 });
 
-const extentMillimeters = computed(
-  () => SLICE_EXTENTS_MILLIMETERS[extentIndex.value]!
-);
+const zoomExponent = computed({
+  get: () => Math.log2(probe.sliceExtentMillimeters),
+  set: (value: number) => {
+    probe.sliceExtentMillimeters = 2 ** value;
+  }
+});
 
 /** Device-pixel edge length of the square canvas, quantized to bound replans. */
 const sizePixels = computed(() => {
+  if (width.value === 0) return 0;
   const devicePixels = width.value * pixelRatio.value;
   const quantized =
     Math.floor(devicePixels / SIZE_QUANTUM_PIXELS) * SIZE_QUANTUM_PIXELS;
@@ -73,12 +82,12 @@ const sizePixels = computed(() => {
 });
 
 const plane = computed(() => {
-  if (!contacts.value) return null;
+  if (!contour.value || sizePixels.value === 0) return null;
   const frame = getProbeFrame(probe, currentExperiment.referenceCoordinate);
   return getProbeSlicePlane(
     frame,
-    contacts.value,
-    extentMillimeters.value,
+    centerHeightMillimeters.value,
+    probe.sliceExtentMillimeters,
     sizePixels.value
   );
 });
@@ -89,13 +98,11 @@ const { createStream } = useAnnotationSampler({
 });
 const { result, isLoading } = createStream(plane);
 
-/** SVG polygon points for the contour overlay, in probe-local mm re-origined on the plane center. */
+/** SVG polygon points for the contour overlay, in probe-local mm re-origined on the slice center. */
 const contourPoints = computed(() => {
-  if (!contour.value || !contacts.value) return null;
-  const { x: centerX, y: centerY } = contacts.value.centerMillimeters;
-  return contour.value.points
-    .map(({ x, y }) => `${x - centerX},${centerY - y}`)
-    .join(" ");
+  if (!contour.value) return null;
+  const center = centerHeightMillimeters.value;
+  return contour.value.points.map(({ x, y }) => `${x},${center - y}`).join(" ");
 });
 
 const hoveredStructure = computed<TerminologyRow | null>(() => {
@@ -105,6 +112,22 @@ const hoveredStructure = computed<TerminologyRow | null>(() => {
     hoveredAnnotationValue.value
   );
 });
+
+/**
+ * Human-readable slice extent, rounded to avoid runs of float noise.
+ * @param extentMillimeters Extent to format, in mm.
+ */
+function formatSliceExtent(extentMillimeters: number): string {
+  return Number(extentMillimeters.toPrecision(2)).toString();
+}
+
+/**
+ * Marker label for a zoom slider tick, converting its log2 exponent back to mm.
+ * @param exponent Tick position, as a log2 mm exponent.
+ */
+function zoomMarkerLabel(exponent: number): string {
+  return formatSliceExtent(2 ** exponent);
+}
 
 /**
  * Convert a pointer event to a device-pixel coordinate on the slice canvas.
@@ -161,25 +184,22 @@ function onClick(): void {
 }
 
 /**
- * Move one step along the zoom ladder, clamped to its ends.
- * @param delta +1 to zoom out (larger extent), -1 to zoom in.
+ * Paint the current result onto the canvas, unless it's a partial update at
+ * a resolution the canvas already holds a complete image for - preserving
+ * that image avoids a flicker to empty between geometry updates. A resize
+ * (canvas resolution changing) has no prior image to protect, so partial
+ * results are blitted as they stream instead of leaving the square blank.
  */
-function zoomBy(delta: number): void {
-  const next = extentIndex.value + delta;
-  if (next < 0 || next >= SLICE_EXTENTS_MILLIMETERS.length) return;
-  currentExperiment.sliceExtentIndex = next;
-}
-
-// The canvas's width/height attributes (device pixels) must match the
-// result's size for putImageData to be valid; happy-dom's getContext("2d")
-// returns null, so this is also what makes the component mountable in specs.
-watch([result, sizePixels], () => {
+function drawSlice(): void {
   const element = canvas.value;
   const slice = result.value;
   if (!element || !slice?.pixels) return;
 
   const size = Math.round(Math.sqrt(slice.sampleCount));
-  if (element.width !== size) {
+  const isCanvasSized = element.width === size;
+  if (isCanvasSized && !isSampleResultComplete(slice)) return;
+
+  if (!isCanvasSized) {
     element.width = size;
     element.height = size;
   }
@@ -192,70 +212,90 @@ watch([result, sizePixels], () => {
   // narrower `ArrayBuffer`-backed variant, so this is a type-only mismatch.
   const pixels = slice.pixels as Uint8ClampedArray<ArrayBuffer>;
   context.putImageData(new ImageData(pixels, size, size), 0, 0);
-});
+}
+
+// `flush: "post"` and the `onMounted` call both exist for the same reason:
+// a result can already be published (the sampler's shared worker pool and
+// open volume persist across mounts) before this component's canvas ref is
+// set, e.g. right after switching the selected probe - without repainting
+// once mounted, that already-sampled result would never reach the screen.
+watch(result, drawSlice, { flush: "post" });
+onMounted(drawSlice);
 </script>
 
 <template>
-  <div ref="container" class="slice-canvas relative-position">
-    <div class="slice-canvas__square">
-      <canvas
-        ref="canvas"
-        class="fit"
-        @pointermove="onPointerMove"
-        @pointerleave="onPointerLeave"
-        @click="onClick"
+  <div class="slice-canvas">
+    <div class="row items-stretch no-wrap slice-canvas__row">
+      <q-slider
+        v-if="contour"
+        v-model="centerHeightMillimeters"
+        vertical
+        reverse
+        :min="0"
+        :max="contour.heightMillimeters"
+        :step="0"
+        dense
+        class="slice-canvas__center-slider"
+        :aria-label="t('slice.center')"
       />
-      <svg
-        v-if="plane"
-        class="fit absolute-top slice-canvas__overlay"
-        :viewBox="`${-plane.halfExtentMillimeters} ${-plane.halfExtentMillimeters} ${extentMillimeters} ${extentMillimeters}`"
-        preserveAspectRatio="none"
-      >
-        <polygon
-          v-if="contourPoints"
-          :points="contourPoints"
-          class="slice-canvas__contour"
+
+      <div ref="square" class="slice-canvas__square col relative-position">
+        <canvas
+          ref="canvas"
+          class="fit slice-canvas__canvas"
+          @pointermove="onPointerMove"
+          @pointerleave="onPointerLeave"
+          @click="onClick"
         />
-      </svg>
+        <svg
+          v-if="contour"
+          class="fit absolute-top slice-canvas__overlay"
+          :viewBox="`${-probe.sliceExtentMillimeters / 2} ${-probe.sliceExtentMillimeters / 2} ${probe.sliceExtentMillimeters} ${probe.sliceExtentMillimeters}`"
+          preserveAspectRatio="none"
+        >
+          <polygon
+            v-if="contourPoints"
+            :points="contourPoints"
+            class="slice-canvas__contour"
+          />
+        </svg>
 
-      <q-linear-progress
-        v-if="isLoading"
-        indeterminate
-        color="secondary"
-        size="sm"
-        class="absolute-top"
-      />
+        <q-linear-progress
+          v-if="isLoading"
+          indeterminate
+          color="secondary"
+          size="sm"
+          class="absolute-top"
+        />
 
-      <div v-if="!contacts" class="fit flex flex-center absolute-top">
-        <p class="text-caption text-weight-light">{{
-          t("slice.noContacts")
-        }}</p>
+        <div v-if="!contour" class="fit flex flex-center absolute-top">
+          <p class="text-caption text-weight-light">{{
+            t("slice.noContour")
+          }}</p>
+        </div>
+
+        <q-tooltip v-if="hoveredStructure">
+          {{ hoveredStructure.abbreviation }} - {{ hoveredStructure.name }}
+        </q-tooltip>
       </div>
-
-      <q-tooltip v-if="hoveredStructure">
-        {{ hoveredStructure.abbreviation }} - {{ hoveredStructure.name }}
-      </q-tooltip>
     </div>
 
-    <div class="row items-center justify-center q-gutter-x-sm q-mt-xs">
-      <q-btn-group flat>
-        <q-btn
-          dense
-          icon="remove"
-          :disable="extentIndex === 0"
-          :aria-label="t('slice.zoomIn')"
-          @click="zoomBy(-1)"
-        />
-        <q-btn
-          dense
-          icon="add"
-          :disable="extentIndex === SLICE_EXTENTS_MILLIMETERS.length - 1"
-          :aria-label="t('slice.zoomOut')"
-          @click="zoomBy(1)"
-        />
-      </q-btn-group>
+    <q-slider
+      v-model="zoomExponent"
+      :min="MINIMUM_SLICE_ZOOM_EXPONENT"
+      :max="MAXIMUM_SLICE_ZOOM_EXPONENT"
+      :step="0"
+      :markers="1"
+      :marker-labels="zoomMarkerLabel"
+      dense
+      class="q-mt-md"
+      :aria-label="t('slice.zoom')"
+    />
+    <div class="row justify-center q-mt-xs">
       <span class="text-caption">{{
-        t("slice.extent", { extent: extentMillimeters })
+        t("slice.extent", {
+          extent: formatSliceExtent(probe.sliceExtentMillimeters)
+        })
       }}</span>
     </div>
   </div>
@@ -265,11 +305,20 @@ watch([result, sizePixels], () => {
 .slice-canvas
   width: 100%
 
+  &__row
+    width: 100%
+
+  &__center-slider
+    height: auto
+    margin-right: 8px
+
   &__square
     position: relative
-    width: 100%
     aspect-ratio: 1
     background-color: $dark
+
+  &__canvas
+    display: block
 
   &__overlay
     pointer-events: none

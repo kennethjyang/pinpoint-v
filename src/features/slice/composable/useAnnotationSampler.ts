@@ -1,5 +1,5 @@
 import { onScopeDispose, type Ref, shallowRef, watch } from "vue";
-import { createSharedComposable, watchDebounced } from "@vueuse/core";
+import { createSharedComposable, watchThrottled } from "@vueuse/core";
 import { FetchStore, type Readable, withByteCaching } from "zarrita";
 import type { Manifest, TerminologyRow } from "@/features/atlas";
 import { getAnnotationVolumeUrl } from "@/features/atlas";
@@ -18,11 +18,8 @@ import type {
   SampledMessage
 } from "../models/sampler-message.model";
 
-/** Milliseconds to debounce a geometry change before replanning. */
-const DEBOUNCE_MILLISECONDS = 120;
-
-/** Maximum milliseconds a geometry change may wait before a repaint is forced. */
-const MAXIMUM_DEBOUNCE_WAIT_MILLISECONDS = 400;
+/** Milliseconds between geometry-change replans, capping the sampler to 24 fps. */
+const THROTTLE_MILLISECONDS = 1000 / 24;
 
 /** Builds one sampler worker. Overridable in tests to avoid a real `Worker`. */
 export type SamplerWorkerFactory = () => SamplerWorker;
@@ -231,9 +228,8 @@ export const useAnnotationSampler = createSharedComposable(
 
       streamReplans.set(streamId, () => planAndSample(geometry.value));
 
-      watchDebounced(geometry, planAndSample, {
-        debounce: DEBOUNCE_MILLISECONDS,
-        maxWait: MAXIMUM_DEBOUNCE_WAIT_MILLISECONDS,
+      watchThrottled(geometry, planAndSample, {
+        throttle: THROTTLE_MILLISECONDS,
         immediate: true
       });
 

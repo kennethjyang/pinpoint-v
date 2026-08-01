@@ -9,6 +9,7 @@ import {
   getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier,
   getProbeModelDisplayName,
+  normalizeProbeSliceView,
   rotateProbeVisibility
 } from "./probe.api";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
@@ -36,6 +37,8 @@ describe("buildProbe", () => {
     );
     expect(probe.name).toMatch(/^Probe /);
     expect(probe.color).toMatch(/^#/);
+    expect(probe.sliceExtentMillimeters).toBe(2);
+    expect(probe.sliceCenterHeightMillimeters).toBe(0);
   });
 
   it("gives each probe a unique id", () => {
@@ -122,6 +125,31 @@ describe("rotateProbeVisibility", () => {
     rotateProbeVisibility(probe);
 
     expect(probe.visibility).toBe("hidden");
+  });
+});
+
+describe("normalizeProbeSliceView", () => {
+  it("leaves existing slice-view fields untouched", () => {
+    const probe = makeProbe({
+      sliceExtentMillimeters: 8,
+      sliceCenterHeightMillimeters: 3
+    });
+
+    normalizeProbeSliceView(probe);
+
+    expect(probe.sliceExtentMillimeters).toBe(8);
+    expect(probe.sliceCenterHeightMillimeters).toBe(3);
+  });
+
+  it("fills in defaults for a probe persisted before these fields existed", () => {
+    const probe = makeProbe();
+    delete (probe as Partial<Probe>).sliceExtentMillimeters;
+    delete (probe as Partial<Probe>).sliceCenterHeightMillimeters;
+
+    normalizeProbeSliceView(probe);
+
+    expect(probe.sliceExtentMillimeters).toBe(2);
+    expect(probe.sliceCenterHeightMillimeters).toBe(0);
   });
 });
 

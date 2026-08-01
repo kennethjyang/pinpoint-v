@@ -127,9 +127,8 @@ describe("useAnnotationSampler", () => {
     );
 
     // isLoading starts false, so waiting on "false" alone would pass
-    // instantly, before the (120ms-debounced) plan ever runs. Wait for the
-    // watch to actually capture a snapshot first, then for the stream to
-    // finish loading.
+    // instantly, before the throttled plan ever runs. Wait for the watch to
+    // actually capture a snapshot first, then for the stream to finish loading.
     await vi.waitFor(() => expect(firstAnnotationValues).not.toBeNull(), {
       timeout: 2000
     });
@@ -350,7 +349,7 @@ describe("useAnnotationSampler", () => {
       sampler.createStream(geometry)
     );
     // isLoading starts false, so wait for the result to actually populate
-    // (the signal that the debounced plan has run) before treating a
+    // (the signal that the throttled plan has run) before treating a
     // "false" isLoading as "finished" rather than "hasn't started".
     await vi.waitFor(() => expect(result.result.value).not.toBeNull(), {
       timeout: 2000

@@ -5,12 +5,14 @@ export type {
 } from "./models/probe-interface.model";
 export type { Probe } from "./models/probe.model";
 export {
+  DEFAULT_SLICE_EXTENT_MILLIMETERS,
   buildProbe,
   getProbeInterfaceIdentifier,
   getProbeInterfaceDisplayName,
   detachProbeInterfaceProbe,
   rotateProbeVisibility,
-  findProbeInterfaceProbeByIdentifier
+  findProbeInterfaceProbeByIdentifier,
+  normalizeProbeSliceView
 } from "./api/probe.api";
 export type { ProbeContacts, ProbeContour } from "./api/contour.api";
 export {

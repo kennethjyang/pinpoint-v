@@ -15,7 +15,6 @@ import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
 import type { SampleResult } from "../models/sample-result.model";
-import { SLICE_EXTENTS_MILLIMETERS } from "../api/slice-plane.api";
 
 // Mirrors ProbeInspector.spec.ts: manifest/terminologyRows are computedAsync
 // and fetch on store creation, so the leaf module must be mocked or mounting
@@ -71,7 +70,7 @@ describe("SliceCanvas", () => {
     mockIsLoading.value = false;
   });
 
-  function mountSlice() {
+  function mountSlice(probeOverrides: Parameters<typeof makeProbe>[0] = {}) {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useCurrentExperimentStore(pinia);
@@ -83,7 +82,9 @@ describe("SliceCanvas", () => {
     });
     internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
     const probe = makeProbe({
-      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+      probeInterfaceIdentifier:
+        getProbeInterfaceIdentifier(probeInterfaceProbe),
+      ...probeOverrides
     });
     store.experiment.probes = [probe];
 
@@ -91,13 +92,11 @@ describe("SliceCanvas", () => {
     return { wrapper, store, probe };
   }
 
-  it("shows the no-contacts message when the probe has no usable contacts", () => {
+  it("shows the no-contour message when the probe has no usable contour", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useCurrentExperimentStore(pinia);
-    const probeInterfaceProbe = makeProbeInterfaceProbe({
-      contact_positions: []
-    });
+    const probeInterfaceProbe = makeProbeInterfaceProbe();
     internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
     const probe = makeProbe({
       probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
@@ -106,24 +105,19 @@ describe("SliceCanvas", () => {
 
     const wrapper = mountWithQuasar(SliceCanvas, { pinia, props: { probe } });
 
-    expect(wrapper.find("svg").exists()).toBe(false);
+    // A bare `find("svg")` would also match the zoom slider's own thumb-shape
+    // svg (always rendered), so this scopes to the contour overlay itself.
+    expect(wrapper.find(".slice-canvas__overlay").exists()).toBe(false);
   });
 
-  it("draws the contour overlay re-origined on the contact center, flipping y for SVG", () => {
-    const { wrapper } = mountSlice();
+  it("draws the contour overlay re-origined on the center slider's height", () => {
+    const { wrapper } = mountSlice({ sliceCenterHeightMillimeters: 2 });
 
-    // Contour is centered at x=0 already; contact sits at local y=0 (2mm
-    // above the tip, same as the contour's local origin after
-    // getProbeContacts re-origins on the contour). The polygon's points must
-    // negate y (SVG down is +y) relative to the contact center.
     const polygon = wrapper.find("polygon");
     expect(polygon.exists()).toBe(true);
     const points = polygon.attributes("points");
     expect(points).toBeTruthy();
 
-    // Every declared contour point's x must appear unchanged (contacts are
-    // laterally centered on the contour), and the y coordinates must be the
-    // negation of (contourY - contactY).
     const parsed = points!
       .trim()
       .split(" ")
@@ -136,42 +130,71 @@ describe("SliceCanvas", () => {
     ]);
   });
 
-  it("disables zoom-in at the smallest extent and zoom-out at the largest", async () => {
-    const { wrapper, store } = mountSlice();
-    store.sliceExtentIndex = 0;
-    await wrapper.vm.$nextTick();
+  it("reads the center slider from the probe's saved height, clamped to the contour", () => {
+    const { wrapper } = mountSlice({ sliceCenterHeightMillimeters: 999 });
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    const zoomIn = buttons.find(b => b.props("icon") === "remove")!;
-    const zoomOut = buttons.find(b => b.props("icon") === "add")!;
-    expect(zoomIn.props("disable")).toBe(true);
-    expect(zoomOut.props("disable")).toBe(false);
-
-    store.sliceExtentIndex = SLICE_EXTENTS_MILLIMETERS.length - 1;
-    await wrapper.vm.$nextTick();
-    expect(zoomOut.props("disable")).toBe(true);
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const centerSlider = sliders.find(s => s.props("vertical") === true)!;
+    expect(centerSlider.props("modelValue")).toBe(10);
   });
 
-  it("clicking zoom out writes the next-larger index to the store", async () => {
-    const { wrapper, store } = mountSlice();
-    store.sliceExtentIndex = 2;
-    await wrapper.vm.$nextTick();
+  it("moving the center slider writes the height to the probe", async () => {
+    const { wrapper, probe } = mountSlice({ sliceCenterHeightMillimeters: 0 });
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    await buttons.find(b => b.props("icon") === "add")!.trigger("click");
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const centerSlider = sliders.find(s => s.props("vertical") === true)!;
+    await centerSlider.vm.$emit("update:modelValue", 6);
 
-    expect(store.sliceExtentIndex).toBe(3);
+    expect(probe.sliceCenterHeightMillimeters).toBe(6);
   });
 
-  it("clicking zoom in writes the next-smaller index to the store", async () => {
-    const { wrapper, store } = mountSlice();
-    store.sliceExtentIndex = 2;
-    await wrapper.vm.$nextTick();
+  it("reads the zoom slider from the probe's saved extent, in log2 space", () => {
+    const { wrapper } = mountSlice({ sliceExtentMillimeters: 4 });
 
-    const buttons = wrapper.findAllComponents({ name: "QBtn" });
-    await buttons.find(b => b.props("icon") === "remove")!.trigger("click");
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    expect(zoomSlider.props("modelValue")).toBe(2);
+  });
 
-    expect(store.sliceExtentIndex).toBe(1);
+  it("moving the zoom slider writes the converted extent to the probe", async () => {
+    const { wrapper, probe } = mountSlice({ sliceExtentMillimeters: 2 });
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    await zoomSlider.vm.$emit("update:modelValue", 3);
+
+    expect(probe.sliceExtentMillimeters).toBe(8);
+  });
+
+  it("switching to a different probe picks up that probe's own saved values", async () => {
+    const { wrapper, store } = mountSlice({
+      sliceExtentMillimeters: 2,
+      sliceCenterHeightMillimeters: 0
+    });
+
+    const otherProbeInterfaceProbe = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: CONTOUR,
+      contact_positions: [[0, 2]]
+    });
+    internProbeInterfaceProbe(store.experiment, otherProbeInterfaceProbe);
+    const otherProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(
+        otherProbeInterfaceProbe
+      ),
+      sliceExtentMillimeters: 8,
+      sliceCenterHeightMillimeters: 4
+    });
+    store.experiment.probes.push(otherProbe);
+
+    // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
+    await wrapper.setProps({ probe: otherProbe } as Record<string, unknown>);
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    const centerSlider = sliders.find(s => s.props("vertical") === true)!;
+    expect(zoomSlider.props("modelValue")).toBe(3);
+    expect(centerSlider.props("modelValue")).toBe(4);
   });
 
   it("shows a tooltip for the structure under a hovered pixel", async () => {

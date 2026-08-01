@@ -7,6 +7,9 @@ import {
 } from "../models/known-probes.model";
 import { STANDARD_COLORS } from "@/features/scene";
 
+/** Default square slice-view extent for a newly built probe, in mm - the modal bucket across the probeinterface library. */
+export const DEFAULT_SLICE_EXTENT_MILLIMETERS = 2;
+
 /**
  * Build a probe referencing the given probe interface definition, with a
  * random name and color, a zeroed position, and a pitch pointing inferiorly.
@@ -23,8 +26,24 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     visibility: "visible",
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     tipPosition: [0, 0, 0],
-    rotation: [0, 0, Math.PI / 2]
+    rotation: [0, 0, Math.PI / 2],
+    sliceExtentMillimeters: DEFAULT_SLICE_EXTENT_MILLIMETERS,
+    sliceCenterHeightMillimeters: 0
   };
+}
+
+/**
+ * Fill in a probe's slice-view fields when missing, e.g. from an experiment
+ * persisted before those fields existed.
+ * @param probe Probe to normalize in place.
+ */
+export function normalizeProbeSliceView(probe: Probe): void {
+  if (typeof probe.sliceExtentMillimeters !== "number") {
+    probe.sliceExtentMillimeters = DEFAULT_SLICE_EXTENT_MILLIMETERS;
+  }
+  if (typeof probe.sliceCenterHeightMillimeters !== "number") {
+    probe.sliceCenterHeightMillimeters = 0;
+  }
 }
 
 /**

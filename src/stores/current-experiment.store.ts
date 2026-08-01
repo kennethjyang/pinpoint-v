@@ -9,7 +9,10 @@ import {
   getManifest,
   getTerminologyRows
 } from "@/features/atlas";
-import { detachProbeInterfaceProbe } from "@/features/probe";
+import {
+  detachProbeInterfaceProbe,
+  normalizeProbeSliceView
+} from "@/features/probe";
 import type { Inspectable } from "@/features/scene";
 import { isSameInspectable } from "@/features/scene";
 
@@ -39,12 +42,6 @@ export const useCurrentExperimentStore = defineStore(
      * Used to ignore updates from pinia going to writing the probe's location.
      */
     const draggedProbeId = ref<string | null>(null);
-
-    /**
-     * Index into the slice inspector's zoom ladder, or null to auto-frame
-     * the selected probe's contacts.
-     */
-    const sliceExtentIndex = ref<number | null>(null);
 
     /**
      * Flag for when the manifest is being updated to match the new atlas.
@@ -132,7 +129,6 @@ export const useCurrentExperimentStore = defineStore(
       experiment,
       selectedInspectable,
       draggedProbeId,
-      sliceExtentIndex,
       isManifestEvaluating
     };
     const getters = {
@@ -153,7 +149,9 @@ export const useCurrentExperimentStore = defineStore(
     persist: {
       pick: ["experiment"],
 
-      // Re-mark probe interface definitions as raw to prevent tracking.
+      // Re-mark probe interface definitions as raw to prevent tracking, and
+      // fill in probe fields missing from experiments persisted before they
+      // existed.
       afterHydrate: context => {
         const experiment: Experiment = context.store.experiment;
         for (const [identifier, definition] of Object.entries(
@@ -161,6 +159,9 @@ export const useCurrentExperimentStore = defineStore(
         )) {
           experiment.probeInterfaceProbes[identifier] =
             detachProbeInterfaceProbe(definition);
+        }
+        for (const probe of experiment.probes) {
+          normalizeProbeSliceView(probe);
         }
       }
     }
