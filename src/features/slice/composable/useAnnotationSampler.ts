@@ -5,6 +5,7 @@ import type { Manifest, TerminologyRow } from "@/features/atlas";
 import { getAnnotationVolumeUrl } from "@/features/atlas";
 import { openAnnotationVolume } from "../api/annotation-volume.api";
 import { getWorkerCount, groupRequestsByShard } from "../api/chunk-shard.api";
+import { createSampleResult } from "../api/sample-paint.api";
 import {
   planSamples,
   selectAnnotationLevelIndex
@@ -209,7 +210,7 @@ export const useAnnotationSampler = createSharedComposable(
         const shardGroups = groupRequestsByShard(plan, workerCount);
         const nonEmptyGroups = shardGroups.filter(group => group.length > 0);
 
-        result.value = createEmptyResult(
+        result.value = createSampleResult(
           plan.sampleCount,
           value.kind === "plane"
         );
@@ -277,22 +278,4 @@ function applySampledMessage(
     if (packedColors) packedColors[sampleIndex] = message.colors[index]!;
   }
   result.paintedChunkCount += message.chunkCount;
-}
-
-/**
- * Allocate an empty sample result for a geometry's sample count.
- * @param sampleCount Number of samples the result will hold.
- * @param withPixels Whether to allocate RGBA8 pixels.
- */
-function createEmptyResult(
-  sampleCount: number,
-  withPixels: boolean
-): SampleResult {
-  return {
-    sampleCount,
-    annotationValues: new Uint32Array(sampleCount),
-    pixels: withPixels ? new Uint8ClampedArray(sampleCount * 4) : null,
-    paintedChunkCount: 0,
-    totalChunkCount: 0
-  };
 }
