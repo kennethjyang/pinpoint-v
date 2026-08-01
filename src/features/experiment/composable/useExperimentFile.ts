@@ -1,8 +1,10 @@
 import { createEventHook, useFileDialog } from "@vueuse/core";
 import { exportFile, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import type { ExperimentVersionRelation } from "../api/experiment-file.api";
 import {
   buildExperimentFileName,
+  compareExperimentVersion,
   parseExperimentFile,
   serializeExperiment
 } from "../api/experiment-file.api";
@@ -61,6 +63,59 @@ export function useExperimentFile() {
   }
 
   /**
+   * Notify about a version mismatch between the loaded file and the running
+   * Pinpoint version, if any. The file is always opened regardless.
+   * @param relation How the file's version relates to the running one.
+   * @param fileVersion Version recorded in the loaded file.
+   */
+  function notifyVersionMismatch(
+    relation: ExperimentVersionRelation,
+    fileVersion: string
+  ) {
+    if (relation === "match") return;
+
+    const appVersion = import.meta.env.APP_VERSION;
+    const messageKeys: Record<
+      Exclude<ExperimentVersionRelation, "match">,
+      { message: string; caption: string; color: "negative" | "warning" }
+    > = {
+      majorBehind: {
+        message: "experimentFile.versionMajorBehind",
+        caption: "experimentFile.versionMajorBehindCaption",
+        color: "negative"
+      },
+      minorBehind: {
+        message: "experimentFile.versionMinorBehind",
+        caption: "experimentFile.versionMinorBehindCaption",
+        color: "warning"
+      },
+      majorAhead: {
+        message: "experimentFile.versionMajorAhead",
+        caption: "experimentFile.versionMajorAheadCaption",
+        color: "negative"
+      },
+      minorAhead: {
+        message: "experimentFile.versionMinorAhead",
+        caption: "experimentFile.versionMinorAheadCaption",
+        color: "warning"
+      },
+      unknown: {
+        message: "experimentFile.versionUnknown",
+        caption: "experimentFile.versionUnknownCaption",
+        color: "warning"
+      }
+    };
+
+    const { message, caption, color } = messageKeys[relation];
+    $q.notify({
+      message: t(message),
+      caption: t(caption, { fileVersion, appVersion }),
+      color,
+      icon: color === "negative" ? "error" : "warning"
+    });
+  }
+
+  /**
    * Prompt for an experiment file to load into the current experiment.
    */
   function openExperiment() {
@@ -93,6 +148,13 @@ export function useExperimentFile() {
         return;
       }
 
+      notifyVersionMismatch(
+        compareExperimentVersion(
+          experiment.version,
+          import.meta.env.APP_VERSION
+        ),
+        experiment.version
+      );
       currentExperimentStore.loadExperiment(experiment);
       if (!(await getManifest(experiment.atlas))) notifyAtlasUnavailable();
 

@@ -1,3 +1,4 @@
+import parse from "semver/functions/parse";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 import type { VueWrapper } from "@vue/test-utils";
@@ -8,6 +9,7 @@ import { mountWithQuasar } from "@/test/mount-helper";
 import { makeAtlas, makeManifest } from "@/test/fixtures";
 import { serializeExperiment } from "../api/experiment-file.api";
 import { buildExperiment } from "../api/experiment.api";
+import enUS from "@/i18n/en-US";
 
 // Mock the leaf module (not the `@/features/atlas` barrel), matching the
 // pattern in `current-experiment.store.spec.ts`.
@@ -80,6 +82,23 @@ async function flush() {
   await new Promise(resolve => setTimeout(resolve, 0));
 }
 
+/**
+ * Build a version string a major version below the running app version, so
+ * version-skew tests stay meaningful across a version bump.
+ */
+function buildOlderMajorVersion(): string {
+  const appVersion = parse(import.meta.env.APP_VERSION)!;
+  return `${appVersion.major - 1}.0.0`;
+}
+
+/**
+ * Build a version string a minor version above the running app version.
+ */
+function buildNewerMinorVersion(): string {
+  const appVersion = parse(import.meta.env.APP_VERSION)!;
+  return `${appVersion.major}.${appVersion.minor + 1}.0`;
+}
+
 describe("useExperimentFile", () => {
   beforeEach(() => {
     openFileDialogSpy.mockReset();
@@ -149,6 +168,7 @@ describe("useExperimentFile", () => {
       await capturedOnChange!(makeFileList(file));
       await flush();
 
+      expect(notifySpy).toHaveBeenCalledTimes(1);
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({ color: "negative" })
       );
@@ -165,6 +185,7 @@ describe("useExperimentFile", () => {
       await capturedOnChange!(makeFileList(file));
       await flush();
 
+      expect(notifySpy).toHaveBeenCalledTimes(1);
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({ color: "negative" })
       );
@@ -197,6 +218,7 @@ describe("useExperimentFile", () => {
       await flush();
 
       expect(store.name).toBe("Loaded");
+      expect(notifySpy).toHaveBeenCalledTimes(1);
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({ color: "warning" })
       );
@@ -213,8 +235,83 @@ describe("useExperimentFile", () => {
       await capturedOnChange!(makeFileList(file));
       await flush();
 
+      expect(notifySpy).toHaveBeenCalledTimes(1);
       expect(notifySpy).toHaveBeenCalledWith(
         expect.objectContaining({ color: "negative" })
+      );
+    });
+
+    it("notifies an error and still loads a file that's a major version behind", async () => {
+      const wrapper = mountHarness();
+      const store = useCurrentExperimentStore();
+      const experiment = {
+        ...buildExperiment("Loaded", makeAtlas(), [0, 0, 0]),
+        version: buildOlderMajorVersion()
+      };
+      const file = new File([serializeExperiment(experiment)], "e.json", {
+        type: "application/json"
+      });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await capturedOnChange!(makeFileList(file));
+      await flush();
+
+      expect(store.name).toBe("Loaded");
+      expect(store.experiment.version).toBe(experiment.version);
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: enUS.experimentFile.versionMajorBehind,
+          color: "negative"
+        })
+      );
+    });
+
+    it("notifies a warning and still loads a file that's a minor version ahead", async () => {
+      const wrapper = mountHarness();
+      const store = useCurrentExperimentStore();
+      const experiment = {
+        ...buildExperiment("Loaded", makeAtlas(), [0, 0, 0]),
+        version: buildNewerMinorVersion()
+      };
+      const file = new File([serializeExperiment(experiment)], "e.json", {
+        type: "application/json"
+      });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await capturedOnChange!(makeFileList(file));
+      await flush();
+
+      expect(store.name).toBe("Loaded");
+      expect(store.experiment.version).toBe(experiment.version);
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: enUS.experimentFile.versionMinorAhead,
+          color: "warning"
+        })
+      );
+    });
+
+    it("notifies a warning and still loads a file with an unparsable version", async () => {
+      const wrapper = mountHarness();
+      const store = useCurrentExperimentStore();
+      const experiment = {
+        ...buildExperiment("Loaded", makeAtlas(), [0, 0, 0]),
+        version: "5.0"
+      };
+      const file = new File([serializeExperiment(experiment)], "e.json", {
+        type: "application/json"
+      });
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await capturedOnChange!(makeFileList(file));
+      await flush();
+
+      expect(store.name).toBe("Loaded");
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: enUS.experimentFile.versionUnknown,
+          color: "warning"
+        })
       );
     });
   });
