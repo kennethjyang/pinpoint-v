@@ -41,6 +41,12 @@ export const useCurrentExperimentStore = defineStore(
     const draggedProbeId = ref<string | null>(null);
 
     /**
+     * Index into the slice inspector's zoom ladder, or null to auto-frame
+     * the selected probe's contacts.
+     */
+    const sliceExtentIndex = ref<number | null>(null);
+
+    /**
      * Flag for when the manifest is being updated to match the new atlas.
      */
     const isManifestEvaluating = ref(false);
@@ -126,6 +132,7 @@ export const useCurrentExperimentStore = defineStore(
       experiment,
       selectedInspectable,
       draggedProbeId,
+      sliceExtentIndex,
       isManifestEvaluating
     };
     const getters = {

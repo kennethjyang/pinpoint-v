@@ -31,6 +31,20 @@ vi.mock("@/features/atlas/api/source.api", async () => {
   };
 });
 
+// ProbeInspector now renders SliceCanvas, which constructs its sampler
+// worker pool eagerly on setup (independent of whether the manifest ever
+// resolves) -- mock the composable so mounting doesn't hit the real
+// `Worker` global, which happy-dom doesn't provide. Mirrors the mocking
+// approach in SliceCanvas.spec.ts.
+vi.mock("@/features/slice/composable/useAnnotationSampler", () => ({
+  useAnnotationSampler: () => ({
+    createStream: () => ({
+      result: { value: null },
+      isLoading: { value: false }
+    })
+  })
+}));
+
 function fieldByLabel(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAllComponents({ name: "QInput" })

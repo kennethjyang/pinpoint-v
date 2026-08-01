@@ -97,6 +97,14 @@ export default {
     nameRequired: "Name is required.",
     mustBeNumber: "Must be a number."
   },
+  slice: {
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    extent: "{extent} mm",
+    loading: "Loading annotations...",
+    noAnnotations: "No annotation volume for this atlas.",
+    noContacts: "This probe has no contacts to slice through."
+  },
   errorNotFound: {
     code: "404",
     message: "Oops. Nothing here...",

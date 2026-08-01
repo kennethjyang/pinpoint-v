@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import { Color3 } from "@babylonjs/core";
 import {
   BRAINGLOBE_BASE_URL,
+  getAnnotationVolumeUrl,
   getAtlasCenter,
   getManifest,
   getTerminologyRows,
@@ -756,6 +757,28 @@ describe("structureEntityFromIdentifier", () => {
     const result = structureEntityFromIdentifier(manifest, terminologyRows, 8);
 
     expect(result?.color).toEqual(Color3.FromHexString("#BFDAE3"));
+  });
+});
+
+describe("getAnnotationVolumeUrl", () => {
+  it("builds the volume URL from the manifest's annotation set location on an HTTP host", () => {
+    const result = getAnnotationVolumeUrl(makeManifest());
+
+    expect(result).toBe(
+      "http://localhost:3000/brainglobe-atlasapi/annotation-sets/allen_mouse-annotation/3_0/annotations_compressed.ome.zarr"
+    );
+  });
+
+  it("builds the volume URL from the manifest's annotation set location on the BrainGlobe bucket", () => {
+    const bucketManifest = makeManifest({
+      atlas: makeAtlas({ source: BRAINGLOBE_BASE_URL })
+    });
+
+    const result = getAnnotationVolumeUrl(bucketManifest);
+
+    expect(result).toBe(
+      `${BRAINGLOBE_BASE_URL}annotation-sets/allen_mouse-annotation/3_0/annotations_compressed.ome.zarr`
+    );
   });
 });
 

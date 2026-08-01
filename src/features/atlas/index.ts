@@ -7,7 +7,8 @@ export {
   getManifest,
   structureEntityFromIdentifier,
   structureEntitiesFromIdentifiers,
-  getAtlasCenter
+  getAtlasCenter,
+  getAnnotationVolumeUrl
 } from "./api/source.api";
 export type { TerminologyRow } from "./models/terminology-row.model";
 export type { Atlas } from "./models/atlas.model";

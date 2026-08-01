@@ -47,6 +47,7 @@ const ATLAS_VERSION_STRING = "3_0";
 const ATLASES_DIRECTORY = "atlases";
 const MANIFEST_FILE = "manifest.json";
 const HTTP_SOURCE_PREFIX = "brainglobe-atlasapi";
+const ANNOTATION_VOLUME_DIRECTORY = "annotations_compressed.ome.zarr";
 
 /**
  * Fallback value if an atlas center coordinate can't be determined.
@@ -328,6 +329,17 @@ export function structureEntitiesFromIdentifiers(
     );
     return structureEntity ? [structureEntity] : [];
   });
+}
+
+/**
+ * Absolute URL of an atlas's uint32 annotation volume (OME-Zarr root).
+ * @param manifest Manifest of the atlas to locate the volume for.
+ */
+export function getAnnotationVolumeUrl(manifest: Manifest): string {
+  return resolveSourcePath(
+    manifest.atlas.source,
+    `${manifest.annotationSetLocation}/${ANNOTATION_VOLUME_DIRECTORY}`
+  );
 }
 
 /**
