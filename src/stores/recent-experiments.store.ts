@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import type { Experiment } from "@/features/experiment";
 import { ref } from "vue";
+import { i18n } from "@/services/i18n.service";
+import { BRAINGLOBE_BASE_URL } from "@/features/atlas";
 
 export const useRecentExperimentsStore = defineStore(
   "recent-experiments",
@@ -8,7 +10,34 @@ export const useRecentExperimentsStore = defineStore(
     /**
      * Ordered list of recent experiments. Newest first.
      */
-    const recents = ref<Experiment[]>([]);
+    const recents = ref<Experiment[]>([
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      },
+      {
+        id: crypto.randomUUID(),
+        version: import.meta.env.APP_VERSION,
+        name: i18n.global.t("currentExperiment.defaultName"),
+        atlas: {
+          source: BRAINGLOBE_BASE_URL,
+          name: "allen_mouse"
+        },
+        referenceCoordinate: [5.7, 0.44, 5.4],
+        visibleStructures: [],
+        probeInterfaceProbes: {},
+        probes: []
+      }
+    ]);
 
     /**
      * Add the most recent experiment.

@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { NewExperimentDialog } from "@/features/experiment";
+import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -8,6 +9,7 @@ defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
+const recentExperimentsStore = useRecentExperimentsStore();
 </script>
 
 <template>
@@ -54,15 +56,15 @@ const $q = useQuasar();
       </q-card-section>
 
       <q-card-section>
-        <q-scroll-area class="recents-list">
-          <q-list separator>
-            <q-item v-for="n in 20" :key="n" v-ripple clickable>
-              <q-item-section>{{
-                $t("splash.recentExperiment", { n })
-              }}</q-item-section>
-            </q-item>
-          </q-list>
-        </q-scroll-area>
+        <q-virtual-scroll
+          v-slot="{ item, index }"
+          :items="recentExperimentsStore.recents"
+          separator
+        >
+          <q-item :key="index" v-ripple clickable>
+            <q-item-section> {{ item.name }} </q-item-section>
+          </q-item>
+        </q-virtual-scroll>
       </q-card-section>
     </q-card>
   </q-dialog>
@@ -72,7 +74,4 @@ const $q = useQuasar();
 .splash
   min-width: 30vw
   max-height: 70vh
-
-.recents-list
-  height: 30vh
 </style>
