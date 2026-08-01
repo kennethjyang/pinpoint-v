@@ -102,9 +102,7 @@ describe("RecentExperimentsList", () => {
     const dialogSpy = vi.fn().mockReturnValue({ onOk });
     wrapper.vm.$q.dialog = dialogSpy;
 
-    // The delete button only renders once the row is hovered.
     const item = wrapper.findComponent({ name: "QItem" });
-    await item.trigger("mouseenter");
     await item.findComponent({ name: "QBtn" }).trigger("click");
 
     expect(dialogSpy).toHaveBeenCalledWith(

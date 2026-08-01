@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { useQuasar } from "quasar";
-import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { Experiment } from "../models/experiment.model";
 import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
@@ -12,8 +11,6 @@ const $q = useQuasar();
 const { t } = useI18n();
 const currentExperimentStore = useCurrentExperimentStore();
 const recentExperimentsStore = useRecentExperimentsStore();
-
-const hoveredRecent = ref<number | null>(null);
 
 /**
  * Open a recent experiment.
@@ -53,18 +50,11 @@ function onDeleteRecent(experiment: Experiment) {
     separator
     class="dialog-list"
   >
-    <q-item
-      :key="index"
-      v-ripple
-      clickable
-      @mouseenter="hoveredRecent = index"
-      @mouseleave="hoveredRecent = null"
-      @click="onOpenRecent(item)"
-    >
+    <q-item :key="index" v-ripple clickable @click="onOpenRecent(item)">
       <q-item-section> {{ item.name }} </q-item-section>
       <q-item-section side>
         <q-btn
-          v-if="index === hoveredRecent"
+          class="recents__delete-button"
           dense
           flat
           icon="delete"
@@ -80,3 +70,12 @@ function onDeleteRecent(experiment: Experiment) {
     </q-item-section>
   </q-item>
 </template>
+
+<style lang="sass" scoped>
+.recents__delete-button
+  visibility: hidden
+
+.q-item:hover .recents__delete-button,
+.q-item:focus-within .recents__delete-button
+  visibility: visible
+</style>
