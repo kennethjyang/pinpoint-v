@@ -15,10 +15,13 @@ import {
 } from "@/features/probe";
 import type { Inspectable } from "@/features/scene";
 import { isSameInspectable } from "@/features/scene";
+import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
 
 export const useCurrentExperimentStore = defineStore(
   "current-experiment",
   () => {
+    const recentExperimentsStore = useRecentExperimentsStore();
+
     /**
      * Current experiment instance.
      */
@@ -128,12 +131,14 @@ export const useCurrentExperimentStore = defineStore(
     }
 
     /**
-     * Replace the current experiment, dropping selection and drag state from
-     * the discarded one and detaching the incoming interface definitions from
-     * reactivity.
+     * Move the current experiment into recents and load in a new one.
      * @param newExperiment Experiment to load.
      */
     function loadExperiment(newExperiment: Experiment) {
+      // Add current experiment to recents.
+      recentExperimentsStore.add(experiment.value);
+
+      // Load in new one.
       detachProbeInterfaceProbes(newExperiment.probeInterfaceProbes);
       experiment.value = newExperiment;
       selectedInspectable.value = null;

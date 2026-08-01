@@ -29,12 +29,16 @@ export default {
       "Please check your connection to the source and the atlas's existence."
   },
   splash: {
+    title: "Pinpoint V",
     new: "New",
     resume: "Resume",
     open: "Open",
     userGuide: "User Guide",
     vblWebsite: "VBL Website",
-    recentExperiment: "Some Recent Experiment {n}"
+    recentExperiment: "Some Recent Experiment {n}",
+    deleteExperiment: "Delete Experiment",
+    confirmDelete: 'Are you sure you wish to delete "{name}"?',
+    delete: "Delete"
   },
   sceneCanvas: {
     problemLoadingAtlasMeshes:

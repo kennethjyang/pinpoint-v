@@ -7,6 +7,7 @@ import {
   useExperimentFile
 } from "@/features/experiment";
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -14,6 +15,7 @@ defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
+const { t } = useI18n();
 const recentExperimentsStore = useRecentExperimentsStore();
 const { openExperiment, onOpened } = useExperimentFile();
 
@@ -25,12 +27,12 @@ const hoveredRecent = ref<number | null>(null);
  */
 function onDeleteRecent(experiment: Experiment) {
   $q.dialog({
-    title: "Delete Experiment",
-    message: `Are you sure you wish to delete "${experiment.name}"?`,
+    title: t("splash.deleteExperiment"),
+    message: t("splash.confirmDelete", { name: experiment.name }),
     cancel: true,
     persistent: true,
     ok: {
-      label: "Delete",
+      label: t("splash.delete"),
       color: "negative"
     }
   }).onOk(() => {
@@ -45,7 +47,7 @@ onOpened(onDialogOK);
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="splash">
       <q-card-section class="column full-width items-center">
-        <p class="text-h2">Pinpoint V</p>
+        <p class="text-h2">{{ $t("splash.title") }}</p>
         <i class="text-caption">{{ appVersion }}</i>
       </q-card-section>
 
