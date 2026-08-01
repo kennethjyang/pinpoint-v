@@ -348,7 +348,7 @@ watch(
         <q-linear-progress
           v-if="isLoadingBarVisible"
           indeterminate
-          color="secondary"
+          color="primary"
           size="sm"
           class="absolute-top"
         />

@@ -293,7 +293,7 @@ onUnmounted(() => {
     <q-linear-progress
       v-if="isLoadingStructures"
       indeterminate
-      color="secondary"
+      color="primary"
       size="lg"
       class="absolute-top"
     />
