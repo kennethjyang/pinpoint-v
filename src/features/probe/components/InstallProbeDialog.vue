@@ -199,7 +199,7 @@ watch(selectedManufacturerName, () => {
                 <q-icon name="search" />
               </template>
             </q-input>
-            <q-list class="dialog-list" separator>
+            <q-list class="fixed-dialog-list" separator>
               <template v-if="probeNamesEvaluating">
                 <q-item v-for="n in 5" :key="n">
                   <q-item-section>
@@ -236,15 +236,7 @@ watch(selectedManufacturerName, () => {
             :loading="uploading"
             icon="upload"
             @click="openFilePicker"
-          >
-            <input
-              ref="file-input"
-              accept="application/json"
-              class="hidden"
-              type="file"
-              @change="onFileSelected"
-            />
-          </q-btn>
+          />
 
           <q-btn
             :disable="!selectedProbeName"
@@ -259,6 +251,13 @@ watch(selectedManufacturerName, () => {
             }}</q-tooltip>
           </q-btn>
         </q-card-actions>
+        <input
+          ref="file-input"
+          accept="application/json"
+          class="hidden"
+          type="file"
+          @change="onFileSelected"
+        />
       </div>
     </q-card>
   </q-dialog>
