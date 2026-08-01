@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { shallowRef } from "vue";
 import type { VueWrapper } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ProbeInspector from "./ProbeInspector.vue";
@@ -39,8 +40,8 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 vi.mock("@/features/slice/composable/useAnnotationSampler", () => ({
   useAnnotationSampler: () => ({
     createStream: () => ({
-      result: { value: null },
-      isLoading: { value: false }
+      result: shallowRef(null),
+      isLoading: shallowRef(false)
     })
   })
 }));
