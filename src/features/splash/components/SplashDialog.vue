@@ -8,6 +8,7 @@ import {
 } from "@/features/experiment";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -16,10 +17,21 @@ defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
 const { t } = useI18n();
+const currentExperimentStore = useCurrentExperimentStore();
 const recentExperimentsStore = useRecentExperimentsStore();
 const { openExperiment, onOpened } = useExperimentFile();
 
 const hoveredRecent = ref<number | null>(null);
+
+/**
+ * Open a recent experiment.
+ * @param experiment
+ */
+function onOpenRecent(experiment: Experiment) {
+  recentExperimentsStore.remove(experiment);
+  currentExperimentStore.loadExperiment(experiment);
+  onDialogOK();
+}
 
 /**
  * Prompt user to confirm before deletion.
@@ -104,6 +116,7 @@ onOpened(onDialogOK);
             clickable
             @mouseenter="hoveredRecent = index"
             @mouseleave="hoveredRecent = null"
+            @click="onOpenRecent(item)"
           >
             <q-item-section> {{ item.name }} </q-item-section>
             <q-item-section side>
