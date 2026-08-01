@@ -4,15 +4,15 @@ layout: home
 
 hero:
   name: "Pinpoint V Documentation"
-  text: "Documentation, guides, and design notes for Pinpoint V"
-  tagline: My great project tagline
+  text: "Guides and notes for developing and using Pinpoint V"
+  tagline: "Next-generation in vivo electrophysiology planning and automation tool."
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: User Guide
+      link: /user-guide
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Developer Guide
+      link: /development
 
 features:
   - title: Feature A
