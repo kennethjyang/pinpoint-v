@@ -20,12 +20,12 @@ import type {
 
 /**
  * Milliseconds a geometry change is debounced before replanning, capped by
- * an equal `maxWait` so a sustained drag still replans at ~24fps instead of
+ * an equal `maxWait` so a sustained drag still replans at ~60fps instead of
  * only once it stops - trailing-only (no leading-edge sample), but unlike a
  * plain throttle, never drops the final, settled value of an isolated change
  * such as a probe switch.
  */
-const REPLAN_INTERVAL_MILLISECONDS = 1000 / 24;
+const REPLAN_INTERVAL_MILLISECONDS = 1000 / 60;
 
 /** Builds one sampler worker. Overridable in tests to avoid a real `Worker`. */
 export type SamplerWorkerFactory = () => SamplerWorker;
