@@ -9,6 +9,7 @@ import { getProbeFrame } from "./probe-frame.api";
 import {
   clampSliceCenterHeight,
   clampSliceExtent,
+  getDefaultSliceExtentMillimeters,
   getProbeSlicePlane,
   getSliceZoomExponentRange
 } from "./slice-plane.api";
@@ -137,5 +138,25 @@ describe("clampSliceExtent", () => {
 
   it("clamps an extent above the range's maximum down to it", () => {
     expect(clampSliceExtent(1000, range)).toBe(2 ** range.maximum);
+  });
+});
+
+describe("getDefaultSliceExtentMillimeters", () => {
+  it("reproduces the historical 2mm default for the Allen-mouse range", () => {
+    expect(getDefaultSliceExtentMillimeters({ minimum: -2, maximum: 4 })).toBe(
+      2
+    );
+  });
+
+  it("scales up for a wider, human-scale range", () => {
+    expect(getDefaultSliceExtentMillimeters({ minimum: 2, maximum: 8 })).toBe(
+      32
+    );
+  });
+
+  it("scales down for a narrower, fly-scale range", () => {
+    expect(getDefaultSliceExtentMillimeters({ minimum: -7, maximum: -1 })).toBe(
+      0.0625
+    );
   });
 });

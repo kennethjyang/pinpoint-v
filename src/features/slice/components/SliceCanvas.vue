@@ -15,6 +15,7 @@ import { isSampleResultComplete } from "../api/sample-result.api";
 import {
   clampSliceCenterHeight,
   clampSliceExtent,
+  getDefaultSliceExtentMillimeters,
   getProbeSlicePlane,
   getSliceZoomExponentRange
 } from "../api/slice-plane.api";
@@ -68,11 +69,15 @@ const zoomRange = computed(() =>
 );
 
 /**
- * Clamped slice extent, in mm - a persisted extent (or the 2mm default) can
- * fall outside a given atlas's range, e.g. after switching atlases.
+ * Effective slice extent, in mm - a probe whose zoom has never been set
+ * (`sliceExtentMillimeters === null`) defaults to the middle of the current
+ * atlas's range; a persisted extent can fall outside that range, e.g. after
+ * switching atlases, so it's clamped instead.
  */
 const extentMillimeters = computed(() =>
-  clampSliceExtent(probe.sliceExtentMillimeters, zoomRange.value)
+  probe.sliceExtentMillimeters === null
+    ? getDefaultSliceExtentMillimeters(zoomRange.value)
+    : clampSliceExtent(probe.sliceExtentMillimeters, zoomRange.value)
 );
 
 const zoomExponent = computed({
@@ -321,7 +326,15 @@ watch(
           }}</p>
         </div>
 
-        <q-tooltip v-if="hoveredStructure">
+        <!--
+          QTooltip normally shows itself from its own anchor's mouseenter,
+          but that anchor only exists once this v-if mounts - entering over
+          background then moving onto a structure gets no further
+          mouseenter to trigger it. Driving it from the model instead shows
+          it the instant it mounts; no-parent-event stops QTooltip's own
+          mouseleave handling from then fighting that model.
+        -->
+        <q-tooltip v-if="hoveredStructure" model-value no-parent-event>
           {{ hoveredStructure.abbreviation }} - {{ hoveredStructure.name }}
         </q-tooltip>
       </div>
