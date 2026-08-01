@@ -287,6 +287,48 @@ describe("SliceCanvas", () => {
     expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(false);
   });
 
+  it("shows a tooltip for a structure hovered right after background, with no intervening leave/re-enter", async () => {
+    // Regression: QTooltip normally shows itself from its own anchor's
+    // mouseenter, but that anchor (the `v-if="hoveredStructure"` element)
+    // doesn't exist yet while the pointer is over background - moving
+    // straight onto a structure from there produces no further mouseenter
+    // to trigger it, so with QTooltip's default behaviour this would stay
+    // hidden until the pointer left the canvas and came back.
+    mockResult.value = makeSampleResult(2, [0, 8, 0, 0]);
+    const rows = [makeTerminologyRow({ annotation_value: 8, identifier: 8 })];
+    vi.mocked(getTerminologyRows).mockResolvedValue(rows);
+    const { wrapper } = mountSlice();
+    await flushPromises();
+
+    const canvas = wrapper.find("canvas");
+    vi.spyOn(canvas.element, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    });
+
+    // Pixel (0, 0) is background; no mouseenter/pointerleave follows. Checked
+    // via the wrapper's own tree (like the neighboring "shows no tooltip
+    // over a background pixel" test) rather than `document.body`, since
+    // QTooltip's portalled content from earlier specs in this file persists
+    // globally without an intervening unmount.
+    await canvas.trigger("pointermove", { clientX: 25, clientY: 25 });
+    expect(wrapper.findComponent({ name: "QTooltip" }).exists()).toBe(false);
+
+    await canvas.trigger("pointermove", { clientX: 75, clientY: 25 });
+    await flushPromises();
+
+    expect(document.body.querySelector(".q-tooltip")?.textContent).toContain(
+      rows[0]!.abbreviation
+    );
+  });
+
   it("clicking a hovered structure toggles it into visibleStructures, and again removes it", async () => {
     mockResult.value = makeSampleResult(2, [0, 8, 0, 0]);
     const rows = [makeTerminologyRow({ annotation_value: 8, identifier: 8 })];
@@ -433,5 +475,33 @@ describe("SliceCanvas", () => {
     const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
     // 2mm (log2 = 1) is below this atlas's range minimum (2), so it clamps up.
     expect(zoomSlider.props("modelValue")).toBe(2);
+  });
+
+  it("defaults a probe whose zoom has never been set to the middle of the mouse-scale range", async () => {
+    const { wrapper } = mountSlice({ sliceExtentMillimeters: null });
+    await flushPromises();
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    // Mouse range is {-2, 4}; its middle, exponent 1, is 2mm - the same
+    // value `buildProbe` used to hardcode.
+    expect(zoomSlider.props("modelValue")).toBe(1);
+  });
+
+  it("defaults a probe whose zoom has never been set to the middle of a human-scale range", async () => {
+    vi.mocked(getManifest).mockResolvedValue(
+      makeManifest({
+        resolutions: [[0.5, 0.5, 0.5]],
+        shape: [[394, 394, 394]]
+      })
+    );
+    const { wrapper } = mountSlice({ sliceExtentMillimeters: null });
+    await flushPromises();
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    // This atlas's range is {2, 8}; its middle, exponent 5, is 32mm - not
+    // pinned to the range's minimum, as a hardcoded 2mm default would be.
+    expect(zoomSlider.props("modelValue")).toBe(5);
   });
 });

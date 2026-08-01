@@ -82,6 +82,11 @@ export function createSamplerHandler(
   maximumCachedChunkBytes: number = MAXIMUM_CACHED_CHUNK_BYTES
 ): SamplerHandler {
   let volume: AnnotationVolume | null = null;
+  // Tracks the in-flight `open`, so a `sample` that arrives before it
+  // resolves can wait on it instead of reading `volume` while it's still
+  // null - the worker's `onmessage` dispatch doesn't await `handleMessage`,
+  // so an `open` and a following `sample` can otherwise overlap.
+  let openPromise: Promise<void> | null = null;
   let colors = new Map<number, number>();
   const chunkCache = createChunkCache(maximumCachedChunkBytes);
   const streams = new Map<string, StreamState>();
@@ -109,7 +114,11 @@ export function createSamplerHandler(
   async function handleOpen(url: string): Promise<void> {
     for (const streamId of streams.keys()) cancelStream(streamId);
     chunkCache.clear();
-    volume = await openAnnotationVolume(storeFactory(url), url);
+    volume = null;
+    openPromise = (async () => {
+      volume = await openAnnotationVolume(storeFactory(url), url);
+    })();
+    await openPromise;
   }
 
   async function handleSample(message: {
@@ -134,6 +143,19 @@ export function createSamplerHandler(
       flushTimer: null
     };
     streams.set(streamId, state);
+
+    // Registering the stream above stays synchronous with dispatch (so a
+    // "cancel"/"close" for it still lands correctly), and this only awaits
+    // when `volume` is genuinely still unresolved - `handleOpen` sets
+    // `volume = null` synchronously before its own await, so that's exactly
+    // "an open is in flight". Gating on it (rather than unconditionally
+    // awaiting `openPromise`) keeps the already-open case perfectly
+    // synchronous, matching every existing caller; without this, a `sample`
+    // dispatched right after an `open` (e.g. a freshly built worker pool, as
+    // happens when selecting a probe with none previously selected) reads
+    // `volume` as still null, reports every chunk as background, and the
+    // stream is marked complete - a blank slice that never retries.
+    if (volume === null && openPromise) await openPromise;
 
     const level = volume?.levels[levelIndex] ?? null;
 

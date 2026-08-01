@@ -7,9 +7,6 @@ import {
 } from "../models/known-probes.model";
 import { STANDARD_COLORS } from "@/features/scene";
 
-/** Default square slice-view extent for a newly built probe, in mm - the modal bucket across the probeinterface library. */
-export const DEFAULT_SLICE_EXTENT_MILLIMETERS = 2;
-
 /**
  * Build a probe referencing the given probe interface definition, with a
  * random name and color, a zeroed position, and a pitch pointing inferiorly.
@@ -27,7 +24,11 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     tipPosition: [0, 0, 0],
     rotation: [0, 0, Math.PI / 2],
-    sliceExtentMillimeters: DEFAULT_SLICE_EXTENT_MILLIMETERS,
+    // Null rather than a fixed value - the slice view resolves this
+    // proportionally to whichever atlas is current
+    // (`getDefaultSliceExtentMillimeters`), since a single constant can't
+    // fit both a mouse and a human atlas.
+    sliceExtentMillimeters: null,
     sliceCenterHeightMillimeters: 0
   };
 }
@@ -39,7 +40,7 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
  */
 export function normalizeProbeSliceView(probe: Probe): void {
   if (typeof probe.sliceExtentMillimeters !== "number") {
-    probe.sliceExtentMillimeters = DEFAULT_SLICE_EXTENT_MILLIMETERS;
+    probe.sliceExtentMillimeters = null;
   }
   if (typeof probe.sliceCenterHeightMillimeters !== "number") {
     probe.sliceCenterHeightMillimeters = 0;

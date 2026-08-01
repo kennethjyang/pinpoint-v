@@ -5,7 +5,6 @@ export type {
 } from "./models/probe-interface.model";
 export type { Probe } from "./models/probe.model";
 export {
-  DEFAULT_SLICE_EXTENT_MILLIMETERS,
   buildProbe,
   getProbeInterfaceIdentifier,
   getProbeInterfaceDisplayName,

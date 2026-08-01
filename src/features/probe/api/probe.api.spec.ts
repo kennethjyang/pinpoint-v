@@ -37,7 +37,9 @@ describe("buildProbe", () => {
     );
     expect(probe.name).toMatch(/^Probe /);
     expect(probe.color).toMatch(/^#/);
-    expect(probe.sliceExtentMillimeters).toBe(2);
+    // Null, not a fixed mm value - the slice view defaults this
+    // proportionally to whichever atlas is current.
+    expect(probe.sliceExtentMillimeters).toBeNull();
     expect(probe.sliceCenterHeightMillimeters).toBe(0);
   });
 
@@ -148,7 +150,8 @@ describe("normalizeProbeSliceView", () => {
 
     normalizeProbeSliceView(probe);
 
-    expect(probe.sliceExtentMillimeters).toBe(2);
+    // Null, not a fixed mm value - same reasoning as `buildProbe`'s default.
+    expect(probe.sliceExtentMillimeters).toBeNull();
     expect(probe.sliceCenterHeightMillimeters).toBe(0);
   });
 });

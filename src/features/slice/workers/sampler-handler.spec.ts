@@ -74,6 +74,34 @@ describe("createSamplerHandler", () => {
     expect(samples.get(10)).toEqual({ value: 42, color: 0xffcc8811 });
   });
 
+  it("waits for an in-flight open before sampling, e.g. a freshly built worker pool", async () => {
+    // `handleMessage` is never awaited by the worker's real `onmessage`
+    // (`annotation-sampler.worker.ts`), so an "open" and a following
+    // "sample" can be in flight at once - most notably right after a fresh
+    // pool is built, which is exactly what happens when a probe is selected
+    // with none previously selected. Not awaiting "open" here reproduces
+    // that race; every other test in this file awaits it, which is why none
+    // of them would have caught a handler that read `volume` too early.
+    const store = makeAnnotationVolumeStore({
+      shapeVoxels: [4, 4, 4],
+      chunkShapeVoxels: [2, 2, 2],
+      chunks: { "0/0/0": Uint32Array.from([0, 42, 0, 0, 0, 0, 0, 0]) }
+    });
+    const { handler, posted } = makeHandler(store);
+
+    void handler.handleMessage({ type: "open", url: "http://example.com" });
+    await handler.handleMessage({
+      type: "sample",
+      streamId: "a",
+      generation: 0,
+      levelIndex: 0,
+      requests: [makeRequest([0, 0, 0], [10], [1])]
+    });
+
+    const samples = collectSampled(posted, "a");
+    expect(samples.get(10)).toEqual({ value: 42, color: 0 });
+  });
+
   it("omits background samples from the flush entirely", async () => {
     const store = makeAnnotationVolumeStore({
       shapeVoxels: [4, 4, 4],

@@ -57,6 +57,18 @@ export function clampSliceExtent(
 }
 
 /**
+ * Default slice extent for a probe whose zoom has never been set, in mm -
+ * the middle of the atlas's own zoom range, which reproduces the historical
+ * 2mm default on the Allen mouse while scaling to any other atlas.
+ * @param range Zoom range to take the middle of, as log2 mm exponents.
+ */
+export function getDefaultSliceExtentMillimeters(
+  range: SliceZoomExponentRange
+): number {
+  return 2 ** ((range.minimum + range.maximum) / 2);
+}
+
+/**
  * Build the sampling plane through a probe's shanks, centered on a height up
  * its contour from the tip.
  * @param frame Probe's shank-plane frame.
