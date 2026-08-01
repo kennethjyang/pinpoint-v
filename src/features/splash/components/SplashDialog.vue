@@ -1,7 +1,11 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
-import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
+import {
+  Experiment,
+  NewExperimentDialog,
+  useExperimentFile
+} from "@/features/experiment";
 import { ref } from "vue";
 
 const appVersion = import.meta.env.APP_VERSION;
@@ -14,6 +18,25 @@ const recentExperimentsStore = useRecentExperimentsStore();
 const { openExperiment, onOpened } = useExperimentFile();
 
 const hoveredRecent = ref<number | null>(null);
+
+/**
+ * Prompt user to confirm before deletion.
+ * @param experiment Experiment to delete.
+ */
+function onDeleteRecent(experiment: Experiment) {
+  $q.dialog({
+    title: "Delete Experiment",
+    message: `Are you sure you wish to delete "${experiment.name}"?`,
+    cancel: true,
+    persistent: true,
+    ok: {
+      label: "Delete",
+      color: "negative"
+    }
+  }).onOk(() => {
+    recentExperimentsStore.remove(experiment);
+  });
+}
 
 onOpened(onDialogOK);
 </script>
@@ -88,7 +111,7 @@ onOpened(onDialogOK);
                 flat
                 icon="delete"
                 round
-                @click.stop="recentExperimentsStore.remove(item.id)"
+                @click.stop="onDeleteRecent(item)"
               />
             </q-item-section>
           </q-item>

@@ -218,11 +218,11 @@ export const useRecentExperimentsStore = defineStore(
 
     /**
      * Take an experiment out of the recents. Returns it.
-     * @param id Experiment ID to remove.
+     * @param experiment Experiment to remove.
      */
-    function remove(id: string): Experiment | null {
+    function remove(experiment: Experiment): Experiment | null {
       const experimentIndex = recents.value.findIndex(
-        recent => recent.id === id
+        recent => recent.id === experiment.id
       );
       if (experimentIndex === -1) return null;
 
