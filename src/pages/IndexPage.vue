@@ -101,7 +101,13 @@ onMounted(() => {
                 <q-item-section>{{ $t("layout.new") }}</q-item-section>
               </q-item>
               <q-item clickable>
-                <q-item-section>{{ $t("layout.save") }}</q-item-section>
+                <q-item-section>{{ $t("layout.open") }}</q-item-section>
+              </q-item>
+              <q-item clickable>
+                <q-item-section>{{ $t("layout.openRecent") }}</q-item-section>
+              </q-item>
+              <q-item clickable>
+                <q-item-section>{{ $t("layout.download") }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>

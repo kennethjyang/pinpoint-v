@@ -58,7 +58,9 @@ export default {
   layout: {
     file: "File",
     new: "New",
-    save: "Save",
+    open: "Open",
+    openRecent: "Open Recent",
+    download: "Download",
     edit: "Edit",
     preferences: "Preferences",
     probeLibrary: "Probe Library",

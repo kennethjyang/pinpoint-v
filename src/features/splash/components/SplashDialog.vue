@@ -39,8 +39,16 @@ const $q = useQuasar();
             <q-btn icon="file_open" :label="$t('splash.open')" size="xl" />
           </div>
           <div class="row q-gutter-x-md justify-center">
-            <q-btn icon="menu_book" :label="$t('splash.userGuide')" />
-            <q-btn icon="web" :label="$t('splash.vblWebsite')" />
+            <q-btn
+              :label="$t('splash.userGuide')"
+              href="/pinpoint-v/docs"
+              icon="menu_book"
+            />
+            <q-btn
+              :label="$t('splash.vblWebsite')"
+              href="https://virtualbrainlab.org/index.html"
+              icon="web"
+            />
           </div>
         </div>
       </q-card-section>
