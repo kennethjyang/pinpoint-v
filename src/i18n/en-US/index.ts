@@ -28,6 +28,14 @@ export default {
     checkAtlas:
       "Please check your connection to the source and the atlas's existence."
   },
+  recentExperiments: {
+    title: "Recent Experiments",
+    noRecents: "No recent experiments.",
+    deleteExperiment: "Delete Experiment",
+    confirmDelete: 'Are you sure you wish to delete "{name}"?',
+    delete: "Delete",
+    close: "Close"
+  },
   splash: {
     title: "Pinpoint V",
     new: "New",
@@ -35,10 +43,7 @@ export default {
     open: "Open",
     userGuide: "User Guide",
     vblWebsite: "VBL Website",
-    recentExperiment: "Some Recent Experiment {n}",
-    deleteExperiment: "Delete Experiment",
-    confirmDelete: 'Are you sure you wish to delete "{name}"?',
-    delete: "Delete"
+    recentExperiment: "Some Recent Experiment {n}"
   },
   sceneCanvas: {
     problemLoadingAtlasMeshes:
@@ -90,6 +95,7 @@ export default {
     file: "File",
     new: "New",
     open: "Open",
+    openRecent: "Open Recent",
     download: "Download",
     edit: "Edit",
     preferences: "Preferences",

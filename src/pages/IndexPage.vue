@@ -2,7 +2,11 @@
 import { onMounted, ref } from "vue";
 import { SceneCanvas, SceneHierarchy } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
-import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
+import {
+  NewExperimentDialog,
+  RecentExperimentsDialog,
+  useExperimentFile
+} from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
@@ -103,6 +107,12 @@ onMounted(() => {
               </q-item>
               <q-item clickable @click="openExperiment">
                 <q-item-section>{{ $t("layout.open") }}</q-item-section>
+              </q-item>
+              <q-item
+                clickable
+                @click="$q.dialog({ component: RecentExperimentsDialog })"
+              >
+                <q-item-section>{{ $t("layout.openRecent") }}</q-item-section>
               </q-item>
               <q-item clickable @click="downloadExperiment">
                 <q-item-section>{{ $t("layout.download") }}</q-item-section>

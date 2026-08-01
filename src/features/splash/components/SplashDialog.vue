@@ -1,14 +1,10 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
-import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
 import {
-  Experiment,
   NewExperimentDialog,
+  RecentExperimentsList,
   useExperimentFile
 } from "@/features/experiment";
-import { ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -16,41 +12,7 @@ defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
-const { t } = useI18n();
-const currentExperimentStore = useCurrentExperimentStore();
-const recentExperimentsStore = useRecentExperimentsStore();
 const { openExperiment, onOpened } = useExperimentFile();
-
-const hoveredRecent = ref<number | null>(null);
-
-/**
- * Open a recent experiment.
- * @param experiment
- */
-function onOpenRecent(experiment: Experiment) {
-  recentExperimentsStore.remove(experiment);
-  currentExperimentStore.loadExperiment(experiment);
-  onDialogOK();
-}
-
-/**
- * Prompt user to confirm before deletion.
- * @param experiment Experiment to delete.
- */
-function onDeleteRecent(experiment: Experiment) {
-  $q.dialog({
-    title: t("splash.deleteExperiment"),
-    message: t("splash.confirmDelete", { name: experiment.name }),
-    cancel: true,
-    persistent: true,
-    ok: {
-      label: t("splash.delete"),
-      color: "negative"
-    }
-  }).onOk(() => {
-    recentExperimentsStore.remove(experiment);
-  });
-}
 
 onOpened(onDialogOK);
 </script>
@@ -104,33 +66,7 @@ onOpened(onDialogOK);
       </q-card-section>
 
       <q-card-section>
-        <q-virtual-scroll
-          v-slot="{ item, index }"
-          :items="recentExperimentsStore.recents"
-          separator
-          class="dialog-list"
-        >
-          <q-item
-            :key="index"
-            v-ripple
-            clickable
-            @mouseenter="hoveredRecent = index"
-            @mouseleave="hoveredRecent = null"
-            @click="onOpenRecent(item)"
-          >
-            <q-item-section> {{ item.name }} </q-item-section>
-            <q-item-section side>
-              <q-btn
-                v-if="index === hoveredRecent"
-                dense
-                flat
-                icon="delete"
-                round
-                @click.stop="onDeleteRecent(item)"
-              />
-            </q-item-section>
-          </q-item>
-        </q-virtual-scroll>
+        <RecentExperimentsList @opened="onDialogOK" />
       </q-card-section>
     </q-card>
   </q-dialog>
