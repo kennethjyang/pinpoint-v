@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
-import { NewExperimentDialog } from "@/features/experiment";
+import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -8,6 +8,9 @@ defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
+const { openExperiment, onOpened } = useExperimentFile();
+
+onOpened(onDialogOK);
 </script>
 
 <template>
@@ -36,7 +39,12 @@ const $q = useQuasar();
               :label="$t('splash.resume')"
               size="xl"
             />
-            <q-btn icon="file_open" :label="$t('splash.open')" size="xl" />
+            <q-btn
+              icon="file_open"
+              :label="$t('splash.open')"
+              size="xl"
+              @click="openExperiment"
+            />
           </div>
           <div class="row q-gutter-x-md justify-center">
             <q-btn

@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import { SceneCanvas, SceneHierarchy } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
-import { NewExperimentDialog } from "@/features/experiment";
+import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { AtlasHierarchy } from "@/features/atlas";
 import { ProbeLibraryDialog } from "@/features/probe";
@@ -11,6 +11,7 @@ import { SplashDialog } from "@/features/splash";
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
+const { openExperiment, downloadExperiment } = useExperimentFile();
 
 const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
@@ -100,13 +101,13 @@ onMounted(() => {
               >
                 <q-item-section>{{ $t("layout.new") }}</q-item-section>
               </q-item>
-              <q-item clickable>
+              <q-item clickable @click="openExperiment">
                 <q-item-section>{{ $t("layout.open") }}</q-item-section>
               </q-item>
               <q-item clickable>
                 <q-item-section>{{ $t("layout.openRecent") }}</q-item-section>
               </q-item>
-              <q-item clickable>
+              <q-item clickable @click="downloadExperiment">
                 <q-item-section>{{ $t("layout.download") }}</q-item-section>
               </q-item>
             </q-list>

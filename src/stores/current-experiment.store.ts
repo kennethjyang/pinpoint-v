@@ -9,7 +9,7 @@ import {
   getManifest,
   getTerminologyRows
 } from "@/features/atlas";
-import { detachProbeInterfaceProbe } from "@/features/probe";
+import { detachProbeInterfaceProbes } from "@/features/probe";
 import type { Inspectable } from "@/features/scene";
 import { isSameInspectable } from "@/features/scene";
 
@@ -122,6 +122,19 @@ export const useCurrentExperimentStore = defineStore(
       );
     }
 
+    /**
+     * Replace the current experiment, dropping selection and drag state from
+     * the discarded one and detaching the incoming interface definitions from
+     * reactivity.
+     * @param newExperiment Experiment to load.
+     */
+    function loadExperiment(newExperiment: Experiment) {
+      detachProbeInterfaceProbes(newExperiment.probeInterfaceProbes);
+      experiment.value = newExperiment;
+      selectedInspectable.value = null;
+      draggedProbeId.value = null;
+    }
+
     const state = {
       experiment,
       selectedInspectable,
@@ -139,7 +152,7 @@ export const useCurrentExperimentStore = defineStore(
       probeInterfaceProbes,
       probes
     };
-    const actions = { isInspectableSelected };
+    const actions = { isInspectableSelected, loadExperiment };
     return { ...state, ...getters, ...actions };
   },
   {
@@ -149,12 +162,7 @@ export const useCurrentExperimentStore = defineStore(
       // Re-mark probe interface definitions as raw to prevent tracking.
       afterHydrate: context => {
         const experiment: Experiment = context.store.experiment;
-        for (const [identifier, definition] of Object.entries(
-          experiment.probeInterfaceProbes
-        )) {
-          experiment.probeInterfaceProbes[identifier] =
-            detachProbeInterfaceProbe(definition);
-        }
+        detachProbeInterfaceProbes(experiment.probeInterfaceProbes);
       }
     }
   }

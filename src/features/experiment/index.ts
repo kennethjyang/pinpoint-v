@@ -1,4 +1,5 @@
 export { default as NewExperimentDialog } from "./components/NewExperimentDialog.vue";
+export { useExperimentFile } from "./composable/useExperimentFile";
 export type { Experiment } from "./models/experiment.model";
 
 export {
