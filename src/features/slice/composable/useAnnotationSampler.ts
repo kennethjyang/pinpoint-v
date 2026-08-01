@@ -230,6 +230,7 @@ export const useAnnotationSampler = createSharedComposable(
 
       watchThrottled(geometry, planAndSample, {
         throttle: THROTTLE_MILLISECONDS,
+        leading: false,
         immediate: true
       });
 
