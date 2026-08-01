@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { useDialogPluginComponent, useQuasar } from "quasar";
-import { NewExperimentDialog } from "@/features/experiment";
 import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
+import { NewExperimentDialog, useExperimentFile } from "@/features/experiment";
 
 const appVersion = import.meta.env.APP_VERSION;
 
@@ -10,6 +10,9 @@ defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 const $q = useQuasar();
 const recentExperimentsStore = useRecentExperimentsStore();
+const { openExperiment, onOpened } = useExperimentFile();
+
+onOpened(onDialogOK);
 </script>
 
 <template>
@@ -38,7 +41,12 @@ const recentExperimentsStore = useRecentExperimentsStore();
               :label="$t('splash.resume')"
               size="xl"
             />
-            <q-btn icon="file_open" :label="$t('splash.open')" size="xl" />
+            <q-btn
+              icon="file_open"
+              :label="$t('splash.open')"
+              size="xl"
+              @click="openExperiment"
+            />
           </div>
           <div class="row q-gutter-x-md justify-center">
             <q-btn

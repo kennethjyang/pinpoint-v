@@ -9,6 +9,9 @@ export {
   getProbeInterfaceIdentifier,
   getProbeInterfaceDisplayName,
   detachProbeInterfaceProbe,
+  detachProbeInterfaceProbes,
   rotateProbeVisibility,
-  findProbeInterfaceProbeByIdentifier
+  findProbeInterfaceProbeByIdentifier,
+  isProbe,
+  isProbeInterfaceProbe
 } from "./api/probe.api";

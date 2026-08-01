@@ -55,6 +55,17 @@ export default {
     invalidProbeFileCaption:
       "Check that the file is a valid ProbeInterface JSON file."
   },
+  experimentFile: {
+    invalidExperimentFile: "Unable to read experiment file.",
+    invalidExperimentFileCaption:
+      "Check that the file is a Pinpoint experiment JSON file.",
+    downloadFailed: "Unable to download experiment.",
+    downloadFailedCaption:
+      "Check your browser's download settings and try again.",
+    atlasUnavailable: "Loaded the experiment, but its atlas is unavailable.",
+    atlasUnavailableCaption:
+      "Check your connection to the atlas source. Probes are shown without the brain."
+  },
   layout: {
     file: "File",
     new: "New",
