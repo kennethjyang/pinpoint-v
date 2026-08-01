@@ -13,8 +13,7 @@ export {
   rotateProbeVisibility,
   findProbeInterfaceProbeByIdentifier,
   isProbe,
-  isProbeInterfaceProbe,
-  normalizeProbeSliceView
+  isProbeInterfaceProbe
 } from "./api/probe.api";
 export type { ProbeContacts, ProbeContour } from "./api/contour.api";
 export {

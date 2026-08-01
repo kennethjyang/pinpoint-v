@@ -193,6 +193,13 @@ describe("parseExperimentFile", () => {
     expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
   });
 
+  it("returns null when a probe is missing slice-view fields, e.g. from an experiment saved before they existed", () => {
+    const experiment = makeFullExperiment();
+    const { sliceExtentMillimeters: _extent, ...probe } = experiment.probes[0]!;
+    experiment.probes[0] = probe as Experiment["probes"][number];
+    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+  });
+
   it("returns null when two probes share an id", () => {
     const experiment = makeFullExperiment();
     const spec =

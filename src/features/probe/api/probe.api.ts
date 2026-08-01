@@ -41,20 +41,6 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
 }
 
 /**
- * Fill in a probe's slice-view fields when missing, e.g. from an experiment
- * persisted before those fields existed.
- * @param probe Probe to normalize in place.
- */
-export function normalizeProbeSliceView(probe: Probe): void {
-  if (typeof probe.sliceExtentMillimeters !== "number") {
-    probe.sliceExtentMillimeters = null;
-  }
-  if (typeof probe.sliceCenterHeightMillimeters !== "number") {
-    probe.sliceCenterHeightMillimeters = 0;
-  }
-}
-
-/**
  * Detach a probe interface definition from Vue's reactivity, so it can be
  * interned into experiment state without being deep-watched.
  * @param probeInterfaceProbe Probe interface definition to detach.
@@ -209,7 +195,12 @@ export function isProbe(value: unknown): value is Probe {
     PROBE_VISIBILITIES.includes(value.visibility as ProbeVisibility) &&
     typeof value.probeInterfaceIdentifier === "string" &&
     isFiniteTriple(value.tipPosition) &&
-    isFiniteTriple(value.rotation)
+    isFiniteTriple(value.rotation) &&
+    (value.sliceExtentMillimeters === null ||
+      (typeof value.sliceExtentMillimeters === "number" &&
+        Number.isFinite(value.sliceExtentMillimeters))) &&
+    typeof value.sliceCenterHeightMillimeters === "number" &&
+    Number.isFinite(value.sliceCenterHeightMillimeters)
   );
 }
 

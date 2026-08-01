@@ -12,7 +12,6 @@ import {
   getProbeModelDisplayName,
   isProbe,
   isProbeInterfaceProbe,
-  normalizeProbeSliceView,
   rotateProbeVisibility
 } from "./probe.api";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
@@ -130,32 +129,6 @@ describe("rotateProbeVisibility", () => {
     rotateProbeVisibility(probe);
 
     expect(probe.visibility).toBe("hidden");
-  });
-});
-
-describe("normalizeProbeSliceView", () => {
-  it("leaves existing slice-view fields untouched", () => {
-    const probe = makeProbe({
-      sliceExtentMillimeters: 8,
-      sliceCenterHeightMillimeters: 3
-    });
-
-    normalizeProbeSliceView(probe);
-
-    expect(probe.sliceExtentMillimeters).toBe(8);
-    expect(probe.sliceCenterHeightMillimeters).toBe(3);
-  });
-
-  it("fills in defaults for a probe persisted before these fields existed", () => {
-    const probe = makeProbe();
-    delete (probe as Partial<Probe>).sliceExtentMillimeters;
-    delete (probe as Partial<Probe>).sliceCenterHeightMillimeters;
-
-    normalizeProbeSliceView(probe);
-
-    // Null, not a fixed mm value - same reasoning as `buildProbe`'s default.
-    expect(probe.sliceExtentMillimeters).toBeNull();
-    expect(probe.sliceCenterHeightMillimeters).toBe(0);
   });
 });
 
@@ -329,6 +302,28 @@ describe("isProbe", () => {
 
   it("rejects a probe with a non-finite rotation component", () => {
     expect(isProbe({ ...makeProbe(), rotation: [0, 0, NaN] })).toBe(false);
+  });
+
+  it("accepts a probe with a null sliceExtentMillimeters", () => {
+    expect(isProbe(makeProbe({ sliceExtentMillimeters: null }))).toBe(true);
+  });
+
+  it("rejects a probe with a non-numeric, non-null sliceExtentMillimeters", () => {
+    expect(isProbe({ ...makeProbe(), sliceExtentMillimeters: "8" })).toBe(
+      false
+    );
+  });
+
+  it("rejects a probe missing sliceCenterHeightMillimeters", () => {
+    const probe = makeProbe();
+    delete (probe as Partial<Probe>).sliceCenterHeightMillimeters;
+    expect(isProbe(probe)).toBe(false);
+  });
+
+  it("rejects a probe with a non-finite sliceCenterHeightMillimeters", () => {
+    expect(isProbe({ ...makeProbe(), sliceCenterHeightMillimeters: NaN })).toBe(
+      false
+    );
   });
 });
 
