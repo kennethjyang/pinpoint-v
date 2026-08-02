@@ -1,6 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref, useTemplateRef } from "vue";
-import { QScrollArea } from "quasar";
+import { computed, ref } from "vue";
 import { useFuzzyFilter } from "@/composable/useFuzzyFilter";
 import { flattenHierarchy } from "../api/hierarchy.api";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
@@ -12,13 +11,7 @@ import {
 
 const currentExperiment = useCurrentExperimentStore();
 
-// Components.
-const scrollArea = useTemplateRef<QScrollArea>("scroll-area");
-
 const filter = ref<string | null>(null);
-
-// Expose scroll area target for the virtual scroll.
-const scrollAreaTarget = computed(() => scrollArea.value?.getScrollTarget());
 
 // DFS-flattened hierarchy, carrying each row's indent guides.
 const items = computed(() =>
@@ -36,65 +29,74 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
 </script>
 
 <template>
-  <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
-    <template #prepend>
-      <q-icon name="search" />
-    </template>
-  </q-input>
+  <div class="column full-height q-gutter-y-sm">
+    <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
+      <template #prepend>
+        <q-icon name="search" />
+      </template>
+    </q-input>
 
-  <!--      :virtual-scroll-item-size="32"-->
-  <q-virtual-scroll v-slot="{ item, index }" :items="displayedItems">
-    <q-item :key="index" dense>
-      <q-item-section no-wrap>
-        <template v-if="!isSearching">
-          <span
-            v-for="(guide, index) in item.guides"
-            :key="index"
-            :class="`guide--${guide}`"
-            class="guide"
-          />
-        </template>
-        <div class="row q-gutter-x-xs items-center no-wrap">
-          <q-checkbox
-            :model-value="
-              isStructureVisible(currentExperiment.experiment, item.identifier)
-            "
-            dense
-            @update:model-value="
-              visible =>
-                setStructureVisibility(
+    <!--      :virtual-scroll-item-size="32"-->
+    <q-virtual-scroll
+      v-slot="{ item, index }"
+      :items="displayedItems"
+      class="col scroll"
+    >
+      <q-item :key="index" dense>
+        <q-item-section no-wrap>
+          <template v-if="!isSearching">
+            <span
+              v-for="(guide, index) in item.guides"
+              :key="index"
+              :class="`guide--${guide}`"
+              class="guide"
+            />
+          </template>
+          <div class="row q-gutter-x-xs items-center no-wrap">
+            <q-checkbox
+              :model-value="
+                isStructureVisible(
                   currentExperiment.experiment,
-                  item.identifier,
-                  visible
+                  item.identifier
                 )
-            "
-          />
-          <q-icon
-            :style="{ color: item.color }"
-            name="radio_button_checked"
-            size="sm"
-          />
-          <b>{{ item.abbreviation }}</b>
-          <span class="text-no-wrap">{{ item.name }}</span>
-        </div>
-      </q-item-section>
-    </q-item>
-    <!--      <template #default="{ item }">-->
-    <!--        <div-->
-    <!--          :key="item.identifier"-->
-    <!--          class="hierarchy-row row items-center no-wrap"-->
-    <!--        >-->
-    <!--        </div>-->
-    <!--      </template>-->
-  </q-virtual-scroll>
+              "
+              dense
+              @update:model-value="
+                visible =>
+                  setStructureVisibility(
+                    currentExperiment.experiment,
+                    item.identifier,
+                    visible
+                  )
+              "
+            />
+            <q-icon
+              :style="{ color: item.color }"
+              name="radio_button_checked"
+              size="sm"
+            />
+            <b>{{ item.abbreviation }}</b>
+            <span class="text-no-wrap">{{ item.name }}</span>
+          </div>
+        </q-item-section>
+      </q-item>
+      <!--      <template #default="{ item }">-->
+      <!--        <div-->
+      <!--          :key="item.identifier"-->
+      <!--          class="hierarchy-row row items-center no-wrap"-->
+      <!--        >-->
+      <!--        </div>-->
+      <!--      </template>-->
+    </q-virtual-scroll>
 
-  <template v-if="currentExperiment.visibleStructures.length">
-    <q-btn
-      :label="$t('atlasHierarchy.clear')"
-      icon="clear_all"
-      @click="clearVisibleStructures(currentExperiment.experiment)"
-    />
-  </template>
+    <template v-if="currentExperiment.visibleStructures.length">
+      <q-btn
+        icon="clear_all"
+        :label="$t('atlasHierarchy.clear')"
+        @click="clearVisibleStructures(currentExperiment.experiment)"
+      />
+    </template>
+  </div>
 </template>
 
 <style lang="sass" scoped>

@@ -169,7 +169,7 @@ onMounted(() => {
       bordered
       show-if-above
       side="left"
-      class="full-width"
+      class="column"
     >
       <q-tabs v-model="tab">
         <q-tab name="scene" :label="$t('layout.scene')" />
@@ -177,7 +177,7 @@ onMounted(() => {
         <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
-      <q-tab-panels v-model="tab" animated>
+      <q-tab-panels v-model="tab" animated class="col">
         <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")
@@ -242,4 +242,8 @@ body.body--dark .q-drawer__resizer
 
 .q-drawer__resizer--right
   left: -1.5px
+
+.q-tab-panel
+  height: 100%
+  overflow: hidden
 </style>
