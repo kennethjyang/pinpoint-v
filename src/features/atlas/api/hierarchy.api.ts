@@ -1,4 +1,6 @@
 import type { TerminologyRow } from "../models/terminology-row.model";
+import type { Atlas } from "@/features/atlas";
+import { KNOWN_DEFAULT_STRUCTURES } from "../models/known-default-structures.model";
 
 /** One tree-indent cell: `line` (│), `blank`, `tee` (├), or `elbow` (└). */
 export type HierarchyGuide = "line" | "blank" | "tee" | "elbow";
@@ -125,16 +127,25 @@ function toTitleCase(name: string): string {
 }
 
 /**
- * Return the identifiers of the direct children of root.
+ * Return the identifiers of the default structure for an atlas.
+ *
+ * Defaults to direct children of root if there are no known defaults.
+ * @param atlas Atlas to get the default structure of.
  * @param terminologyRows Parsed terminology rows.
  */
 export function getDefaultStructureIdentifiers(
+  atlas: Atlas,
   terminologyRows: TerminologyRow[]
 ): number[] {
-  const rootRow = terminologyRows.find(row => row.parent_identifier === null);
-  if (!rootRow) return [];
+  const knownDefaults = KNOWN_DEFAULT_STRUCTURES[atlas.name];
+  if (!knownDefaults) {
+    const rootRow = terminologyRows.find(row => row.parent_identifier === null);
+    if (!rootRow) return [];
 
-  return terminologyRows
-    .filter(row => row.parent_identifier === rootRow.identifier)
-    .map(row => row.identifier);
+    return terminologyRows
+      .filter(row => row.parent_identifier === rootRow.identifier)
+      .map(row => row.identifier);
+  }
+
+  return knownDefaults;
 }

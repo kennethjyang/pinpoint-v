@@ -173,7 +173,7 @@ watch(selectedManufacturerName, () => {
                 <q-icon name="search" />
               </template>
             </q-input>
-            <q-list class="dialog-list" separator>
+            <q-list class="fixed-dialog-list" separator>
               <template v-if="probeNamesEvaluating">
                 <q-item v-for="n in 5" :key="n">
                   <q-item-section>
@@ -225,9 +225,19 @@ watch(selectedManufacturerName, () => {
             }}</q-tooltip>
           </q-btn>
         </q-card-actions>
+        <input
+          ref="file-input"
+          accept="application/json"
+          class="hidden"
+          type="file"
+          @change="onFileSelected"
+        />
       </div>
     </q-card>
   </q-dialog>
 </template>
 
-<style lang="sass" scoped></style>
+<style lang="sass" scoped>
+.install-card
+  min-width: 50vw
+</style>
