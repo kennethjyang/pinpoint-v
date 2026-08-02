@@ -36,74 +36,65 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
 </script>
 
 <template>
-  <div class="full-width column q-gutter-y-sm">
-    <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
-      <template #prepend>
-        <q-icon name="search" />
-      </template>
-    </q-input>
-
-    <!--      :virtual-scroll-item-size="32"-->
-    <q-virtual-scroll
-      v-slot="{ item, index }"
-      :items="displayedItems"
-      class="col"
-    >
-      <q-item :key="index" dense>
-        <q-item-section no-wrap>
-          <template v-if="!isSearching">
-            <span
-              v-for="(guide, index) in item.guides"
-              :key="index"
-              :class="`guide--${guide}`"
-              class="guide"
-            />
-          </template>
-          <div class="row q-gutter-x-xs items-center no-wrap">
-            <q-checkbox
-              :model-value="
-                isStructureVisible(
-                  currentExperiment.experiment,
-                  item.identifier
-                )
-              "
-              dense
-              @update:model-value="
-                visible =>
-                  setStructureVisibility(
-                    currentExperiment.experiment,
-                    item.identifier,
-                    visible
-                  )
-              "
-            />
-            <q-icon
-              :style="{ color: item.color }"
-              name="radio_button_checked"
-              size="sm"
-            />
-            <b>{{ item.abbreviation }}</b>
-            <span class="text-no-wrap">{{ item.name }}</span>
-          </div>
-        </q-item-section>
-      </q-item>
-      <!--      <template #default="{ item }">-->
-      <!--        <div-->
-      <!--          :key="item.identifier"-->
-      <!--          class="hierarchy-row row items-center no-wrap"-->
-      <!--        >-->
-      <!--        </div>-->
-      <!--      </template>-->
-    </q-virtual-scroll>
-
-    <template v-if="currentExperiment.visibleStructures.length">
-      <q-btn
-        icon="clear_all"
-        :label="$t('atlasHierarchy.clear')"
-        @click="clearVisibleStructures(currentExperiment.experiment)"
-      />
+  <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
+    <template #prepend>
+      <q-icon name="search" />
     </template>
-  </div>
+  </q-input>
+
+  <!--      :virtual-scroll-item-size="32"-->
+  <q-virtual-scroll v-slot="{ item, index }" :items="displayedItems">
+    <q-item :key="index" dense>
+      <q-item-section no-wrap>
+        <template v-if="!isSearching">
+          <span
+            v-for="(guide, index) in item.guides"
+            :key="index"
+            :class="`guide--${guide}`"
+            class="guide"
+          />
+        </template>
+        <div class="row q-gutter-x-xs items-center no-wrap">
+          <q-checkbox
+            :model-value="
+              isStructureVisible(currentExperiment.experiment, item.identifier)
+            "
+            dense
+            @update:model-value="
+              visible =>
+                setStructureVisibility(
+                  currentExperiment.experiment,
+                  item.identifier,
+                  visible
+                )
+            "
+          />
+          <q-icon
+            :style="{ color: item.color }"
+            name="radio_button_checked"
+            size="sm"
+          />
+          <b>{{ item.abbreviation }}</b>
+          <span class="text-no-wrap">{{ item.name }}</span>
+        </div>
+      </q-item-section>
+    </q-item>
+    <!--      <template #default="{ item }">-->
+    <!--        <div-->
+    <!--          :key="item.identifier"-->
+    <!--          class="hierarchy-row row items-center no-wrap"-->
+    <!--        >-->
+    <!--        </div>-->
+    <!--      </template>-->
+  </q-virtual-scroll>
+
+  <template v-if="currentExperiment.visibleStructures.length">
+    <q-btn
+      :label="$t('atlasHierarchy.clear')"
+      icon="clear_all"
+      @click="clearVisibleStructures(currentExperiment.experiment)"
+    />
+  </template>
 </template>
 
 <style lang="sass" scoped>

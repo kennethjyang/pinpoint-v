@@ -25,7 +25,7 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("scene");
+const tab = ref("atlas");
 
 /**
  * Toggle a drawer's open state.
@@ -169,7 +169,7 @@ onMounted(() => {
       bordered
       show-if-above
       side="left"
-      class="column"
+      class="full-width"
     >
       <q-tabs v-model="tab">
         <q-tab name="scene" :label="$t('layout.scene')" />
@@ -177,7 +177,7 @@ onMounted(() => {
         <q-tab name="atlas" :label="$t('layout.atlas')" />
       </q-tabs>
       <q-separator />
-      <q-tab-panels v-model="tab" animated class="col">
+      <q-tab-panels v-model="tab" animated>
         <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
         <q-tab-panel name="channel-maps">{{
           $t("layout.channelMaps")
