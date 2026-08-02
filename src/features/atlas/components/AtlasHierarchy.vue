@@ -36,14 +36,16 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
       </template>
     </q-input>
 
-    <!--      :virtual-scroll-item-size="32"-->
     <q-virtual-scroll
-      v-slot="{ item, index }"
       :items="displayedItems"
+      :virtual-scroll-item-size="32"
       class="col scroll"
     >
-      <q-item :key="index" dense>
-        <q-item-section no-wrap>
+      <template #default="{ item }">
+        <div
+          :key="item.identifier"
+          class="hierarchy-row row items-center no-wrap"
+        >
           <template v-if="!isSearching">
             <span
               v-for="(guide, index) in item.guides"
@@ -78,15 +80,8 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
             <b>{{ item.abbreviation }}</b>
             <span class="text-no-wrap">{{ item.name }}</span>
           </div>
-        </q-item-section>
-      </q-item>
-      <!--      <template #default="{ item }">-->
-      <!--        <div-->
-      <!--          :key="item.identifier"-->
-      <!--          class="hierarchy-row row items-center no-wrap"-->
-      <!--        >-->
-      <!--        </div>-->
-      <!--      </template>-->
+        </div>
+      </template>
     </q-virtual-scroll>
 
     <template v-if="currentExperiment.visibleStructures.length">
