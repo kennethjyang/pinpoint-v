@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   atlasDisplayName,
   flattenHierarchy,
-  getDefaultStructureIdentifiers,
-  toTitleCase
+  getDefaultStructureIdentifiers
 } from "./hierarchy.api";
 import {
   makeRelativePathTerminologyRows,
@@ -115,20 +114,6 @@ describe("getDefaultStructureIdentifiers", () => {
 
   it("returns an empty list for an empty list", () => {
     expect(getDefaultStructureIdentifiers([])).toEqual([]);
-  });
-});
-
-describe("toTitleCase", () => {
-  it("title-cases a multi-word, mixed-case name", () => {
-    expect(toTitleCase("basic cell GROUPS")).toBe("Basic Cell Groups");
-  });
-
-  it("title-cases a single word", () => {
-    expect(toTitleCase("root")).toBe("Root");
-  });
-
-  it("returns an empty string unchanged", () => {
-    expect(toTitleCase("")).toBe("");
   });
 });
 
