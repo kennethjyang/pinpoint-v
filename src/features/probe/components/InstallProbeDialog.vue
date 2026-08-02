@@ -225,13 +225,6 @@ watch(selectedManufacturerName, () => {
             }}</q-tooltip>
           </q-btn>
         </q-card-actions>
-        <input
-          ref="file-input"
-          accept="application/json"
-          class="hidden"
-          type="file"
-          @change="onFileSelected"
-        />
       </div>
     </q-card>
   </q-dialog>
