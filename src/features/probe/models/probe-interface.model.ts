@@ -18,6 +18,9 @@ export interface ProbeInterfaceProbe {
   contact_positions: number[][];
   contact_shapes?: string[]; // "circle" | "square" | "rect"
   contact_shape_params?: ContactShapeParams[];
+  // Per-contact 2x2 orientation basis [[ux, uy], [vx, vy]], index-aligned
+  // with contact_positions.
+  contact_plane_axes?: number[][][];
   contact_ids?: (string | number)[];
   shank_ids?: (string | number)[];
   // Per-contact face of the shank, e.g. "front" / "back". Present on

@@ -2,18 +2,38 @@ import type { SampleResult } from "../models/sample-result.model";
 
 /**
  * Allocate an empty sample result, with all values initialized to background.
- * @param sampleCount Number of samples the result will hold.
- * @param withPixels Whether to also allocate RGBA8 pixels (skip for a 1D
- *   consumer that only needs annotation values).
+ * Reuses and zeroes `reuse`'s typed arrays when its sample count already
+ * matches, rather than allocating fresh ones, to spare a replan's GC cost -
+ * the returned result is always a new object, so callers that publish it
+ * through a `shallowRef` still trigger reactivity.
+ * @param widthPixels Edge length along u, in pixels.
+ * @param heightPixels Edge length along v, in pixels.
+ * @param reuse Prior result whose typed arrays may be reused if sized identically.
  */
 export function createSampleResult(
-  sampleCount: number,
-  withPixels: boolean
+  widthPixels: number,
+  heightPixels: number,
+  reuse?: SampleResult
 ): SampleResult {
+  const sampleCount = widthPixels * heightPixels;
+  if (reuse && reuse.annotationValues.length === sampleCount) {
+    reuse.annotationValues.fill(0);
+    reuse.pixels.fill(0);
+    return {
+      widthPixels,
+      heightPixels,
+      annotationValues: reuse.annotationValues,
+      pixels: reuse.pixels,
+      paintedChunkCount: 0,
+      totalChunkCount: 0
+    };
+  }
+
   return {
-    sampleCount,
+    widthPixels,
+    heightPixels,
     annotationValues: new Uint32Array(sampleCount),
-    pixels: withPixels ? new Uint8ClampedArray(sampleCount * 4) : null,
+    pixels: new Uint8ClampedArray(sampleCount * 4),
     paintedChunkCount: 0,
     totalChunkCount: 0
   };
@@ -26,12 +46,4 @@ export function createSampleResult(
  */
 export function isSampleResultComplete(result: SampleResult): boolean {
   return result.paintedChunkCount >= result.totalChunkCount;
-}
-
-/**
- * Edge length in samples of a square result, recovered from its sample count.
- * @param result Result to measure.
- */
-export function getSampleEdgeLength(result: SampleResult): number {
-  return Math.round(Math.sqrt(result.sampleCount));
 }

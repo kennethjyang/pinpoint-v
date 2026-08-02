@@ -7,10 +7,7 @@ import { createAnnotationMetadataStore } from "../api/annotation-store.api";
 import { openAnnotationVolume } from "../api/annotation-volume.api";
 import { getWorkerCount, groupRequestsByShard } from "../api/chunk-shard.api";
 import { createSampleResult } from "../api/sample-result.api";
-import {
-  planSamples,
-  selectAnnotationLevelIndex
-} from "../api/sample-plan.api";
+import { selectSamplePlan } from "../api/sample-plan.api";
 import { buildStructureColors } from "../api/structure-colors.api";
 import type { AnnotationVolume } from "../models/annotation-level.model";
 import type { SampleGeometry } from "../models/sample-geometry.model";
@@ -177,14 +174,14 @@ export const useAnnotationSampler = createSharedComposable(
         const generation = (streamGenerations.get(streamId) ?? 0) + 1;
         streamGenerations.set(streamId, generation);
 
-        const levelIndex = selectAnnotationLevelIndex(volume, value);
-        const plan = planSamples(value, volume.levels[levelIndex]!, levelIndex);
+        const plan = selectSamplePlan(value, volume);
         const shardGroups = groupRequestsByShard(plan, workerCount);
         const nonEmptyGroups = shardGroups.filter(group => group.length > 0);
 
         result.value = createSampleResult(
-          plan.sampleCount,
-          value.kind === "plane"
+          value.widthPixels,
+          value.heightPixels,
+          result.value ?? undefined
         );
         result.value.totalChunkCount = plan.chunkRequests.length;
         streamRequestCounts.set(streamId, {
@@ -199,7 +196,7 @@ export const useAnnotationSampler = createSharedComposable(
             type: "sample",
             streamId,
             generation,
-            levelIndex,
+            levelIndex: plan.levelIndex,
             requests
           });
         });
@@ -241,13 +238,11 @@ function applySampledMessage(
   result: SampleResult,
   message: SampledMessage
 ): void {
-  const packedColors = result.pixels
-    ? new Uint32Array(result.pixels.buffer)
-    : null;
+  const packedColors = new Uint32Array(result.pixels.buffer);
   for (let index = 0; index < message.sampleIndices.length; index++) {
     const sampleIndex = message.sampleIndices[index]!;
     result.annotationValues[sampleIndex] = message.annotationValues[index]!;
-    if (packedColors) packedColors[sampleIndex] = message.colors[index]!;
+    packedColors[sampleIndex] = message.colors[index]!;
   }
   result.paintedChunkCount += message.chunkCount;
 }

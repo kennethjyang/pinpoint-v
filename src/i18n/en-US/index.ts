@@ -137,6 +137,13 @@ export default {
     extent: "{extent} mm",
     noContour: "This probe has no contour to slice through."
   },
+  channelMaps: {
+    small: "Small",
+    medium: "Medium",
+    large: "Large",
+    range: "Visible range along probe",
+    noProbes: "Add a probe to see its channel map."
+  },
   errorNotFound: {
     code: "404",
     message: "Oops. Nothing here...",

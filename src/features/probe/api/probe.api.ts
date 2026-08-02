@@ -37,7 +37,11 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     // (`getDefaultSliceExtentMillimeters`), since a single constant can't
     // fit both a mouse and a human atlas.
     sliceExtentMillimeters: null,
-    sliceCenterHeightMillimeters: 0
+    sliceCenterHeightMillimeters: 0,
+    channelMapRangeStartMillimeters: 0,
+    // Null rather than the contour height - the channel map resolves this to
+    // the current probe's own contour once it has one.
+    channelMapRangeEndMillimeters: null
   };
 }
 
@@ -199,6 +203,9 @@ export function isProbe(value: unknown): value is Probe {
     isFiniteTriple(value.rotation) &&
     (value.sliceExtentMillimeters === null ||
       isFiniteNumber(value.sliceExtentMillimeters)) &&
-    isFiniteNumber(value.sliceCenterHeightMillimeters)
+    isFiniteNumber(value.sliceCenterHeightMillimeters) &&
+    isFiniteNumber(value.channelMapRangeStartMillimeters) &&
+    (value.channelMapRangeEndMillimeters === null ||
+      isFiniteNumber(value.channelMapRangeEndMillimeters))
   );
 }

@@ -12,6 +12,15 @@ export interface ProbeContour {
   origin: { x: number; y: number };
 }
 
+/** One contact's drawn footprint and orientation, in probe-local mm. */
+export interface ProbeContactShape {
+  kind: "circle" | "rect";
+  widthMillimeters: number;
+  heightMillimeters: number;
+  /** Rotation from `contact_plane_axes`, in radians; 0 when absent or unparseable. */
+  rotationRadians: number;
+}
+
 /** A probe's contacts, in the same probe-local mm frame as its contour. */
 export interface ProbeContacts {
   /** Contact centers in probe-local mm, in `contact_positions` order (with any unusable points dropped). */
@@ -22,6 +31,8 @@ export interface ProbeContacts {
   widthMillimeters: number;
   /** Full y extent of the contacts, in mm. */
   heightMillimeters: number;
+  /** Per-contact drawn footprint and orientation, index-aligned with `points`. */
+  shapes: ProbeContactShape[];
   /** Per-contact shank grouping from `shank_ids`, index-aligned with `points`, or null when absent. */
   shankIds: (string | number)[] | null;
 }
@@ -35,6 +46,9 @@ const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
 
 /** Fallback conversion factor for an unrecognized `si_units` value. */
 const MICROMETERS_TO_MILLIMETERS = 1e-3;
+
+/** Fallback contact footprint side when shape params are missing, in the definition's own units. */
+const DEFAULT_CONTACT_SIZE_UNITS = 10;
 
 /**
  * Millimeters per unit of a definition's `si_units`.
@@ -115,6 +129,10 @@ export function getProbeContacts(
     ? validIndices.map(index => probeInterfaceProbe.shank_ids![index]!)
     : null;
 
+  const shapes = validIndices.map(index =>
+    getContactShape(probeInterfaceProbe, index, scale)
+  );
+
   return {
     points: localPoints,
     centerMillimeters: {
@@ -123,8 +141,83 @@ export function getProbeContacts(
     },
     widthMillimeters: maximumX - minimumX,
     heightMillimeters: maximumY - minimumY,
+    shapes,
     shankIds
   };
+}
+
+/**
+ * Derive one contact's drawn footprint and rotation from its shape, shape
+ * params, and plane axes, falling back to an unrotated square sized from
+ * whatever dimension is available when any of those are missing or unparseable.
+ * @param probeInterfaceProbe Definition the contact belongs to.
+ * @param index Contact's original index into `contact_positions`.
+ * @param scale Millimeters per unit.
+ */
+function getContactShape(
+  probeInterfaceProbe: ProbeInterfaceProbe,
+  index: number,
+  scale: number
+): ProbeContactShape {
+  const shape = probeInterfaceProbe.contact_shapes?.[index];
+  const params = probeInterfaceProbe.contact_shape_params?.[index];
+  const rotationRadians = getContactRotationRadians(
+    probeInterfaceProbe.contact_plane_axes?.[index]
+  );
+
+  if (shape === "circle") {
+    const diameter =
+      2 * (params?.radius ?? DEFAULT_CONTACT_SIZE_UNITS / 2) * scale;
+    return {
+      kind: "circle",
+      widthMillimeters: diameter,
+      heightMillimeters: diameter,
+      rotationRadians
+    };
+  }
+
+  if (shape === "rect") {
+    return {
+      kind: "rect",
+      widthMillimeters:
+        (params?.width ?? params?.height ?? DEFAULT_CONTACT_SIZE_UNITS) * scale,
+      heightMillimeters:
+        (params?.height ?? params?.width ?? DEFAULT_CONTACT_SIZE_UNITS) * scale,
+      rotationRadians
+    };
+  }
+
+  // "square", or an absent/unrecognized shape: a square footprint, sized
+  // from whatever dimension is available.
+  const side =
+    (params?.width ??
+      params?.height ??
+      params?.radius ??
+      DEFAULT_CONTACT_SIZE_UNITS) * scale;
+  return {
+    kind: "rect",
+    widthMillimeters: side,
+    heightMillimeters: side,
+    rotationRadians
+  };
+}
+
+/**
+ * A contact's rotation from its plane axes' `u` basis vector, or 0 when
+ * absent or not a finite 2-vector.
+ * @param planeAxes Contact's `contact_plane_axes` entry, `[[ux, uy], [vx, vy]]`.
+ */
+function getContactRotationRadians(planeAxes: number[][] | undefined): number {
+  const u = planeAxes?.[0];
+  if (
+    !u ||
+    u.length !== 2 ||
+    !Number.isFinite(u[0]) ||
+    !Number.isFinite(u[1])
+  ) {
+    return 0;
+  }
+  return Math.atan2(u[1]!, u[0]!);
 }
 
 /**

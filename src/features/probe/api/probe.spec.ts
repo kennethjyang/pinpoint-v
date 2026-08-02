@@ -43,6 +43,10 @@ describe("buildProbe", () => {
     // proportionally to whichever atlas is current.
     expect(probe.sliceExtentMillimeters).toBeNull();
     expect(probe.sliceCenterHeightMillimeters).toBe(0);
+    expect(probe.channelMapRangeStartMillimeters).toBe(0);
+    // Null, not the contour height - the channel map defaults this to the
+    // probe's own contour once it has one.
+    expect(probe.channelMapRangeEndMillimeters).toBeNull();
   });
 
   it("gives each probe a unique id", () => {
@@ -324,6 +328,30 @@ describe("isProbe", () => {
     expect(isProbe({ ...makeProbe(), sliceCenterHeightMillimeters: NaN })).toBe(
       false
     );
+  });
+
+  it("accepts a probe with a null channelMapRangeEndMillimeters", () => {
+    expect(isProbe(makeProbe({ channelMapRangeEndMillimeters: null }))).toBe(
+      true
+    );
+  });
+
+  it("rejects a probe with a non-numeric, non-null channelMapRangeEndMillimeters", () => {
+    expect(
+      isProbe({ ...makeProbe(), channelMapRangeEndMillimeters: "8" })
+    ).toBe(false);
+  });
+
+  it("rejects a probe missing channelMapRangeStartMillimeters", () => {
+    const probe = makeProbe();
+    delete (probe as Partial<Probe>).channelMapRangeStartMillimeters;
+    expect(isProbe(probe)).toBe(false);
+  });
+
+  it("rejects a probe with a non-finite channelMapRangeStartMillimeters", () => {
+    expect(
+      isProbe({ ...makeProbe(), channelMapRangeStartMillimeters: NaN })
+    ).toBe(false);
   });
 });
 
