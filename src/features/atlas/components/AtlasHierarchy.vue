@@ -102,6 +102,9 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
 <style lang="sass" scoped>
 $guide-width: 2px
 
+.column
+  flex-wrap: nowrap
+
 .hierarchy-row
   height: 32px
   width: max-content
