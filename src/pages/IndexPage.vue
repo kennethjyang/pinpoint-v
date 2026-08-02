@@ -13,6 +13,7 @@ import { ProbeLibraryDialog } from "@/features/probe";
 import { Inspector } from "@/features/inspector";
 import { SplashDialog } from "@/features/splash";
 import { clamp } from "@/utils/math";
+import { ChannelMaps } from "@/features/slice";
 
 /** Widest a drawer can be resized to, as a fraction of the window width. */
 const MAXIMUM_DRAWER_WIDTH_RATIO = 0.4;
@@ -179,9 +180,9 @@ onMounted(() => {
       <q-separator />
       <q-tab-panels v-model="tab" animated class="col">
         <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
-        <q-tab-panel name="channel-maps">{{
-          $t("layout.channelMaps")
-        }}</q-tab-panel>
+        <q-tab-panel name="channel-maps">
+          <ChannelMaps />
+        </q-tab-panel>
         <q-tab-panel name="atlas">
           <AtlasHierarchy />
         </q-tab-panel>
