@@ -172,6 +172,8 @@ useSliceCanvasPainter(
       reverse
       :min="0"
       :max="contour.heightMillimeters"
+      :label-value="`${centerHeightMillimeters.toFixed(2)} mm`"
+      label
       :step="0"
       dense
       class="col-auto slice-canvas__center-slider"
@@ -215,14 +217,6 @@ useSliceCanvasPainter(
           }}</p>
         </div>
 
-        <!--
-          QTooltip normally shows itself from its own anchor's mouseenter,
-          but that anchor only exists once this v-if mounts - entering over
-          background then moving onto a structure gets no further
-          mouseenter to trigger it. Driving it from the model instead shows
-          it the instant it mounts; no-parent-event stops QTooltip's own
-          mouseleave handling from then fighting that model.
-        -->
         <q-tooltip v-if="hoveredStructure" model-value no-parent-event>
           {{ hoveredStructure.abbreviation }} - {{ hoveredStructure.name }}
         </q-tooltip>
@@ -232,6 +226,8 @@ useSliceCanvasPainter(
         v-model="zoomExponent"
         :min="zoomRange.minimum"
         :max="zoomRange.maximum"
+        :label-value="`${formatSliceExtentMillimeters(extentMillimeters)} mm`"
+        label
         :step="0"
         :markers="1"
         :marker-labels="zoomMarkerLabel"
@@ -239,13 +235,6 @@ useSliceCanvasPainter(
         class="q-mt-md"
         :aria-label="t('slice.zoom')"
       />
-      <div class="row justify-center q-mt-xs">
-        <span class="text-caption">{{
-          t("slice.extent", {
-            extent: formatSliceExtentMillimeters(extentMillimeters)
-          })
-        }}</span>
-      </div>
     </div>
   </div>
 </template>
