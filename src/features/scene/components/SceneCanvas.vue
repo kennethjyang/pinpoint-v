@@ -45,11 +45,21 @@ const runtime = useBabylonRuntimeService();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
+type EnabledGizmo = "position" | "rotation";
+type GizmoCoordinateSpace = "local" | "global";
+
 /**
  * Whether structures are currently being synced into the scene, driving the
  * loading bar overlaid on the canvas.
  */
 const isLoadingStructures = ref(false);
+
+const enabledGizmo = ref<EnabledGizmo>("position");
+const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
+
+const isInspectableSelected = computed<boolean>(
+  () => currentExperiment.selectedInspectable !== null
+);
 
 /**
  * Atlas structures that must always be present in the scene, faded out when
@@ -288,6 +298,36 @@ onUnmounted(() => {
     />
   </div>
   <q-resize-observer @resize="onResize" />
+  <q-dialog v-model="isInspectableSelected" position="bottom" seamless>
+    <q-card>
+      <q-card-section class="row q-gutter-x-md">
+        <q-btn-toggle
+          v-model="enabledGizmo"
+          :options="[
+            { label: 'Position', value: 'position', icon: 'sym_o_point_scan' },
+            {
+              label: 'Rotation',
+              value: 'rotation',
+              icon: 'flip_camera_android'
+            }
+          ]"
+          toggle-color="primary"
+        />
+        <q-btn-toggle
+          v-model="gizmoCoordinateSpace"
+          :options="[
+            { label: 'Local', value: 'local', icon: 'sym_o_nearby' },
+            {
+              label: 'Global',
+              value: 'global',
+              icon: 'sym_o_globe'
+            }
+          ]"
+          toggle-color="primary"
+        />
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>
 
 <style scoped>
