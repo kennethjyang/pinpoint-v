@@ -26,7 +26,7 @@ const leftDrawerOpen = ref(false);
 const rightDrawerOpen = ref(false);
 const leftDrawerWidth = ref(350);
 const rightDrawerWidth = ref(350);
-const tab = ref("scene");
+const tab = ref("channel-maps");
 
 /**
  * Toggle a drawer's open state.
