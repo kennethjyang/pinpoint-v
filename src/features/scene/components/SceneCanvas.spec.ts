@@ -16,6 +16,7 @@ import type {
   Scene,
   SelectionOutlineLayer
 } from "@babylonjs/core";
+import { PointerEventTypes } from "@babylonjs/core";
 import { shallowRef } from "vue";
 import SceneCanvas from "./SceneCanvas.vue";
 import type { FakeTextRenderer } from "@/test/mount-helper";
@@ -230,6 +231,20 @@ describe("SceneCanvas", () => {
     expect(runtime.init).toHaveBeenCalledTimes(1);
     const canvasArg = vi.mocked(runtime.init).mock.calls[0]![0];
     expect(canvasArg).toBe(wrapper.find("canvas").element);
+  });
+
+  it("registers exactly one axis guide double-tap observer, and removes it on unmount", async () => {
+    const { wrapper, runtime } = await mountCanvas();
+
+    const observers = () =>
+      runtime.scene.value!.onPointerObservable.observers.filter(
+        observer => observer.mask === PointerEventTypes.POINTERDOUBLETAP
+      );
+    expect(observers()).toHaveLength(1);
+
+    wrapper.unmount();
+
+    expect(observers()).toHaveLength(0);
   });
 
   it("syncs structures built from the manifest, not the atlas", async () => {
