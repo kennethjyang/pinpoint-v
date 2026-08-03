@@ -31,6 +31,8 @@ import {
   setProbeRotationFromGizmoDrag,
   syncProbes
 } from "../api/probe.api";
+import { setGizmoControls } from "../api/gizmo.api";
+import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 import {
   deselectFromPointerDown,
@@ -45,16 +47,13 @@ const runtime = useBabylonRuntimeService();
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
-type EnabledGizmo = "position" | "rotation";
-type GizmoCoordinateSpace = "local" | "global";
-
 /**
  * Whether structures are currently being synced into the scene, driving the
  * loading bar overlaid on the canvas.
  */
 const isLoadingStructures = ref(false);
 
-const enabledGizmo = ref<EnabledGizmo>("position");
+const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
 
 /**
@@ -183,41 +182,42 @@ watchEffect(() => {
   }
 });
 
-// Sync state from probes, re-registering when the experiment is replaced.
+// Configure the gizmos from the control bar and keep the probe drag
+// observers on them.
 watch(
   [
-    runtime.scene,
     runtime.gizmoManager,
     () => currentExperiment.experiment,
-    enabledGizmo,
+    gizmoMode,
     gizmoCoordinateSpace
   ],
-  ([scene, gizmoManager, experiment]) => {
-    if (!scene || !gizmoManager) return;
+  ([gizmoManager, experiment, mode, coordinateSpace]) => {
+    if (!gizmoManager) return;
+
+    const gizmos = setGizmoControls(gizmoManager, mode, coordinateSpace);
 
     const probePositionDraggingObserver = setProbePositionFromGizmoDrag(
-      gizmoManager,
+      gizmos.positionGizmo,
       experiment,
       probeId => {
         currentExperiment.draggedProbeId = probeId;
       }
     );
     const probeRotationDraggingObserver = setProbeRotationFromGizmoDrag(
-      gizmoManager,
+      gizmos.rotationGizmo,
       experiment,
       probeId => {
         currentExperiment.draggedProbeId = probeId;
       }
     );
-
-    const probeDragEndObservers = endProbeGizmoDrag(gizmoManager, () => {
+    const probeDragEndObservers = endProbeGizmoDrag(gizmos, () => {
       currentExperiment.draggedProbeId = null;
     });
 
     onWatcherCleanup(() => {
-      probePositionDraggingObserver?.remove();
-      probeRotationDraggingObserver?.remove();
-      probeDragEndObservers.forEach(observer => observer?.remove());
+      probePositionDraggingObserver.remove();
+      probeRotationDraggingObserver.remove();
+      probeDragEndObservers.forEach(observer => observer.remove());
     });
   }
 );
@@ -275,24 +275,6 @@ watchEffect(() => {
   );
 });
 
-// Configure gizmo based on control bar.
-watchEffect(() => {
-  const gizmoManager = runtime.gizmoManager.value;
-  if (!gizmoManager) return;
-
-  gizmoManager.positionGizmoEnabled = enabledGizmo.value === "position";
-  gizmoManager.rotationGizmoEnabled = enabledGizmo.value === "rotation";
-
-  if (gizmoManager.gizmos.positionGizmo) {
-    gizmoManager.gizmos.positionGizmo.updateGizmoPositionToMatchAttachedMesh =
-      gizmoCoordinateSpace.value === "local";
-  }
-  if (gizmoManager.gizmos.rotationGizmo) {
-    gizmoManager.gizmos.rotationGizmo.updateGizmoRotationToMatchAttachedMesh =
-      gizmoCoordinateSpace.value === "local";
-  }
-});
-
 onMounted(async () => {
   if (!canvas.value) {
     throw new Error("Scene canvas not found in DOM!");
@@ -322,11 +304,16 @@ onUnmounted(() => {
     <q-card>
       <q-card-section class="row justify-center gizmo-controls">
         <q-btn-toggle
-          v-model="enabledGizmo"
+          v-model="gizmoMode"
+          :aria-label="$t('sceneCanvas.gizmoMode')"
           :options="[
-            { label: 'Position', value: 'position', icon: 'sym_o_point_scan' },
             {
-              label: 'Rotation',
+              label: $t('sceneCanvas.gizmoPosition'),
+              value: 'position',
+              icon: 'sym_o_point_scan'
+            },
+            {
+              label: $t('sceneCanvas.gizmoRotation'),
               value: 'rotation',
               icon: 'flip_camera_android'
             }
@@ -335,10 +322,15 @@ onUnmounted(() => {
         />
         <q-btn-toggle
           v-model="gizmoCoordinateSpace"
+          :aria-label="$t('sceneCanvas.gizmoCoordinateSpace')"
           :options="[
-            { label: 'Local', value: 'local', icon: 'sym_o_nearby' },
             {
-              label: 'Global',
+              label: $t('sceneCanvas.gizmoLocal'),
+              value: 'local',
+              icon: 'sym_o_nearby'
+            },
+            {
+              label: $t('sceneCanvas.gizmoGlobal'),
               value: 'global',
               icon: 'sym_o_globe'
             }
