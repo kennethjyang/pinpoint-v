@@ -120,7 +120,9 @@ watch(atlas, async (newAtlas, oldAtlas) => {
       <q-card-section>
         <div class="text-h5">{{ $t("experimentProperties.title") }}</div>
       </q-card-section>
-      <q-card-section class="q-gutter-y-md experiment-properties__content">
+      <q-card-section
+        class="q-gutter-y-md experiment-properties__content q-mt-none q-pt-none"
+      >
         <q-input
           ref="nameInput"
           v-model="name"

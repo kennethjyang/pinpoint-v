@@ -1,9 +1,12 @@
 <script lang="ts" setup>
 import { computed, ref, useTemplateRef } from "vue";
-import { type QInput, type ValidationRule } from "quasar";
+import {
+  type QInput,
+  useDialogPluginComponent,
+  type ValidationRule
+} from "quasar";
 import { Atlas, AtlasPicker, getManifest } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { useDialogPluginComponent } from "quasar";
 import { buildInitialReferenceCoordinate } from "../api/reference-coordinate.api";
 import { useI18n } from "vue-i18n";
 import { buildExperiment } from "../api/experiment.api";
@@ -60,7 +63,9 @@ async function create() {
       <q-card-section>
         <div class="text-h5">{{ $t("newExperiment.title") }}</div>
       </q-card-section>
-      <q-card-section class="q-gutter-y-md new-experiment__content">
+      <q-card-section
+        class="q-gutter-y-md new-experiment__content q-mt-none q-pt-none"
+      >
         <q-input
           ref="nameInput"
           v-model="name"

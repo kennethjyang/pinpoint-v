@@ -159,7 +159,9 @@ watch(selectedManufacturerName, () => {
         class="install-card__body"
         :class="{ disabled: uploading || installing }"
       >
-        <q-card-section class="q-gutter-y-sm install-card__content">
+        <q-card-section
+          class="q-gutter-y-sm install-card__content q-mt-none q-pt-none"
+        >
           <q-select
             v-model="selectedManufacturerName"
             :label="$t('installProbe.manufacturer')"
