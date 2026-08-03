@@ -300,7 +300,7 @@ onUnmounted(() => {
   <q-resize-observer @resize="onResize" />
   <q-page-sticky :offset="[0, 18]" position="bottom">
     <q-card v-if="isInspectableSelected">
-      <q-card-section class="row justify-center q-gutter-x-md">
+      <q-card-section class="row justify-center gizmo-controls">
         <q-btn-toggle
           v-model="enabledGizmo"
           :options="[
@@ -335,4 +335,7 @@ canvas
   display: block
   width: 100%
   height: 100%
+
+.gizmo-controls
+  gap: 16px
 </style>
