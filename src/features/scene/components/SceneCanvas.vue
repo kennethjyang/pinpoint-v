@@ -273,6 +273,24 @@ watchEffect(() => {
   );
 });
 
+// Configure gizmo based on control bar.
+watchEffect(() => {
+  const gizmoManager = runtime.gizmoManager.value;
+  if (!gizmoManager) return;
+
+  gizmoManager.positionGizmoEnabled = enabledGizmo.value === "position";
+  gizmoManager.rotationGizmoEnabled = enabledGizmo.value === "rotation";
+
+  if (gizmoManager.gizmos.positionGizmo) {
+    gizmoManager.gizmos.positionGizmo.updateGizmoPositionToMatchAttachedMesh =
+      gizmoCoordinateSpace.value === "local";
+  }
+  if (gizmoManager.gizmos.rotationGizmo) {
+    gizmoManager.gizmos.rotationGizmo.updateGizmoRotationToMatchAttachedMesh =
+      gizmoCoordinateSpace.value === "global";
+  }
+});
+
 onMounted(async () => {
   if (!canvas.value) {
     throw new Error("Scene canvas not found in DOM!");

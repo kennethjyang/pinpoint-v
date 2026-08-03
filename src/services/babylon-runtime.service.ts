@@ -83,8 +83,6 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
 
     // Setup gizmo manager.
     const gm = new GizmoManager(s);
-    gm.positionGizmoEnabled = true;
-    gm.rotationGizmoEnabled = true;
 
     new HemisphericLight("main_light", Vector3.Up(), s);
 
