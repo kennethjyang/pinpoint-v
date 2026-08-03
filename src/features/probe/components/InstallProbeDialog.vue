@@ -3,8 +3,8 @@ import { computed, ref, watch } from "vue";
 import { computedAsync, useFileDialog } from "@vueuse/core";
 import { useDialogPluginComponent } from "quasar";
 import { useI18n } from "vue-i18n";
-import { useFuzzyFilter } from "@/composable/useFuzzyFilter";
-import { useNotify } from "@/composable/useNotify";
+import { useFuzzyFilter } from "@/composables/useFuzzyFilter";
+import { useNotify } from "@/composables/useNotify";
 import {
   buildProbeOverviewImageSrc,
   getManufacturers,

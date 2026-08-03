@@ -10,7 +10,7 @@ import {
 } from "../api/experiment-file.api";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getManifest } from "@/features/atlas";
-import { useNotify } from "@/composable/useNotify";
+import { useNotify } from "@/composables/useNotify";
 
 /**
  * Open and download the current experiment as a JSON file, notifying on

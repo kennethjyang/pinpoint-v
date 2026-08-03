@@ -10,7 +10,7 @@ import {
   setStructureVisibility
 } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { useDelayedFlag } from "@/composable/useDelayedFlag";
+import { useDelayedFlag } from "@/composables/useDelayedFlag";
 import { getProbeFrame } from "../api/probe-frame.api";
 import { getSampleEdgeLength } from "../api/sample-result.api";
 import {
@@ -21,9 +21,9 @@ import {
   getSlicePixelFromRect
 } from "../api/slice-plane.api";
 import { findStructureByAnnotationValue } from "../api/structure-colors.api";
-import { useAnnotationSampler } from "../composable/useAnnotationSampler";
-import { useSliceCanvasPainter } from "../composable/useSliceCanvasPainter";
-import { useSliceViewport } from "../composable/useSliceViewport";
+import { useAnnotationSampler } from "../composables/useAnnotationSampler";
+import { useSliceCanvasPainter } from "../composables/useSliceCanvasPainter";
+import { useSliceViewport } from "../composables/useSliceViewport";
 
 /** How long sampling must run before the loading bar is worth showing. */
 const LOADING_BAR_DELAY_MILLISECONDS = 500;

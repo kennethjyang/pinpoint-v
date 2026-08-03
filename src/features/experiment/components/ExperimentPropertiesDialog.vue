@@ -8,8 +8,8 @@ import {
 import { useI18n } from "vue-i18n";
 import { Atlas, AtlasPicker, getManifest, isSameAtlas } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { useNotify } from "@/composable/useNotify";
-import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
+import { useNotify } from "@/composables/useNotify";
+import { useNumericTupleModel } from "@/composables/useNumericTupleModel";
 import { isFiniteTriple } from "@/utils/type-guards";
 import CommittedInput from "@/components/CommittedInput.vue";
 import { setExperimentProperties } from "../api/experiment.api";

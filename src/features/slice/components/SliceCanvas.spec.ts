@@ -35,7 +35,7 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 // over `result`/`isLoading`, without a real worker or zarr fetch.
 const mockResult = shallowRef<SampleResult | null>(null);
 const mockIsLoading = shallowRef(false);
-vi.mock("../composable/useAnnotationSampler", () => ({
+vi.mock("../composables/useAnnotationSampler", () => ({
   useAnnotationSampler: () => ({
     createStream: () => ({ result: mockResult, isLoading: mockIsLoading })
   })

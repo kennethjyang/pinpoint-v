@@ -37,7 +37,7 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 // resolves) -- mock the composable so mounting doesn't hit the real
 // `Worker` global, which happy-dom doesn't provide. Mirrors the mocking
 // approach in SliceCanvas.spec.ts.
-vi.mock("@/features/slice/composable/useAnnotationSampler", () => ({
+vi.mock("@/features/slice/composables/useAnnotationSampler", () => ({
   useAnnotationSampler: () => ({
     createStream: () => ({
       result: shallowRef(null),

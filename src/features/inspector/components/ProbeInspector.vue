@@ -13,7 +13,7 @@ import { SliceCanvas } from "@/features/slice";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
+import { useNumericTupleModel } from "@/composables/useNumericTupleModel";
 import CommittedInput from "@/components/CommittedInput.vue";
 
 // A library probe's identifier paired with its display label. `emit-value`

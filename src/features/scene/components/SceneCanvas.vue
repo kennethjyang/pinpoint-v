@@ -9,7 +9,7 @@ import {
   watch,
   watchEffect
 } from "vue";
-import { useBabylonRuntimeService } from "@/composable/useBabylonRuntimeService";
+import { useBabylonRuntimeService } from "@/composables/useBabylonRuntimeService";
 import {
   removeAllStructures,
   setAtlasCenterOffset,
@@ -38,7 +38,7 @@ import {
   deselectFromPointerDown,
   selectFromSelectedInspectableState
 } from "../api/scene.api";
-import { useNotify } from "@/composable/useNotify";
+import { useNotify } from "@/composables/useNotify";
 
 const { t } = useI18n();
 const { notifyWarning } = useNotify();

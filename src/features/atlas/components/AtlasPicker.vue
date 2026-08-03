@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { computedAsync } from "@vueuse/core";
 import { useFavoriteAtlasesStore } from "@/stores/favorite-atlases.store";
-import { useFuzzyFilter } from "@/composable/useFuzzyFilter";
+import { useFuzzyFilter } from "@/composables/useFuzzyFilter";
 import { Atlas } from "../models/atlas.model";
 import { atlasDisplayName } from "../api/hierarchy.api";
 import { listAtlases, listAtlasesHTTP } from "../api/source.api";

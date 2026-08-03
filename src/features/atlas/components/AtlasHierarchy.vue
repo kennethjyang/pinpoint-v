@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref, useTemplateRef } from "vue";
-import { useFuzzyFilter } from "@/composable/useFuzzyFilter";
+import { useFuzzyFilter } from "@/composables/useFuzzyFilter";
 import {
   flattenHierarchy,
   widestHierarchyRowWidth

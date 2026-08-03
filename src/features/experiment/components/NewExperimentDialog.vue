@@ -10,7 +10,7 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { buildInitialReferenceCoordinate } from "../api/reference-coordinate.api";
 import { useI18n } from "vue-i18n";
 import { buildExperiment } from "../api/experiment.api";
-import { useNotify } from "@/composable/useNotify";
+import { useNotify } from "@/composables/useNotify";
 
 defineEmits([...useDialogPluginComponent.emits]);
 
