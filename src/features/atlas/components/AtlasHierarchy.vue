@@ -105,6 +105,13 @@ $guide-width: 2px
   width: max-content
   min-width: 100%
 
+// Quasar's virtual-scroll content wrapper is `contain: content`, which
+// paint-clips rows wider than the panel. Sizing it to its widest row moves the
+// overflow onto the scrolling root instead.
+:deep(.q-virtual-scroll__content)
+  width: max-content
+  min-width: 100%
+
 .guide
   flex: 0 0 1rem
   align-self: stretch
