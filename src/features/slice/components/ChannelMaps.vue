@@ -36,7 +36,7 @@ const zoomStyles: Record<ChannelMapsZoom, ZoomStyles> = {
 };
 
 /** Horizontal exaggeration applied to every shank's width, so a skinny shank is legible. */
-const SHANK_WIDTH_SCALE = 5;
+const SHANK_WIDTH_SCALE = 8;
 
 const currentExperimentStore = useCurrentExperimentStore();
 const { t } = useI18n();
