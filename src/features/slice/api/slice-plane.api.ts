@@ -90,78 +90,147 @@ export function getProbeSlicePlane(
   sizePixels: number
 ): SampleGeometry {
   return {
-    centerMillimeters: toAtlasMillimeters(frame, 0, centerHeightMillimeters),
     rightMillimeters: frame.rightMillimeters,
     upMillimeters: frame.upMillimeters,
-    halfWidthMillimeters: extentMillimeters / 2,
     halfHeightMillimeters: extentMillimeters / 2,
     widthPixels: sizePixels,
-    heightPixels: sizePixels
+    heightPixels: sizePixels,
+    bands: [
+      {
+        centerMillimeters: toAtlasMillimeters(
+          frame,
+          0,
+          centerHeightMillimeters
+        ),
+        halfWidthMillimeters: extentMillimeters / 2,
+        columnOffset: 0,
+        columnCount: sizePixels
+      }
+    ]
   };
 }
 
-/**
- * Build the sampling rectangle covering one shank's full extent in the
- * shank plane, centered halfway up the probe's contour.
- * @param frame Probe's shank-plane frame.
- * @param shank Shank whose x-range the rectangle covers.
- * @param heightMillimeters Height of the probe's contour, shared by every shank.
- * @param widthPixels Output width, in pixels.
- * @param heightPixels Output height, in pixels.
- */
-export function getShankSlicePlane(
-  frame: ProbeFrame,
-  shank: ProbeShank,
-  heightMillimeters: number,
-  widthPixels: number,
-  heightPixels: number
-): SampleGeometry {
-  return {
-    centerMillimeters: toAtlasMillimeters(
-      frame,
-      (shank.minimumXMillimeters + shank.maximumXMillimeters) / 2,
-      heightMillimeters / 2
-    ),
-    rightMillimeters: frame.rightMillimeters,
-    upMillimeters: frame.upMillimeters,
-    halfWidthMillimeters: shank.widthMillimeters / 2,
-    halfHeightMillimeters: heightMillimeters / 2,
-    widthPixels,
-    heightPixels
-  };
+/** One shank's placement in a packed multi-shank slice. */
+export interface ShankPlacement {
+  shank: ProbeShank;
+  /** First output column this shank fills, inclusive. */
+  columnOffset: number;
+  /** Output columns this shank fills. */
+  columnCount: number;
+  /** mm added to the shank's probe-local x to place it in packed overlay space. */
+  offsetMillimeters: number;
+}
+
+/** A packed multi-shank slice layout: one shared scale plus per-shank placements. */
+export interface ShankLayout {
+  /** Placements left to right, with contiguous `columnOffset`s starting at 0. */
+  placements: ShankPlacement[];
+  /** Total output width, in pixels. */
+  widthPixels: number;
+  /** Output height, in pixels. */
+  heightPixels: number;
+  /** Output columns per packed mm along x, shared by every shank. */
+  pixelsPerMillimeter: number;
+  /** Full packed x extent, in mm - `widthPixels / pixelsPerMillimeter`. */
+  widthMillimeters: number;
 }
 
 /**
- * Device-pixel dimensions of a shank-shaped canvas of the given CSS height,
- * quantized along height and widened to the shank's true aspect ratio.
- * @param widthMillimeters Shank's full x extent, in mm.
- * @param heightMillimeters Height of the probe's contour, shared by every shank.
+ * Pack a probe's shanks edge to edge into one output image, at the shanks'
+ * true aspect ratio and a height quantized like every other slice canvas.
+ * Null while unmeasured or when there is nothing with width to draw.
+ * @param shanks Shanks to pack, left to right.
+ * @param heightMillimeters Height of the probe's contour, spanned by every shank.
  * @param cssHeight Canvas height in CSS pixels; 0 while unmeasured.
  * @param pixelRatio Device pixel ratio.
  */
-export function getSliceSizePixels(
-  widthMillimeters: number,
+export function getShankLayout(
+  shanks: ProbeShank[],
   heightMillimeters: number,
   cssHeight: number,
   pixelRatio: number
-): { widthPixels: number; heightPixels: number } {
-  if (cssHeight <= 0 || heightMillimeters <= 0 || widthMillimeters <= 0) {
-    return { widthPixels: 0, heightPixels: 0 };
+): ShankLayout | null {
+  if (cssHeight <= 0 || heightMillimeters <= 0 || shanks.length === 0) {
+    return null;
   }
 
-  const devicePixels = cssHeight * pixelRatio;
   const heightPixels = clamp(
-    Math.floor(devicePixels / SIZE_QUANTUM_PIXELS) * SIZE_QUANTUM_PIXELS,
+    Math.floor((cssHeight * pixelRatio) / SIZE_QUANTUM_PIXELS) *
+      SIZE_QUANTUM_PIXELS,
     MINIMUM_SIZE_PIXELS,
     MAXIMUM_SIZE_PIXELS
   );
-  const widthPixels = clamp(
-    Math.round((heightPixels * widthMillimeters) / heightMillimeters),
-    1,
-    MAXIMUM_SIZE_PIXELS
-  );
 
-  return { widthPixels, heightPixels };
+  const totalWidthMillimeters = shanks.reduce(
+    (total, shank) => total + shank.widthMillimeters,
+    0
+  );
+  if (totalWidthMillimeters <= 0) return null;
+
+  let pixelsPerMillimeter = heightPixels / heightMillimeters;
+  if (totalWidthMillimeters * pixelsPerMillimeter > MAXIMUM_SIZE_PIXELS) {
+    pixelsPerMillimeter = MAXIMUM_SIZE_PIXELS / totalWidthMillimeters;
+  }
+
+  const placements: ShankPlacement[] = [];
+  let columnOffset = 0;
+  for (const shank of shanks) {
+    const columnCount = Math.max(
+      1,
+      Math.round(shank.widthMillimeters * pixelsPerMillimeter)
+    );
+    placements.push({
+      shank,
+      columnOffset,
+      columnCount,
+      offsetMillimeters:
+        columnOffset / pixelsPerMillimeter - shank.minimumXMillimeters
+    });
+    columnOffset += columnCount;
+  }
+
+  const widthPixels = columnOffset;
+  return {
+    placements,
+    widthPixels,
+    heightPixels,
+    pixelsPerMillimeter,
+    widthMillimeters: widthPixels / pixelsPerMillimeter
+  };
+}
+
+/**
+ * Build the sampling surface for a packed multi-shank slice: one band per
+ * shank, each centered on its own x and spanning the contour's full height.
+ * @param frame Probe's shank-plane frame.
+ * @param layout Packed layout the bands take their columns and widths from.
+ * @param heightMillimeters Height of the probe's contour, spanned by every band.
+ */
+export function getShankSliceGeometry(
+  frame: ProbeFrame,
+  layout: ShankLayout,
+  heightMillimeters: number
+): SampleGeometry {
+  return {
+    rightMillimeters: frame.rightMillimeters,
+    upMillimeters: frame.upMillimeters,
+    halfHeightMillimeters: heightMillimeters / 2,
+    widthPixels: layout.widthPixels,
+    heightPixels: layout.heightPixels,
+    bands: layout.placements.map(placement => ({
+      centerMillimeters: toAtlasMillimeters(
+        frame,
+        (placement.shank.minimumXMillimeters +
+          placement.shank.maximumXMillimeters) /
+          2,
+        heightMillimeters / 2
+      ),
+      halfWidthMillimeters:
+        placement.columnCount / (2 * layout.pixelsPerMillimeter),
+      columnOffset: placement.columnOffset,
+      columnCount: placement.columnCount
+    }))
+  };
 }
 
 /**

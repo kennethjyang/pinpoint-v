@@ -10,15 +10,26 @@ import { createSampleResult } from "../api/sample-result.api";
 import { selectSamplePlan } from "../api/sample-plan.api";
 import { buildStructureColors } from "../api/structure-colors.api";
 import type { AnnotationVolume } from "../models/annotation-level.model";
-import type { SampleGeometry } from "../models/sample-geometry.model";
+import type {
+  SampleBand,
+  SampleGeometry
+} from "../models/sample-geometry.model";
 import type { SampleResult } from "../models/sample-result.model";
 import type {
   InboundSamplerMessage,
   SampledMessage
 } from "../models/sampler-message.model";
 
-/** Milliseconds a geometry change is debounced before replanning, capped by an equal `maxWait`. */
-const REPLAN_INTERVAL_MILLISECONDS = 1000 / 60;
+/** Milliseconds a settled geometry change waits before replanning. */
+const REPLAN_DEBOUNCE_MILLISECONDS = 1000 / 60;
+
+/**
+ * Milliseconds a continuously changing geometry may coalesce before a replan
+ * is forced. A slider drag emits ~60 changes/second and each replan walks
+ * every sample of the plan on the main thread, so this bounds that to one
+ * walk per window instead of one per frame.
+ */
+const REPLAN_MAXIMUM_WAIT_MILLISECONDS = 100;
 
 /** Builds one sampler worker. Overridable in tests to avoid a real `Worker`. */
 export type SamplerWorkerFactory = () => SamplerWorker;
@@ -79,7 +90,6 @@ export const useAnnotationSampler = createSharedComposable(
     );
     const workers = Array.from({ length: workerCount }, workerFactory);
 
-    let streamCount = 0;
     let nextStreamId = 0;
     let volume: AnnotationVolume | null = null;
     const streamGenerations = new Map<string, number>();
@@ -101,6 +111,10 @@ export const useAnnotationSampler = createSharedComposable(
         streamCallbacks.get(event.data.streamId)?.(event.data);
       };
     }
+
+    onScopeDispose(() => {
+      for (const worker of workers) worker.terminate();
+    });
 
     function broadcast(message: InboundSamplerMessage): void {
       for (const worker of workers) worker.postMessage(message);
@@ -141,7 +155,6 @@ export const useAnnotationSampler = createSharedComposable(
       geometry: Ref<SampleGeometry | null>
     ): AnnotationSampleStream {
       const streamId = `stream-${nextStreamId++}`;
-      streamCount += 1;
 
       const result = shallowRef<SampleResult | null>(null);
       const isLoading = shallowRef(false);
@@ -234,8 +247,8 @@ export const useAnnotationSampler = createSharedComposable(
       streamReplans.set(streamId, () => planAndSample(geometry.value));
 
       watchDebounced(geometry, planAndSample, {
-        debounce: REPLAN_INTERVAL_MILLISECONDS,
-        maxWait: REPLAN_INTERVAL_MILLISECONDS,
+        debounce: REPLAN_DEBOUNCE_MILLISECONDS,
+        maxWait: REPLAN_MAXIMUM_WAIT_MILLISECONDS,
         immediate: true
       });
 
@@ -245,10 +258,6 @@ export const useAnnotationSampler = createSharedComposable(
         streamGenerations.delete(streamId);
         streamRequestCounts.delete(streamId);
         streamReplans.delete(streamId);
-        streamCount -= 1;
-        if (streamCount === 0) {
-          for (const worker of workers) worker.terminate();
-        }
       });
 
       return { result, isLoading };
@@ -284,13 +293,27 @@ function applySampledMessage(
  */
 function isSameGeometry(a: SampleGeometry, b: SampleGeometry): boolean {
   return (
-    a.halfWidthMillimeters === b.halfWidthMillimeters &&
     a.halfHeightMillimeters === b.halfHeightMillimeters &&
     a.widthPixels === b.widthPixels &&
     a.heightPixels === b.heightPixels &&
-    isSameTriple(a.centerMillimeters, b.centerMillimeters) &&
     isSameTriple(a.rightMillimeters, b.rightMillimeters) &&
-    isSameTriple(a.upMillimeters, b.upMillimeters)
+    isSameTriple(a.upMillimeters, b.upMillimeters) &&
+    a.bands.length === b.bands.length &&
+    a.bands.every((band, index) => isSameBand(band, b.bands[index]!))
+  );
+}
+
+/**
+ * Are two bands sample-for-sample identical.
+ * @param a First band to compare.
+ * @param b Second band to compare.
+ */
+function isSameBand(a: SampleBand, b: SampleBand): boolean {
+  return (
+    a.halfWidthMillimeters === b.halfWidthMillimeters &&
+    a.columnOffset === b.columnOffset &&
+    a.columnCount === b.columnCount &&
+    isSameTriple(a.centerMillimeters, b.centerMillimeters)
   );
 }
 

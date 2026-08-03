@@ -49,28 +49,15 @@ export function planSamples(
   const gridMl = Math.ceil(shapeR / chunkR);
 
   const {
-    centerMillimeters: center,
     rightMillimeters: right,
     upMillimeters: up,
-    halfWidthMillimeters: halfWidth,
     halfHeightMillimeters: halfHeight,
     widthPixels,
-    heightPixels
+    heightPixels,
+    bands
   } = geometry;
-  const stepU = (2 * halfWidth) / widthPixels;
   const stepV = (2 * halfHeight) / heightPixels;
-  const firstU = -halfWidth + 0.5 * stepU;
   const firstV = halfHeight - 0.5 * stepV;
-
-  const baseA =
-    (center[0] + right[0] * firstU + up[0] * firstV - translationA) / scaleA;
-  const baseS =
-    (center[1] + right[1] * firstU + up[1] * firstV - translationS) / scaleS;
-  const baseR =
-    (center[2] + right[2] * firstU + up[2] * firstV - translationR) / scaleR;
-  const columnA = (right[0] * stepU) / scaleA;
-  const columnS = (right[1] * stepU) / scaleS;
-  const columnR = (right[2] * stepU) / scaleR;
   const rowA = (-up[0] * stepV) / scaleA;
   const rowS = (-up[1] * stepV) / scaleS;
   const rowR = (-up[2] * stepV) / scaleR;
@@ -81,79 +68,100 @@ export function planSamples(
   let originS = -1;
   let originR = -1;
 
-  for (let row = 0; row < heightPixels; row++) {
-    // Each row restarts from a multiply so accumulated float error stays
-    // bounded by one row rather than growing across the whole rectangle.
-    let coordinateA = baseA + row * rowA;
-    let coordinateS = baseS + row * rowS;
-    let coordinateR = baseR + row * rowR;
-    const rowOffset = row * widthPixels;
+  for (const band of bands) {
+    const {
+      centerMillimeters: center,
+      halfWidthMillimeters: halfWidth,
+      columnOffset,
+      columnCount
+    } = band;
+    const stepU = (2 * halfWidth) / columnCount;
+    const firstU = -halfWidth + 0.5 * stepU;
 
-    for (
-      let column = 0;
-      column < widthPixels;
-      column++,
-        coordinateA += columnA,
-        coordinateS += columnS,
-        coordinateR += columnR
-    ) {
-      // Math.floor, not `| 0`: `| 0` truncates toward zero and is wrong for
-      // negative coordinates just outside the volume.
-      const voxelA = Math.floor(coordinateA);
-      const voxelS = Math.floor(coordinateS);
-      const voxelR = Math.floor(coordinateR);
-      if (
-        voxelA < 0 ||
-        voxelS < 0 ||
-        voxelR < 0 ||
-        voxelA >= shapeA ||
-        voxelS >= shapeS ||
-        voxelR >= shapeR
+    const baseA =
+      (center[0] + right[0] * firstU + up[0] * firstV - translationA) / scaleA;
+    const baseS =
+      (center[1] + right[1] * firstU + up[1] * firstV - translationS) / scaleS;
+    const baseR =
+      (center[2] + right[2] * firstU + up[2] * firstV - translationR) / scaleR;
+    const columnA = (right[0] * stepU) / scaleA;
+    const columnS = (right[1] * stepU) / scaleS;
+    const columnR = (right[2] * stepU) / scaleR;
+
+    for (let row = 0; row < heightPixels; row++) {
+      // Each row restarts from a multiply so accumulated float error stays
+      // bounded by one row rather than growing across the whole rectangle.
+      let coordinateA = baseA + row * rowA;
+      let coordinateS = baseS + row * rowS;
+      let coordinateR = baseR + row * rowR;
+      const rowOffset = row * widthPixels + columnOffset;
+
+      for (
+        let column = 0;
+        column < columnCount;
+        column++,
+          coordinateA += columnA,
+          coordinateS += columnS,
+          coordinateR += columnR
       ) {
-        continue;
-      }
-
-      if (
-        bucket === null ||
-        voxelA < originA ||
-        voxelA >= originA + chunkA ||
-        voxelS < originS ||
-        voxelS >= originS + chunkS ||
-        voxelR < originR ||
-        voxelR >= originR + chunkR
-      ) {
-        const chunkCoordinateA = Math.floor(voxelA / chunkA);
-        const chunkCoordinateS = Math.floor(voxelS / chunkS);
-        const chunkCoordinateR = Math.floor(voxelR / chunkR);
-        originA = chunkCoordinateA * chunkA;
-        originS = chunkCoordinateS * chunkS;
-        originR = chunkCoordinateR * chunkR;
-
-        const chunkKey =
-          (chunkCoordinateA * gridDv + chunkCoordinateS) * gridMl +
-          chunkCoordinateR;
-        bucket = buckets.get(chunkKey) ?? null;
-        if (!bucket) {
-          bucket = {
-            chunkCoordinates: [
-              chunkCoordinateA,
-              chunkCoordinateS,
-              chunkCoordinateR
-            ],
-            count: 0,
-            sampleIndices: new Int32Array(INITIAL_BUCKET_CAPACITY),
-            voxelOffsets: new Int32Array(INITIAL_BUCKET_CAPACITY)
-          };
-          buckets.set(chunkKey, bucket);
+        // Math.floor, not `| 0`: `| 0` truncates toward zero and is wrong for
+        // negative coordinates just outside the volume.
+        const voxelA = Math.floor(coordinateA);
+        const voxelS = Math.floor(coordinateS);
+        const voxelR = Math.floor(coordinateR);
+        if (
+          voxelA < 0 ||
+          voxelS < 0 ||
+          voxelR < 0 ||
+          voxelA >= shapeA ||
+          voxelS >= shapeS ||
+          voxelR >= shapeR
+        ) {
+          continue;
         }
-      }
 
-      if (bucket.count === bucket.sampleIndices.length) growBucket(bucket);
-      bucket.sampleIndices[bucket.count] = rowOffset + column;
-      bucket.voxelOffsets[bucket.count] =
-        ((voxelA - originA) * chunkS + (voxelS - originS)) * chunkR +
-        (voxelR - originR);
-      bucket.count += 1;
+        if (
+          bucket === null ||
+          voxelA < originA ||
+          voxelA >= originA + chunkA ||
+          voxelS < originS ||
+          voxelS >= originS + chunkS ||
+          voxelR < originR ||
+          voxelR >= originR + chunkR
+        ) {
+          const chunkCoordinateA = Math.floor(voxelA / chunkA);
+          const chunkCoordinateS = Math.floor(voxelS / chunkS);
+          const chunkCoordinateR = Math.floor(voxelR / chunkR);
+          originA = chunkCoordinateA * chunkA;
+          originS = chunkCoordinateS * chunkS;
+          originR = chunkCoordinateR * chunkR;
+
+          const chunkKey =
+            (chunkCoordinateA * gridDv + chunkCoordinateS) * gridMl +
+            chunkCoordinateR;
+          bucket = buckets.get(chunkKey) ?? null;
+          if (!bucket) {
+            bucket = {
+              chunkCoordinates: [
+                chunkCoordinateA,
+                chunkCoordinateS,
+                chunkCoordinateR
+              ],
+              count: 0,
+              sampleIndices: new Int32Array(INITIAL_BUCKET_CAPACITY),
+              voxelOffsets: new Int32Array(INITIAL_BUCKET_CAPACITY)
+            };
+            buckets.set(chunkKey, bucket);
+          }
+        }
+
+        if (bucket.count === bucket.sampleIndices.length) growBucket(bucket);
+        bucket.sampleIndices[bucket.count] = rowOffset + column;
+        bucket.voxelOffsets[bucket.count] =
+          ((voxelA - originA) * chunkS + (voxelS - originS)) * chunkR +
+          (voxelR - originR);
+        bucket.count += 1;
+      }
     }
   }
 
@@ -236,22 +244,16 @@ function countChunksAtLevel(
   const [chunkA, chunkS, chunkR] = level.chunkShapeVoxels;
 
   const {
-    centerMillimeters: center,
     rightMillimeters: right,
     upMillimeters: up,
-    halfWidthMillimeters: halfWidth,
     halfHeightMillimeters: halfHeight,
-    widthPixels,
-    heightPixels
+    heightPixels,
+    bands
   } = geometry;
 
   const stepMillimeters =
     COUNT_STEP_CHUNK_FRACTION *
     Math.min(chunkA * scaleA, chunkS * scaleS, chunkR * scaleR);
-  const columns = Math.max(
-    2,
-    Math.min(widthPixels, Math.ceil((2 * halfWidth) / stepMillimeters) + 1)
-  );
   const rows = Math.max(
     2,
     Math.min(heightPixels, Math.ceil((2 * halfHeight) / stepMillimeters) + 1)
@@ -260,38 +262,49 @@ function countChunksAtLevel(
   const gridDv = Math.ceil(shapeS / chunkS);
   const gridMl = Math.ceil(shapeR / chunkR);
   const chunkKeys = new Set<number>();
-  for (let row = 0; row < rows; row++) {
-    const v = halfHeight - (2 * halfHeight * row) / (rows - 1);
-    for (let column = 0; column < columns; column++) {
-      const u = -halfWidth + (2 * halfWidth * column) / (columns - 1);
+  for (const band of bands) {
+    const { centerMillimeters: center, halfWidthMillimeters: halfWidth } = band;
+    const columns = Math.max(
+      2,
+      Math.min(
+        band.columnCount,
+        Math.ceil((2 * halfWidth) / stepMillimeters) + 1
+      )
+    );
 
-      const voxelA = Math.floor(
-        (center[0] + right[0] * u + up[0] * v - translationA) / scaleA
-      );
-      const voxelS = Math.floor(
-        (center[1] + right[1] * u + up[1] * v - translationS) / scaleS
-      );
-      const voxelR = Math.floor(
-        (center[2] + right[2] * u + up[2] * v - translationR) / scaleR
-      );
-      if (
-        voxelA < 0 ||
-        voxelS < 0 ||
-        voxelR < 0 ||
-        voxelA >= shapeA ||
-        voxelS >= shapeS ||
-        voxelR >= shapeR
-      ) {
-        continue;
+    for (let row = 0; row < rows; row++) {
+      const v = halfHeight - (2 * halfHeight * row) / (rows - 1);
+      for (let column = 0; column < columns; column++) {
+        const u = -halfWidth + (2 * halfWidth * column) / (columns - 1);
+
+        const voxelA = Math.floor(
+          (center[0] + right[0] * u + up[0] * v - translationA) / scaleA
+        );
+        const voxelS = Math.floor(
+          (center[1] + right[1] * u + up[1] * v - translationS) / scaleS
+        );
+        const voxelR = Math.floor(
+          (center[2] + right[2] * u + up[2] * v - translationR) / scaleR
+        );
+        if (
+          voxelA < 0 ||
+          voxelS < 0 ||
+          voxelR < 0 ||
+          voxelA >= shapeA ||
+          voxelS >= shapeS ||
+          voxelR >= shapeR
+        ) {
+          continue;
+        }
+
+        const chunkCoordinateA = Math.floor(voxelA / chunkA);
+        const chunkCoordinateS = Math.floor(voxelS / chunkS);
+        const chunkCoordinateR = Math.floor(voxelR / chunkR);
+        chunkKeys.add(
+          (chunkCoordinateA * gridDv + chunkCoordinateS) * gridMl +
+            chunkCoordinateR
+        );
       }
-
-      const chunkCoordinateA = Math.floor(voxelA / chunkA);
-      const chunkCoordinateS = Math.floor(voxelS / chunkS);
-      const chunkCoordinateR = Math.floor(voxelR / chunkR);
-      chunkKeys.add(
-        (chunkCoordinateA * gridDv + chunkCoordinateS) * gridMl +
-          chunkCoordinateR
-      );
     }
   }
 
@@ -303,7 +316,10 @@ function countChunksAtLevel(
  * @param geometry Geometry to measure.
  */
 function getMillimetersPerSample(geometry: SampleGeometry): number {
-  const stepU = (2 * geometry.halfWidthMillimeters) / geometry.widthPixels;
-  const stepV = (2 * geometry.halfHeightMillimeters) / geometry.heightPixels;
-  return Math.min(stepU, stepV);
+  let finest = (2 * geometry.halfHeightMillimeters) / geometry.heightPixels;
+  for (const band of geometry.bands) {
+    const stepU = (2 * band.halfWidthMillimeters) / band.columnCount;
+    if (stepU < finest) finest = stepU;
+  }
+  return finest;
 }

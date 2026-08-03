@@ -16,10 +16,10 @@ import {
   getDefaultSliceExtentMillimeters,
   getProbeSlicePlane,
   getQuantizedSizePixels,
+  getShankLayout,
   getShankOutlinePath,
-  getShankSlicePlane,
+  getShankSliceGeometry,
   getSlicePixelFromRect,
-  getSliceSizePixels,
   getSliceZoomExponentRange
 } from "./slice-plane.api";
 
@@ -46,19 +46,21 @@ describe("getProbeSlicePlane", () => {
     // Default rotation [0,0,0]: right = ML (asrToVector3 x), up = DV, so a
     // nonzero center height must shift the plane center along the frame's up
     // axis relative to the tip-centered plane.
-    expect(tipPlane.centerMillimeters).not.toEqual(
-      raisedPlane.centerMillimeters
+    expect(tipPlane.bands[0]!.centerMillimeters).not.toEqual(
+      raisedPlane.bands[0]!.centerMillimeters
     );
-    expect(tipPlane.centerMillimeters).toEqual(frame.originMillimeters);
+    expect(tipPlane.bands[0]!.centerMillimeters).toEqual(
+      frame.originMillimeters
+    );
   });
 
-  it("sets halfWidthMillimeters and halfHeightMillimeters to half the given extent", () => {
+  it("sets the band's and plane's half-extents to half the given extent", () => {
     const probe = makeProbe();
     const frame = getProbeFrame(probe, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 4, 32);
 
-    expect(plane.halfWidthMillimeters).toBe(2);
+    expect(plane.bands[0]!.halfWidthMillimeters).toBe(2);
     expect(plane.halfHeightMillimeters).toBe(2);
     expect(plane.widthPixels).toBe(32);
     expect(plane.heightPixels).toBe(32);
@@ -73,193 +75,164 @@ describe("getProbeSlicePlane", () => {
     expect(plane.rightMillimeters).toEqual(frame.rightMillimeters);
     expect(plane.upMillimeters).toEqual(frame.upMillimeters);
   });
+
+  it("emits exactly one band spanning the full output width", () => {
+    const probe = makeProbe();
+    const frame = getProbeFrame(probe, [0, 0, 0]);
+
+    const plane = getProbeSlicePlane(frame, 0, 4, 32);
+
+    expect(plane.bands).toHaveLength(1);
+    expect(plane.bands[0]!.columnOffset).toBe(0);
+    expect(plane.bands[0]!.columnCount).toBe(32);
+  });
 });
 
-describe("getShankSlicePlane", () => {
-  const contour = getProbeContour(
-    makeProbeInterfaceProbe({
-      si_units: "mm",
-      probe_planar_contour: [
-        [-0.035, 0],
-        [0.035, 0],
-        [0.035, 10],
-        [-0.035, 10]
-      ]
-    })
-  )!;
-  const definition = makeProbeInterfaceProbe({
+describe("getShankLayout", () => {
+  const twoShankDefinition = makeProbeInterfaceProbe({
     si_units: "mm",
-    probe_planar_contour: [
-      [-0.035, 0],
-      [0.035, 0],
-      [0.035, 10],
-      [-0.035, 10]
-    ]
+    probe_planar_contour: TWO_SHANK_CONTOUR,
+    contact_positions: [
+      [-0.95, 1],
+      [0.95, 1]
+    ],
+    shank_ids: ["0", "1"],
+    contact_shapes: ["square", "square"],
+    contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
   });
-  const shank = getProbeShanks(definition, contour)[0]!;
+  const twoShankContour = getProbeContour(twoShankDefinition)!;
+  const shanks = getProbeShanks(twoShankDefinition, twoShankContour);
+
+  it("quantizes the height and derives one shared pixels-per-mm scale from it", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
+
+    expect(layout.heightPixels).toBe(576);
+    expect(layout.pixelsPerMillimeter).toBeCloseTo(57.6, 10);
+  });
+
+  it("packs each shank into contiguous columns proportional to its width", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
+
+    expect(layout.placements.map(p => p.columnCount)).toEqual([6, 6]);
+    expect(layout.placements.map(p => p.columnOffset)).toEqual([0, 6]);
+    expect(layout.widthPixels).toBe(12);
+    expect(layout.widthMillimeters).toBeCloseTo(0.208333, 5);
+  });
+
+  it("offsets each shank's probe-local x into packed overlay space", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
+
+    expect(layout.placements[0]!.offsetMillimeters).toBeCloseTo(1, 5);
+    expect(layout.placements[1]!.offsetMillimeters).toBeCloseTo(-0.795833, 5);
+  });
+
+  it("returns null while unmeasured", () => {
+    expect(
+      getShankLayout(shanks, twoShankContour.heightMillimeters, 0, 1)
+    ).toBeNull();
+  });
+
+  it("returns null for no shanks", () => {
+    expect(
+      getShankLayout([], twoShankContour.heightMillimeters, 600, 1)
+    ).toBeNull();
+  });
+});
+
+describe("getShankSliceGeometry", () => {
+  const twoShankDefinition = makeProbeInterfaceProbe({
+    si_units: "mm",
+    probe_planar_contour: TWO_SHANK_CONTOUR,
+    contact_positions: [
+      [-0.95, 1],
+      [0.95, 1]
+    ],
+    shank_ids: ["0", "1"],
+    contact_shapes: ["square", "square"],
+    contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
+  });
+  const twoShankContour = getProbeContour(twoShankDefinition)!;
+  const shanks = getProbeShanks(twoShankDefinition, twoShankContour);
   const frame = getProbeFrame(
     makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] }),
     [0, 0, 0]
   );
 
-  it("halves the shank's width, and the given height, into the rectangle's half-width and half-height", () => {
-    const plane = getShankSlicePlane(
-      frame,
-      shank,
-      contour.heightMillimeters,
-      4,
-      576
-    );
-
-    expect(plane.halfWidthMillimeters).toBe(0.035);
-    expect(plane.halfHeightMillimeters).toBe(5);
-    expect(plane.widthPixels).toBe(4);
-    expect(plane.heightPixels).toBe(576);
-  });
-
-  it("carries the frame's right and up axes through unchanged", () => {
-    const plane = getShankSlicePlane(
-      frame,
-      shank,
-      contour.heightMillimeters,
-      4,
-      576
-    );
-
-    expect(plane.rightMillimeters).toEqual(frame.rightMillimeters);
-    expect(plane.upMillimeters).toEqual(frame.upMillimeters);
-  });
-
-  it("centers on the shank's x center and halfway up the given height", () => {
-    const plane = getShankSlicePlane(
-      frame,
-      shank,
-      contour.heightMillimeters,
-      4,
-      576
-    );
-
-    expect(plane.centerMillimeters).toEqual(toAtlasMillimeters(frame, 0, 5));
-  });
-
-  it("centers on the shank's own x center, not the probe's, for an off-center shank", () => {
-    const twoShankDefinition = makeProbeInterfaceProbe({
-      si_units: "mm",
-      probe_planar_contour: TWO_SHANK_CONTOUR,
-      contact_positions: [
-        [-0.95, 1],
-        [0.95, 1]
-      ],
-      shank_ids: ["0", "1"],
-      contact_shapes: ["square", "square"],
-      contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
-    });
-    const twoShankContour = getProbeContour(twoShankDefinition)!;
-    const secondShank = getProbeShanks(twoShankDefinition, twoShankContour)[1]!;
-
-    const plane = getShankSlicePlane(
-      frame,
-      secondShank,
+  it("builds one band per shank, centered on its own x and the shared height", () => {
+    const layout = getShankLayout(
+      shanks,
       twoShankContour.heightMillimeters,
-      6,
-      576
+      600,
+      1
+    )!;
+
+    const geometry = getShankSliceGeometry(
+      frame,
+      layout,
+      twoShankContour.heightMillimeters
     );
 
-    expect(plane.centerMillimeters).toEqual(toAtlasMillimeters(frame, 0.95, 5));
-    expect(plane.centerMillimeters).not.toEqual(
-      toAtlasMillimeters(frame, 0, 5)
+    expect(geometry.bands).toHaveLength(2);
+    expect(geometry.bands[0]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, -0.95, 5)
+    );
+    expect(geometry.bands[1]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, 0.95, 5)
     );
   });
-});
 
-describe("getSliceSizePixels", () => {
-  const singleShankContour = getProbeContour(
-    makeProbeInterfaceProbe({
-      si_units: "mm",
-      probe_planar_contour: [
-        [-0.035, 0],
-        [0.035, 0],
-        [0.035, 10],
-        [-0.035, 10]
-      ]
-    })
-  )!;
-  const squareContour = getProbeContour(
-    makeProbeInterfaceProbe({
-      si_units: "mm",
-      probe_planar_contour: [
-        [-5, 0],
-        [5, 0],
-        [5, 10],
-        [-5, 10]
-      ]
-    })
-  )!;
-  const wideContour = getProbeContour(
-    makeProbeInterfaceProbe({
-      si_units: "mm",
-      probe_planar_contour: [
-        [-50, 0],
-        [50, 0],
-        [50, 1],
-        [-50, 1]
-      ]
-    })
-  )!;
+  it("derives each band's half-width from its column count over the shared scale", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
 
-  it("quantizes height and widens the width to the given aspect ratio", () => {
-    expect(
-      getSliceSizePixels(
-        singleShankContour.widthMillimeters,
-        singleShankContour.heightMillimeters,
-        600,
-        1
-      )
-    ).toEqual({ widthPixels: 4, heightPixels: 576 });
+    const geometry = getShankSliceGeometry(
+      frame,
+      layout,
+      twoShankContour.heightMillimeters
+    );
+
+    for (const band of geometry.bands) {
+      expect(band.halfWidthMillimeters).toBeCloseTo(0.0520833, 5);
+    }
   });
 
-  it("returns zero dimensions while unmeasured", () => {
-    expect(
-      getSliceSizePixels(
-        singleShankContour.widthMillimeters,
-        singleShankContour.heightMillimeters,
-        0,
-        2
-      )
-    ).toEqual({ widthPixels: 0, heightPixels: 0 });
-  });
+  it("carries the frame's right and up axes and the layout's pixel dimensions through", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
 
-  it("keeps a square aspect ratio's width equal to its height", () => {
-    expect(
-      getSliceSizePixels(
-        squareContour.widthMillimeters,
-        squareContour.heightMillimeters,
-        600,
-        1
-      )
-    ).toEqual({ widthPixels: 576, heightPixels: 576 });
-  });
+    const geometry = getShankSliceGeometry(
+      frame,
+      layout,
+      twoShankContour.heightMillimeters
+    );
 
-  it("clamps the width at the maximum edge length for a very wide aspect ratio", () => {
-    expect(
-      getSliceSizePixels(
-        wideContour.widthMillimeters,
-        wideContour.heightMillimeters,
-        600,
-        1
-      ).widthPixels
-    ).toBe(1024);
-  });
-
-  it("returns zero dimensions for a zero width or height", () => {
-    expect(getSliceSizePixels(0, 10, 600, 1)).toEqual({
-      widthPixels: 0,
-      heightPixels: 0
-    });
-    expect(getSliceSizePixels(1, 0, 600, 1)).toEqual({
-      widthPixels: 0,
-      heightPixels: 0
-    });
+    expect(geometry.rightMillimeters).toEqual(frame.rightMillimeters);
+    expect(geometry.upMillimeters).toEqual(frame.upMillimeters);
+    expect(geometry.widthPixels).toBe(layout.widthPixels);
+    expect(geometry.heightPixels).toBe(layout.heightPixels);
   });
 });
 

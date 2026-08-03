@@ -1,21 +1,36 @@
 /**
- * An oriented rectangle through the annotation volume, sampled row-major with
- * row 0 at the +up edge. A square is the special case `halfWidthMillimeters
- * === halfHeightMillimeters` and `widthPixels === heightPixels`.
+ * One column band of a sampled image: an oriented rectangle that shares the
+ * image's up axis and height, mapped onto a contiguous run of output columns.
+ */
+export interface SampleBand {
+  /** Band center, in atlas ASR mm. */
+  centerMillimeters: [number, number, number];
+  /** Half the band's u extent, in mm. */
+  halfWidthMillimeters: number;
+  /** First output column this band fills, inclusive. */
+  columnOffset: number;
+  /** Output columns this band fills. */
+  columnCount: number;
+}
+
+/**
+ * An oriented sampling surface through the annotation volume, sampled
+ * row-major with row 0 at the +up edge. Horizontally it is one or more bands
+ * packed edge to edge across `widthPixels`; a one-band geometry is a plain
+ * rectangle, and a square is additionally `halfHeightMillimeters ===
+ * bands[0].halfWidthMillimeters` with `heightPixels === widthPixels`.
  */
 export interface SampleGeometry {
-  /** Rectangle center, in atlas ASR mm. */
-  centerMillimeters: [number, number, number];
-  /** Unit ASR direction of the rectangle's +u (rightward) axis. */
+  /** Unit ASR direction of the +u (rightward) axis, shared by every band. */
   rightMillimeters: [number, number, number];
-  /** Unit ASR direction of the rectangle's +v (upward) axis. */
+  /** Unit ASR direction of the +v (upward) axis, shared by every band. */
   upMillimeters: [number, number, number];
-  /** Half the rectangle's u extent, in mm. */
-  halfWidthMillimeters: number;
-  /** Half the rectangle's v extent, in mm. */
+  /** Half the v extent, in mm, shared by every band. */
   halfHeightMillimeters: number;
-  /** Edge length of the output along u, in pixels. */
+  /** Total edge length of the output along u, in pixels - the sum of every band's `columnCount`. */
   widthPixels: number;
   /** Edge length of the output along v, in pixels. */
   heightPixels: number;
+  /** Bands packed left to right, with contiguous `columnOffset`s starting at 0. */
+  bands: SampleBand[];
 }

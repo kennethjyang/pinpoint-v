@@ -163,8 +163,7 @@ export default {
     center: "Center along probe",
     extent: "{extent} mm",
     noContour: "This probe has no contour to slice through.",
-    channelMap: "In-plane slice for {name}",
-    channelMapShank: "In-plane slice for {name}, shank {shank}"
+    channelMap: "In-plane slice for {name}"
   },
   errorNotFound: {
     code: "404",

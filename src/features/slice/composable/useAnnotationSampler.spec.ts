@@ -72,14 +72,35 @@ function mountWithComposable<T>(setup: () => T): {
 // center of chunk (0, 0, 0).
 function makePlane(overrides: Partial<SampleGeometry> = {}): SampleGeometry {
   return {
-    centerMillimeters: [0.01, 0.01, 0.01],
     rightMillimeters: [0, 0, 1],
     upMillimeters: [0, -1, 0],
-    halfWidthMillimeters: 0.005,
     halfHeightMillimeters: 0.005,
     widthPixels: 2,
     heightPixels: 2,
+    bands: [
+      {
+        centerMillimeters: [0.01, 0.01, 0.01],
+        halfWidthMillimeters: 0.005,
+        columnOffset: 0,
+        columnCount: 2
+      }
+    ],
     ...overrides
+  };
+}
+
+/**
+ * Build a one-band geometry centered on the given point, leaving every other
+ * field at `makePlane`'s defaults.
+ * @param centerMillimeters Center to place the sole band at.
+ */
+function makePlaneAt(
+  centerMillimeters: [number, number, number]
+): SampleGeometry {
+  const plane = makePlane();
+  return {
+    ...plane,
+    bands: [{ ...plane.bands[0]!, centerMillimeters }]
   };
 }
 
@@ -258,7 +279,7 @@ describe("useAnnotationSampler", () => {
     // Chunk (0,0,0) covers mm [0,0.02) on every axis; chunk (0,0,1) covers
     // [0,0.02) x [0,0.02) x [0.02,0.04).
     const geometry = ref<SampleGeometry | null>(
-      makePlane({ centerMillimeters: [0.01, 0.01, 0.01] })
+      makePlaneAt([0.01, 0.01, 0.01])
     );
     const { result, unmount: unmountStream } = mountWithComposable(() =>
       sampler.createStream(geometry)
@@ -275,7 +296,7 @@ describe("useAnnotationSampler", () => {
     // A later geometry pointed at a different chunk must fully replace the
     // first plan's generation - if the superseded generation's flush were
     // applied, value 1 would leak into this result alongside value 2.
-    geometry.value = makePlane({ centerMillimeters: [0.01, 0.01, 0.03] });
+    geometry.value = makePlaneAt([0.01, 0.01, 0.03]);
 
     await vi.waitFor(
       () =>
@@ -320,7 +341,7 @@ describe("useAnnotationSampler", () => {
     await flushPromises();
 
     const geometry = ref<SampleGeometry | null>(
-      makePlane({ centerMillimeters: [0.01, 0.01, 0.01] })
+      makePlaneAt([0.01, 0.01, 0.01])
     );
     const { result, unmount: unmountStream } = mountWithComposable(() =>
       sampler.createStream(geometry)
@@ -343,7 +364,7 @@ describe("useAnnotationSampler", () => {
     // geometry differs from the previously selected one.
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    geometry.value = makePlane({ centerMillimeters: [0.01, 0.01, 0.03] });
+    geometry.value = makePlaneAt([0.01, 0.01, 0.03]);
 
     await vi.waitFor(
       () =>
@@ -357,7 +378,7 @@ describe("useAnnotationSampler", () => {
     unmount();
   });
 
-  it("terminates every worker once the last stream disposes", async () => {
+  it("terminates every worker once the composable's shared scope disposes", async () => {
     const store = makeAnnotationVolumeStore();
     const terminateSpies: ReturnType<typeof vi.fn>[] = [];
     const workerFactory = () => {
@@ -384,9 +405,10 @@ describe("useAnnotationSampler", () => {
     );
 
     unmountStream();
+    for (const spy of terminateSpies) expect(spy).not.toHaveBeenCalled();
 
-    for (const spy of terminateSpies) expect(spy).toHaveBeenCalledOnce();
     unmount();
+    for (const spy of terminateSpies) expect(spy).toHaveBeenCalledOnce();
   });
 
   it("clears the result and stops loading when the geometry becomes null", async () => {
