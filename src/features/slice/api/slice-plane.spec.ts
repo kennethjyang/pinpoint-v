@@ -5,12 +5,14 @@ import {
   makeProbe,
   makeProbeInterfaceProbe
 } from "@/test/fixtures";
-import { getProbeFrame } from "./probe-frame.api";
+import { getProbeFrame, toAtlasMillimeters } from "./probe-frame.api";
 import {
   clampSliceCenterHeight,
   clampSliceExtent,
   formatSliceExtentMillimeters,
   getContourPolygonPoints,
+  getContourSizePixels,
+  getContourSlicePlane,
   getDefaultSliceExtentMillimeters,
   getProbeSlicePlane,
   getQuantizedSizePixels,
@@ -55,6 +57,107 @@ describe("getProbeSlicePlane", () => {
 
     expect(plane.rightMillimeters).toEqual(frame.rightMillimeters);
     expect(plane.upMillimeters).toEqual(frame.upMillimeters);
+  });
+});
+
+describe("getContourSlicePlane", () => {
+  const contour = getProbeContour(
+    makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: [
+        [-0.035, 0],
+        [0.035, 0],
+        [0.035, 10],
+        [-0.035, 10]
+      ]
+    })
+  )!;
+  const frame = getProbeFrame(
+    makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] }),
+    [0, 0, 0]
+  );
+
+  it("halves the contour's extent into the rectangle's half-width and half-height", () => {
+    const plane = getContourSlicePlane(frame, contour, 4, 576);
+
+    expect(plane.halfWidthMillimeters).toBe(0.035);
+    expect(plane.halfHeightMillimeters).toBe(5);
+    expect(plane.widthPixels).toBe(4);
+    expect(plane.heightPixels).toBe(576);
+  });
+
+  it("carries the frame's right and up axes through unchanged", () => {
+    const plane = getContourSlicePlane(frame, contour, 4, 576);
+
+    expect(plane.rightMillimeters).toEqual(frame.rightMillimeters);
+    expect(plane.upMillimeters).toEqual(frame.upMillimeters);
+  });
+
+  it("centers halfway up the contour", () => {
+    const plane = getContourSlicePlane(frame, contour, 4, 576);
+
+    expect(plane.centerMillimeters).toEqual(toAtlasMillimeters(frame, 0, 5));
+  });
+});
+
+describe("getContourSizePixels", () => {
+  const singleShankContour = getProbeContour(
+    makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: [
+        [-0.035, 0],
+        [0.035, 0],
+        [0.035, 10],
+        [-0.035, 10]
+      ]
+    })
+  )!;
+  const squareContour = getProbeContour(
+    makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: [
+        [-5, 0],
+        [5, 0],
+        [5, 10],
+        [-5, 10]
+      ]
+    })
+  )!;
+  const wideContour = getProbeContour(
+    makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: [
+        [-50, 0],
+        [50, 0],
+        [50, 1],
+        [-50, 1]
+      ]
+    })
+  )!;
+
+  it("quantizes height and widens the width to the contour's aspect ratio", () => {
+    expect(getContourSizePixels(singleShankContour, 600, 1)).toEqual({
+      widthPixels: 4,
+      heightPixels: 576
+    });
+  });
+
+  it("returns zero dimensions while unmeasured", () => {
+    expect(getContourSizePixels(singleShankContour, 0, 2)).toEqual({
+      widthPixels: 0,
+      heightPixels: 0
+    });
+  });
+
+  it("keeps a square contour's width equal to its height", () => {
+    expect(getContourSizePixels(squareContour, 600, 1)).toEqual({
+      widthPixels: 576,
+      heightPixels: 576
+    });
+  });
+
+  it("clamps the width at the maximum edge length for a very wide contour", () => {
+    expect(getContourSizePixels(wideContour, 600, 1).widthPixels).toBe(1024);
   });
 });
 

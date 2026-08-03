@@ -97,6 +97,68 @@ export function getProbeSlicePlane(
 }
 
 /**
+ * Build the sampling rectangle covering a probe contour's full extent in the
+ * shank plane, centered halfway up the contour.
+ * @param frame Probe's shank-plane frame.
+ * @param contour Probe's contour, whose bounding box the rectangle covers.
+ * @param widthPixels Output width, in pixels.
+ * @param heightPixels Output height, in pixels.
+ */
+export function getContourSlicePlane(
+  frame: ProbeFrame,
+  contour: ProbeContour,
+  widthPixels: number,
+  heightPixels: number
+): SampleGeometry {
+  return {
+    centerMillimeters: toAtlasMillimeters(
+      frame,
+      0,
+      contour.heightMillimeters / 2
+    ),
+    rightMillimeters: frame.rightMillimeters,
+    upMillimeters: frame.upMillimeters,
+    halfWidthMillimeters: contour.widthMillimeters / 2,
+    halfHeightMillimeters: contour.heightMillimeters / 2,
+    widthPixels,
+    heightPixels
+  };
+}
+
+/**
+ * Device-pixel dimensions of a contour-shaped canvas of the given CSS
+ * height, quantized along height and widened to the contour's aspect ratio.
+ * @param contour Contour whose aspect ratio the output carries.
+ * @param cssHeight Canvas height in CSS pixels; 0 while unmeasured.
+ * @param pixelRatio Device pixel ratio.
+ */
+export function getContourSizePixels(
+  contour: ProbeContour,
+  cssHeight: number,
+  pixelRatio: number
+): { widthPixels: number; heightPixels: number } {
+  if (cssHeight <= 0 || contour.heightMillimeters <= 0) {
+    return { widthPixels: 0, heightPixels: 0 };
+  }
+
+  const devicePixels = cssHeight * pixelRatio;
+  const heightPixels = clamp(
+    Math.floor(devicePixels / SIZE_QUANTUM_PIXELS) * SIZE_QUANTUM_PIXELS,
+    MINIMUM_SIZE_PIXELS,
+    MAXIMUM_SIZE_PIXELS
+  );
+  const widthPixels = clamp(
+    Math.round(
+      (heightPixels * contour.widthMillimeters) / contour.heightMillimeters
+    ),
+    1,
+    MAXIMUM_SIZE_PIXELS
+  );
+
+  return { widthPixels, heightPixels };
+}
+
+/**
  * Clamp a slice center height into a contour's tip-to-top range.
  * @param centerHeightMillimeters Height up the contour from the tip, in probe-local mm.
  * @param contour Probe's contour to clamp against.
