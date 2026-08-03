@@ -191,7 +191,7 @@ describe("ChannelMaps", () => {
     expect(wrapper.findComponent(ChannelMapCanvas).exists()).toBe(false);
   });
 
-  it("packs a two-shank probe into equal-width flex cells and mounts one canvas per shank once intersecting", async () => {
+  it("packs a two-shank probe into one canvas and mounts it once intersecting", async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useCurrentExperimentStore(pinia);
@@ -226,11 +226,11 @@ describe("ChannelMaps", () => {
     expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(0);
     await triggerIntersection(true);
 
-    const shankCells = wrapper.findAll(".channel-maps__shank");
-    expect(shankCells).toHaveLength(2);
-    shankCells.forEach(cell => {
-      expect(cell.attributes("style")).toContain("flex-grow: 0.5");
-    });
-    expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(2);
+    expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(1);
+    expect(
+      wrapper.findComponent({ name: "ChannelMapCanvas" }).props("shanks") as
+        | unknown[]
+        | undefined
+    ).toHaveLength(2);
   });
 });

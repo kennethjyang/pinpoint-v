@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import type { ProbeShank } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
@@ -44,43 +45,56 @@ const zoomSelection = ref<ChannelMapsZoom>("large");
 
 const styles = computed(() => zoomStyles[zoomSelection.value]);
 
-/** Each probe paired with its shanks, packed left to right at 5x their proportional width. */
-const channelMaps = computed(() =>
-  currentExperimentStore.probes.map(probe => {
-    const definition =
-      currentExperimentStore.probeInterfaceProbes[
-        probe.probeInterfaceIdentifier
-      ];
-    const contour = definition ? getProbeContour(definition) : null;
+/** One probe definition's packed shanks, derived once per interned definition. */
+interface DefinitionShanks {
+  shanks: ProbeShank[];
+  heightMillimeters: number;
+  aspectRatio: number;
+}
+
+/**
+ * Shanks per interned definition. Keyed by identifier so a probe added,
+ * removed, or renamed doesn't re-derive every definition's contact outlines.
+ */
+const shanksByIdentifier = computed(() => {
+  const byIdentifier: Record<string, DefinitionShanks> = {};
+  for (const [identifier, definition] of Object.entries(
+    currentExperimentStore.probeInterfaceProbes
+  )) {
+    const contour = getProbeContour(definition);
     if (
-      !definition ||
       !contour ||
       contour.widthMillimeters <= 0 ||
       contour.heightMillimeters <= 0
     ) {
-      return {
-        probe,
-        shanks: [],
-        heightMillimeters: 0,
-        totalWidthMillimeters: 0,
-        aspectRatio: 0
-      };
+      continue;
     }
-
     const shanks = getProbeShanks(definition, contour);
     const totalWidthMillimeters = shanks.reduce(
       (total, shank) => total + shank.widthMillimeters,
       0
     );
-    return {
-      probe,
+    if (totalWidthMillimeters <= 0) continue;
+    byIdentifier[identifier] = {
       shanks,
       heightMillimeters: contour.heightMillimeters,
-      totalWidthMillimeters,
       aspectRatio:
         (SHANK_WIDTH_SCALE * totalWidthMillimeters) / contour.heightMillimeters
     };
-  })
+  }
+  return byIdentifier;
+});
+
+/** Each probe paired with its packed shanks, or an empty set when it has none to slice. */
+const channelMaps = computed(() =>
+  currentExperimentStore.probes.map(probe => ({
+    probe,
+    ...(shanksByIdentifier.value[probe.probeInterfaceIdentifier] ?? {
+      shanks: [],
+      heightMillimeters: 0,
+      aspectRatio: 0
+    })
+  }))
 );
 </script>
 
@@ -99,13 +113,7 @@ const channelMaps = computed(() =>
     />
     <div class="col row q-gutter-sm content-start channel-maps__scroll">
       <q-card
-        v-for="{
-          probe,
-          shanks,
-          heightMillimeters,
-          totalWidthMillimeters,
-          aspectRatio
-        } of channelMaps"
+        v-for="{ probe, shanks, heightMillimeters, aspectRatio } of channelMaps"
         :key="probe.id"
       >
         <q-card-section :class="styles.header">
@@ -123,22 +131,11 @@ const channelMaps = computed(() =>
             class="channel-maps__viewport"
             :style="{ height: styles.canvasHeight, aspectRatio }"
           >
-            <div class="row no-wrap fit">
-              <div
-                v-for="shank of shanks"
-                :key="String(shank.id)"
-                class="full-height channel-maps__shank"
-                :style="{
-                  flexGrow: shank.widthMillimeters / totalWidthMillimeters
-                }"
-              >
-                <ChannelMapCanvas
-                  :probe="probe"
-                  :shank="shank"
-                  :height-millimeters="heightMillimeters"
-                />
-              </div>
-            </div>
+            <ChannelMapCanvas
+              :probe="probe"
+              :shanks="shanks"
+              :height-millimeters="heightMillimeters"
+            />
           </q-intersection>
           <div
             v-else
@@ -168,10 +165,6 @@ const channelMaps = computed(() =>
     :deep(> div)
       width: 100%
       height: 100%
-
-  &__shank
-    flex-basis: 0
-    min-width: 0
 
   &__no-contour
     width: 8rem

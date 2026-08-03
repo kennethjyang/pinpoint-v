@@ -25,16 +25,41 @@ function makeAnnotationLevel(
   };
 }
 
-function makeGeometry(overrides: Partial<SampleGeometry> = {}): SampleGeometry {
+/** One-band geometry override shape, matching the pre-band single-rectangle fixture. */
+interface GeometryOverrides {
+  centerMillimeters?: [number, number, number];
+  rightMillimeters?: [number, number, number];
+  upMillimeters?: [number, number, number];
+  halfWidthMillimeters?: number;
+  halfHeightMillimeters?: number;
+  widthPixels?: number;
+  heightPixels?: number;
+}
+
+/**
+ * Build a single-band test geometry - a plain rectangle, ported to the
+ * banded model as one band spanning the full output width.
+ * @param overrides Scalars to override; defaults form a 4x4 rectangle
+ *   centered at (0.5, 0.5, 0.5).
+ */
+function makeGeometry(overrides: GeometryOverrides = {}): SampleGeometry {
+  const centerMillimeters = overrides.centerMillimeters ?? [0.5, 0.5, 0.5];
+  const halfWidthMillimeters = overrides.halfWidthMillimeters ?? 0.1;
+  const widthPixels = overrides.widthPixels ?? 4;
   return {
-    centerMillimeters: [0.5, 0.5, 0.5],
-    rightMillimeters: [0, 0, 1],
-    upMillimeters: [0, -1, 0],
-    halfWidthMillimeters: 0.1,
-    halfHeightMillimeters: 0.1,
-    widthPixels: 4,
-    heightPixels: 4,
-    ...overrides
+    rightMillimeters: overrides.rightMillimeters ?? [0, 0, 1],
+    upMillimeters: overrides.upMillimeters ?? [0, -1, 0],
+    halfHeightMillimeters: overrides.halfHeightMillimeters ?? 0.1,
+    widthPixels,
+    heightPixels: overrides.heightPixels ?? 4,
+    bands: [
+      {
+        centerMillimeters,
+        halfWidthMillimeters,
+        columnOffset: 0,
+        columnCount: widthPixels
+      }
+    ]
   };
 }
 
@@ -193,6 +218,147 @@ describe("planSamples", () => {
     const plan = planSamples(geometry, level, 0);
 
     expect(plan.chunkRequests[0]!.voxelOffsets[0]).toBe(255);
+  });
+
+  it("folds two bands reading the same chunk into one chunk request", () => {
+    // Both bands sit entirely inside chunk (0,0,0)'s 0.1mm cube [0, 0.1)^3.
+    const level = makeAnnotationLevel();
+    const bandA = {
+      centerMillimeters: [0.05, 0.05, 0.03] as [number, number, number],
+      halfWidthMillimeters: 0.01,
+      columnOffset: 0,
+      columnCount: 2
+    };
+    const bandB = {
+      centerMillimeters: [0.05, 0.05, 0.07] as [number, number, number],
+      halfWidthMillimeters: 0.01,
+      columnOffset: 2,
+      columnCount: 2
+    };
+    const geometry: SampleGeometry = {
+      rightMillimeters: [0, 0, 1],
+      upMillimeters: [0, -1, 0],
+      halfHeightMillimeters: 0.01,
+      widthPixels: 4,
+      heightPixels: 2,
+      bands: [bandA, bandB]
+    };
+
+    const plan = planSamples(geometry, level, 0);
+
+    expect(plan.chunkRequests).toHaveLength(1);
+    expect(
+      Array.from(plan.chunkRequests[0]!.sampleIndices).sort((a, b) => a - b)
+    ).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+
+    // Two separate one-band plans over the same two rectangles return one
+    // request each - the win above is folding both into a single request.
+    const planA = planSamples(
+      {
+        ...geometry,
+        widthPixels: 2,
+        bands: [{ ...bandA, columnOffset: 0 }]
+      },
+      level,
+      0
+    );
+    const planB = planSamples(
+      {
+        ...geometry,
+        widthPixels: 2,
+        bands: [{ ...bandB, columnOffset: 0 }]
+      },
+      level,
+      0
+    );
+    expect(planA.chunkRequests).toHaveLength(1);
+    expect(planB.chunkRequests).toHaveLength(1);
+  });
+
+  it("places unequal-width bands' samples at row * widthPixels + columnOffset + column", () => {
+    const level = makeAnnotationLevel();
+    const geometry: SampleGeometry = {
+      rightMillimeters: [0, 0, 1],
+      upMillimeters: [0, -1, 0],
+      halfHeightMillimeters: 0.01,
+      widthPixels: 4,
+      heightPixels: 2,
+      bands: [
+        {
+          centerMillimeters: [0.05, 0.05, 0.03],
+          halfWidthMillimeters: 0.005,
+          columnOffset: 0,
+          columnCount: 1
+        },
+        {
+          centerMillimeters: [0.05, 0.05, 0.07],
+          halfWidthMillimeters: 0.015,
+          columnOffset: 1,
+          columnCount: 3
+        }
+      ]
+    };
+
+    const plan = planSamples(geometry, level, 0);
+
+    const seen = new Set<number>();
+    for (const request of plan.chunkRequests) {
+      for (const index of request.sampleIndices) {
+        expect(seen.has(index)).toBe(false);
+        seen.add(index);
+      }
+    }
+    expect(Array.from(seen).sort((a, b) => a - b)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7
+    ]);
+  });
+
+  it("selects a level as fine as the geometry's finest band, not their average", () => {
+    const volume: AnnotationVolume = {
+      url: "http://example.com",
+      levels: [
+        makeAnnotationLevel({
+          scaleMillimeters: [0.001, 0.001, 0.001],
+          chunkShapeVoxels: [50, 50, 50]
+        }),
+        makeAnnotationLevel({
+          scaleMillimeters: [0.01, 0.01, 0.01],
+          chunkShapeVoxels: [50, 50, 50]
+        })
+      ]
+    };
+
+    const coarseGeometry = makeGeometry({
+      halfWidthMillimeters: 0.05,
+      halfHeightMillimeters: 0.05,
+      widthPixels: 4,
+      heightPixels: 4
+    });
+    const fineGeometry = makeGeometry({
+      halfWidthMillimeters: 0.0005,
+      halfHeightMillimeters: 0.05,
+      widthPixels: 4,
+      heightPixels: 4
+    });
+    const twoBandGeometry: SampleGeometry = {
+      rightMillimeters: coarseGeometry.rightMillimeters,
+      upMillimeters: coarseGeometry.upMillimeters,
+      halfHeightMillimeters: coarseGeometry.halfHeightMillimeters,
+      widthPixels: 4,
+      heightPixels: 4,
+      bands: [
+        { ...coarseGeometry.bands[0]!, columnOffset: 0, columnCount: 2 },
+        { ...fineGeometry.bands[0]!, columnOffset: 2, columnCount: 2 }
+      ]
+    };
+
+    const coarseIndex = selectSamplePlan(coarseGeometry, volume).levelIndex;
+    const fineIndex = selectSamplePlan(fineGeometry, volume).levelIndex;
+    const twoBandIndex = selectSamplePlan(twoBandGeometry, volume).levelIndex;
+
+    expect(twoBandIndex).toBe(fineIndex);
+    expect(twoBandIndex).toBeLessThanOrEqual(coarseIndex);
+    expect(twoBandIndex).not.toBe(coarseIndex);
   });
 });
 

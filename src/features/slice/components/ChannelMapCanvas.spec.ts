@@ -106,30 +106,44 @@ describe("ChannelMapCanvas", () => {
       contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
-    const shank = getProbeShanks(probeInterfaceProbe, contour)[0]!;
+    const shanks = getProbeShanks(probeInterfaceProbe, contour);
     const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: { probe, shank, heightMillimeters: contour.heightMillimeters }
+      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
     });
-    return { wrapper, store, probe, shank, contour };
+    return { wrapper, store, probe, shanks, contour };
   }
 
-  it("hands the sampler a geometry covering the shank's full extent at the measured size", () => {
+  it("hands the sampler a geometry covering every shank's full extent at the measured size", () => {
     const { store, probe, contour } = mountCanvas();
     const frame = getProbeFrame(probe, store.referenceCoordinate);
 
     expect(capturedGeometry).toEqual({
-      centerMillimeters: toAtlasMillimeters(frame, 0, 5),
       rightMillimeters: frame.rightMillimeters,
       upMillimeters: frame.upMillimeters,
-      halfWidthMillimeters: 0.035,
       halfHeightMillimeters: 5,
       widthPixels: 4,
-      heightPixels: 576
+      heightPixels: 576,
+      bands: [
+        {
+          centerMillimeters: toAtlasMillimeters(frame, 0, 5),
+          // Derived from columnCount / (2 * pixelsPerMillimeter) = 4 / 115.2,
+          // not the shank's true 0.035mm half-width - see getShankLayout.
+          halfWidthMillimeters: 4 / 115.2,
+          columnOffset: 0,
+          columnCount: 4
+        }
+      ]
     });
     expect(contour.widthMillimeters).toBeCloseTo(0.07);
+  });
+
+  it("renders exactly one canvas", () => {
+    const { wrapper } = mountCanvas();
+
+    expect(wrapper.findAll("canvas")).toHaveLength(1);
   });
 
   it("sizes the canvas to a published non-square result", async () => {
@@ -147,7 +161,9 @@ describe("ChannelMapCanvas", () => {
     const { wrapper } = mountCanvas();
 
     const svg = wrapper.find(".channel-map-canvas__overlay");
-    expect(svg.attributes("viewBox")).toBe("-0.035 -5 0.07 10");
+    // viewBox width is widthPixels / pixelsPerMillimeter = 4 / 57.6, the
+    // packed layout's scale - not the shank's true 0.07mm width.
+    expect(svg.attributes("viewBox")).toBe(`0 -5 ${4 / 57.6} 10`);
 
     const outline = wrapper.find(".channel-map-canvas__contour");
     expect(outline.attributes("d")).toBe(
@@ -174,19 +190,19 @@ describe("ChannelMapCanvas", () => {
       contact_positions: []
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
-    const shank = getProbeShanks(probeInterfaceProbe, contour)[0]!;
+    const shanks = getProbeShanks(probeInterfaceProbe, contour);
     const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: { probe, shank, heightMillimeters: contour.heightMillimeters }
+      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
     });
 
     expect(wrapper.find(".channel-map-canvas__contour").exists()).toBe(true);
     expect(wrapper.find(".channel-map-canvas__contacts").exists()).toBe(false);
   });
 
-  it("scopes geometry, viewBox, and aria-label to the mounted shank of a multi-shank probe", () => {
+  it("packs a two-shank probe into one canvas with two bands and two overlay groups", () => {
     vi.mocked(getManifest).mockResolvedValue(null);
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     capturedGeometry = null;
@@ -207,43 +223,46 @@ describe("ChannelMapCanvas", () => {
       contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
-    const secondShank = getProbeShanks(probeInterfaceProbe, contour)[1]!;
+    const shanks = getProbeShanks(probeInterfaceProbe, contour);
     const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: {
-        probe,
-        shank: secondShank,
-        heightMillimeters: contour.heightMillimeters
-      }
+      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
     });
 
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    expect(wrapper.findAll("canvas")).toHaveLength(1);
+
     expect(capturedGeometry).not.toBeNull();
-    expect(capturedGeometry!.centerMillimeters).toEqual(
+    expect(capturedGeometry!.widthPixels).toBe(12);
+    expect(capturedGeometry!.heightPixels).toBe(576);
+    expect(capturedGeometry!.bands).toHaveLength(2);
+    expect(capturedGeometry!.bands.map(band => band.columnOffset)).toEqual([
+      0, 6
+    ]);
+    expect(capturedGeometry!.bands.map(band => band.columnCount)).toEqual([
+      6, 6
+    ]);
+
+    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, -0.95, 5)
+    );
+    expect(capturedGeometry!.bands[1]!.centerMillimeters).toEqual(
       toAtlasMillimeters(frame, 0.95, 5)
     );
-    expect(capturedGeometry!.rightMillimeters).toEqual(frame.rightMillimeters);
-    expect(capturedGeometry!.upMillimeters).toEqual(frame.upMillimeters);
-    expect(capturedGeometry!.halfWidthMillimeters).toBeCloseTo(0.05, 10);
-    expect(capturedGeometry!.halfHeightMillimeters).toBe(5);
-    expect(capturedGeometry!.widthPixels).toBe(6);
-    expect(capturedGeometry!.heightPixels).toBe(576);
 
-    const svg = wrapper.find(".channel-map-canvas__overlay");
-    const [minX, minY, width, height] = svg
-      .attributes("viewBox")!
-      .split(" ")
-      .map(Number);
-    expect(minX).toBe(0.9);
-    expect(minY).toBe(-5);
-    expect(width).toBeCloseTo(0.1, 10);
-    expect(height).toBe(10);
+    const groups = wrapper.findAll(".channel-map-canvas__overlay > g");
+    expect(groups).toHaveLength(2);
+    expect(groups[1]!.attributes("transform")).toContain("translate(");
+    const secondTranslateX = Number(
+      groups[1]!.attributes("transform")!.match(/translate\(([^ ]+) /)![1]
+    );
+    expect(secondTranslateX).toBeCloseTo(-0.795833, 5);
 
     const canvas = wrapper.find("canvas");
     expect(canvas.attributes("aria-label")).toBe(
-      `In-plane slice for ${probe.name}, shank 1`
+      `In-plane slice for ${probe.name}`
     );
   });
 });
