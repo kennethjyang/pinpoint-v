@@ -147,7 +147,7 @@ const channelMaps = computed(() =>
         <q-card-section class="flex flex-center q-pa-sm">
           <div class="row">
             <q-range
-              v-if="shanks.length"
+              v-if="shanks.length && zoomSelection !== 'small'"
               :model-value="channelMapWindow"
               :min="0"
               :max="heightMillimeters"
