@@ -83,12 +83,12 @@ describe("orbitCameraTowards", () => {
     {
       label: "-DV",
       direction: new Vector3(0, 1, 0),
-      expected: [1.234, 0]
+      expected: [-Math.PI / 2, 0]
     },
     {
       label: "+DV",
       direction: new Vector3(0, -1, 0),
-      expected: [1.234, Math.PI]
+      expected: [-Math.PI / 2, Math.PI]
     }
   ];
 
@@ -106,6 +106,16 @@ describe("orbitCameraTowards", () => {
       expect(call[1]).toBeCloseTo(expected[1]);
     }
   );
+
+  it("uses a fixed alpha at the DV poles, ignoring the camera's prior alpha", () => {
+    const { camera, interpolateTo } = makeStubCamera();
+    camera.alpha = 2.5;
+
+    orbitCameraTowards(camera, new Vector3(0, -1, 0));
+
+    const call = interpolateTo.mock.calls[0]!;
+    expect(call[0]).toBeCloseTo(-Math.PI / 2);
+  });
 
   it("normalizes a non-unit direction", () => {
     const { camera, interpolateTo } = makeStubCamera();
