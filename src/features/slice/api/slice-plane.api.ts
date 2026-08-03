@@ -26,7 +26,7 @@ const MAXIMUM_SIZE_PIXELS = 1024;
 const SIZE_QUANTUM_PIXELS = 32;
 
 /** Blank device pixels left between adjacent shanks in a packed layout. */
-const SHANK_GAP_PIXELS = 5;
+const SHANK_GAP_PIXELS = 1;
 
 /** A slice zoom range, as log2 mm exponents. */
 export interface SliceZoomExponentRange {
