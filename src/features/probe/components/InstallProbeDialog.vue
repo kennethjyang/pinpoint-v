@@ -152,13 +152,14 @@ watch(selectedManufacturerName, () => {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="install-card">
+      <q-card-section>
+        <div class="text-h5">{{ $t("installProbe.title") }}</div>
+      </q-card-section>
       <div
         class="install-card__body"
         :class="{ disabled: uploading || installing }"
       >
         <q-card-section class="q-gutter-y-sm install-card__content">
-          <p class="text-h5">{{ $t("installProbe.title") }}</p>
-
           <q-select
             v-model="selectedManufacturerName"
             :label="$t('installProbe.manufacturer')"
