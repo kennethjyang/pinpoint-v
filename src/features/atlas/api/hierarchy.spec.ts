@@ -198,7 +198,7 @@ describe("widestHierarchyRowWidth", () => {
         { guideWidth: 16, chromeWidth: 56 },
         measure
       )
-    ).toBe(228);
+    ).toBe(258);
   });
 
   it("adds one guideWidth per guide", () => {
@@ -212,7 +212,7 @@ describe("widestHierarchyRowWidth", () => {
         { guideWidth: 16, chromeWidth: 56 },
         measure
       )
-    ).toBe(102);
+    ).toBe(132);
   });
 
   it("excludes indent when guideWidth is 0", () => {
@@ -226,7 +226,7 @@ describe("widestHierarchyRowWidth", () => {
         { guideWidth: 0, chromeWidth: 56 },
         measure
       )
-    ).toBe(70);
+    ).toBe(100);
   });
 
   it("returns 0 for an empty list", () => {
@@ -244,6 +244,14 @@ describe("widestHierarchyRowWidth", () => {
         { guideWidth: 0, chromeWidth: 0 },
         () => 10.2
       )
-    ).toBe(22);
+    ).toBe(73);
+  });
+
+  it("appends a margin of five average character widths", () => {
+    const items = [makeItem({ abbreviation: "", name: "" })];
+
+    expect(
+      widestHierarchyRowWidth(items, { guideWidth: 0, chromeWidth: 0 }, measure)
+    ).toBe(30);
   });
 });

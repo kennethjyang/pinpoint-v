@@ -25,6 +25,9 @@ export interface HierarchyRowMetrics {
   chromeWidth: number;
 }
 
+/** Breathing room appended to the widest row, in average character widths. */
+const MARGIN_CHARACTERS = 5;
+
 /** Atlas folder-name tokens that stay uppercase instead of being title-cased. */
 const ACRONYMS = new Set([
   "whs", // Waxholm Space
@@ -106,8 +109,9 @@ export function flattenHierarchy(
 }
 
 /**
- * Widest rendered row width in pixels across every hierarchy item, so a virtual
- * scroller can be sized from the whole list rather than its mounted rows.
+ * Widest rendered row width in pixels across every hierarchy item, plus a
+ * {@link MARGIN_CHARACTERS}-wide margin, so a virtual scroller can be sized
+ * from the whole list rather than its mounted rows.
  * @param items Hierarchy items to measure.
  * @param metrics Fixed pixel widths of a row's non-text parts.
  * @param measureText Measures a string's pixel width; `bold` selects the abbreviation's weight.
@@ -117,6 +121,8 @@ export function widestHierarchyRowWidth(
   metrics: HierarchyRowMetrics,
   measureText: (text: string, bold: boolean) => number
 ): number {
+  if (items.length === 0) return 0;
+
   let widest = 0;
   for (const item of items) {
     // Ceil each string separately: canvas measurement runs up to ~0.015px
@@ -128,7 +134,7 @@ export function widestHierarchyRowWidth(
       Math.ceil(measureText(item.name, false));
     if (width > widest) widest = width;
   }
-  return widest;
+  return widest + Math.ceil(measureText("0", false) * MARGIN_CHARACTERS);
 }
 
 /**
