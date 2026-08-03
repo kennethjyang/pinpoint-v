@@ -2,7 +2,7 @@ import type { Manifest } from "@/features/atlas";
 import { getAtlasLongestDimensionMillimeters } from "@/features/atlas";
 import type { ProbeContour } from "@/features/probe";
 import { clamp } from "@/utils/math";
-import type { PlaneGeometry } from "../models/sample-geometry.model";
+import type { SampleGeometry } from "../models/sample-geometry.model";
 import type { ProbeFrame } from "./probe-frame.api";
 import { toAtlasMillimeters } from "./probe-frame.api";
 
@@ -72,11 +72,11 @@ export function getDefaultSliceExtentMillimeters(
 }
 
 /**
- * Build the sampling plane through a probe's shanks, centered on a height up
- * its contour from the tip.
+ * Build the sampling rectangle through a probe's shanks, centered on a
+ * height up its contour from the tip - the square case of {@link SampleGeometry}.
  * @param frame Probe's shank-plane frame.
  * @param centerHeightMillimeters Height up the contour from the tip to center on, in probe-local mm.
- * @param extentMillimeters Edge length of the square plane, in mm.
+ * @param extentMillimeters Edge length of the square rectangle, in mm.
  * @param sizePixels Edge length of the square output, in pixels.
  */
 export function getProbeSlicePlane(
@@ -84,14 +84,15 @@ export function getProbeSlicePlane(
   centerHeightMillimeters: number,
   extentMillimeters: number,
   sizePixels: number
-): PlaneGeometry {
+): SampleGeometry {
   return {
-    kind: "plane",
     centerMillimeters: toAtlasMillimeters(frame, 0, centerHeightMillimeters),
     rightMillimeters: frame.rightMillimeters,
     upMillimeters: frame.upMillimeters,
-    halfExtentMillimeters: extentMillimeters / 2,
-    sizePixels
+    halfWidthMillimeters: extentMillimeters / 2,
+    halfHeightMillimeters: extentMillimeters / 2,
+    widthPixels: sizePixels,
+    heightPixels: sizePixels
   };
 }
 
@@ -145,19 +146,21 @@ export function getContourPolygonPoints(
  * @param rect Canvas element's bounding rect.
  * @param clientX Pointer's viewport x coordinate.
  * @param clientY Pointer's viewport y coordinate.
- * @param sizePixels Edge length of the square slice, in pixels.
+ * @param widthPixels Edge length of the slice along u, in pixels.
+ * @param heightPixels Edge length of the slice along v, in pixels.
  */
 export function getSlicePixelFromRect(
   rect: DOMRect,
   clientX: number,
   clientY: number,
-  sizePixels: number
+  widthPixels: number,
+  heightPixels: number
 ): { x: number; y: number } | null {
   if (rect.width <= 0 || rect.height <= 0) return null;
 
-  const x = Math.floor(((clientX - rect.left) / rect.width) * sizePixels);
-  const y = Math.floor(((clientY - rect.top) / rect.height) * sizePixels);
-  if (x < 0 || y < 0 || x >= sizePixels || y >= sizePixels) return null;
+  const x = Math.floor(((clientX - rect.left) / rect.width) * widthPixels);
+  const y = Math.floor(((clientY - rect.top) / rect.height) * heightPixels);
+  if (x < 0 || y < 0 || x >= widthPixels || y >= heightPixels) return null;
   return { x, y };
 }
 

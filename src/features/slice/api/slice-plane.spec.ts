@@ -35,14 +35,16 @@ describe("getProbeSlicePlane", () => {
     expect(tipPlane.centerMillimeters).toEqual(frame.originMillimeters);
   });
 
-  it("sets halfExtentMillimeters to half the given extent", () => {
+  it("sets halfWidthMillimeters and halfHeightMillimeters to half the given extent", () => {
     const probe = makeProbe();
     const frame = getProbeFrame(probe, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 4, 32);
 
-    expect(plane.halfExtentMillimeters).toBe(2);
-    expect(plane.sizePixels).toBe(32);
+    expect(plane.halfWidthMillimeters).toBe(2);
+    expect(plane.halfHeightMillimeters).toBe(2);
+    expect(plane.widthPixels).toBe(32);
+    expect(plane.heightPixels).toBe(32);
   });
 
   it("carries the frame's right and up axes through unchanged", () => {
@@ -207,17 +209,25 @@ describe("getSlicePixelFromRect", () => {
   const rect = { left: 0, top: 0, width: 16, height: 16 } as DOMRect;
 
   it("maps a point within the rect to a device pixel", () => {
-    expect(getSlicePixelFromRect(rect, 8, 8, 16)).toEqual({ x: 8, y: 8 });
+    expect(getSlicePixelFromRect(rect, 8, 8, 16, 16)).toEqual({ x: 8, y: 8 });
   });
 
   it("returns null outside the rect", () => {
-    expect(getSlicePixelFromRect(rect, -1, 0, 16)).toBeNull();
-    expect(getSlicePixelFromRect(rect, 16, 0, 16)).toBeNull();
+    expect(getSlicePixelFromRect(rect, -1, 0, 16, 16)).toBeNull();
+    expect(getSlicePixelFromRect(rect, 16, 0, 16, 16)).toBeNull();
   });
 
   it("returns null for a degenerate rect", () => {
     const zeroRect = { left: 0, top: 0, width: 0, height: 0 } as DOMRect;
-    expect(getSlicePixelFromRect(zeroRect, 0, 0, 16)).toBeNull();
+    expect(getSlicePixelFromRect(zeroRect, 0, 0, 16, 16)).toBeNull();
+  });
+
+  it("maps independently sized width and height axes", () => {
+    const wideRect = { left: 0, top: 0, width: 100, height: 100 } as DOMRect;
+    expect(getSlicePixelFromRect(wideRect, 50, 50, 32, 8)).toEqual({
+      x: 16,
+      y: 4
+    });
   });
 });
 

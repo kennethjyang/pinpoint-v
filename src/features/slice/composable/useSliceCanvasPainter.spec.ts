@@ -8,7 +8,8 @@ function makeResult(
   overrides: Partial<SampleResult> = {}
 ): SampleResult {
   return {
-    sampleCount: sizePixels * sizePixels,
+    widthPixels: sizePixels,
+    heightPixels: sizePixels,
     annotationValues: new Uint32Array(sizePixels * sizePixels),
     pixels: new Uint8ClampedArray(sizePixels * sizePixels * 4),
     paintedChunkCount: 1,
@@ -107,6 +108,21 @@ describe("useSliceCanvasPainter", () => {
     await nextTick();
 
     expect(canvas.value.context.clearRect).toHaveBeenCalled();
+    unmount();
+  });
+
+  it("sizes the canvas independently along width and height for a non-square result", async () => {
+    const canvas = ref(makeCanvasStub());
+    const result = ref<SampleResult | null>(null);
+    const probeId = ref("probe-a");
+    const { unmount } = mountWithPainter(canvas, result, probeId);
+    await nextTick();
+
+    result.value = makeResult(4, { widthPixels: 4, heightPixels: 2 });
+    await nextTick();
+
+    expect(canvas.value.width).toBe(4);
+    expect(canvas.value.height).toBe(2);
     unmount();
   });
 });
