@@ -80,7 +80,8 @@ const nameRules: ValidationRule<string>[] = [
 
 const numberRules: ValidationRule<string>[] = [
   value =>
-    (value.trim().length > 0 && Number.isFinite(Number(value))) ||
+    value.trim().length === 0 ||
+    Number.isFinite(Number(value)) ||
     t("probeInspector.mustBeNumber")
 ];
 </script>

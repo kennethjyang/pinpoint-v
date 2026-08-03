@@ -26,7 +26,8 @@ export default {
     pickNameAndAtlas: "Pick an experiment name and atlas",
     failedToFetchAtlas: "Failed to fetch atlas.",
     checkAtlas:
-      "Please check your connection to the source and the atlas's existence."
+      "Please check your connection to the source and the atlas's existence.",
+    nameRequired: "Name is required."
   },
   recentExperiments: {
     title: "Recent Experiments",
