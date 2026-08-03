@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { getProbeContour } from "@/features/probe";
+import { getProbeContour, getProbeShanks } from "@/features/probe";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 
@@ -34,6 +34,9 @@ const zoomStyles: Record<ChannelMapsZoom, ZoomStyles> = {
   }
 };
 
+/** Horizontal exaggeration applied to every shank's width, so a skinny shank is legible. */
+const SHANK_WIDTH_SCALE = 5;
+
 const currentExperimentStore = useCurrentExperimentStore();
 const { t } = useI18n();
 
@@ -41,7 +44,7 @@ const zoomSelection = ref<ChannelMapsZoom>("large");
 
 const styles = computed(() => zoomStyles[zoomSelection.value]);
 
-/** Each probe paired with its contour, or null when it has none to slice. */
+/** Each probe paired with its shanks, packed left to right at 5x their proportional width. */
 const channelMaps = computed(() =>
   currentExperimentStore.probes.map(probe => {
     const definition =
@@ -49,12 +52,33 @@ const channelMaps = computed(() =>
         probe.probeInterfaceIdentifier
       ];
     const contour = definition ? getProbeContour(definition) : null;
+    if (
+      !definition ||
+      !contour ||
+      contour.widthMillimeters <= 0 ||
+      contour.heightMillimeters <= 0
+    ) {
+      return {
+        probe,
+        shanks: [],
+        heightMillimeters: 0,
+        totalWidthMillimeters: 0,
+        aspectRatio: 0
+      };
+    }
+
+    const shanks = getProbeShanks(definition, contour);
+    const totalWidthMillimeters = shanks.reduce(
+      (total, shank) => total + shank.widthMillimeters,
+      0
+    );
     return {
       probe,
-      contour:
-        contour && contour.widthMillimeters > 0 && contour.heightMillimeters > 0
-          ? contour
-          : null
+      shanks,
+      heightMillimeters: contour.heightMillimeters,
+      totalWidthMillimeters,
+      aspectRatio:
+        (SHANK_WIDTH_SCALE * totalWidthMillimeters) / contour.heightMillimeters
     };
   })
 );
@@ -74,7 +98,16 @@ const channelMaps = computed(() =>
       class="col-auto"
     />
     <div class="col row q-gutter-sm content-start channel-maps__scroll">
-      <q-card v-for="{ probe, contour } of channelMaps" :key="probe.id">
+      <q-card
+        v-for="{
+          probe,
+          shanks,
+          heightMillimeters,
+          totalWidthMillimeters,
+          aspectRatio
+        } of channelMaps"
+        :key="probe.id"
+      >
         <q-card-section :class="styles.header">
           <q-icon
             :style="{ color: probe.color }"
@@ -86,14 +119,26 @@ const channelMaps = computed(() =>
         <q-separator />
         <q-card-section class="flex flex-center q-pa-sm">
           <q-intersection
-            v-if="contour"
+            v-if="shanks.length"
             class="channel-maps__viewport"
-            :style="{
-              height: styles.canvasHeight,
-              aspectRatio: contour.widthMillimeters / contour.heightMillimeters
-            }"
+            :style="{ height: styles.canvasHeight, aspectRatio }"
           >
-            <ChannelMapCanvas :probe="probe" :contour="contour" />
+            <div class="row no-wrap fit">
+              <div
+                v-for="shank of shanks"
+                :key="String(shank.id)"
+                class="full-height channel-maps__shank"
+                :style="{
+                  flexGrow: shank.widthMillimeters / totalWidthMillimeters
+                }"
+              >
+                <ChannelMapCanvas
+                  :probe="probe"
+                  :shank="shank"
+                  :height-millimeters="heightMillimeters"
+                />
+              </div>
+            </div>
           </q-intersection>
           <div
             v-else
@@ -117,10 +162,16 @@ const channelMaps = computed(() =>
     min-width: 1px
 
     // QIntersection renders its slot inside a plain div of its own, which
-    // must stretch for the canvas to fill the sized viewport.
-    :deep(div)
+    // must stretch for the shank row to fill the sized viewport. Scoped to
+    // the direct child only - going deeper would also force width: 100% onto
+    // each shank's flex cell, defeating flex-grow's proportional sizing.
+    :deep(> div)
       width: 100%
       height: 100%
+
+  &__shank
+    flex-basis: 0
+    min-width: 0
 
   &__no-contour
     width: 8rem

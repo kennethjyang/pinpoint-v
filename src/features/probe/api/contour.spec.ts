@@ -259,6 +259,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -1, y: 3 },
           { x: -1, y: 5 },
@@ -283,6 +284,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -1, y: 2 },
           { x: -1, y: 6 },
@@ -305,7 +307,12 @@ describe("getProbeContactOutlines", () => {
     );
 
     expect(result).toEqual([
-      { kind: "circle", center: { x: 0, y: 4 }, radiusMillimeters: 2 }
+      {
+        kind: "circle",
+        shankId: null,
+        center: { x: 0, y: 4 },
+        radiusMillimeters: 2
+      }
     ]);
   });
 
@@ -329,6 +336,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: 1, y: 3 },
           { x: -1, y: 3 },
@@ -351,6 +359,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -2.5, y: 1.5 },
           { x: -2.5, y: 6.5 },
@@ -374,6 +383,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -2.5, y: 1.5 },
           { x: -2.5, y: 6.5 },
@@ -397,6 +407,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -2.5, y: 1.5 },
           { x: -2.5, y: 6.5 },
@@ -422,6 +433,23 @@ describe("getProbeContactOutlines", () => {
     expect(result).toHaveLength(1);
   });
 
+  it("passes shankId through from shank_ids, index-aligned after an unusable position is dropped", () => {
+    const result = getProbeContactOutlines(
+      makeProbeInterfaceProbe({
+        si_units: "mm",
+        contact_positions: [
+          [0, 4],
+          [Number.NaN, 1],
+          [1, 4]
+        ],
+        shank_ids: [0, 1, 2]
+      }),
+      ORIGIN
+    );
+
+    expect(result.map(outline => outline.shankId)).toEqual([0, 2]);
+  });
+
   it("returns an empty array when contact_positions is absent", () => {
     const definition: Partial<ProbeInterfaceProbe> = makeProbeInterfaceProbe();
     delete definition.contact_positions;
@@ -445,6 +473,7 @@ describe("getProbeContactOutlines", () => {
     expect(result).toEqual([
       {
         kind: "polygon",
+        shankId: null,
         points: [
           { x: -2, y: 1 },
           { x: -2, y: 3 },

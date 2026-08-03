@@ -44,6 +44,18 @@ const SINGLE_SHANK_CONTOUR = [
   [-0.035, 10]
 ];
 
+/** Two 0.1mm shanks 1.8mm apart, joined along a top edge at y = 10mm. */
+const TWO_SHANK_CONTOUR = [
+  [-1, 10],
+  [-1, 0],
+  [-0.9, 0],
+  [-0.9, 10],
+  [0.9, 10],
+  [0.9, 0],
+  [1, 0],
+  [1, 10]
+];
+
 // happy-dom's IntersectionObserver never invokes its callback, so replace it
 // with a fake whose constructor records a trigger function per observed
 // `q-intersection` root, giving each test explicit control over visibility.
@@ -125,8 +137,8 @@ describe("ChannelMaps", () => {
     const viewports = wrapper.findAll(".channel-maps__viewport");
     expect(viewports).toHaveLength(1);
     const style = viewports[0]!.attributes("style")!;
-    expect(style).toContain("height: 80vh");
-    expect(style).toContain("aspect-ratio: 0.007");
+    expect(style).toContain("height: 70vh");
+    expect(style).toContain("aspect-ratio: 0.035");
   });
 
   it("resizes the viewport when the zoom toggle changes", async () => {
@@ -139,7 +151,7 @@ describe("ChannelMaps", () => {
 
     expect(
       wrapper.find(".channel-maps__viewport").attributes("style")
-    ).toContain("height: 20vh");
+    ).toContain("height: 15vh");
 
     const mediumButton = wrapper
       .findAllComponents({ name: "QBtn" })
@@ -148,7 +160,7 @@ describe("ChannelMaps", () => {
 
     expect(
       wrapper.find(".channel-maps__viewport").attributes("style")
-    ).toContain("height: 50vh");
+    ).toContain("height: 30vh");
   });
 
   it("shows the no-contour message and no viewport for a probe without a usable contour", () => {
@@ -177,5 +189,48 @@ describe("ChannelMaps", () => {
 
     await triggerIntersection(false);
     expect(wrapper.findComponent(ChannelMapCanvas).exists()).toBe(false);
+  });
+
+  it("packs a two-shank probe into equal-width flex cells and mounts one canvas per shank once intersecting", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = useCurrentExperimentStore(pinia);
+
+    const twoShankDefinition = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: TWO_SHANK_CONTOUR,
+      contact_positions: [
+        [-0.95, 1],
+        [0.95, 1]
+      ],
+      shank_ids: ["0", "1"],
+      contact_shapes: ["square", "square"],
+      contact_shape_params: [{ width: 0.02 }, { width: 0.02 }],
+      annotations: { manufacturer: "cambridgeneurotech", model_name: "ASSY-3" }
+    });
+    internProbeInterfaceProbe(store.experiment, twoShankDefinition);
+    const twoShankProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(twoShankDefinition),
+      name: "Two-shank probe"
+    });
+    store.experiment.probes = [twoShankProbe];
+
+    const wrapper = mountWithQuasar(ChannelMaps, { pinia });
+
+    const viewport = wrapper.find(".channel-maps__viewport");
+    const aspectRatio = Number(
+      viewport.attributes("style")!.match(/aspect-ratio: ([\d.]+)/)![1]
+    );
+    expect(aspectRatio).toBeCloseTo(0.1, 10);
+
+    expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(0);
+    await triggerIntersection(true);
+
+    const shankCells = wrapper.findAll(".channel-maps__shank");
+    expect(shankCells).toHaveLength(2);
+    shankCells.forEach(cell => {
+      expect(cell.attributes("style")).toContain("flex-grow: 0.5");
+    });
+    expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(2);
   });
 });

@@ -1,6 +1,10 @@
 import type { Manifest } from "@/features/atlas";
 import { getAtlasLongestDimensionMillimeters } from "@/features/atlas";
-import type { ProbeContactOutline, ProbeContour } from "@/features/probe";
+import type {
+  ProbeContactOutline,
+  ProbeContour,
+  ProbeShank
+} from "@/features/probe";
 import { clamp } from "@/utils/math";
 import type { SampleGeometry } from "../models/sample-geometry.model";
 import type { ProbeFrame } from "./probe-frame.api";
@@ -97,47 +101,51 @@ export function getProbeSlicePlane(
 }
 
 /**
- * Build the sampling rectangle covering a probe contour's full extent in the
- * shank plane, centered halfway up the contour.
+ * Build the sampling rectangle covering one shank's full extent in the
+ * shank plane, centered halfway up the probe's contour.
  * @param frame Probe's shank-plane frame.
- * @param contour Probe's contour, whose bounding box the rectangle covers.
+ * @param shank Shank whose x-range the rectangle covers.
+ * @param heightMillimeters Height of the probe's contour, shared by every shank.
  * @param widthPixels Output width, in pixels.
  * @param heightPixels Output height, in pixels.
  */
-export function getContourSlicePlane(
+export function getShankSlicePlane(
   frame: ProbeFrame,
-  contour: ProbeContour,
+  shank: ProbeShank,
+  heightMillimeters: number,
   widthPixels: number,
   heightPixels: number
 ): SampleGeometry {
   return {
     centerMillimeters: toAtlasMillimeters(
       frame,
-      0,
-      contour.heightMillimeters / 2
+      (shank.minimumXMillimeters + shank.maximumXMillimeters) / 2,
+      heightMillimeters / 2
     ),
     rightMillimeters: frame.rightMillimeters,
     upMillimeters: frame.upMillimeters,
-    halfWidthMillimeters: contour.widthMillimeters / 2,
-    halfHeightMillimeters: contour.heightMillimeters / 2,
+    halfWidthMillimeters: shank.widthMillimeters / 2,
+    halfHeightMillimeters: heightMillimeters / 2,
     widthPixels,
     heightPixels
   };
 }
 
 /**
- * Device-pixel dimensions of a contour-shaped canvas of the given CSS
- * height, quantized along height and widened to the contour's aspect ratio.
- * @param contour Contour whose aspect ratio the output carries.
+ * Device-pixel dimensions of a shank-shaped canvas of the given CSS height,
+ * quantized along height and widened to the shank's true aspect ratio.
+ * @param widthMillimeters Shank's full x extent, in mm.
+ * @param heightMillimeters Height of the probe's contour, shared by every shank.
  * @param cssHeight Canvas height in CSS pixels; 0 while unmeasured.
  * @param pixelRatio Device pixel ratio.
  */
-export function getContourSizePixels(
-  contour: ProbeContour,
+export function getSliceSizePixels(
+  widthMillimeters: number,
+  heightMillimeters: number,
   cssHeight: number,
   pixelRatio: number
 ): { widthPixels: number; heightPixels: number } {
-  if (cssHeight <= 0 || contour.heightMillimeters <= 0) {
+  if (cssHeight <= 0 || heightMillimeters <= 0 || widthMillimeters <= 0) {
     return { widthPixels: 0, heightPixels: 0 };
   }
 
@@ -148,9 +156,7 @@ export function getContourSizePixels(
     MAXIMUM_SIZE_PIXELS
   );
   const widthPixels = clamp(
-    Math.round(
-      (heightPixels * contour.widthMillimeters) / contour.heightMillimeters
-    ),
+    Math.round((heightPixels * widthMillimeters) / heightMillimeters),
     1,
     MAXIMUM_SIZE_PIXELS
   );
@@ -199,6 +205,21 @@ export function getContourPolygonPoints(
 ): string {
   return contour.points
     .map(({ x, y }) => `${x},${centerHeightMillimeters - y}`)
+    .join(" ");
+}
+
+/**
+ * Build the SVG path `d` for a shank's outline, re-origined on the slice
+ * center height. Multiple rings become extra closed subpaths.
+ * @param shank Shank whose outline rings to render.
+ * @param centerHeightMillimeters Height the slice is centered on, in probe-local mm.
+ */
+export function getShankOutlinePath(
+  shank: ProbeShank,
+  centerHeightMillimeters: number
+): string {
+  return shank.rings
+    .map(ring => getPolygonSubpath(ring, centerHeightMillimeters))
     .join(" ");
 }
 

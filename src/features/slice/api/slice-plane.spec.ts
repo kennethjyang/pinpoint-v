@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getProbeContour } from "@/features/probe";
+import type { ProbeShank } from "@/features/probe";
+import { getProbeContour, getProbeShanks } from "@/features/probe";
 import {
   makeManifest,
   makeProbe,
@@ -12,14 +13,27 @@ import {
   formatSliceExtentMillimeters,
   getContactOutlinePath,
   getContourPolygonPoints,
-  getContourSizePixels,
-  getContourSlicePlane,
   getDefaultSliceExtentMillimeters,
   getProbeSlicePlane,
   getQuantizedSizePixels,
+  getShankOutlinePath,
+  getShankSlicePlane,
   getSlicePixelFromRect,
+  getSliceSizePixels,
   getSliceZoomExponentRange
 } from "./slice-plane.api";
+
+/** Two 0.1mm shanks 1.8mm apart, joined along a top edge at y = 10mm. */
+const TWO_SHANK_CONTOUR = [
+  [-1, 10],
+  [-1, 0],
+  [-0.9, 0],
+  [-0.9, 10],
+  [0.9, 10],
+  [0.9, 0],
+  [1, 0],
+  [1, 10]
+];
 
 describe("getProbeSlicePlane", () => {
   it("centers on the given height up the contour from the tip", () => {
@@ -61,7 +75,7 @@ describe("getProbeSlicePlane", () => {
   });
 });
 
-describe("getContourSlicePlane", () => {
+describe("getShankSlicePlane", () => {
   const contour = getProbeContour(
     makeProbeInterfaceProbe({
       si_units: "mm",
@@ -73,13 +87,29 @@ describe("getContourSlicePlane", () => {
       ]
     })
   )!;
+  const definition = makeProbeInterfaceProbe({
+    si_units: "mm",
+    probe_planar_contour: [
+      [-0.035, 0],
+      [0.035, 0],
+      [0.035, 10],
+      [-0.035, 10]
+    ]
+  });
+  const shank = getProbeShanks(definition, contour)[0]!;
   const frame = getProbeFrame(
     makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] }),
     [0, 0, 0]
   );
 
-  it("halves the contour's extent into the rectangle's half-width and half-height", () => {
-    const plane = getContourSlicePlane(frame, contour, 4, 576);
+  it("halves the shank's width, and the given height, into the rectangle's half-width and half-height", () => {
+    const plane = getShankSlicePlane(
+      frame,
+      shank,
+      contour.heightMillimeters,
+      4,
+      576
+    );
 
     expect(plane.halfWidthMillimeters).toBe(0.035);
     expect(plane.halfHeightMillimeters).toBe(5);
@@ -88,20 +118,61 @@ describe("getContourSlicePlane", () => {
   });
 
   it("carries the frame's right and up axes through unchanged", () => {
-    const plane = getContourSlicePlane(frame, contour, 4, 576);
+    const plane = getShankSlicePlane(
+      frame,
+      shank,
+      contour.heightMillimeters,
+      4,
+      576
+    );
 
     expect(plane.rightMillimeters).toEqual(frame.rightMillimeters);
     expect(plane.upMillimeters).toEqual(frame.upMillimeters);
   });
 
-  it("centers halfway up the contour", () => {
-    const plane = getContourSlicePlane(frame, contour, 4, 576);
+  it("centers on the shank's x center and halfway up the given height", () => {
+    const plane = getShankSlicePlane(
+      frame,
+      shank,
+      contour.heightMillimeters,
+      4,
+      576
+    );
 
     expect(plane.centerMillimeters).toEqual(toAtlasMillimeters(frame, 0, 5));
   });
+
+  it("centers on the shank's own x center, not the probe's, for an off-center shank", () => {
+    const twoShankDefinition = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: TWO_SHANK_CONTOUR,
+      contact_positions: [
+        [-0.95, 1],
+        [0.95, 1]
+      ],
+      shank_ids: ["0", "1"],
+      contact_shapes: ["square", "square"],
+      contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
+    });
+    const twoShankContour = getProbeContour(twoShankDefinition)!;
+    const secondShank = getProbeShanks(twoShankDefinition, twoShankContour)[1]!;
+
+    const plane = getShankSlicePlane(
+      frame,
+      secondShank,
+      twoShankContour.heightMillimeters,
+      6,
+      576
+    );
+
+    expect(plane.centerMillimeters).toEqual(toAtlasMillimeters(frame, 0.95, 5));
+    expect(plane.centerMillimeters).not.toEqual(
+      toAtlasMillimeters(frame, 0, 5)
+    );
+  });
 });
 
-describe("getContourSizePixels", () => {
+describe("getSliceSizePixels", () => {
   const singleShankContour = getProbeContour(
     makeProbeInterfaceProbe({
       si_units: "mm",
@@ -136,29 +207,59 @@ describe("getContourSizePixels", () => {
     })
   )!;
 
-  it("quantizes height and widens the width to the contour's aspect ratio", () => {
-    expect(getContourSizePixels(singleShankContour, 600, 1)).toEqual({
-      widthPixels: 4,
-      heightPixels: 576
-    });
+  it("quantizes height and widens the width to the given aspect ratio", () => {
+    expect(
+      getSliceSizePixels(
+        singleShankContour.widthMillimeters,
+        singleShankContour.heightMillimeters,
+        600,
+        1
+      )
+    ).toEqual({ widthPixels: 4, heightPixels: 576 });
   });
 
   it("returns zero dimensions while unmeasured", () => {
-    expect(getContourSizePixels(singleShankContour, 0, 2)).toEqual({
+    expect(
+      getSliceSizePixels(
+        singleShankContour.widthMillimeters,
+        singleShankContour.heightMillimeters,
+        0,
+        2
+      )
+    ).toEqual({ widthPixels: 0, heightPixels: 0 });
+  });
+
+  it("keeps a square aspect ratio's width equal to its height", () => {
+    expect(
+      getSliceSizePixels(
+        squareContour.widthMillimeters,
+        squareContour.heightMillimeters,
+        600,
+        1
+      )
+    ).toEqual({ widthPixels: 576, heightPixels: 576 });
+  });
+
+  it("clamps the width at the maximum edge length for a very wide aspect ratio", () => {
+    expect(
+      getSliceSizePixels(
+        wideContour.widthMillimeters,
+        wideContour.heightMillimeters,
+        600,
+        1
+      ).widthPixels
+    ).toBe(1024);
+  });
+
+  it("returns zero dimensions for a zero width or height", () => {
+    expect(getSliceSizePixels(0, 10, 600, 1)).toEqual({
       widthPixels: 0,
       heightPixels: 0
     });
-  });
-
-  it("keeps a square contour's width equal to its height", () => {
-    expect(getContourSizePixels(squareContour, 600, 1)).toEqual({
-      widthPixels: 576,
-      heightPixels: 576
+    expect(getSliceSizePixels(1, 0, 600, 1)).toEqual({
+      widthPixels: 0,
+      heightPixels: 0
     });
-  });
-
-  it("clamps the width at the maximum edge length for a very wide contour", () => {
-    expect(getContourSizePixels(wideContour, 600, 1).widthPixels).toBe(1024);
   });
 });
 
@@ -309,12 +410,57 @@ describe("getContourPolygonPoints", () => {
   });
 });
 
+describe("getShankOutlinePath", () => {
+  it("builds one closed subpath for a shank with one ring", () => {
+    const shank: ProbeShank = {
+      id: "0",
+      rings: [
+        [
+          { x: -1, y: 0 },
+          { x: 1, y: 0 },
+          { x: 1, y: 10 },
+          { x: -1, y: 10 }
+        ]
+      ],
+      contacts: [],
+      minimumXMillimeters: -1,
+      maximumXMillimeters: 1,
+      widthMillimeters: 2
+    };
+
+    expect(getShankOutlinePath(shank, 0)).toBe("M-1,0L1,0L1,-10L-1,-10Z");
+  });
+
+  it("joins two rings' subpaths with a single space", () => {
+    const shank: ProbeShank = {
+      id: "0",
+      rings: [
+        [
+          { x: -1, y: 0 },
+          { x: 1, y: 0 }
+        ],
+        [
+          { x: 2, y: 0 },
+          { x: 3, y: 0 }
+        ]
+      ],
+      contacts: [],
+      minimumXMillimeters: -1,
+      maximumXMillimeters: 3,
+      widthMillimeters: 4
+    };
+
+    expect(getShankOutlinePath(shank, 0)).toBe("M-1,0L1,0Z M2,0L3,0Z");
+  });
+});
+
 describe("getContactOutlinePath", () => {
   it("builds one closed polygon subpath, y-flipped about the given center height", () => {
     const path = getContactOutlinePath(
       [
         {
           kind: "polygon",
+          shankId: null,
           points: [
             { x: -1, y: 3 },
             { x: -1, y: 5 },
@@ -331,7 +477,14 @@ describe("getContactOutlinePath", () => {
 
   it("builds one closed circle subpath as two semicircular arcs", () => {
     const path = getContactOutlinePath(
-      [{ kind: "circle", center: { x: 0, y: 4 }, radiusMillimeters: 2 }],
+      [
+        {
+          kind: "circle",
+          shankId: null,
+          center: { x: 0, y: 4 },
+          radiusMillimeters: 2
+        }
+      ],
       0
     );
 
@@ -341,8 +494,18 @@ describe("getContactOutlinePath", () => {
   it("joins multiple outlines with a single space", () => {
     const path = getContactOutlinePath(
       [
-        { kind: "circle", center: { x: 0, y: 0 }, radiusMillimeters: 1 },
-        { kind: "circle", center: { x: 2, y: 0 }, radiusMillimeters: 1 }
+        {
+          kind: "circle",
+          shankId: null,
+          center: { x: 0, y: 0 },
+          radiusMillimeters: 1
+        },
+        {
+          kind: "circle",
+          shankId: null,
+          center: { x: 2, y: 0 },
+          radiusMillimeters: 1
+        }
       ],
       0
     );
@@ -361,6 +524,7 @@ describe("getContactOutlinePath", () => {
       [
         {
           kind: "polygon",
+          shankId: null,
           points: [
             { x: -1, y: 3 },
             { x: -1, y: 5 },

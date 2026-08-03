@@ -27,13 +27,17 @@ export interface ProbeContacts {
 }
 
 /** A contact's outline in probe-local mm: a closed polygon, or a circle. */
-export type ProbeContactOutline =
+export type ProbeContactOutline = {
+  /** `shank_ids` value for this contact, or null when the definition has none. */
+  shankId: string | number | null;
+} & (
   | { kind: "polygon"; points: { x: number; y: number }[] }
   | {
       kind: "circle";
       center: { x: number; y: number };
       radiusMillimeters: number;
-    };
+    }
+);
 
 /** Conversion factor to millimeters, keyed by `ProbeInterfaceProbe.si_units`. */
 const SI_UNITS_TO_MILLIMETERS: Record<string, number> = {
@@ -172,6 +176,7 @@ export function getProbeContactOutlines(
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
     const center = { x: x * scale - origin.x, y: y * scale - origin.y };
+    const shankId = probeInterfaceProbe.shank_ids?.[index] ?? null;
     const axes = getContactPlaneAxes(
       probeInterfaceProbe.contact_plane_axes?.[index]
     );
@@ -186,6 +191,7 @@ export function getProbeContactOutlines(
     ) {
       outlines.push({
         kind: "circle",
+        shankId,
         center,
         radiusMillimeters: params.radius * scale
       });
@@ -203,6 +209,7 @@ export function getProbeContactOutlines(
     ) {
       outlines.push({
         kind: "polygon",
+        shankId,
         points: getRectangleVertices(
           center,
           axes,
@@ -222,6 +229,7 @@ export function getProbeContactOutlines(
     const widthMillimeters = widthUnits * scale;
     outlines.push({
       kind: "polygon",
+      shankId,
       points: getRectangleVertices(
         center,
         axes,
