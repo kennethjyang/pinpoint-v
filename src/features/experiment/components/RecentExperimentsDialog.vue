@@ -9,8 +9,10 @@ const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="recent-experiments">
+      <q-card-section>
+        <div class="text-h5">{{ $t("recentExperiments.title") }}</div>
+      </q-card-section>
       <q-card-section class="recent-experiments__content">
-        <p class="text-h5">{{ $t("recentExperiments.title") }}</p>
         <RecentExperimentsList @opened="onDialogOK" />
       </q-card-section>
       <q-card-actions align="right">

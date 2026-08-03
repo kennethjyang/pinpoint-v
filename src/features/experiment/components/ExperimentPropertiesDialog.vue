@@ -117,9 +117,10 @@ watch(atlas, async (newAtlas, oldAtlas) => {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="experiment-properties">
+      <q-card-section>
+        <div class="text-h5">{{ $t("experimentProperties.title") }}</div>
+      </q-card-section>
       <q-card-section class="q-gutter-y-md experiment-properties__content">
-        <p class="text-h5">{{ $t("experimentProperties.title") }}</p>
-
         <q-input
           ref="nameInput"
           v-model="name"

@@ -57,9 +57,10 @@ async function create() {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="new-experiment">
+      <q-card-section>
+        <div class="text-h5">{{ $t("newExperiment.title") }}</div>
+      </q-card-section>
       <q-card-section class="q-gutter-y-md new-experiment__content">
-        <p class="text-h5">{{ $t("newExperiment.title") }}</p>
-
         <q-input
           ref="nameInput"
           v-model="name"
