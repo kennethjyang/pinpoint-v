@@ -57,10 +57,6 @@ const isLoadingStructures = ref(false);
 const enabledGizmo = ref<EnabledGizmo>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
 
-const isInspectableSelected = computed<boolean>(
-  () => currentExperiment.selectedInspectable !== null
-);
-
 /**
  * Atlas structures that must always be present in the scene, faded out when
  * not visible instead of being removed.
@@ -189,7 +185,13 @@ watchEffect(() => {
 
 // Sync state from probes, re-registering when the experiment is replaced.
 watch(
-  [runtime.scene, runtime.gizmoManager, () => currentExperiment.experiment],
+  [
+    runtime.scene,
+    runtime.gizmoManager,
+    () => currentExperiment.experiment,
+    enabledGizmo,
+    gizmoCoordinateSpace
+  ],
   ([scene, gizmoManager, experiment]) => {
     if (!scene || !gizmoManager) return;
 
@@ -213,9 +215,9 @@ watch(
     });
 
     onWatcherCleanup(() => {
-      probePositionDraggingObserver.remove();
-      probeRotationDraggingObserver.remove();
-      probeDragEndObservers.forEach(observer => observer.remove());
+      probePositionDraggingObserver?.remove();
+      probeRotationDraggingObserver?.remove();
+      probeDragEndObservers.forEach(observer => observer?.remove());
     });
   }
 );
@@ -287,7 +289,7 @@ watchEffect(() => {
   }
   if (gizmoManager.gizmos.rotationGizmo) {
     gizmoManager.gizmos.rotationGizmo.updateGizmoRotationToMatchAttachedMesh =
-      gizmoCoordinateSpace.value === "global";
+      gizmoCoordinateSpace.value === "local";
   }
 });
 
@@ -317,7 +319,7 @@ onUnmounted(() => {
   </div>
   <q-resize-observer @resize="onResize" />
   <q-page-sticky :offset="[0, 18]" position="bottom">
-    <q-card v-if="isInspectableSelected">
+    <q-card>
       <q-card-section class="row justify-center gizmo-controls">
         <q-btn-toggle
           v-model="enabledGizmo"

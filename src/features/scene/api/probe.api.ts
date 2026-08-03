@@ -322,8 +322,8 @@ export function setProbePositionFromGizmoDrag(
   gizmoManager: GizmoManager,
   experiment: Experiment,
   onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return gizmoManager.gizmos.positionGizmo!.onDragObservable.add(() => {
+): Observer<DragEvent> | undefined {
+  return gizmoManager.gizmos.positionGizmo?.onDragObservable.add(() => {
     const attached = attachedProbeFromGizmo(gizmoManager, experiment);
     if (!attached) return;
 
@@ -342,8 +342,8 @@ export function setProbeRotationFromGizmoDrag(
   gizmoManager: GizmoManager,
   experiment: Experiment,
   onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return gizmoManager.gizmos.rotationGizmo!.onDragObservable.add(() => {
+): Observer<DragEvent> | undefined {
+  return gizmoManager.gizmos.rotationGizmo?.onDragObservable.add(() => {
     const attached = attachedProbeFromGizmo(gizmoManager, experiment);
     if (!attached) return;
 
@@ -361,7 +361,7 @@ export function setProbeRotationFromGizmoDrag(
 export function endProbeGizmoDrag(
   gizmoManager: GizmoManager,
   onDragEnd: () => void
-): Observer<DragStartEndEvent>[] {
+): (Observer<DragStartEndEvent> | undefined)[] {
   const onEnd = () => {
     if (!gizmoManager.attachedNode) return;
     if (!isProbeEntityName(gizmoManager.attachedNode.name)) return;
@@ -369,8 +369,8 @@ export function endProbeGizmoDrag(
   };
 
   return [
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.add(onEnd),
-    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.add(onEnd)
+    gizmoManager.gizmos.positionGizmo?.onDragEndObservable.add(onEnd),
+    gizmoManager.gizmos.rotationGizmo?.onDragEndObservable.add(onEnd)
   ];
 }
 
