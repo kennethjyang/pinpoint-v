@@ -138,7 +138,7 @@ describe("ChannelMaps", () => {
     expect(viewports).toHaveLength(1);
     const style = viewports[0]!.attributes("style")!;
     expect(style).toContain("height: 70vh");
-    expect(style).toContain("aspect-ratio: 0.035");
+    expect(style).toContain("aspect-ratio: 0.056");
   });
 
   it("resizes the viewport when the zoom toggle changes", async () => {
@@ -221,7 +221,7 @@ describe("ChannelMaps", () => {
     const aspectRatio = Number(
       viewport.attributes("style")!.match(/aspect-ratio: ([\d.]+)/)![1]
     );
-    expect(aspectRatio).toBeCloseTo(0.1, 10);
+    expect(aspectRatio).toBeCloseTo(0.16, 10);
 
     expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(0);
     await triggerIntersection(true);
@@ -232,5 +232,56 @@ describe("ChannelMaps", () => {
         | unknown[]
         | undefined
     ).toHaveLength(2);
+  });
+
+  it("renders a channel map window slider for the contoured probe only, bound to its full window", () => {
+    const { wrapper } = mountChannelMaps();
+
+    const ranges = wrapper.findAllComponents({ name: "QRange" });
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]!.props("min")).toBe(0);
+    expect(ranges[0]!.props("max")).toBe(10);
+    expect(ranges[0]!.props("modelValue")).toEqual({ min: 0, max: 10 });
+  });
+
+  it("sizes the slider to the current zoom's canvas height", async () => {
+    const { wrapper } = mountChannelMaps();
+
+    const range = wrapper.findComponent({ name: "QRange" });
+    expect(range.attributes("style")).toContain("height: 70vh");
+
+    const smallButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(btn => btn.text() === "Small")!;
+    await smallButton.trigger("click");
+
+    expect(
+      wrapper.findComponent({ name: "QRange" }).attributes("style")
+    ).toContain("height: 15vh");
+  });
+
+  it("labels the slider's thumbs in mm", () => {
+    const { wrapper } = mountChannelMaps();
+
+    const range = wrapper.findComponent({ name: "QRange" });
+    expect(range.props("leftLabelValue")).toBe("0.00 mm");
+    expect(range.props("rightLabelValue")).toBe("10.00 mm");
+  });
+
+  it("writes a dragged window to the probe and re-renders the slider from it", async () => {
+    const { wrapper, store } = mountChannelMaps();
+
+    await wrapper
+      .findComponent({ name: "QRange" })
+      .vm.$emit("update:model-value", { min: -1, max: 6 });
+    await nextTick();
+
+    expect(store.experiment.probes[0]!.channelMapWindow).toEqual({
+      min: 0,
+      max: 7
+    });
+    expect(
+      wrapper.findComponent({ name: "QRange" }).props("modelValue")
+    ).toEqual({ min: 0, max: 7 });
   });
 });

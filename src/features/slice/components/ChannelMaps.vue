@@ -4,6 +4,10 @@ import { useI18n } from "vue-i18n";
 import type { ProbeShank } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import {
+  getProbeChannelMapWindow,
+  setProbeChannelMapWindow
+} from "../api/slice-plane.api";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 
 type ChannelMapsZoom = "small" | "medium" | "large";
@@ -15,6 +19,13 @@ interface ZoomStyles {
   name: string;
   /** CSS height of the slice canvas at this zoom. */
   canvasHeight: string;
+}
+
+/** One probe definition's packed shanks, derived once per interned definition. */
+interface DefinitionShanks {
+  shanks: ProbeShank[];
+  heightMillimeters: number;
+  aspectRatio: number;
 }
 
 const zoomStyles: Record<ChannelMapsZoom, ZoomStyles> = {
@@ -44,13 +55,6 @@ const { t } = useI18n();
 const zoomSelection = ref<ChannelMapsZoom>("large");
 
 const styles = computed(() => zoomStyles[zoomSelection.value]);
-
-/** One probe definition's packed shanks, derived once per interned definition. */
-interface DefinitionShanks {
-  shanks: ProbeShank[];
-  heightMillimeters: number;
-  aspectRatio: number;
-}
 
 /**
  * Shanks per interned definition. Keyed by identifier so a probe added,
@@ -85,18 +89,26 @@ const shanksByIdentifier = computed(() => {
   return byIdentifier;
 });
 
-/** Each probe paired with its packed shanks, or an empty set when it has none to slice. */
+/** Each probe paired with its packed shanks and rendered window, or an empty set when it has none to slice. */
 const channelMaps = computed(() =>
-  currentExperimentStore.probes.map(probe => ({
-    probe,
-    ...(shanksByIdentifier.value[probe.probeInterfaceIdentifier] ?? {
+  currentExperimentStore.probes.map(probe => {
+    const definitionShanks = shanksByIdentifier.value[
+      probe.probeInterfaceIdentifier
+    ] ?? {
       shanks: [],
       heightMillimeters: 0,
       aspectRatio: 0
-    })
-  }))
+    };
+    return {
+      probe,
+      ...definitionShanks,
+      channelMapWindow: getProbeChannelMapWindow(
+        probe,
+        definitionShanks.heightMillimeters
+      )
+    };
+  })
 );
-const test = ref({ min: 0, max: 50 });
 </script>
 
 <template>
@@ -114,7 +126,13 @@ const test = ref({ min: 0, max: 50 });
     />
     <div class="col row q-gutter-sm content-start channel-maps__scroll">
       <q-card
-        v-for="{ probe, shanks, heightMillimeters, aspectRatio } of channelMaps"
+        v-for="{
+          probe,
+          shanks,
+          heightMillimeters,
+          aspectRatio,
+          channelMapWindow
+        } of channelMaps"
         :key="probe.id"
       >
         <q-card-section :class="styles.header">
@@ -128,7 +146,35 @@ const test = ref({ min: 0, max: 50 });
         <q-separator />
         <q-card-section class="flex flex-center q-pa-sm">
           <div class="row">
-            <q-range v-model="test" :max="50" :min="0" label reverse vertical />
+            <q-range
+              v-if="shanks.length"
+              :model-value="channelMapWindow"
+              :min="0"
+              :max="heightMillimeters"
+              :step="0"
+              :left-label-value="
+                t('slice.millimeters', {
+                  value: channelMapWindow.min.toFixed(2)
+                })
+              "
+              :right-label-value="
+                t('slice.millimeters', {
+                  value: channelMapWindow.max.toFixed(2)
+                })
+              "
+              :aria-label="t('slice.channelMapWindow', { name: probe.name })"
+              :style="{ height: styles.canvasHeight }"
+              label
+              drag-range
+              vertical
+              reverse
+              dense
+              class="col-auto q-mr-sm"
+              @update:model-value="
+                value =>
+                  setProbeChannelMapWindow(probe, value, heightMillimeters)
+              "
+            />
             <q-intersection
               v-if="shanks.length"
               :style="{ height: styles.canvasHeight, aspectRatio }"

@@ -1,6 +1,6 @@
 export { default as ProbeLibraryDialog } from "./components/ProbeLibraryDialog.vue";
 export type { ProbeInterfaceProbe } from "./models/probe-interface.model";
-export type { Probe } from "./models/probe.model";
+export type { Probe, ProbeChannelMapWindow } from "./models/probe.model";
 export {
   buildProbe,
   getProbeInterfaceIdentifier,

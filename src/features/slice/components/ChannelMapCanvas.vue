@@ -7,6 +7,7 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getProbeFrame } from "../api/probe-frame.api";
 import {
   getContactOutlinePath,
+  getProbeChannelMapWindow,
   getShankLayout,
   getShankOutlinePath,
   getShankSliceGeometry
@@ -28,6 +29,11 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 const { height } = useElementSize(canvas);
 const { pixelRatio } = useDevicePixelRatio();
 
+/** Window along the shanks this canvas renders, resolved from the probe. */
+const channelMapWindow = computed(() =>
+  getProbeChannelMapWindow(probe, heightMillimeters)
+);
+
 /** Packed layout of every shank into one canvas, or null while unmeasured. */
 const layout = computed(() =>
   getShankLayout(shanks, heightMillimeters, height.value, pixelRatio.value)
@@ -37,7 +43,7 @@ const layout = computed(() =>
 const plane = computed(() => {
   if (!layout.value) return null;
   const frame = getProbeFrame(probe, currentExperiment.referenceCoordinate);
-  return getShankSliceGeometry(frame, layout.value, heightMillimeters);
+  return getShankSliceGeometry(frame, layout.value, channelMapWindow.value);
 });
 
 const { createStream } = useAnnotationSampler({
@@ -46,13 +52,20 @@ const { createStream } = useAnnotationSampler({
 });
 const { result } = createStream(plane);
 
-/** Height the sampled plane is centered on, matching `getShankSliceGeometry`. */
-const centerHeightMillimeters = computed(() => heightMillimeters / 2);
+/** Height the sampled window is centered on, matching `getShankSliceGeometry`. */
+const centerHeightMillimeters = computed(
+  () => (channelMapWindow.value.min + channelMapWindow.value.max) / 2
+);
+
+/** Vertical extent the window spans, in mm. */
+const spanMillimeters = computed(
+  () => channelMapWindow.value.max - channelMapWindow.value.min
+);
 
 /** viewBox spanning the packed shanks, centered like the sampled bands. */
 const viewBox = computed(() =>
   layout.value
-    ? `0 ${-centerHeightMillimeters.value} ${layout.value.widthMillimeters} ${heightMillimeters}`
+    ? `0 ${-spanMillimeters.value / 2} ${layout.value.widthMillimeters} ${spanMillimeters.value}`
     : null
 );
 

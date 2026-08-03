@@ -14,13 +14,15 @@ import {
   getContactOutlinePath,
   getContourPolygonPoints,
   getDefaultSliceExtentMillimeters,
+  getProbeChannelMapWindow,
   getProbeSlicePlane,
   getQuantizedSizePixels,
   getShankLayout,
   getShankOutlinePath,
   getShankSliceGeometry,
   getSlicePixelFromRect,
-  getSliceZoomExponentRange
+  getSliceZoomExponentRange,
+  setProbeChannelMapWindow
 } from "./slice-plane.api";
 
 /** Two 0.1mm shanks 1.8mm apart, joined along a top edge at y = 10mm. */
@@ -115,7 +117,7 @@ describe("getShankLayout", () => {
     expect(layout.pixelsPerMillimeter).toBeCloseTo(57.6, 10);
   });
 
-  it("packs each shank into columns proportional to its width, leaving a 5px gap after each but the last", () => {
+  it("packs each shank into columns proportional to its width, leaving a 1px gap after each but the last", () => {
     const layout = getShankLayout(
       shanks,
       twoShankContour.heightMillimeters,
@@ -124,9 +126,9 @@ describe("getShankLayout", () => {
     )!;
 
     expect(layout.placements.map(p => p.columnCount)).toEqual([6, 6]);
-    expect(layout.placements.map(p => p.columnOffset)).toEqual([0, 11]);
-    expect(layout.widthPixels).toBe(17);
-    expect(layout.widthMillimeters).toBeCloseTo(0.295139, 5);
+    expect(layout.placements.map(p => p.columnOffset)).toEqual([0, 7]);
+    expect(layout.widthPixels).toBe(13);
+    expect(layout.widthMillimeters).toBeCloseTo(0.225694, 5);
   });
 
   it("offsets each shank's probe-local x into packed overlay space", () => {
@@ -138,7 +140,7 @@ describe("getShankLayout", () => {
     )!;
 
     expect(layout.placements[0]!.offsetMillimeters).toBeCloseTo(1, 5);
-    expect(layout.placements[1]!.offsetMillimeters).toBeCloseTo(-0.709028, 5);
+    expect(layout.placements[1]!.offsetMillimeters).toBeCloseTo(-0.778472, 5);
   });
 
   it("has no gap - and no gap-sized offset - for a single shank", () => {
@@ -208,11 +210,10 @@ describe("getShankSliceGeometry", () => {
       1
     )!;
 
-    const geometry = getShankSliceGeometry(
-      frame,
-      layout,
-      twoShankContour.heightMillimeters
-    );
+    const geometry = getShankSliceGeometry(frame, layout, {
+      min: 0,
+      max: twoShankContour.heightMillimeters
+    });
 
     expect(geometry.bands).toHaveLength(2);
     expect(geometry.bands[0]!.centerMillimeters).toEqual(
@@ -231,11 +232,10 @@ describe("getShankSliceGeometry", () => {
       1
     )!;
 
-    const geometry = getShankSliceGeometry(
-      frame,
-      layout,
-      twoShankContour.heightMillimeters
-    );
+    const geometry = getShankSliceGeometry(frame, layout, {
+      min: 0,
+      max: twoShankContour.heightMillimeters
+    });
 
     for (const band of geometry.bands) {
       expect(band.halfWidthMillimeters).toBeCloseTo(0.0520833, 5);
@@ -250,16 +250,88 @@ describe("getShankSliceGeometry", () => {
       1
     )!;
 
-    const geometry = getShankSliceGeometry(
-      frame,
-      layout,
-      twoShankContour.heightMillimeters
-    );
+    const geometry = getShankSliceGeometry(frame, layout, {
+      min: 0,
+      max: twoShankContour.heightMillimeters
+    });
 
     expect(geometry.rightMillimeters).toEqual(frame.rightMillimeters);
     expect(geometry.upMillimeters).toEqual(frame.upMillimeters);
     expect(geometry.widthPixels).toBe(layout.widthPixels);
     expect(geometry.heightPixels).toBe(layout.heightPixels);
+  });
+
+  it("crops to the window's span and centers bands on its midpoint", () => {
+    const layout = getShankLayout(
+      shanks,
+      twoShankContour.heightMillimeters,
+      600,
+      1
+    )!;
+
+    const geometry = getShankSliceGeometry(frame, layout, { min: 2, max: 4 });
+
+    expect(geometry.halfHeightMillimeters).toBe(1);
+    expect(geometry.bands[0]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, -0.95, 3)
+    );
+    expect(geometry.bands[1]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, 0.95, 3)
+    );
+    expect(geometry.widthPixels).toBe(layout.widthPixels);
+    expect(geometry.heightPixels).toBe(layout.heightPixels);
+    for (const band of geometry.bands) {
+      expect(band.halfWidthMillimeters).toBeCloseTo(0.0520833, 5);
+    }
+  });
+});
+
+describe("getProbeChannelMapWindow", () => {
+  it("defaults an unset window to the full contour height", () => {
+    expect(
+      getProbeChannelMapWindow(makeProbe({ channelMapWindow: null }), 10)
+    ).toEqual({ min: 0, max: 10 });
+  });
+
+  it("passes an in-range persisted window through unchanged", () => {
+    expect(
+      getProbeChannelMapWindow(
+        makeProbe({ channelMapWindow: { min: 2, max: 6 } }),
+        10
+      )
+    ).toEqual({ min: 2, max: 6 });
+  });
+
+  it("clamps a persisted window that overruns the contour", () => {
+    expect(
+      getProbeChannelMapWindow(
+        makeProbe({ channelMapWindow: { min: -5, max: 99 } }),
+        10
+      )
+    ).toEqual({ min: 0, max: 10 });
+  });
+
+  it("pushes a collapsed window's span up to the minimum", () => {
+    expect(
+      getProbeChannelMapWindow(
+        makeProbe({ channelMapWindow: { min: 5, max: 5 } }),
+        10
+      )
+    ).toEqual({ min: 5, max: 5.05 });
+  });
+});
+
+describe("setProbeChannelMapWindow", () => {
+  it("clamps a window that undershoots the tip", () => {
+    const probe = makeProbe();
+    setProbeChannelMapWindow(probe, { min: -1, max: 3 }, 10);
+    expect(probe.channelMapWindow).toEqual({ min: 0, max: 4 });
+  });
+
+  it("pushes a window collapsed at the top edge down, not past the top", () => {
+    const probe = makeProbe();
+    setProbeChannelMapWindow(probe, { min: 10, max: 10 }, 10);
+    expect(probe.channelMapWindow).toEqual({ min: 9.95, max: 10 });
   });
 });
 

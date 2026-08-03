@@ -1,6 +1,8 @@
 import type { Manifest } from "@/features/atlas";
 import { getAtlasLongestDimensionMillimeters } from "@/features/atlas";
 import type {
+  Probe,
+  ProbeChannelMapWindow,
   ProbeContactOutline,
   ProbeContour,
   ProbeShank
@@ -27,6 +29,12 @@ const SIZE_QUANTUM_PIXELS = 32;
 
 /** Blank device pixels left between adjacent shanks in a packed layout. */
 const SHANK_GAP_PIXELS = 1;
+
+/**
+ * Smallest channel map window the range may collapse to, in mm - about one
+ * atlas voxel, past which more zoom reveals no new detail.
+ */
+const MINIMUM_CHANNEL_MAP_WINDOW_MILLIMETERS = 0.05;
 
 /** A slice zoom range, as log2 mm exponents. */
 export interface SliceZoomExponentRange {
@@ -211,20 +219,24 @@ export function getShankLayout(
 
 /**
  * Build the sampling surface for a packed multi-shank slice: one band per
- * shank, each centered on its own x and spanning the contour's full height.
+ * shank, each centered on its own x and on the channel map window's center,
+ * spanning only that window vertically.
  * @param frame Probe's shank-plane frame.
- * @param layout Packed layout the bands take their columns and widths from.
- * @param heightMillimeters Height of the probe's contour, spanned by every band.
+ * @param layout Packed layout the bands take their x columns and scale from -
+ * zooming the window does not change x resolution.
+ * @param channelMapWindow Window along the shank the bands span vertically.
  */
 export function getShankSliceGeometry(
   frame: ProbeFrame,
   layout: ShankLayout,
-  heightMillimeters: number
+  channelMapWindow: ProbeChannelMapWindow
 ): SampleGeometry {
+  const centerHeightMillimeters =
+    (channelMapWindow.min + channelMapWindow.max) / 2;
   return {
     rightMillimeters: frame.rightMillimeters,
     upMillimeters: frame.upMillimeters,
-    halfHeightMillimeters: heightMillimeters / 2,
+    halfHeightMillimeters: (channelMapWindow.max - channelMapWindow.min) / 2,
     widthPixels: layout.widthPixels,
     heightPixels: layout.heightPixels,
     bands: layout.placements.map(placement => ({
@@ -233,7 +245,7 @@ export function getShankSliceGeometry(
         (placement.shank.minimumXMillimeters +
           placement.shank.maximumXMillimeters) /
           2,
-        heightMillimeters / 2
+        centerHeightMillimeters
       ),
       halfWidthMillimeters:
         placement.columnCount / (2 * layout.pixelsPerMillimeter),
@@ -241,6 +253,63 @@ export function getShankSliceGeometry(
       columnCount: placement.columnCount
     }))
   };
+}
+
+/**
+ * Resolve a probe's channel map window against its contour height,
+ * defaulting an unset window to the full height and clamping a persisted one
+ * into range.
+ * @param probe Probe to read the persisted window from.
+ * @param heightMillimeters Height of the probe's contour, in mm.
+ */
+export function getProbeChannelMapWindow(
+  probe: Probe,
+  heightMillimeters: number
+): ProbeChannelMapWindow {
+  return probe.channelMapWindow === null
+    ? { min: 0, max: heightMillimeters }
+    : clampChannelMapWindow(probe.channelMapWindow, heightMillimeters);
+}
+
+/**
+ * Write a channel map window to a probe in place, clamped into its contour
+ * height and to the minimum window span.
+ * @param probe Probe to write the window to.
+ * @param channelMapWindow Window to write, in mm up from the tip.
+ * @param heightMillimeters Height of the probe's contour, in mm.
+ */
+export function setProbeChannelMapWindow(
+  probe: Probe,
+  channelMapWindow: ProbeChannelMapWindow,
+  heightMillimeters: number
+): void {
+  probe.channelMapWindow = clampChannelMapWindow(
+    channelMapWindow,
+    heightMillimeters
+  );
+}
+
+/**
+ * Clamp a channel map window inside `[0, heightMillimeters]`, holding its
+ * span at or above the minimum window.
+ * @param channelMapWindow Window to clamp, in mm up from the tip.
+ * @param heightMillimeters Height of the probe's contour, in mm.
+ */
+function clampChannelMapWindow(
+  channelMapWindow: ProbeChannelMapWindow,
+  heightMillimeters: number
+): ProbeChannelMapWindow {
+  if (heightMillimeters <= MINIMUM_CHANNEL_MAP_WINDOW_MILLIMETERS) {
+    return { min: 0, max: heightMillimeters };
+  }
+
+  const span = clamp(
+    channelMapWindow.max - channelMapWindow.min,
+    MINIMUM_CHANNEL_MAP_WINDOW_MILLIMETERS,
+    heightMillimeters
+  );
+  const min = clamp(channelMapWindow.min, 0, heightMillimeters - span);
+  return { min, max: min + span };
 }
 
 /**

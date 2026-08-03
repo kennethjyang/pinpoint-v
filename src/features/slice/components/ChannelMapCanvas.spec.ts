@@ -6,6 +6,7 @@ import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
+import type { ProbeChannelMapWindow } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
 import { getProbeFrame, toAtlasMillimeters } from "../api/probe-frame.api";
 import type { SampleGeometry } from "../models/sample-geometry.model";
@@ -84,7 +85,7 @@ function makeSampleResult(
 }
 
 describe("ChannelMapCanvas", () => {
-  function mountCanvas() {
+  function mountCanvas(channelMapWindow: ProbeChannelMapWindow | null = null) {
     vi.mocked(getManifest).mockResolvedValue(null);
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     capturedGeometry = null;
@@ -107,7 +108,11 @@ describe("ChannelMapCanvas", () => {
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
     const shanks = getProbeShanks(probeInterfaceProbe, contour);
-    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
+    const probe = makeProbe({
+      tipPosition: [0, 0, 0],
+      rotation: [0, 0, 0],
+      channelMapWindow
+    });
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
@@ -177,6 +182,26 @@ describe("ChannelMapCanvas", () => {
     expect(d.match(/Z/g)).toHaveLength(2);
   });
 
+  it("crops the sampled geometry and overlay to the probe's channel map window", () => {
+    const { wrapper, store, probe } = mountCanvas({ min: 2, max: 4 });
+    const frame = getProbeFrame(probe, store.referenceCoordinate);
+
+    expect(capturedGeometry!.halfHeightMillimeters).toBe(1);
+    expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
+      toAtlasMillimeters(frame, 0, 3)
+    );
+    expect(capturedGeometry!.widthPixels).toBe(4);
+    expect(capturedGeometry!.heightPixels).toBe(576);
+
+    const svg = wrapper.find(".channel-map-canvas__overlay");
+    expect(svg.attributes("viewBox")).toBe(`0 -1 ${4 / 57.6} 2`);
+
+    const outline = wrapper.find(".channel-map-canvas__contour");
+    expect(outline.attributes("d")).toBe(
+      "M-0.035,3L0.035,3L0.035,-7L-0.035,-7Z"
+    );
+  });
+
   it("renders the outline with no contact path for a contour-only shank", () => {
     vi.mocked(getManifest).mockResolvedValue(null);
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
@@ -234,11 +259,11 @@ describe("ChannelMapCanvas", () => {
     expect(wrapper.findAll("canvas")).toHaveLength(1);
 
     expect(capturedGeometry).not.toBeNull();
-    expect(capturedGeometry!.widthPixels).toBe(17);
+    expect(capturedGeometry!.widthPixels).toBe(13);
     expect(capturedGeometry!.heightPixels).toBe(576);
     expect(capturedGeometry!.bands).toHaveLength(2);
     expect(capturedGeometry!.bands.map(band => band.columnOffset)).toEqual([
-      0, 11
+      0, 7
     ]);
     expect(capturedGeometry!.bands.map(band => band.columnCount)).toEqual([
       6, 6
@@ -258,7 +283,7 @@ describe("ChannelMapCanvas", () => {
     const secondTranslateX = Number(
       groups[1]!.attributes("transform")!.match(/translate\(([^ ]+) /)![1]
     );
-    expect(secondTranslateX).toBeCloseTo(-0.709028, 5);
+    expect(secondTranslateX).toBeCloseTo(-0.778472, 5);
 
     const canvas = wrapper.find("canvas");
     expect(canvas.attributes("aria-label")).toBe(
