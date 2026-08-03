@@ -153,12 +153,17 @@ export async function createAxisGuides(scene: Scene): Promise<AxisGuides> {
   }
 
   // Text renderers are not scene nodes, so Babylon never draws them: render
-  // each one after the scene with the active camera's matrices.
+  // each one after the scene with the active camera's matrices. Skip a
+  // renderer with no paragraphs (`parent` nulled by `clearAxisGuides`):
+  // `TextRenderer.render()` always issues a draw call, and Babylon's
+  // engine falls back to a *non-instanced* draw of one quad when the
+  // instance count is 0, redrawing a stale glyph instead of nothing.
   const observer = scene.onAfterRenderObservable.add(() => {
     const camera = scene.activeCamera;
     if (!camera) return;
 
     for (const renderer of Object.values(renderers)) {
+      if (!renderer.parent) continue;
       renderer.render(camera.getViewMatrix(), camera.getProjectionMatrix());
     }
   });
