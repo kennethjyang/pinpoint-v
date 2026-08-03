@@ -21,6 +21,7 @@ import {
 } from "../api/slice-plane.api";
 import { findStructureByAnnotationValue } from "../api/structure-colors.api";
 import { useAnnotationSampler } from "../composable/useAnnotationSampler";
+import { useMotionResolutionScale } from "../composable/useMotionResolutionScale";
 import { useSliceCanvasPainter } from "../composable/useSliceCanvasPainter";
 import { useSliceViewport } from "../composable/useSliceViewport";
 
@@ -57,9 +58,32 @@ const { zoomRange, extentMillimeters, zoomExponent, centerHeightMillimeters } =
     computed(() => currentExperiment.manifest)
   );
 
-/** Device-pixel edge length of the square canvas, quantized to bound replans. */
-const sizePixels = computed(() =>
+/** Full-resolution device-pixel edge length, quantized to bound replans. */
+const settledSizePixels = computed(() =>
   getQuantizedSizePixels(width.value, pixelRatio.value)
+);
+
+/**
+ * Everything that would trigger a replan, excluding the resolution scale
+ * itself - feeding the scale back in would make its own change look like
+ * movement.
+ */
+const motionKey = computed(() =>
+  [
+    settledSizePixels.value,
+    ...probe.tipPosition,
+    ...probe.rotation,
+    ...currentExperiment.referenceCoordinate,
+    centerHeightMillimeters.value,
+    extentMillimeters.value
+  ].join(",")
+);
+
+const resolutionScale = useMotionResolutionScale(motionKey);
+
+/** Device-pixel edge length of the square canvas, reduced while moving. */
+const sizePixels = computed(() =>
+  getQuantizedSizePixels(width.value, pixelRatio.value * resolutionScale.value)
 );
 
 const plane = computed(() => {
