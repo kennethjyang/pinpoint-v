@@ -16,8 +16,8 @@ import {
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
-import { buildAxisGuides, createAxisGuides } from "../api/axis-guide.api";
 import type { AxisGuides } from "../api/axis-guide.api";
+import { buildAxisGuides, createAxisGuides } from "../api/axis-guide.api";
 import { setInitialZoom } from "../api/camera.api";
 import type { StructureEntity } from "@/features/atlas";
 import {
@@ -58,6 +58,8 @@ const isLoadingStructures = ref(false);
 
 /** Axis guide text renderers, created once per scene. */
 const axisGuides = shallowRef<AxisGuides | null>(null);
+
+const areAxisGuidesVisible = ref(false);
 
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
@@ -349,6 +351,7 @@ onUnmounted(() => {
   <q-page-sticky :offset="[0, 18]" position="bottom">
     <q-card>
       <q-card-section class="row justify-center gizmo-controls">
+        <q-toggle v-model="areAxisGuidesVisible" label="Show Axes" left-label />
         <q-btn-toggle
           v-model="gizmoMode"
           :aria-label="$t('sceneCanvas.gizmoMode')"
