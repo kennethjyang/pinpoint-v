@@ -1,5 +1,11 @@
-import { Color3, Matrix, TransformNode } from "@babylonjs/core";
-import type { Color4, IMatrixLike, Scene } from "@babylonjs/core";
+import {
+  Color3,
+  Matrix,
+  MeshBuilder,
+  Quaternion,
+  TransformNode
+} from "@babylonjs/core";
+import type { Color4, IMatrixLike, Scene, Vector3 } from "@babylonjs/core";
 import { FontAsset, SdfTextParagraph, TextRenderer } from "@babylonjs/addons";
 import type { INodeLike, ParagraphOptions } from "@babylonjs/addons";
 import axios from "axios";
@@ -110,6 +116,13 @@ const AXIS_GUIDE_SPECS: AxisGuideSpec[] = [
 /** Widest label's width, as a fraction of the atlas's ML length. */
 const AXIS_GUIDE_WIDTH_ML_FRACTION = 0.5;
 
+const AXIS_GUIDE_PICK_MESH_NAME_PREFIX = "axisGuidePick_";
+
+/** Metadata on an axis guide's pick mesh: the direction its label marks. */
+interface AxisGuidePickMetadata {
+  direction: Vector3;
+}
+
 /**
  * Load the MSDF font and create one text renderer per axis, drawn after every
  * frame of the scene. Rejects, leaving nothing behind, if the font definition
@@ -162,7 +175,8 @@ export async function createAxisGuides(scene: Scene): Promise<AxisGuides> {
 }
 
 /**
- * Rebuild the atlas's six axis guide labels, replacing any existing ones.
+ * Rebuild the atlas's six axis guide labels and their pick meshes, replacing
+ * any existing ones.
  * @param scene Scene holding the axis guide root node.
  * @param guides Text renderers and font asset to draw the labels with.
  * @param manifest Manifest supplying the atlas's dimensions.
@@ -191,11 +205,20 @@ export function buildAxisGuides(
       undefined,
       axisGuideMatrix(spec, dimensions, fontSize)
     );
+    buildAxisGuidePickMesh(
+      scene,
+      root,
+      spec,
+      dimensions,
+      fontSize,
+      guides.fontAsset
+    );
   }
 }
 
 /**
- * Remove every axis guide label and the root node they hang from, if built.
+ * Remove every axis guide label and pick mesh, and the root node they hang
+ * from, if built.
  * @param scene Scene to remove the axis guide root node from.
  * @param guides Text renderers to clear the labels from.
  */
@@ -227,6 +250,15 @@ async function createTextRenderer(
 }
 
 /**
+ * Unit world direction the given guide's label sits along.
+ */
+function axisGuideDirection(spec: AxisGuideSpec): Vector3 {
+  const offset: [number, number, number] = [0, 0, 0];
+  offset[AXIS_GUIDE_ASR_INDEX[spec.axis]] = spec.sign;
+  return asrToBabylon(offset);
+}
+
+/**
  * Paragraph world matrix scaling, orienting, and placing one label one atlas
  * dimension along its own signed axis from the scene origin.
  * @param spec Axis guide to place.
@@ -238,10 +270,9 @@ function axisGuideMatrix(
   dimensions: [number, number, number],
   fontSize: number
 ): Matrix {
-  const index = AXIS_GUIDE_ASR_INDEX[spec.axis];
-  const offset: [number, number, number] = [0, 0, 0];
-  offset[index] = spec.sign * dimensions[index];
-  const position = asrToBabylon(offset);
+  const position = axisGuideDirection(spec).scale(
+    dimensions[AXIS_GUIDE_ASR_INDEX[spec.axis]]
+  );
 
   return Matrix.Scaling(fontSize, fontSize, 1)
     .multiply(
@@ -255,22 +286,87 @@ function axisGuideMatrix(
 }
 
 /**
+ * Create one axis guide's invisible pick mesh, covering its label's quad and
+ * carrying the world direction that label marks.
+ * @param scene Scene to create the mesh in.
+ * @param root Axis guide root node to parent the mesh to.
+ * @param spec Axis guide the mesh stands in for.
+ * @param dimensions Atlas dimensions in mm as [ap, dv, ml].
+ * @param fontSize Label em size in mm.
+ * @param fontAsset Font asset the label is measured with.
+ */
+function buildAxisGuidePickMesh(
+  scene: Scene,
+  root: TransformNode,
+  spec: AxisGuideSpec,
+  dimensions: [number, number, number],
+  fontSize: number,
+  fontAsset: FontAsset
+): void {
+  const { width, height } = labelSizeEm(spec.text, fontAsset);
+  const direction = axisGuideDirection(spec);
+  const mesh = MeshBuilder.CreatePlane(
+    `${AXIS_GUIDE_PICK_MESH_NAME_PREFIX}${spec.text}`,
+    { width: width * fontSize, height: height * fontSize },
+    scene
+  );
+  mesh.parent = root;
+  mesh.position = direction.scale(dimensions[AXIS_GUIDE_ASR_INDEX[spec.axis]]);
+  mesh.rotationQuaternion = Quaternion.RotationYawPitchRoll(
+    spec.rotation.yaw,
+    spec.rotation.pitch,
+    spec.rotation.roll
+  );
+  // Never rendered: the label itself is drawn by the text renderer. A custom
+  // pick predicate reaches it regardless of `isVisible`.
+  mesh.isVisible = false;
+  mesh.metadata = { direction } satisfies AxisGuidePickMetadata;
+}
+
+/**
+ * World direction marked by the axis guide label under a screen position, or
+ * null when no label is there.
+ * @param scene Scene holding the axis guide pick meshes.
+ * @param x Horizontal screen position, in canvas pixels.
+ * @param y Vertical screen position, in canvas pixels.
+ */
+export function pickAxisGuideDirection(
+  scene: Scene,
+  x: number,
+  y: number
+): Vector3 | null {
+  const { pickedMesh } = scene.pick(x, y, mesh =>
+    mesh.name.startsWith(AXIS_GUIDE_PICK_MESH_NAME_PREFIX)
+  );
+  const metadata = pickedMesh?.metadata as AxisGuidePickMetadata | undefined;
+  return metadata?.direction ?? null;
+}
+
+/**
  * Em size in mm making the widest label exactly half the atlas's ML length.
  * @param mlLength Atlas ML extent in mm.
  * @param fontAsset Font asset the labels are measured with.
  */
 function axisGuideFontSize(mlLength: number, fontAsset: FontAsset): number {
   const widest = Math.max(
-    ...AXIS_GUIDE_SPECS.map(spec => labelWidthEm(spec.text, fontAsset))
+    ...AXIS_GUIDE_SPECS.map(spec => labelSizeEm(spec.text, fontAsset).width)
   );
   return (mlLength * AXIS_GUIDE_WIDTH_ML_FRACTION) / widest;
 }
 
 /**
- * Width of a label in em, from the same layout engine that renders it.
+ * Width and height of a label in em, from the same layout engine that
+ * renders it.
  * @param text Label text to measure.
  * @param fontAsset Font asset the label is laid out with.
  */
-function labelWidthEm(text: string, fontAsset: FontAsset): number {
-  return new SdfTextParagraph(text, fontAsset).width * fontAsset.scale;
+function labelSizeEm(
+  text: string,
+  fontAsset: FontAsset
+): { width: number; height: number } {
+  const paragraph = new SdfTextParagraph(text, fontAsset);
+  return {
+    width: paragraph.width * fontAsset.scale,
+    height: paragraph.height * fontAsset.scale
+  };
 }

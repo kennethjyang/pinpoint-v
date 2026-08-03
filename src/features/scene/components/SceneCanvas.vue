@@ -43,6 +43,7 @@ import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 import {
   deselectFromPointerDown,
+  orbitCameraFromAxisGuideDoubleTap,
   selectFromSelectedInspectableState
 } from "../api/scene.api";
 import { useNotify } from "@/composable/useNotify";
@@ -197,6 +198,14 @@ watchEffect(() => {
   if (!camera || !manifest || areAtlasComponentsEvaluating) return;
 
   setInitialZoom(camera, manifest);
+});
+
+// Orbit the camera onto an axis guide's axis when its label is double-clicked.
+watch([runtime.scene, runtime.camera], ([scene, camera]) => {
+  if (!scene || !camera) return;
+
+  const observer = orbitCameraFromAxisGuideDoubleTap(scene, camera);
+  onWatcherCleanup(() => observer.remove());
 });
 
 // Clear the scene whenever the atlas changes, but not on the scene's own

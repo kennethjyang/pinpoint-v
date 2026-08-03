@@ -16,6 +16,7 @@ import type {
   Scene,
   SelectionOutlineLayer
 } from "@babylonjs/core";
+import { PointerEventTypes } from "@babylonjs/core";
 import { shallowRef } from "vue";
 import SceneCanvas from "./SceneCanvas.vue";
 import type { FakeTextRenderer } from "@/test/mount-helper";
@@ -215,6 +216,16 @@ async function setAxisGuidesVisible(wrapper: CanvasWrapper, visible: boolean) {
   await flushPromises();
 }
 
+/**
+ * Count the scene's axis guide pick meshes -- the invisible click targets
+ * that let clicking a label orbit the camera onto its axis.
+ * @param scene Scene holding the axis guide pick meshes.
+ */
+function axisGuidePickMeshCount(scene: Scene): number {
+  return scene.meshes.filter(mesh => mesh.name.startsWith("axisGuidePick_"))
+    .length;
+}
+
 describe("SceneCanvas", () => {
   beforeAll(async () => {
     await initializeTestCSG2();
@@ -255,6 +266,20 @@ describe("SceneCanvas", () => {
     expect(runtime.init).toHaveBeenCalledTimes(1);
     const canvasArg = vi.mocked(runtime.init).mock.calls[0]![0];
     expect(canvasArg).toBe(wrapper.find("canvas").element);
+  });
+
+  it("registers exactly one axis guide double-tap observer, and removes it on unmount", async () => {
+    const { wrapper, runtime } = await mountCanvas();
+
+    const observers = () =>
+      runtime.scene.value!.onPointerObservable.observers.filter(
+        observer => observer.mask === PointerEventTypes.POINTERDOUBLETAP
+      );
+    expect(observers()).toHaveLength(1);
+
+    wrapper.unmount();
+
+    expect(observers()).toHaveLength(0);
   });
 
   it("syncs structures built from the manifest, not the atlas", async () => {
@@ -341,16 +366,17 @@ describe("SceneCanvas", () => {
     );
   });
 
-  it("loads no axis guide text renderers while the toggle is off", async () => {
+  it("loads no axis guide text renderers or pick meshes while the toggle is off", async () => {
     const { runtime } = await mountCanvas();
 
     expect(createAxisGuides).not.toHaveBeenCalled();
     expect(
       runtime.scene.value!.getTransformNodeByName("axisGuideRoot_node")
     ).toBeNull();
+    expect(axisGuidePickMeshCount(runtime.scene.value!)).toBe(0);
   });
 
-  it("creates the axis guide text renderers and builds six paragraphs under axisGuideRoot_node when the toggle is switched on", async () => {
+  it("creates the axis guide text renderers and builds six paragraphs and pick meshes under axisGuideRoot_node when the toggle is switched on", async () => {
     const { wrapper, runtime } = await mountCanvas();
     await setAxisGuidesVisible(wrapper, true);
 
@@ -361,6 +387,7 @@ describe("SceneCanvas", () => {
     const root = scene.getTransformNodeByName("axisGuideRoot_node")!;
     expect(root).toBeTruthy();
     expect(root.parent).toBeNull();
+    expect(axisGuidePickMeshCount(scene)).toBe(6);
 
     const guides = (await vi.mocked(createAxisGuides).mock.results[0]!
       .value) as { renderers: Record<"ap" | "dv" | "ml", FakeTextRenderer> };
@@ -370,7 +397,7 @@ describe("SceneCanvas", () => {
     expect(texts).toEqual(["+AP", "-AP", "+DV", "-DV", "+ML", "-ML"]);
   });
 
-  it("clears the labels when switched off and reuses the loaded renderers when switched back on", async () => {
+  it("clears the labels and pick meshes when switched off and reuses the loaded renderers when switched back on", async () => {
     const { wrapper, runtime } = await mountCanvas();
     await setAxisGuidesVisible(wrapper, true);
 
@@ -384,6 +411,7 @@ describe("SceneCanvas", () => {
     await setAxisGuidesVisible(wrapper, false);
 
     expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeNull();
+    expect(axisGuidePickMeshCount(scene)).toBe(0);
     for (const renderer of Object.values(guides.renderers)) {
       expect(renderer.paragraphs).toHaveLength(0);
       expect(renderer.parent).toBeNull();
@@ -394,6 +422,7 @@ describe("SceneCanvas", () => {
 
     expect(createAxisGuides).toHaveBeenCalledTimes(1);
     expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeTruthy();
+    expect(axisGuidePickMeshCount(scene)).toBe(6);
     expect(
       Object.values(guides.renderers).flatMap(renderer =>
         renderer.paragraphs.map(paragraph => paragraph.text)
