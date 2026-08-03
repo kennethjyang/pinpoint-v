@@ -3,9 +3,12 @@ import { computed, toRef, useTemplateRef } from "vue";
 import { useDevicePixelRatio, useElementSize } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import type { Probe, ProbeContour } from "@/features/probe";
+import { getProbeContactOutlines } from "@/features/probe";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { getProbeFrame } from "../api/probe-frame.api";
 import {
+  getContactOutlinePath,
+  getContourPolygonPoints,
   getContourSizePixels,
   getContourSlicePlane
 } from "../api/slice-plane.api";
@@ -43,6 +46,30 @@ const { createStream } = useAnnotationSampler({
 });
 const { result } = createStream(plane);
 
+/** Height the sampled plane is centered on, matching `getContourSlicePlane`. */
+const centerHeightMillimeters = computed(() => contour.heightMillimeters / 2);
+
+/** viewBox spanning the contour's full extent, centered like the sampled plane. */
+const viewBox = computed(
+  () =>
+    `${-contour.widthMillimeters / 2} ${-centerHeightMillimeters.value} ${contour.widthMillimeters} ${contour.heightMillimeters}`
+);
+
+const contourPoints = computed(() =>
+  getContourPolygonPoints(contour, centerHeightMillimeters.value)
+);
+
+/** Contact outlines as one SVG path, empty when the definition has none. */
+const contactsPath = computed(() => {
+  const definition =
+    currentExperiment.probeInterfaceProbes[probe.probeInterfaceIdentifier];
+  if (!definition) return "";
+  return getContactOutlinePath(
+    getProbeContactOutlines(definition, contour.origin),
+    centerHeightMillimeters.value
+  );
+});
+
 useSliceCanvasPainter(
   canvas,
   result,
@@ -51,15 +78,55 @@ useSliceCanvasPainter(
 </script>
 
 <template>
-  <canvas
-    ref="canvas"
-    class="fit channel-map-canvas"
-    role="img"
-    :aria-label="t('slice.channelMap', { name: probe.name })"
-  />
+  <div class="fit relative-position channel-map-canvas">
+    <canvas
+      ref="canvas"
+      class="fit channel-map-canvas__canvas"
+      role="img"
+      :aria-label="t('slice.channelMap', { name: probe.name })"
+    />
+    <svg
+      class="fit absolute-top channel-map-canvas__overlay"
+      :viewBox="viewBox"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polygon :points="contourPoints" class="channel-map-canvas__contour" />
+      <path
+        v-if="contactsPath"
+        :d="contactsPath"
+        class="channel-map-canvas__contacts"
+      />
+    </svg>
+  </div>
 </template>
 
 <style lang="sass" scoped>
 .channel-map-canvas
-  display: block
+  &__canvas
+    display: block
+
+  &__overlay
+    pointer-events: none
+
+  &__contour
+    fill: none
+    stroke: $dark
+    stroke-opacity: 0.6
+    stroke-width: 1
+    vector-effect: non-scaling-stroke
+
+  &__contacts
+    fill: none
+    stroke: $dark
+    stroke-opacity: 0.6
+    stroke-width: 1
+    vector-effect: non-scaling-stroke
+
+body.body--dark
+  .channel-map-canvas__contour
+    stroke: #fff
+
+  .channel-map-canvas__contacts
+    stroke: #fff
 </style>

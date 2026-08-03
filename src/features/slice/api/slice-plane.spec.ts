@@ -10,6 +10,7 @@ import {
   clampSliceCenterHeight,
   clampSliceExtent,
   formatSliceExtentMillimeters,
+  getContactOutlinePath,
   getContourPolygonPoints,
   getContourSizePixels,
   getContourSlicePlane,
@@ -305,6 +306,73 @@ describe("getContourPolygonPoints", () => {
     expect(getContourPolygonPoints(contour, 0)).toBe(
       contour.points.map(({ x, y }) => `${x},${-y}`).join(" ")
     );
+  });
+});
+
+describe("getContactOutlinePath", () => {
+  it("builds one closed polygon subpath, y-flipped about the given center height", () => {
+    const path = getContactOutlinePath(
+      [
+        {
+          kind: "polygon",
+          points: [
+            { x: -1, y: 3 },
+            { x: -1, y: 5 },
+            { x: 1, y: 5 },
+            { x: 1, y: 3 }
+          ]
+        }
+      ],
+      0
+    );
+
+    expect(path).toBe("M-1,-3L-1,-5L1,-5L1,-3Z");
+  });
+
+  it("builds one closed circle subpath as two semicircular arcs", () => {
+    const path = getContactOutlinePath(
+      [{ kind: "circle", center: { x: 0, y: 4 }, radiusMillimeters: 2 }],
+      0
+    );
+
+    expect(path).toBe("M-2,-4A2,2 0 0,1 2,-4A2,2 0 0,1 -2,-4Z");
+  });
+
+  it("joins multiple outlines with a single space", () => {
+    const path = getContactOutlinePath(
+      [
+        { kind: "circle", center: { x: 0, y: 0 }, radiusMillimeters: 1 },
+        { kind: "circle", center: { x: 2, y: 0 }, radiusMillimeters: 1 }
+      ],
+      0
+    );
+
+    expect(path).toBe(
+      "M-1,0A1,1 0 0,1 1,0A1,1 0 0,1 -1,0Z M1,0A1,1 0 0,1 3,0A1,1 0 0,1 1,0Z"
+    );
+  });
+
+  it("returns an empty string for no outlines", () => {
+    expect(getContactOutlinePath([], 0)).toBe("");
+  });
+
+  it("flips the polygon about a nonzero center height", () => {
+    const path = getContactOutlinePath(
+      [
+        {
+          kind: "polygon",
+          points: [
+            { x: -1, y: 3 },
+            { x: -1, y: 5 },
+            { x: 1, y: 5 },
+            { x: 1, y: 3 }
+          ]
+        }
+      ],
+      5
+    );
+
+    expect(path.startsWith("M-1,2")).toBe(true);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { Manifest } from "@/features/atlas";
 import { getAtlasLongestDimensionMillimeters } from "@/features/atlas";
-import type { ProbeContour } from "@/features/probe";
+import type { ProbeContactOutline, ProbeContour } from "@/features/probe";
 import { clamp } from "@/utils/math";
 import type { SampleGeometry } from "../models/sample-geometry.model";
 import type { ProbeFrame } from "./probe-frame.api";
@@ -200,6 +200,59 @@ export function getContourPolygonPoints(
   return contour.points
     .map(({ x, y }) => `${x},${centerHeightMillimeters - y}`)
     .join(" ");
+}
+
+/**
+ * Build the SVG path `d` for a contact overlay, re-origined on the slice
+ * center height. Empty when there are no outlines.
+ * @param outlines Contact outlines to render, in probe-local mm.
+ * @param centerHeightMillimeters Height the slice is centered on, in probe-local mm.
+ */
+export function getContactOutlinePath(
+  outlines: ProbeContactOutline[],
+  centerHeightMillimeters: number
+): string {
+  return outlines
+    .map(outline =>
+      outline.kind === "polygon"
+        ? getPolygonSubpath(outline.points, centerHeightMillimeters)
+        : getCircleSubpath(
+            outline.center,
+            outline.radiusMillimeters,
+            centerHeightMillimeters
+          )
+    )
+    .join(" ");
+}
+
+/**
+ * Build one closed polygon subpath, y-flipped about the slice center height.
+ * @param points Polygon vertices, in probe-local mm.
+ * @param centerHeightMillimeters Height the slice is centered on, in probe-local mm.
+ */
+function getPolygonSubpath(
+  points: { x: number; y: number }[],
+  centerHeightMillimeters: number
+): string {
+  return `M${points.map(({ x, y }) => `${x},${centerHeightMillimeters - y}`).join("L")}Z`;
+}
+
+/**
+ * Build one closed circle subpath as two semicircular arcs, y-flipped about
+ * the slice center height.
+ * @param center Circle center, in probe-local mm.
+ * @param radiusMillimeters Circle radius, in mm.
+ * @param centerHeightMillimeters Height the slice is centered on, in probe-local mm.
+ */
+function getCircleSubpath(
+  center: { x: number; y: number },
+  radiusMillimeters: number,
+  centerHeightMillimeters: number
+): string {
+  const cy = centerHeightMillimeters - center.y;
+  const left = center.x - radiusMillimeters;
+  const right = center.x + radiusMillimeters;
+  return `M${left},${cy}A${radiusMillimeters},${radiusMillimeters} 0 0,1 ${right},${cy}A${radiusMillimeters},${radiusMillimeters} 0 0,1 ${left},${cy}Z`;
 }
 
 /**

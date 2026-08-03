@@ -6,7 +6,8 @@ import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
-import { getProbeContour } from "@/features/probe";
+import { internProbeInterfaceProbe } from "@/features/experiment";
+import { getProbeContour, getProbeInterfaceIdentifier } from "@/features/probe";
 import { getProbeFrame, toAtlasMillimeters } from "../api/probe-frame.api";
 import type { SampleGeometry } from "../models/sample-geometry.model";
 import type { SampleResult } from "../models/sample-result.model";
@@ -83,13 +84,25 @@ describe("ChannelMapCanvas", () => {
     setActivePinia(pinia);
     const store = useCurrentExperimentStore(pinia);
 
-    const contour = getProbeContour(
-      makeProbeInterfaceProbe({
-        si_units: "mm",
-        probe_planar_contour: SINGLE_SHANK_CONTOUR
-      })
-    )!;
-    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
+    const probeInterfaceProbe = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: SINGLE_SHANK_CONTOUR,
+      contact_positions: [
+        [0, 1],
+        [0, 2]
+      ],
+      contact_shapes: ["square", "square"],
+      contact_shape_params: [{ width: 0.02 }, { width: 0.02 }]
+    });
+    internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
+    const contour = getProbeContour(probeInterfaceProbe)!;
+    const probe = makeProbe({
+      probeInterfaceIdentifier:
+        getProbeInterfaceIdentifier(probeInterfaceProbe),
+      tipPosition: [0, 0, 0],
+      rotation: [0, 0, 0]
+    });
+    store.experiment.probes = [probe];
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
@@ -123,5 +136,56 @@ describe("ChannelMapCanvas", () => {
     const canvas = wrapper.find("canvas").element as HTMLCanvasElement;
     expect(canvas.width).toBe(4);
     expect(canvas.height).toBe(576);
+  });
+
+  it("draws the contour and contact overlay from the interned definition", () => {
+    const { wrapper, contour } = mountCanvas();
+
+    const svg = wrapper.find(".channel-map-canvas__overlay");
+    expect(svg.attributes("viewBox")).toBe("-0.035 -5 0.07 10");
+
+    const polygon = wrapper.find("polygon");
+    const points = polygon
+      .attributes("points")!
+      .trim()
+      .split(" ")
+      .map(pair => pair.split(",").map(Number));
+    expect(points).toEqual([
+      [-0.035, 5],
+      [0.035, 5],
+      [0.035, -5],
+      [-0.035, -5]
+    ]);
+    expect(contour.widthMillimeters).toBeCloseTo(0.07);
+
+    const path = wrapper.find("path");
+    expect(path.exists()).toBe(true);
+    const d = path.attributes("d")!;
+    expect(d.startsWith("M")).toBe(true);
+    expect(d.match(/Z/g)).toHaveLength(2);
+  });
+
+  it("renders no contact path when the probe's definition isn't interned", () => {
+    vi.mocked(getManifest).mockResolvedValue(null);
+    vi.mocked(getTerminologyRows).mockResolvedValue([]);
+
+    const pinia = createPinia();
+    setActivePinia(pinia);
+
+    const contour = getProbeContour(
+      makeProbeInterfaceProbe({
+        si_units: "mm",
+        probe_planar_contour: SINGLE_SHANK_CONTOUR
+      })
+    )!;
+    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
+
+    const wrapper = mountWithQuasar(ChannelMapCanvas, {
+      pinia,
+      props: { probe, contour }
+    });
+
+    expect(wrapper.find("polygon").exists()).toBe(true);
+    expect(wrapper.find("path").exists()).toBe(false);
   });
 });
