@@ -117,7 +117,7 @@ watch(atlas, async (newAtlas, oldAtlas) => {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="experiment-properties">
-      <q-card-section class="q-gutter-y-md">
+      <q-card-section class="q-gutter-y-md experiment-properties__content">
         <p class="text-h5">{{ $t("experimentProperties.title") }}</p>
 
         <q-input
@@ -178,4 +178,12 @@ watch(atlas, async (newAtlas, oldAtlas) => {
 .experiment-properties
   min-width: 30vw
   width: fit-content
+  display: flex
+  flex-direction: column
+  overflow: hidden
+
+.experiment-properties__content
+  flex: 1 1 auto
+  min-height: 0
+  overflow-y: auto
 </style>

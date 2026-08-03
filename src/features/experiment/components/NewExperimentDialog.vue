@@ -57,7 +57,7 @@ async function create() {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="new-experiment">
-      <q-card-section class="q-gutter-y-md">
+      <q-card-section class="q-gutter-y-md new-experiment__content">
         <p class="text-h5">{{ $t("newExperiment.title") }}</p>
 
         <q-input
@@ -94,4 +94,12 @@ async function create() {
 .new-experiment
   min-width: 25vw
   width: fit-content
+  display: flex
+  flex-direction: column
+  overflow: hidden
+
+.new-experiment__content
+  flex: 1 1 auto
+  min-height: 0
+  overflow-y: auto
 </style>
