@@ -17,10 +17,13 @@ export function useSliceCanvasPainter(
 ): void {
   /** Id of the probe the canvas currently holds a painted (or in-progress) image for. */
   let paintedProbeId: string | null = null;
+  /** Whether the canvas currently holds a fully painted image. */
+  let hasCompleteImage = false;
 
   function clearCanvas(): void {
     const element = canvas.value;
     paintedProbeId = null;
+    hasCompleteImage = false;
     if (!element) return;
 
     const context = element.getContext("2d");
@@ -28,9 +31,9 @@ export function useSliceCanvasPainter(
   }
 
   /**
-   * Paint the current result, unless it's a partial update at a resolution
-   * the canvas already holds a complete image for and the same probe -
-   * preserving that image avoids a flicker to empty between geometry updates.
+   * Paint the current result, unless it's a partial update and the canvas
+   * already holds a complete image for the same probe - preserving that
+   * image avoids a flicker to empty between geometry updates.
    */
   function drawSlice(): void {
     const element = canvas.value;
@@ -38,11 +41,14 @@ export function useSliceCanvasPainter(
     if (!element || !slice) return;
 
     const { widthPixels, heightPixels } = slice;
-    const isCanvasCurrent =
-      element.width === widthPixels &&
-      element.height === heightPixels &&
-      paintedProbeId === probeId.value;
-    if (isCanvasCurrent && !isSampleResultComplete(slice)) return;
+    const isComplete = isSampleResultComplete(slice);
+    // A partial update is skipped whenever the canvas already holds a complete
+    // image for this probe, at any resolution - so the image held during
+    // movement stays up until its replacement finishes instead of flashing
+    // empty when the sampling resolution changes.
+    if (hasCompleteImage && paintedProbeId === probeId.value && !isComplete) {
+      return;
+    }
 
     if (element.width !== widthPixels || element.height !== heightPixels) {
       element.width = widthPixels;
@@ -57,6 +63,7 @@ export function useSliceCanvasPainter(
       0
     );
     paintedProbeId = probeId.value;
+    hasCompleteImage = isComplete;
   }
 
   // `flush: "post"` and the `onMounted` call both exist for the same reason:

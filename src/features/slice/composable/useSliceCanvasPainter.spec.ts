@@ -97,6 +97,32 @@ describe("useSliceCanvasPainter", () => {
     unmount();
   });
 
+  it("holds the last complete image while a lower-resolution result is still partial", async () => {
+    const canvas = ref(makeCanvasStub());
+    const result = ref<SampleResult | null>(makeResult(4));
+    const probeId = ref("probe-a");
+    const { unmount } = mountWithPainter(canvas, result, probeId);
+    await nextTick();
+
+    const paintedBefore = canvas.value.context.putImageData.mock.calls.length;
+    result.value = makeResult(2, { paintedChunkCount: 1, totalChunkCount: 3 });
+    await nextTick();
+
+    expect(canvas.value.context.putImageData.mock.calls.length).toBe(
+      paintedBefore
+    );
+    expect(canvas.value.width).toBe(4);
+
+    result.value = makeResult(2);
+    await nextTick();
+
+    expect(canvas.value.context.putImageData.mock.calls.length).toBe(
+      paintedBefore + 1
+    );
+    expect(canvas.value.width).toBe(2);
+    unmount();
+  });
+
   it("clears the canvas when the result becomes null", async () => {
     const canvas = ref(makeCanvasStub());
     const result = ref<SampleResult | null>(makeResult(2));
