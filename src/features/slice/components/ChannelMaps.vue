@@ -20,17 +20,17 @@ const zoomStyles: Record<ChannelMapsZoom, ZoomStyles> = {
   small: {
     header: "column flex-center",
     name: "text-caption",
-    canvasHeight: "20vh"
+    canvasHeight: "15vh"
   },
   medium: {
     header: "row q-gutter-x-sm no-wrap items-center",
     name: "text-body2",
-    canvasHeight: "50vh"
+    canvasHeight: "30vh"
   },
   large: {
     header: "row q-gutter-x-sm no-wrap",
     name: "text-body1",
-    canvasHeight: "80vh"
+    canvasHeight: "70vh"
   }
 };
 
