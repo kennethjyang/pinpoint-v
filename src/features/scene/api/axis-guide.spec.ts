@@ -9,7 +9,7 @@ import {
 } from "@/test/mount-helper";
 import { makeManifest } from "@/test/fixtures";
 import type { AxisGuideAxis, AxisGuides } from "./axis-guide.api";
-import { buildAxisGuides } from "./axis-guide.api";
+import { buildAxisGuides, clearAxisGuides } from "./axis-guide.api";
 
 /**
  * Assert two Babylon vectors are componentwise close, tolerating float
@@ -232,5 +232,35 @@ describe("buildAxisGuides", () => {
       expect(renderer.paragraphs).toHaveLength(0);
       expect(renderer.parent).toBeNull();
     }
+  });
+});
+
+describe("clearAxisGuides", () => {
+  it("removes the root node and every label, leaving the renderers reusable", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+    buildAxisGuides(scene, guides, makeManifest());
+
+    clearAxisGuides(scene, guides);
+
+    expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeNull();
+    for (const renderer of Object.values(renderers)) {
+      expect(renderer.paragraphs).toHaveLength(0);
+      expect(renderer.parent).toBeNull();
+    }
+
+    buildAxisGuides(scene, guides, makeManifest());
+    expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeTruthy();
+    for (const renderer of Object.values(renderers)) {
+      expect(renderer.paragraphs).toHaveLength(2);
+    }
+  });
+
+  it("is a no-op when no guides were built", () => {
+    const scene = makeTestScene();
+    const { guides } = makeTestAxisGuides(scene);
+
+    expect(() => clearAxisGuides(scene, guides)).not.toThrow();
+    expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeNull();
   });
 });

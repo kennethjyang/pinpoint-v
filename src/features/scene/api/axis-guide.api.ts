@@ -172,7 +172,7 @@ export function buildAxisGuides(
   guides: AxisGuides,
   manifest: Manifest
 ): void {
-  removeAxisGuides(scene, guides);
+  clearAxisGuides(scene, guides);
 
   const dimensions = getAtlasDimensionsMillimeters(manifest);
   const mlLength = dimensions[AXIS_GUIDE_ASR_INDEX.ml];
@@ -195,6 +195,19 @@ export function buildAxisGuides(
 }
 
 /**
+ * Remove every axis guide label and the root node they hang from, if built.
+ * @param scene Scene to remove the axis guide root node from.
+ * @param guides Text renderers to clear the labels from.
+ */
+export function clearAxisGuides(scene: Scene, guides: AxisGuides): void {
+  scene.getTransformNodeByName(AXIS_GUIDE_ROOT_NODE_NAME)?.dispose();
+  for (const renderer of Object.values(guides.renderers)) {
+    renderer.clearParagraphs();
+    renderer.parent = null;
+  }
+}
+
+/**
  * Create one colored MSDF text renderer.
  * @param scene Scene supplying the engine the renderer compiles against.
  * @param fontAsset Font asset the renderer draws with.
@@ -211,19 +224,6 @@ async function createTextRenderer(
   );
   renderer.color = color;
   return renderer;
-}
-
-/**
- * Dispose the axis guide root node and clear every label, if built.
- * @param scene Scene to remove the axis guide root node from.
- * @param guides Text renderers to clear the labels from.
- */
-function removeAxisGuides(scene: Scene, guides: AxisGuides): void {
-  scene.getTransformNodeByName(AXIS_GUIDE_ROOT_NODE_NAME)?.dispose();
-  for (const renderer of Object.values(guides.renderers)) {
-    renderer.clearParagraphs();
-    renderer.parent = null;
-  }
 }
 
 /**
