@@ -17,7 +17,11 @@ import {
   syncStructuresVisibility
 } from "../api/structures.api";
 import type { AxisGuides } from "../api/axis-guide.api";
-import { buildAxisGuides, createAxisGuides } from "../api/axis-guide.api";
+import {
+  buildAxisGuides,
+  clearAxisGuides,
+  createAxisGuides
+} from "../api/axis-guide.api";
 import { setInitialZoom } from "../api/camera.api";
 import type { StructureEntity } from "@/features/atlas";
 import {
@@ -57,7 +61,10 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
  */
 const isLoadingStructures = ref(false);
 
-/** Axis guide text renderers, created once per scene. */
+/**
+ * Axis guide text renderers, created for the current scene the first time
+ * the guides are shown.
+ */
 const axisGuides = shallowRef<AxisGuides | null>(null);
 
 const areAxisGuidesVisible = ref(false);
@@ -135,19 +142,24 @@ watchEffect(() => {
   setAtlasCenterOffset(scene, getAtlasCenter(manifest));
 });
 
-// Create the axis guide text renderers whenever the scene is replaced.
+// Axis guide renderers belong to the scene that created them.
+watch(runtime.scene, () => {
+  axisGuides.value?.dispose();
+  axisGuides.value = null;
+});
+
+// Create the axis guide text renderers the first time they are shown: the
+// MSDF font is fetched remotely, so hidden guides load nothing.
 watch(
-  runtime.scene,
-  async scene => {
-    const previous = axisGuides.value;
-    axisGuides.value = null;
-    previous?.dispose();
-    if (!scene) return;
+  [runtime.scene, areAxisGuidesVisible],
+  async ([scene, isVisible]) => {
+    if (!scene || !isVisible || axisGuides.value) return;
 
     try {
       const guides = await createAxisGuides(scene);
-      // The scene can be replaced or disposed while the font loads.
-      if (runtime.scene.value !== scene) {
+      // The scene can be replaced, or another creation can win, while the
+      // font loads.
+      if (runtime.scene.value !== scene || axisGuides.value) {
         guides.dispose();
         return;
       }
@@ -162,13 +174,19 @@ watch(
   { immediate: true }
 );
 
-// Rebuild the axis guide labels whenever the atlas changes.
+// Draw the atlas's axis guide labels while they are shown, and strip them
+// when hidden, keeping the loaded renderers for the next time.
 watchEffect(() => {
   const scene = runtime.scene.value;
   const guides = axisGuides.value;
   const { manifest } = currentExperiment;
-  if (!scene || !guides || !manifest || currentExperiment.isManifestEvaluating)
+  if (!scene || !guides) return;
+
+  if (!areAxisGuidesVisible.value) {
+    clearAxisGuides(scene, guides);
     return;
+  }
+  if (!manifest || currentExperiment.isManifestEvaluating) return;
 
   buildAxisGuides(scene, guides, manifest);
 });
@@ -360,7 +378,11 @@ onUnmounted(() => {
   <q-page-sticky :offset="[0, 18]" position="bottom">
     <q-card>
       <q-card-section class="row justify-center gizmo-controls">
-        <q-toggle v-model="areAxisGuidesVisible" label="Show Axes" left-label />
+        <q-toggle
+          v-model="areAxisGuidesVisible"
+          :label="$t('sceneCanvas.showAxisGuides')"
+          left-label
+        />
         <q-btn-toggle
           v-model="gizmoMode"
           :aria-label="$t('sceneCanvas.gizmoMode')"

@@ -175,7 +175,8 @@ export async function createAxisGuides(scene: Scene): Promise<AxisGuides> {
 }
 
 /**
- * Rebuild the atlas's six axis guide labels, replacing any existing ones.
+ * Rebuild the atlas's six axis guide labels and their pick meshes, replacing
+ * any existing ones.
  * @param scene Scene holding the axis guide root node.
  * @param guides Text renderers and font asset to draw the labels with.
  * @param manifest Manifest supplying the atlas's dimensions.
@@ -185,7 +186,7 @@ export function buildAxisGuides(
   guides: AxisGuides,
   manifest: Manifest
 ): void {
-  removeAxisGuides(scene, guides);
+  clearAxisGuides(scene, guides);
 
   const dimensions = getAtlasDimensionsMillimeters(manifest);
   const mlLength = dimensions[AXIS_GUIDE_ASR_INDEX.ml];
@@ -216,6 +217,20 @@ export function buildAxisGuides(
 }
 
 /**
+ * Remove every axis guide label and pick mesh, and the root node they hang
+ * from, if built.
+ * @param scene Scene to remove the axis guide root node from.
+ * @param guides Text renderers to clear the labels from.
+ */
+export function clearAxisGuides(scene: Scene, guides: AxisGuides): void {
+  scene.getTransformNodeByName(AXIS_GUIDE_ROOT_NODE_NAME)?.dispose();
+  for (const renderer of Object.values(guides.renderers)) {
+    renderer.clearParagraphs();
+    renderer.parent = null;
+  }
+}
+
+/**
  * Create one colored MSDF text renderer.
  * @param scene Scene supplying the engine the renderer compiles against.
  * @param fontAsset Font asset the renderer draws with.
@@ -235,19 +250,8 @@ async function createTextRenderer(
 }
 
 /**
- * Dispose the axis guide root node and clear every label, if built.
- * @param scene Scene to remove the axis guide root node from.
- * @param guides Text renderers to clear the labels from.
+ * Unit world direction the given guide's label sits along.
  */
-function removeAxisGuides(scene: Scene, guides: AxisGuides): void {
-  scene.getTransformNodeByName(AXIS_GUIDE_ROOT_NODE_NAME)?.dispose();
-  for (const renderer of Object.values(guides.renderers)) {
-    renderer.clearParagraphs();
-    renderer.parent = null;
-  }
-}
-
-/** Unit world direction the given guide's label sits along. */
 function axisGuideDirection(spec: AxisGuideSpec): Vector3 {
   const offset: [number, number, number] = [0, 0, 0];
   offset[AXIS_GUIDE_ASR_INDEX[spec.axis]] = spec.sign;

@@ -70,6 +70,7 @@ export default {
     problemLoadingAxisGuides:
       "There was a problem loading the axis guide labels.",
     axisGuidesUnavailable: "The atlas axis labels won't be shown.",
+    showAxisGuides: "Show Axes",
     gizmoMode: "Transform mode",
     gizmoPosition: "Position",
     gizmoRotation: "Rotation",
