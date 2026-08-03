@@ -298,9 +298,9 @@ onUnmounted(() => {
     />
   </div>
   <q-resize-observer @resize="onResize" />
-  <q-dialog v-model="isInspectableSelected" position="bottom" seamless>
-    <q-card>
-      <q-card-section class="row q-gutter-x-md">
+  <q-page-sticky :offset="[0, 18]" position="bottom">
+    <q-card v-if="isInspectableSelected">
+      <q-card-section class="row justify-center q-gutter-x-md">
         <q-btn-toggle
           v-model="enabledGizmo"
           :options="[
@@ -327,13 +327,12 @@ onUnmounted(() => {
         />
       </q-card-section>
     </q-card>
-  </q-dialog>
+  </q-page-sticky>
 </template>
 
-<style scoped>
-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+<style lang="sass" scoped>
+canvas
+  display: block
+  width: 100%
+  height: 100%
 </style>
