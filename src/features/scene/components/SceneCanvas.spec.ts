@@ -279,6 +279,18 @@ describe("SceneCanvas", () => {
     );
   });
 
+  it("builds six axis guide labels under axisGuideRoot_node once the manifest resolves", async () => {
+    const { runtime } = await mountCanvas();
+
+    const scene = runtime.scene.value!;
+    const root = scene.getTransformNodeByName("axisGuideRoot_node")!;
+    expect(root).toBeTruthy();
+    const guideMeshes = scene.meshes.filter(
+      mesh => mesh.parent === root && mesh.name.endsWith("_axisGuide_mesh")
+    );
+    expect(guideMeshes).toHaveLength(6);
+  });
+
   it("re-offsets when the experiment's atlas changes", async () => {
     await mountCanvas();
     vi.mocked(setAtlasCenterOffset).mockClear();

@@ -15,6 +15,7 @@ import {
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
+import { buildAxisGuides } from "../api/axis-guide.api";
 import { setInitialZoom } from "../api/camera.api";
 import type { StructureEntity } from "@/features/atlas";
 import {
@@ -124,6 +125,15 @@ watchEffect(() => {
   if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
 
   setAtlasCenterOffset(scene, getAtlasCenter(manifest));
+});
+
+// Rebuild the axis guide labels whenever the atlas changes.
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  const { manifest } = currentExperiment;
+  if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
+
+  buildAxisGuides(scene, manifest);
 });
 
 // Set the camera's initial zoom relative to the AP length of the atlas.
