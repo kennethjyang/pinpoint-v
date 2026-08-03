@@ -96,6 +96,7 @@ const channelMaps = computed(() =>
     })
   }))
 );
+const test = ref({ min: 0, max: 50 });
 </script>
 
 <template>
@@ -126,23 +127,26 @@ const channelMaps = computed(() =>
         </q-card-section>
         <q-separator />
         <q-card-section class="flex flex-center q-pa-sm">
-          <q-intersection
-            v-if="shanks.length"
-            class="channel-maps__viewport"
-            :style="{ height: styles.canvasHeight, aspectRatio }"
-          >
-            <ChannelMapCanvas
-              :probe="probe"
-              :shanks="shanks"
-              :height-millimeters="heightMillimeters"
-            />
-          </q-intersection>
-          <div
-            v-else
-            class="flex flex-center text-caption text-weight-light channel-maps__no-contour"
-            :style="{ height: styles.canvasHeight }"
-          >
-            {{ t("slice.noContour") }}
+          <div class="row">
+            <q-range v-model="test" :max="50" :min="0" label reverse vertical />
+            <q-intersection
+              v-if="shanks.length"
+              :style="{ height: styles.canvasHeight, aspectRatio }"
+              class="channel-maps__viewport"
+            >
+              <ChannelMapCanvas
+                :height-millimeters="heightMillimeters"
+                :probe="probe"
+                :shanks="shanks"
+              />
+            </q-intersection>
+            <div
+              v-else
+              :style="{ height: styles.canvasHeight }"
+              class="flex flex-center text-caption text-weight-light channel-maps__no-contour"
+            >
+              {{ t("slice.noContour") }}
+            </div>
           </div>
         </q-card-section>
       </q-card>
