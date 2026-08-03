@@ -18,9 +18,13 @@ import type {
 } from "@babylonjs/core";
 import { shallowRef } from "vue";
 import SceneCanvas from "./SceneCanvas.vue";
+import type { FakeTextRenderer } from "@/test/mount-helper";
+import type * as MountHelper from "@/test/mount-helper";
 import {
   createWrapperRegistry,
   initializeTestCSG2,
+  makeFakeTextRenderer,
+  makeTestFontAsset,
   makeTestSceneWithGizmo,
   mountWithQuasar
 } from "@/test/mount-helper";
@@ -31,6 +35,8 @@ import {
   syncStructuresVisibility
 } from "../api/structures.api";
 import { setInitialZoom } from "../api/camera.api";
+import { createAxisGuides } from "../api/axis-guide.api";
+import type * as AxisGuideApi from "../api/axis-guide.api";
 import {
   getAtlasCenter,
   getManifest,
@@ -74,6 +80,27 @@ vi.mock("../api/camera.api", async () => {
       "../api/camera.api"
     );
   return { ...actual, setInitialZoom: vi.fn() };
+});
+
+vi.mock("../api/axis-guide.api", async () => {
+  const actual = await vi.importActual<typeof AxisGuideApi>(
+    "../api/axis-guide.api"
+  );
+  const { makeFakeTextRenderer: makeFake, makeTestFontAsset: makeFontAsset } =
+    await vi.importActual<typeof MountHelper>("@/test/mount-helper");
+
+  return {
+    ...actual,
+    createAxisGuides: vi.fn(async (scene: Scene) => ({
+      renderers: {
+        ap: makeFake(),
+        dv: makeFake(),
+        ml: makeFake()
+      },
+      fontAsset: makeFontAsset(scene),
+      dispose: vi.fn()
+    }))
+  };
 });
 
 // `useCurrentExperimentStore`'s `manifest` and `terminologyRows` are
@@ -181,6 +208,16 @@ describe("SceneCanvas", () => {
     vi.mocked(setAtlasCenterOffset).mockReset();
     vi.mocked(removeAllStructures).mockReset();
     vi.mocked(setInitialZoom).mockReset();
+    vi.mocked(createAxisGuides).mockReset();
+    vi.mocked(createAxisGuides).mockImplementation(async scene => ({
+      renderers: {
+        ap: makeFakeTextRenderer(),
+        dv: makeFakeTextRenderer(),
+        ml: makeFakeTextRenderer()
+      },
+      fontAsset: makeTestFontAsset(scene),
+      dispose: vi.fn()
+    }));
   });
 
   afterEach(() => {
@@ -279,16 +316,23 @@ describe("SceneCanvas", () => {
     );
   });
 
-  it("builds six axis guide labels under axisGuideRoot_node once the manifest resolves", async () => {
+  it("creates the axis guide text renderers and builds six paragraphs under axisGuideRoot_node once the manifest resolves", async () => {
     const { runtime } = await mountCanvas();
+
+    expect(createAxisGuides).toHaveBeenCalledTimes(1);
+    expect(createAxisGuides).toHaveBeenCalledWith(runtime.scene.value);
 
     const scene = runtime.scene.value!;
     const root = scene.getTransformNodeByName("axisGuideRoot_node")!;
     expect(root).toBeTruthy();
-    const guideMeshes = scene.meshes.filter(
-      mesh => mesh.parent === root && mesh.name.endsWith("_axisGuide_mesh")
+    expect(root.parent).toBeNull();
+
+    const guides = (await vi.mocked(createAxisGuides).mock.results[0]!
+      .value) as { renderers: Record<"ap" | "dv" | "ml", FakeTextRenderer> };
+    const texts = Object.values(guides.renderers).flatMap(renderer =>
+      renderer.paragraphs.map(paragraph => paragraph.text)
     );
-    expect(guideMeshes).toHaveLength(6);
+    expect(texts).toEqual(["+AP", "-AP", "+DV", "-DV", "+ML", "-ML"]);
   });
 
   it("re-offsets when the experiment's atlas changes", async () => {
@@ -379,6 +423,36 @@ describe("SceneCanvas", () => {
     wrapper.unmount();
 
     expect(runtime.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disposes the axis guide text renderers on unmount", async () => {
+    const { wrapper } = await mountCanvas();
+
+    const guides = (await vi.mocked(createAxisGuides).mock.results[0]!
+      .value) as { dispose: () => void };
+
+    wrapper.unmount();
+
+    expect(guides.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns and draws no axis guides when the text renderers fail to load", async () => {
+    const { promise, reject } =
+      Promise.withResolvers<AxisGuideApi.AxisGuides>();
+    vi.mocked(createAxisGuides).mockReturnValue(promise);
+
+    const { wrapper, runtime } = await mountCanvas();
+    const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+    reject(new Error("font load failed"));
+    await flushPromises();
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ color: "warning" })
+    );
+    expect(
+      runtime.scene.value!.getTransformNodeByName("axisGuideRoot_node")
+    ).toBeNull();
   });
 
   it(

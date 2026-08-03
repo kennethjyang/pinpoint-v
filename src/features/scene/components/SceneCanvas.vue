@@ -5,6 +5,7 @@ import {
   onUnmounted,
   onWatcherCleanup,
   ref,
+  shallowRef,
   useTemplateRef,
   watch,
   watchEffect
@@ -15,7 +16,8 @@ import {
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
-import { buildAxisGuides } from "../api/axis-guide.api";
+import { buildAxisGuides, createAxisGuides } from "../api/axis-guide.api";
+import type { AxisGuides } from "../api/axis-guide.api";
 import { setInitialZoom } from "../api/camera.api";
 import type { StructureEntity } from "@/features/atlas";
 import {
@@ -53,6 +55,9 @@ const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
  * loading bar overlaid on the canvas.
  */
 const isLoadingStructures = ref(false);
+
+/** Axis guide text renderers, created once per scene. */
+const axisGuides = shallowRef<AxisGuides | null>(null);
 
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
@@ -127,13 +132,42 @@ watchEffect(() => {
   setAtlasCenterOffset(scene, getAtlasCenter(manifest));
 });
 
+// Create the axis guide text renderers whenever the scene is replaced.
+watch(
+  runtime.scene,
+  async scene => {
+    const previous = axisGuides.value;
+    axisGuides.value = null;
+    previous?.dispose();
+    if (!scene) return;
+
+    try {
+      const guides = await createAxisGuides(scene);
+      // The scene can be replaced or disposed while the font loads.
+      if (runtime.scene.value !== scene) {
+        guides.dispose();
+        return;
+      }
+      axisGuides.value = guides;
+    } catch {
+      notifyWarning(
+        t("sceneCanvas.problemLoadingAxisGuides"),
+        t("sceneCanvas.axisGuidesUnavailable")
+      );
+    }
+  },
+  { immediate: true }
+);
+
 // Rebuild the axis guide labels whenever the atlas changes.
 watchEffect(() => {
   const scene = runtime.scene.value;
+  const guides = axisGuides.value;
   const { manifest } = currentExperiment;
-  if (!scene || !manifest || currentExperiment.isManifestEvaluating) return;
+  if (!scene || !guides || !manifest || currentExperiment.isManifestEvaluating)
+    return;
 
-  buildAxisGuides(scene, manifest);
+  buildAxisGuides(scene, guides, manifest);
 });
 
 // Set the camera's initial zoom relative to the AP length of the atlas.
@@ -294,6 +328,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  axisGuides.value?.dispose();
+  axisGuides.value = null;
   runtime.dispose();
 });
 </script>

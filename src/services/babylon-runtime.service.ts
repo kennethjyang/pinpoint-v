@@ -12,7 +12,6 @@ import {
   Vector3
 } from "@babylonjs/core";
 import Module from "manifold-3d";
-import { FontAsset, TextRenderer } from "@babylonjs/addons";
 
 /**
  * Service holding the Babylon engine, scene, camera, and gizmo manager
@@ -24,7 +23,6 @@ export interface BabylonRuntimeService {
   camera: Readonly<ShallowRef<ArcRotateCamera | null>>;
   gizmoManager: Readonly<ShallowRef<GizmoManager | null>>;
   selectionOutlineLayer: Readonly<ShallowRef<SelectionOutlineLayer | null>>;
-  textRenderer: Readonly<ShallowRef<TextRenderer | null>>;
   init: (canvas: HTMLCanvasElement) => Promise<void>;
   dispose: () => void;
 }
@@ -57,7 +55,6 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
   const camera = shallowRef<ArcRotateCamera | null>(null);
   const gizmoManager = shallowRef<GizmoManager | null>(null);
   const selectionOutlineLayer = shallowRef<SelectionOutlineLayer | null>(null);
-  const textRenderer = shallowRef<TextRenderer | null>(null);
 
   /**
    * Create the runtime from a canvas. Does nothing if already initialized.
@@ -96,16 +93,6 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
 
     const sol = new SelectionOutlineLayer("selection_outline_layer", s);
 
-    const sdfFontDefinition = await (
-      await fetch("https://assets.babylonjs.com/fonts/roboto-regular.json")
-    ).text();
-    const fontAsset = new FontAsset(
-      sdfFontDefinition,
-      "https://assets.babylonjs.com/fonts/roboto-regular.png"
-    );
-
-    const tR = await TextRenderer.CreateTextRendererAsync(fontAsset, e);
-
     e.runRenderLoop(() => {
       s.render();
     });
@@ -115,21 +102,18 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
     camera.value = c;
     gizmoManager.value = gm;
     selectionOutlineLayer.value = sol;
-    textRenderer.value = tR;
   }
 
   /**
    * Cleanup this runtime.
    */
   function dispose() {
-    textRenderer.value?.dispose();
     selectionOutlineLayer.value?.dispose();
     gizmoManager.value?.dispose();
     camera.value?.dispose();
     scene.value?.dispose();
     engine.value?.dispose();
 
-    textRenderer.value = null;
     selectionOutlineLayer.value = null;
     gizmoManager.value = null;
     camera.value = null;
@@ -143,7 +127,6 @@ export function createBabylonRuntimeService(): BabylonRuntimeService {
     camera: shallowReadonly(camera),
     gizmoManager: shallowReadonly(gizmoManager),
     selectionOutlineLayer: shallowReadonly(selectionOutlineLayer),
-    textRenderer: shallowReadonly(textRenderer),
     init,
     dispose
   };

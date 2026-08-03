@@ -1,19 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { StandardMaterial } from "@babylonjs/core";
-import { Color3, Vector3 } from "@babylonjs/core";
-import { makeTestScene } from "@/test/mount-helper";
+import type { Matrix, Scene } from "@babylonjs/core";
+import { Vector3 } from "@babylonjs/core";
+import type { FakeTextRenderer } from "@/test/mount-helper";
+import {
+  makeFakeTextRenderer,
+  makeTestFontAsset,
+  makeTestScene
+} from "@/test/mount-helper";
 import { makeManifest } from "@/test/fixtures";
+import type { AxisGuideAxis, AxisGuides } from "./axis-guide.api";
 import { buildAxisGuides } from "./axis-guide.api";
-import { asrToVector3 } from "./coordinate-transforms.api";
-
-const AXIS_GUIDE_MESH_NAMES = [
-  "apPositive_axisGuide_mesh",
-  "apNegative_axisGuide_mesh",
-  "dvPositive_axisGuide_mesh",
-  "dvNegative_axisGuide_mesh",
-  "mlPositive_axisGuide_mesh",
-  "mlNegative_axisGuide_mesh"
-];
 
 /**
  * Assert two Babylon vectors are componentwise close, tolerating float
@@ -30,185 +26,211 @@ function expectVectorCloseTo(
   expect(actual.z).toBeCloseTo(expected.z);
 }
 
-describe("buildAxisGuides", () => {
-  it("builds six labels parented to axisGuideRoot_node under atlasRoot_node", () => {
-    const scene = makeTestScene();
+/** Fake renderers and the `AxisGuides` object they back, for one test. */
+interface TestAxisGuides {
+  renderers: Record<AxisGuideAxis, FakeTextRenderer>;
+  guides: AxisGuides;
+}
 
-    buildAxisGuides(scene, makeManifest());
+/**
+ * Build a fresh `AxisGuides` object backed by fake renderers and a real
+ * fixture font asset, for one test's scene.
+ * @param scene Scene the font asset's texture is hosted in.
+ */
+function makeTestAxisGuides(scene: Scene): TestAxisGuides {
+  const renderers = {
+    ap: makeFakeTextRenderer(),
+    dv: makeFakeTextRenderer(),
+    ml: makeFakeTextRenderer()
+  };
+  const guides: AxisGuides = {
+    renderers,
+    fontAsset: makeTestFontAsset(scene),
+    dispose: () => {}
+  };
+  return { renderers, guides };
+}
+
+describe("buildAxisGuides", () => {
+  it("creates axisGuideRoot_node with no parent and an identity world matrix, and parents every renderer to it", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+
+    buildAxisGuides(scene, guides, makeManifest());
 
     const root = scene.getTransformNodeByName("axisGuideRoot_node")!;
     expect(root).toBeTruthy();
-    expect(root.parent?.name).toBe("atlasRoot_node");
-
-    const names = [
-      "apPositive_axisGuide_mesh",
-      "apNegative_axisGuide_mesh",
-      "dvPositive_axisGuide_mesh",
-      "dvNegative_axisGuide_mesh",
-      "mlPositive_axisGuide_mesh",
-      "mlNegative_axisGuide_mesh"
-    ];
-    for (const name of names) {
-      const mesh = scene.getMeshByName(name)!;
-      expect(mesh).toBeTruthy();
-      expect(mesh.parent).toBe(root);
+    expect(root.parent).toBeNull();
+    expect(root.getWorldMatrix().isIdentity()).toBe(true);
+    for (const renderer of Object.values(renderers)) {
+      expect(renderer.parent).toBe(root);
     }
   });
 
-  it("positions each label one atlas dimension away from the atlas center", () => {
+  it("adds each axis's own pair of labels to its own renderer, and creates no mesh", () => {
     const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
 
-    buildAxisGuides(scene, makeManifest());
+    buildAxisGuides(scene, guides, makeManifest());
 
-    const apPositive = scene.getMeshByName("apPositive_axisGuide_mesh")!;
-    const apNegative = scene.getMeshByName("apNegative_axisGuide_mesh")!;
-    const dvPositive = scene.getMeshByName("dvPositive_axisGuide_mesh")!;
-    const mlPositive = scene.getMeshByName("mlPositive_axisGuide_mesh")!;
-
-    expectVectorCloseTo(apPositive.position, asrToVector3([19.8, 4, 5.7]));
-    expectVectorCloseTo(apNegative.position, asrToVector3([-6.6, 4, 5.7]));
-    expectVectorCloseTo(dvPositive.position, asrToVector3([6.6, 12, 5.7]));
-    expectVectorCloseTo(mlPositive.position, asrToVector3([6.6, 4, 17.1]));
+    expect(renderers.ap.paragraphs.map(p => p.text)).toEqual(["+AP", "-AP"]);
+    expect(renderers.dv.paragraphs.map(p => p.text)).toEqual(["+DV", "-DV"]);
+    expect(renderers.ml.paragraphs.map(p => p.text)).toEqual(["+ML", "-ML"]);
+    expect(scene.meshes).toHaveLength(0);
   });
 
-  it("extrudes each label to 5% of the atlas's ML length", () => {
+  it("positions each label one atlas dimension away from the scene origin", () => {
     const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
 
-    buildAxisGuides(scene, makeManifest());
+    buildAxisGuides(scene, guides, makeManifest());
 
-    for (const name of AXIS_GUIDE_MESH_NAMES) {
-      const mesh = scene.getMeshByName(name)!;
-      const extent = mesh.getBoundingInfo().boundingBox.extendSize.z * 2;
-      expect(extent).toBeCloseTo(0.57, 2);
-    }
-  });
-
-  it("sizes labels so none exceeds half the atlas's ML length, and the widest is close to it", () => {
-    const scene = makeTestScene();
-
-    buildAxisGuides(scene, makeManifest());
-
-    let maxWidth = 0;
-    for (const name of AXIS_GUIDE_MESH_NAMES) {
-      const mesh = scene.getMeshByName(name)!;
-      const width = mesh.getBoundingInfo().boundingBox.extendSize.x * 2;
-      expect(width).toBeLessThanOrEqual(5.7);
-      maxWidth = Math.max(maxWidth, width);
-    }
-    expect(maxWidth).toBeGreaterThan(5.7 * 0.95);
-  });
-
-  it("centers each label's geometry on its own local origin", () => {
-    const scene = makeTestScene();
-
-    buildAxisGuides(scene, makeManifest());
-
-    for (const name of AXIS_GUIDE_MESH_NAMES) {
-      const mesh = scene.getMeshByName(name)!;
-      const center = mesh.getBoundingInfo().boundingBox.center;
-      expect(center.x).toBeCloseTo(0, 1);
-      expect(center.y).toBeCloseTo(0, 1);
-      expect(center.z).toBeCloseTo(0, 1);
-    }
+    expectVectorCloseTo(
+      renderers.ap.paragraphs[0]!.worldMatrix.getTranslation(),
+      new Vector3(0, 0, -13.2)
+    );
+    expectVectorCloseTo(
+      renderers.ap.paragraphs[1]!.worldMatrix.getTranslation(),
+      new Vector3(0, 0, 13.2)
+    );
+    expectVectorCloseTo(
+      renderers.dv.paragraphs[0]!.worldMatrix.getTranslation(),
+      new Vector3(0, -8, 0)
+    );
+    expectVectorCloseTo(
+      renderers.dv.paragraphs[1]!.worldMatrix.getTranslation(),
+      new Vector3(0, 8, 0)
+    );
+    expectVectorCloseTo(
+      renderers.ml.paragraphs[0]!.worldMatrix.getTranslation(),
+      new Vector3(11.4, 0, 0)
+    );
+    expectVectorCloseTo(
+      renderers.ml.paragraphs[1]!.worldMatrix.getTranslation(),
+      new Vector3(-11.4, 0, 0)
+    );
   });
 
   it("faces each label's readable side outward along its own signed axis", () => {
     const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
 
-    buildAxisGuides(scene, makeManifest());
+    buildAxisGuides(scene, guides, makeManifest());
 
-    // A zero-rotation `CreateText` mesh reads correctly when viewed from its
-    // local -Z side, so that direction, carried into world space, must point
-    // along the label's own axis and sign for the label to be legible to a
-    // viewer orbiting toward it.
-    const worldAxis: Record<"ap" | "dv" | "ml", "x" | "y" | "z"> = {
-      ap: "z",
-      dv: "y",
-      ml: "x"
-    };
-    const cases: [string, "ap" | "dv" | "ml", 1 | -1][] = [
-      ["apPositive_axisGuide_mesh", "ap", 1],
-      ["apNegative_axisGuide_mesh", "ap", -1],
-      ["dvPositive_axisGuide_mesh", "dv", 1],
-      ["dvNegative_axisGuide_mesh", "dv", -1],
-      ["mlPositive_axisGuide_mesh", "ml", 1],
-      ["mlNegative_axisGuide_mesh", "ml", -1]
-    ];
-    for (const [name, axis, sign] of cases) {
-      const mesh = scene.getMeshByName(name)!;
-      mesh.computeWorldMatrix(true);
-      const readableDirection = Vector3.TransformNormal(
-        new Vector3(0, 0, -1),
-        mesh.getWorldMatrix()
-      );
-      expect(readableDirection[worldAxis[axis]]).toBeCloseTo(sign);
-    }
-  });
+    const facing = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(0, 0, -1), matrix).normalize();
 
-  it("colors each axis's pair with a shared frozen unlit material", () => {
-    const scene = makeTestScene();
-
-    buildAxisGuides(scene, makeManifest());
-
-    const apPositive = scene.getMeshByName("apPositive_axisGuide_mesh")!;
-    const apNegative = scene.getMeshByName("apNegative_axisGuide_mesh")!;
-    expect(apPositive.material).toBe(apNegative.material);
-
-    const material = apPositive.material as StandardMaterial;
-    expect(material.name).toBe("axisGuideAp_material");
-    expect(material.emissiveColor.equals(Color3.Blue())).toBe(true);
-    expect(material.disableLighting).toBe(true);
-    expect(material.isFrozen).toBe(true);
-
-    const dvMaterial = scene.getMeshByName("dvPositive_axisGuide_mesh")!
-      .material as StandardMaterial;
-    expect(dvMaterial.emissiveColor.equals(Color3.Green())).toBe(true);
-
-    const mlMaterial = scene.getMeshByName("mlPositive_axisGuide_mesh")!
-      .material as StandardMaterial;
-    expect(mlMaterial.emissiveColor.equals(Color3.Red())).toBe(true);
-  });
-
-  it("makes every label unpickable", () => {
-    const scene = makeTestScene();
-
-    buildAxisGuides(scene, makeManifest());
-
-    for (const name of AXIS_GUIDE_MESH_NAMES) {
-      expect(scene.getMeshByName(name)!.isPickable).toBe(false);
-    }
-  });
-
-  it("rebuilds idempotently, reusing the same materials", () => {
-    const scene = makeTestScene();
-
-    buildAxisGuides(scene, makeManifest());
-    const materialsBefore = AXIS_GUIDE_MESH_NAMES.map(
-      name => scene.getMeshByName(name)!.material
+    expectVectorCloseTo(
+      facing(renderers.ap.paragraphs[0]!.worldMatrix),
+      new Vector3(0, 1, 0)
     );
+    expectVectorCloseTo(
+      facing(renderers.ap.paragraphs[1]!.worldMatrix),
+      new Vector3(0, 1, 0)
+    );
+    expectVectorCloseTo(
+      facing(renderers.ml.paragraphs[0]!.worldMatrix),
+      new Vector3(0, 1, 0)
+    );
+    expectVectorCloseTo(
+      facing(renderers.ml.paragraphs[1]!.worldMatrix),
+      new Vector3(0, 1, 0)
+    );
+    expectVectorCloseTo(
+      facing(renderers.dv.paragraphs[0]!.worldMatrix),
+      new Vector3(0, 0, -1)
+    );
+    expectVectorCloseTo(
+      facing(renderers.dv.paragraphs[1]!.worldMatrix),
+      new Vector3(0, 0, -1)
+    );
+  });
 
-    buildAxisGuides(scene, makeManifest());
+  it("points each label's top edge towards its own signed axis, except DV where both point -DV", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+
+    buildAxisGuides(scene, guides, makeManifest());
+
+    const topEdge = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(0, 1, 0), matrix).normalize();
+
+    expectVectorCloseTo(
+      topEdge(renderers.ap.paragraphs[0]!.worldMatrix),
+      new Vector3(0, 0, -1)
+    );
+    expectVectorCloseTo(
+      topEdge(renderers.ap.paragraphs[1]!.worldMatrix),
+      new Vector3(0, 0, 1)
+    );
+    expectVectorCloseTo(
+      topEdge(renderers.ml.paragraphs[0]!.worldMatrix),
+      new Vector3(1, 0, 0)
+    );
+    expectVectorCloseTo(
+      topEdge(renderers.ml.paragraphs[1]!.worldMatrix),
+      new Vector3(-1, 0, 0)
+    );
+    expectVectorCloseTo(
+      topEdge(renderers.dv.paragraphs[0]!.worldMatrix),
+      new Vector3(0, 1, 0)
+    );
+    expectVectorCloseTo(
+      topEdge(renderers.dv.paragraphs[1]!.worldMatrix),
+      new Vector3(0, 1, 0)
+    );
+  });
+
+  it("sizes every label so the widest spans half the atlas's ML length, tracking the atlas", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+
+    buildAxisGuides(scene, guides, makeManifest());
+
+    const scale = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(1, 0, 0), matrix).length();
+
+    for (const renderer of Object.values(renderers)) {
+      for (const paragraph of renderer.paragraphs) {
+        expect(scale(paragraph.worldMatrix)).toBeCloseTo(5.7 / 1.52, 4);
+      }
+    }
+
+    buildAxisGuides(
+      scene,
+      guides,
+      makeManifest({ resolutions: [[0.05, 0.05, 0.05]] })
+    );
+    expect(scale(renderers.ml.paragraphs[0]!.worldMatrix)).toBeCloseTo(7.5, 4);
+  });
+
+  it("rebuilds idempotently, leaving one root and two paragraphs per renderer", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+
+    buildAxisGuides(scene, guides, makeManifest());
+    buildAxisGuides(scene, guides, makeManifest());
 
     expect(
       scene.transformNodes.filter(node => node.name === "axisGuideRoot_node")
     ).toHaveLength(1);
-    const meshesAfter = AXIS_GUIDE_MESH_NAMES.map(name =>
-      scene.getMeshByName(name)
-    );
-    expect(meshesAfter.every(mesh => mesh !== null)).toBe(true);
-    const materialsAfter = AXIS_GUIDE_MESH_NAMES.map(
-      name => scene.getMeshByName(name)!.material
-    );
-    expect(materialsAfter).toEqual(materialsBefore);
+    for (const renderer of Object.values(renderers)) {
+      expect(renderer.paragraphs).toHaveLength(2);
+    }
   });
 
   it("builds nothing and clears any existing guides for an unknown manifest", () => {
     const scene = makeTestScene();
-    buildAxisGuides(scene, makeManifest());
+    const { renderers, guides } = makeTestAxisGuides(scene);
+    buildAxisGuides(scene, guides, makeManifest());
     expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeTruthy();
 
-    buildAxisGuides(scene, makeManifest({ resolutions: [] }));
+    buildAxisGuides(scene, guides, makeManifest({ resolutions: [] }));
 
     expect(scene.getTransformNodeByName("axisGuideRoot_node")).toBeNull();
+    for (const renderer of Object.values(renderers)) {
+      expect(renderer.paragraphs).toHaveLength(0);
+      expect(renderer.parent).toBeNull();
+    }
   });
 });
