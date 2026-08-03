@@ -123,7 +123,7 @@ const channelMaps = computed(() =>
             class="channel-maps__viewport"
             :style="{ height: styles.canvasHeight, aspectRatio }"
           >
-            <div class="row no-wrap fit">
+            <div class="row no-wrap fit q-gutter-x-xs">
               <div
                 v-for="shank of shanks"
                 :key="String(shank.id)"
