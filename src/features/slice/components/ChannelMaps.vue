@@ -37,8 +37,8 @@ const classes = computed(() => zoomClasses[zoomSelection.value]);
       spread
       toggle-color="primary"
     />
-    <div v-for="probe of currentExperimentStore.experiment.probes" class="row">
-      <q-card>
+    <div class="row q-gutter-sm">
+      <q-card v-for="probe of currentExperimentStore.experiment.probes">
         <q-card-section :class="classes.header">
           <q-icon
             :style="{ color: probe.color }"
