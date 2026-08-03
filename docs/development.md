@@ -27,7 +27,7 @@ The code roughly follows _feature-based organization_.
 
 Each feature folder contains the components, models, and business logic concerning that one feature.
 
-- `/api`: pure-ish functions that enable behavior for the feature. Called by other scripts in the feature.
+- `/api`: pure-ish functions (they don't host state and only operate on inputs and sometimes return an output) that enable behavior for the feature. Called by other scripts in the feature.
 - `/components`: Vue Single Component File (SCF) style files using the Composition API. These primarily define the UI of that component and include reactive interfaces that call out to the API to drive functionality.
 - `/composables`: Reactive elements that either get reused or encapsulate some local logic used by components. It's sort of a blend between pure functions and UI and are used when the state is tightly couples with reactive state.
 - `/models`: Non-behavior code like interfaces and constants.
@@ -36,6 +36,6 @@ Test scripts use the `.spec.ts` extension and are co-located with the script the
 
 ### Accessing code
 
-All script files are modules. Meaning members are private to the outside and must be exported. Exported members can be used through **relative imports** within the same feature. However, to be used outside of the feature, it must be re-exported in the feature barrel file `index.ts`. This is the feature's public API.
+All script files are modules. Meaning members are private to the outside and must be exported. Exported members can be used through **relative imports** within the same feature. However, to be used outside the feature, it must be re-exported in the feature barrel file `index.ts`. This is the feature's public API.
 
-Other features can use a feature by importing the re-exported members exposed by the barrel file. They should import the feature folder as a module.
+Other features can use a feature by importing the re-exported members exposed by the barrel file. They should **import the feature folder** as a module.
