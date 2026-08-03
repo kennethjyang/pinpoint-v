@@ -3,6 +3,7 @@ import { onMounted, ref, type Ref } from "vue";
 import { SceneCanvas, SceneHierarchy } from "@/features/scene";
 import { TouchPanValue, useQuasar } from "quasar";
 import {
+  ExperimentPropertiesDialog,
   NewExperimentDialog,
   RecentExperimentsDialog,
   useExperimentFile
@@ -131,6 +132,14 @@ onMounted(() => {
             <q-list>
               <q-item
                 clickable
+                @click="$q.dialog({ component: ExperimentPropertiesDialog })"
+              >
+                <q-item-section>{{
+                  $t("layout.experimentProperties")
+                }}</q-item-section>
+              </q-item>
+              <q-item
+                clickable
                 @click="$q.dialog({ component: ProbeLibraryDialog })"
               >
                 <q-item-section>{{ $t("layout.probeLibrary") }}</q-item-section>
@@ -170,6 +179,8 @@ onMounted(() => {
       bordered
       show-if-above
       side="left"
+      no-swipe-close
+      no-swipe-open
     >
       <div class="column full-height">
         <q-tabs v-model="tab">
@@ -200,6 +211,8 @@ onMounted(() => {
       bordered
       show-if-above
       side="right"
+      no-swipe-close
+      no-swipe-open
     >
       <Inspector />
       <div

@@ -1,8 +1,12 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, ref, useTemplateRef } from "vue";
+import {
+  type QInput,
+  useDialogPluginComponent,
+  type ValidationRule
+} from "quasar";
 import { Atlas, AtlasPicker, getManifest } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { useDialogPluginComponent } from "quasar";
 import { buildInitialReferenceCoordinate } from "../api/reference-coordinate.api";
 import { useI18n } from "vue-i18n";
 import { buildExperiment } from "../api/experiment.api";
@@ -17,11 +21,16 @@ const currentExperimentStore = useCurrentExperimentStore();
 
 const name = ref<string | null>(null);
 const atlas = ref<Atlas | null>(null);
+const nameInput = useTemplateRef<QInput>("nameInput");
 
 /**
  * Whether the Create button should be disabled.
  */
 const isCreateDisabled = computed(() => !name.value || !atlas.value);
+
+const nameRules: ValidationRule<string | null>[] = [
+  value => (value ?? "").trim().length > 0 || t("newExperiment.nameRequired")
+];
 
 /**
  * Create a new experiment with the given name and atlas, seeding its
@@ -51,13 +60,20 @@ async function create() {
 <template>
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="new-experiment">
-      <q-card-section class="q-gutter-y-md">
-        <p class="text-h5">{{ $t("newExperiment.title") }}</p>
-
+      <q-card-section>
+        <div class="text-h5">{{ $t("newExperiment.title") }}</div>
+      </q-card-section>
+      <q-card-section
+        class="q-gutter-y-md new-experiment__content q-mt-none q-pt-none"
+      >
         <q-input
+          ref="nameInput"
           v-model="name"
           clearable
           :label="$t('newExperiment.experimentName')"
+          lazy-rules
+          :rules="nameRules"
+          @blur="nameInput?.validate()"
         />
 
         <AtlasPicker v-model="atlas" />
@@ -84,4 +100,12 @@ async function create() {
 .new-experiment
   min-width: 25vw
   width: fit-content
+  display: flex
+  flex-direction: column
+  overflow: hidden
+
+.new-experiment__content
+  flex: 1 1 auto
+  min-height: 0
+  overflow-y: auto
 </style>
