@@ -1,7 +1,10 @@
 <script lang="ts" setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, useTemplateRef } from "vue";
 import { useFuzzyFilter } from "@/composable/useFuzzyFilter";
-import { flattenHierarchy } from "../api/hierarchy.api";
+import {
+  flattenHierarchy,
+  widestHierarchyRowWidth
+} from "../api/hierarchy.api";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   clearVisibleStructures,
@@ -9,9 +12,22 @@ import {
   setStructureVisibility
 } from "@/features/experiment";
 
+/** Width of one indent guide cell, matching `.guide`'s `flex: 0 0 1rem`. */
+const GUIDE_WIDTH = 16;
+
+/**
+ * Checkbox (20px dense) + colour icon (24px at `size="sm"`) + the row's
+ * `q-gutter-x-xs` gaps (four 4px child margins less the parent's -4px).
+ */
+const ROW_CHROME_WIDTH = 56;
+
+const measurementContext = document.createElement("canvas").getContext("2d");
+
 const currentExperiment = useCurrentExperimentStore();
 
 const filter = ref<string | null>(null);
+const root = useTemplateRef<HTMLDivElement>("root");
+const fontsReady = ref(false);
 
 // DFS-flattened hierarchy, carrying each row's indent guides.
 const items = computed(() =>
@@ -26,10 +42,46 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
   { keys: ["name", "abbreviation"] },
   query => query.trim().length === 0
 );
+
+// Guides are hidden while searching, so they contribute no width then.
+const contentWidth = computed(() => {
+  if (!fontsReady.value || !root.value) return 0;
+  return widestHierarchyRowWidth(
+    displayedItems.value,
+    {
+      guideWidth: isSearching.value ? 0 : GUIDE_WIDTH,
+      chromeWidth: ROW_CHROME_WIDTH
+    },
+    makeTextMeasurer(root.value)
+  );
+});
+
+/**
+ * Build a canvas-backed text measurer using the list's own font.
+ * @param element Element to read the rendered font from.
+ */
+function makeTextMeasurer(element: HTMLElement) {
+  const { fontSize, fontFamily } = getComputedStyle(element);
+  const boldFont = `700 ${fontSize} ${fontFamily}`;
+  const regularFont = `400 ${fontSize} ${fontFamily}`;
+  return (text: string, bold: boolean): number => {
+    if (!measurementContext) return 0;
+    measurementContext.font = bold ? boldFont : regularFont;
+    return measurementContext.measureText(text).width;
+  };
+}
+
+onMounted(async () => {
+  // Measuring before the webfont lands yields fallback metrics that are too
+  // narrow. `document.fonts` is absent under happy-dom, where this resolves
+  // immediately and text measures 0.
+  await document.fonts?.ready;
+  fontsReady.value = true;
+});
 </script>
 
 <template>
-  <div class="column full-height q-gutter-y-sm">
+  <div ref="root" class="column full-height q-gutter-y-sm">
     <q-input v-model="filter" :label="$t('atlasHierarchy.search')" clearable>
       <template #prepend>
         <q-icon name="search" />
@@ -38,6 +90,7 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
 
     <q-virtual-scroll
       :items="displayedItems"
+      :style="{ '--hierarchy-content-width': `${contentWidth}px` }"
       :virtual-scroll-item-size="32"
       class="col scroll"
     >
@@ -102,14 +155,13 @@ $guide-width: 2px
 
 .hierarchy-row
   height: 32px
-  width: max-content
-  min-width: 100%
 
 // Quasar's virtual-scroll content wrapper is `contain: content`, which
-// paint-clips rows wider than the panel. Sizing it to its widest row moves the
-// overflow onto the scrolling root instead.
+// paint-clips rows wider than the panel. Sizing it to the widest row in the
+// whole list moves that overflow onto the scrolling root and keeps the
+// scrollable width constant as rows mount and unmount.
 :deep(.q-virtual-scroll__content)
-  width: max-content
+  width: var(--hierarchy-content-width)
   min-width: 100%
 
 .guide
