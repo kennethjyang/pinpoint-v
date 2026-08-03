@@ -268,14 +268,14 @@ describe("ChannelMaps", () => {
     const range = wrapper.findComponent({ name: "QRange" });
     expect(range.attributes("style")).toContain("height: 70vh");
 
-    const smallButton = wrapper
+    const mediumButton = wrapper
       .findAllComponents({ name: "QBtn" })
-      .find(btn => btn.text() === "Small")!;
-    await smallButton.trigger("click");
+      .find(btn => btn.text() === "Medium")!;
+    await mediumButton.trigger("click");
 
     expect(
       wrapper.findComponent({ name: "QRange" }).attributes("style")
-    ).toContain("height: 15vh");
+    ).toContain("height: 30vh");
   });
 
   it("labels the slider's thumbs in mm", () => {
