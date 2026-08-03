@@ -23,6 +23,13 @@ export function setInitialZoom(camera: ArcRotateCamera, manifest: Manifest) {
 const ORBIT_POLE_EPSILON = 1e-6;
 
 /**
+ * Azimuth used when orbiting straight up or down `DV`, where azimuth is
+ * otherwise undefined: matches `+AP`'s, so the camera's roll at the pole is
+ * always the same regardless of where it orbited from.
+ */
+const ORBIT_POLE_ALPHA = -Math.PI / 2;
+
+/**
  * Orbit the camera to sit along the given world direction from its target,
  * animating there and leaving its radius and target untouched.
  * @param camera Camera to orbit.
@@ -36,10 +43,10 @@ export function orbitCameraTowards(
   if (length === 0) return;
 
   const horizontal = Math.hypot(direction.x, direction.z);
-  // At the poles the azimuth is undefined, so keep the camera's own.
+  // At the poles the azimuth is undefined, so use a fixed one.
   const alpha =
     horizontal < ORBIT_POLE_EPSILON
-      ? camera.alpha
+      ? ORBIT_POLE_ALPHA
       : Math.atan2(direction.z, direction.x);
   const beta = Math.acos(clamp(direction.y / length, -1, 1));
 
