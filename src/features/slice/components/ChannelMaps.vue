@@ -1,15 +1,28 @@
 <script lang="ts" setup>
-import { ref } from "vue";
-import LargeChannelMap from "./LargeChannelMap.vue";
-import MediumChannelMap from "./MediumChannelMap.vue";
-import SmallChannelMap from "./SmallChannelMap.vue";
+import { computed, ref } from "vue";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 
 type ChannelMapsZoom = "small" | "medium" | "large";
 
+interface ZoomClasses {
+  header: string;
+  name: string;
+}
+
+const zoomClasses: Record<ChannelMapsZoom, ZoomClasses> = {
+  small: { header: "column flex-center", name: "text-caption" },
+  medium: {
+    header: "row q-gutter-x-sm no-wrap items-center",
+    name: "text-body2"
+  },
+  large: { header: "row q-gutter-x-sm no-wrap", name: "text-body1" }
+};
+
 const currentExperimentStore = useCurrentExperimentStore();
 
 const zoomSelection = ref<ChannelMapsZoom>("large");
+
+const classes = computed(() => zoomClasses[zoomSelection.value]);
 </script>
 
 <template>
@@ -24,26 +37,19 @@ const zoomSelection = ref<ChannelMapsZoom>("large");
       spread
       toggle-color="primary"
     />
-    <div
-      v-for="probe of currentExperimentStore.experiment.probes"
-      v-if="zoomSelection === 'large'"
-      class="row"
-    >
-      <LargeChannelMap :probe="probe" />
-    </div>
-    <div
-      v-for="probe of currentExperimentStore.experiment.probes"
-      v-else-if="zoomSelection === 'medium'"
-      class="row"
-    >
-      <MediumChannelMap :probe="probe" />
-    </div>
-    <div
-      v-for="probe of currentExperimentStore.experiment.probes"
-      v-else-if="zoomSelection === 'small'"
-      class="row"
-    >
-      <SmallChannelMap :probe="probe" />
+    <div v-for="probe of currentExperimentStore.experiment.probes" class="row">
+      <q-card>
+        <q-card-section :class="classes.header">
+          <q-icon
+            :style="{ color: probe.color }"
+            name="radio_button_checked"
+            size="sm"
+          />
+          <div :class="classes.name">{{ probe.name }}</div>
+        </q-card-section>
+        <q-separator />
+        <q-card-section> Channel maps </q-card-section>
+      </q-card>
     </div>
   </div>
 </template>
