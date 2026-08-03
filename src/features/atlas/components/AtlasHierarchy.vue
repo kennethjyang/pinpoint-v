@@ -77,7 +77,7 @@ const { isSearching, filtered: displayedItems } = useFuzzyFilter(
               name="radio_button_checked"
               size="sm"
             />
-            <b>{{ item.abbreviation }}</b>
+            <b class="text-no-wrap">{{ item.abbreviation }}</b>
             <span class="text-no-wrap">{{ item.name }}</span>
           </div>
         </div>
