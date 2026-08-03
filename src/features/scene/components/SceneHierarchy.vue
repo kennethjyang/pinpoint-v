@@ -65,7 +65,7 @@ function removeProbeAndDeselect(probe: Probe) {
 </script>
 
 <template>
-  <div class="column">
+  <div class="column q-gutter-y-sm">
     <q-btn-dropdown
       color="primary"
       dropdown-icon="add"
