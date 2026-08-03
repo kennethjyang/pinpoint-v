@@ -170,23 +170,24 @@ onMounted(() => {
       bordered
       show-if-above
       side="left"
-      class="column"
     >
-      <q-tabs v-model="tab">
-        <q-tab name="scene" :label="$t('layout.scene')" />
-        <q-tab name="channel-maps" :label="$t('layout.channelMaps')" />
-        <q-tab name="atlas" :label="$t('layout.atlas')" />
-      </q-tabs>
-      <q-separator />
-      <q-tab-panels v-model="tab" animated class="col">
-        <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
-        <q-tab-panel name="channel-maps">
-          <ChannelMaps />
-        </q-tab-panel>
-        <q-tab-panel name="atlas">
-          <AtlasHierarchy />
-        </q-tab-panel>
-      </q-tab-panels>
+      <div class="column full-height">
+        <q-tabs v-model="tab">
+          <q-tab name="scene" :label="$t('layout.scene')" />
+          <q-tab name="channel-maps" :label="$t('layout.channelMaps')" />
+          <q-tab name="atlas" :label="$t('layout.atlas')" />
+        </q-tabs>
+        <q-separator />
+        <q-tab-panels v-model="tab" animated class="col">
+          <q-tab-panel name="scene"><SceneHierarchy /></q-tab-panel>
+          <q-tab-panel name="channel-maps">
+            <ChannelMaps />
+          </q-tab-panel>
+          <q-tab-panel name="atlas">
+            <AtlasHierarchy />
+          </q-tab-panel>
+        </q-tab-panels>
+      </div>
       <div
         v-touch-pan.horizontal.prevent.mouse="resizeLeftDrawer"
         class="q-drawer__resizer q-drawer__resizer--left"
@@ -243,4 +244,11 @@ body.body--dark .q-drawer__resizer
 
 .q-drawer__resizer--right
   left: -1.5px
+
+.q-tab-panel
+  height: 100%
+  overflow: hidden
+
+.column
+  flex-wrap: nowrap
 </style>
