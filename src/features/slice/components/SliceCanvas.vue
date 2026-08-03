@@ -12,6 +12,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useDelayedFlag } from "@/composable/useDelayedFlag";
 import { getProbeFrame } from "../api/probe-frame.api";
+import { getSampleEdgeLength } from "../api/sample-result.api";
 import {
   formatSliceExtentMillimeters,
   getContourPolygonPoints,
@@ -125,15 +126,15 @@ function onPointerMove(event: PointerEvent): void {
     return;
   }
 
+  const size = getSampleEdgeLength(slice);
   const pixel = getSlicePixelFromRect(
     element.getBoundingClientRect(),
     event.clientX,
     event.clientY,
-    slice.widthPixels,
-    slice.heightPixels
+    size
   );
   hoveredAnnotationValue.value = pixel
-    ? (slice.annotationValues[pixel.y * slice.widthPixels + pixel.x] ?? 0)
+    ? (slice.annotationValues[pixel.y * size + pixel.x] ?? 0)
     : 0;
 }
 

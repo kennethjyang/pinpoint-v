@@ -33,18 +33,6 @@ export function findStructureByAnnotationValue(
 }
 
 /**
- * Map annotation values to their terminology row, for repeated O(1) lookups.
- * @param terminologyRows Parsed terminology rows for the atlas.
- */
-export function buildStructureIndex(
-  terminologyRows: TerminologyRow[]
-): Map<number, TerminologyRow> {
-  const index = new Map<number, TerminologyRow>();
-  for (const row of terminologyRows) index.set(row.annotation_value, row);
-  return index;
-}
-
-/**
  * Pack a `#RRGGBB` hex triplet into a fully opaque, little-endian RGBA8
  * value, matching the byte order `Uint8ClampedArray`-backed `ImageData` expects.
  * @param colorHexTriplet Hex triplet to pack, e.g. `#BFDAE3`.

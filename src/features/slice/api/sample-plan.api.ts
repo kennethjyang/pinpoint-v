@@ -78,23 +78,37 @@ export function planSamples(
 }
 
 /**
- * Choose an annotation level for a geometry and plan its samples against it
- * in the same pass, escalating to coarser levels until the plan's chunk count
- * fits the preferred budget (or the coarsest level is reached).
+ * Number of distinct chunks a geometry would read from.
  * @param geometry Geometry to sample.
- * @param volume Annotation volume to plan against.
+ * @param level Multiscale level to sample from.
  */
-export function selectSamplePlan(
+export function countSampleChunks(
   geometry: SampleGeometry,
-  volume: AnnotationVolume
-): SamplePlan {
-  if (volume.levels.length === 0) {
-    return {
-      levelIndex: 0,
-      sampleCount: getSampleCount(geometry),
-      chunkRequests: []
-    };
-  }
+  level: AnnotationLevel
+): number {
+  const grid = getChunkGrid(level);
+  const chunkKeys = new Set<number>();
+
+  forEachSamplePoint(geometry, (_index, a, s, r) => {
+    const voxel = resolveVoxel(level, grid, a, s, r);
+    if (voxel) chunkKeys.add(voxel.chunkKey);
+  });
+
+  return chunkKeys.size;
+}
+
+/**
+ * Index of the finest level that resolves the geometry within the preferred
+ * chunk budget, escalating to coarser levels and falling back to the
+ * coarsest available when every level exceeds it.
+ * @param volume Annotation volume to choose a level from.
+ * @param geometry Geometry to sample.
+ */
+export function selectAnnotationLevelIndex(
+  volume: AnnotationVolume,
+  geometry: SampleGeometry
+): number {
+  if (volume.levels.length === 0) return 0;
 
   const millimetersPerSample = getMillimetersPerSample(geometry);
   let startIndex = 0;
@@ -110,27 +124,26 @@ export function selectSamplePlan(
 
   for (let index = startIndex; index < volume.levels.length; index++) {
     const isCoarsestLevel = index === volume.levels.length - 1;
-    const plan = planSamples(geometry, volume.levels[index]!, index);
     if (
       isCoarsestLevel ||
-      plan.chunkRequests.length <= PREFERRED_MAXIMUM_CHUNK_REQUESTS
+      countSampleChunks(geometry, volume.levels[index]!) <=
+        PREFERRED_MAXIMUM_CHUNK_REQUESTS
     ) {
-      return plan;
+      return index;
     }
   }
 
-  const coarsestIndex = volume.levels.length - 1;
-  return planSamples(geometry, volume.levels[coarsestIndex]!, coarsestIndex);
+  return volume.levels.length - 1;
 }
 
 /**
- * Millimeters spanned by one sample of a geometry, along whichever axis is finer.
+ * Millimeters spanned by one sample of a geometry.
  * @param geometry Geometry to measure.
  */
 function getMillimetersPerSample(geometry: SampleGeometry): number {
-  const stepU = (2 * geometry.halfWidthMillimeters) / geometry.widthPixels;
-  const stepV = (2 * geometry.halfHeightMillimeters) / geometry.heightPixels;
-  return Math.min(stepU, stepV);
+  return geometry.kind === "plane"
+    ? (2 * geometry.halfExtentMillimeters) / geometry.sizePixels
+    : geometry.lengthMillimeters / geometry.sampleCount;
 }
 
 /**
@@ -138,14 +151,16 @@ function getMillimetersPerSample(geometry: SampleGeometry): number {
  * @param geometry Geometry to measure.
  */
 function getSampleCount(geometry: SampleGeometry): number {
-  return geometry.widthPixels * geometry.heightPixels;
+  return geometry.kind === "plane"
+    ? geometry.sizePixels * geometry.sizePixels
+    : geometry.sampleCount;
 }
 
 /**
  * Visit every sample point of a geometry in atlas ASR millimeters.
  *
- * Row 0 is the +up edge and samples are visited row-major - the same
- * convention the slice canvas's SVG overlay must mirror.
+ * For a plane, row 0 is the +up edge and samples are visited row-major - the
+ * same convention the slice canvas's SVG overlay must mirror.
  * @param geometry Geometry to walk.
  * @param visit Callback invoked with each sample's output index and ASR coordinates.
  */
@@ -153,29 +168,45 @@ function forEachSamplePoint(
   geometry: SampleGeometry,
   visit: (index: number, a: number, s: number, r: number) => void
 ): void {
-  const {
-    centerMillimeters,
-    rightMillimeters,
-    upMillimeters,
-    halfWidthMillimeters,
-    halfHeightMillimeters,
-    widthPixels,
-    heightPixels
-  } = geometry;
-  const stepU = (2 * halfWidthMillimeters) / widthPixels;
-  const stepV = (2 * halfHeightMillimeters) / heightPixels;
+  if (geometry.kind === "plane") {
+    const {
+      centerMillimeters,
+      rightMillimeters,
+      upMillimeters,
+      halfExtentMillimeters,
+      sizePixels
+    } = geometry;
+    const step = (2 * halfExtentMillimeters) / sizePixels;
 
-  for (let row = 0; row < heightPixels; row++) {
-    const v = halfHeightMillimeters - (row + 0.5) * stepV;
-    for (let column = 0; column < widthPixels; column++) {
-      const u = -halfWidthMillimeters + (column + 0.5) * stepU;
-      visit(
-        row * widthPixels + column,
-        centerMillimeters[0] + rightMillimeters[0] * u + upMillimeters[0] * v,
-        centerMillimeters[1] + rightMillimeters[1] * u + upMillimeters[1] * v,
-        centerMillimeters[2] + rightMillimeters[2] * u + upMillimeters[2] * v
-      );
+    for (let row = 0; row < sizePixels; row++) {
+      const v = halfExtentMillimeters - (row + 0.5) * step;
+      for (let column = 0; column < sizePixels; column++) {
+        const u = -halfExtentMillimeters + (column + 0.5) * step;
+        visit(
+          row * sizePixels + column,
+          centerMillimeters[0] + rightMillimeters[0] * u + upMillimeters[0] * v,
+          centerMillimeters[1] + rightMillimeters[1] * u + upMillimeters[1] * v,
+          centerMillimeters[2] + rightMillimeters[2] * u + upMillimeters[2] * v
+        );
+      }
     }
+    return;
+  }
+
+  const {
+    originMillimeters,
+    directionMillimeters,
+    lengthMillimeters,
+    sampleCount
+  } = geometry;
+  for (let index = 0; index < sampleCount; index++) {
+    const t = ((index + 0.5) / sampleCount) * lengthMillimeters;
+    visit(
+      index,
+      originMillimeters[0] + directionMillimeters[0] * t,
+      originMillimeters[1] + directionMillimeters[1] * t,
+      originMillimeters[2] + directionMillimeters[2] * t
+    );
   }
 }
 

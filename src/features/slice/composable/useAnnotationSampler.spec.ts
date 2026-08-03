@@ -6,7 +6,7 @@ import {
   makeManifest,
   makeTerminologyRow
 } from "@/test/fixtures";
-import type { SampleGeometry } from "../models/sample-geometry.model";
+import type { PlaneGeometry } from "../models/sample-geometry.model";
 import type {
   InboundSamplerMessage,
   SampledMessage
@@ -70,15 +70,14 @@ function mountWithComposable<T>(setup: () => T): {
 // The fixture volume is a 4^3 array at 0.01mm/voxel, spanning [0, 0.04)mm on
 // each axis with 2^3 chunks of 2^3 voxels. (0.01, 0.01, 0.01) sits at the
 // center of chunk (0, 0, 0).
-function makePlane(overrides: Partial<SampleGeometry> = {}): SampleGeometry {
+function makePlane(overrides: Partial<PlaneGeometry> = {}): PlaneGeometry {
   return {
+    kind: "plane",
     centerMillimeters: [0.01, 0.01, 0.01],
     rightMillimeters: [0, 0, 1],
     upMillimeters: [0, -1, 0],
-    halfWidthMillimeters: 0.005,
-    halfHeightMillimeters: 0.005,
-    widthPixels: 2,
-    heightPixels: 2,
+    halfExtentMillimeters: 0.005,
+    sizePixels: 2,
     ...overrides
   };
 }
@@ -105,7 +104,7 @@ describe("useAnnotationSampler", () => {
     );
     await flushPromises();
 
-    const geometry = ref<SampleGeometry | null>(makePlane());
+    const geometry = ref<PlaneGeometry | null>(makePlane());
     const { result, unmount: unmountStream } = mountWithComposable(() =>
       sampler.createStream(geometry)
     );
@@ -192,8 +191,8 @@ describe("useAnnotationSampler", () => {
     );
     await flushPromises();
 
-    const geometryA = ref<SampleGeometry | null>(makePlane());
-    const geometryB = ref<SampleGeometry | null>(makePlane());
+    const geometryA = ref<PlaneGeometry | null>(makePlane());
+    const geometryB = ref<PlaneGeometry | null>(makePlane());
     const { result: streamA, unmount: unmountA } = mountWithComposable(() =>
       sampler.createStream(geometryA)
     );
@@ -257,7 +256,7 @@ describe("useAnnotationSampler", () => {
 
     // Chunk (0,0,0) covers mm [0,0.02) on every axis; chunk (0,0,1) covers
     // [0,0.02) x [0,0.02) x [0.02,0.04).
-    const geometry = ref<SampleGeometry | null>(
+    const geometry = ref<PlaneGeometry | null>(
       makePlane({ centerMillimeters: [0.01, 0.01, 0.01] })
     );
     const { result, unmount: unmountStream } = mountWithComposable(() =>
@@ -319,7 +318,7 @@ describe("useAnnotationSampler", () => {
     );
     await flushPromises();
 
-    const geometry = ref<SampleGeometry | null>(
+    const geometry = ref<PlaneGeometry | null>(
       makePlane({ centerMillimeters: [0.01, 0.01, 0.01] })
     );
     const { result, unmount: unmountStream } = mountWithComposable(() =>
@@ -378,7 +377,7 @@ describe("useAnnotationSampler", () => {
     );
     await flushPromises();
 
-    const geometry = ref<SampleGeometry | null>(null);
+    const geometry = ref<PlaneGeometry | null>(null);
     const { unmount: unmountStream } = mountWithComposable(() =>
       sampler.createStream(geometry)
     );
@@ -408,7 +407,7 @@ describe("useAnnotationSampler", () => {
     );
     await flushPromises();
 
-    const geometry = ref<SampleGeometry | null>(makePlane());
+    const geometry = ref<PlaneGeometry | null>(makePlane());
     const { result, unmount: unmountStream } = mountWithComposable(() =>
       sampler.createStream(geometry)
     );

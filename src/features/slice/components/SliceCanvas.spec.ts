@@ -54,8 +54,7 @@ function makeSampleResult(
   annotationValues: number[]
 ): SampleResult {
   return {
-    widthPixels: sizePixels,
-    heightPixels: sizePixels,
+    sampleCount: sizePixels * sizePixels,
     annotationValues: Uint32Array.from(annotationValues),
     pixels: new Uint8ClampedArray(sizePixels * sizePixels * 4),
     paintedChunkCount: 1,

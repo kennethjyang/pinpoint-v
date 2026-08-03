@@ -2,7 +2,7 @@ import type { Manifest } from "@/features/atlas";
 import { getAtlasLongestDimensionMillimeters } from "@/features/atlas";
 import type { ProbeContour } from "@/features/probe";
 import { clamp } from "@/utils/math";
-import type { SampleGeometry } from "../models/sample-geometry.model";
+import type { PlaneGeometry } from "../models/sample-geometry.model";
 import type { ProbeFrame } from "./probe-frame.api";
 import { toAtlasMillimeters } from "./probe-frame.api";
 
@@ -84,15 +84,14 @@ export function getProbeSlicePlane(
   centerHeightMillimeters: number,
   extentMillimeters: number,
   sizePixels: number
-): SampleGeometry {
+): PlaneGeometry {
   return {
+    kind: "plane",
     centerMillimeters: toAtlasMillimeters(frame, 0, centerHeightMillimeters),
     rightMillimeters: frame.rightMillimeters,
     upMillimeters: frame.upMillimeters,
-    halfWidthMillimeters: extentMillimeters / 2,
-    halfHeightMillimeters: extentMillimeters / 2,
-    widthPixels: sizePixels,
-    heightPixels: sizePixels
+    halfExtentMillimeters: extentMillimeters / 2,
+    sizePixels
   };
 }
 
@@ -118,35 +117,11 @@ export function getQuantizedSizePixels(
   cssWidth: number,
   pixelRatio: number
 ): number {
-  return quantizeSizePixels(
-    cssWidth,
-    pixelRatio,
-    SIZE_QUANTUM_PIXELS,
-    MINIMUM_SIZE_PIXELS,
-    MAXIMUM_SIZE_PIXELS
-  );
-}
-
-/**
- * Quantize a canvas's device-pixel size along one axis into a bounded edge
- * length, so small resizes don't trigger a replan.
- * @param cssSize Canvas element size along the axis, in CSS pixels.
- * @param pixelRatio Device pixel ratio.
- * @param quantum Step device pixels are rounded down to.
- * @param minimum Lower bound on the quantized size, in device pixels.
- * @param maximum Upper bound on the quantized size, in device pixels.
- */
-export function quantizeSizePixels(
-  cssSize: number,
-  pixelRatio: number,
-  quantum: number,
-  minimum: number,
-  maximum: number
-): number {
-  if (cssSize === 0) return 0;
-  const devicePixels = cssSize * pixelRatio;
-  const quantized = Math.floor(devicePixels / quantum) * quantum;
-  return clamp(quantized, minimum, maximum);
+  if (cssWidth === 0) return 0;
+  const devicePixels = cssWidth * pixelRatio;
+  const quantized =
+    Math.floor(devicePixels / SIZE_QUANTUM_PIXELS) * SIZE_QUANTUM_PIXELS;
+  return clamp(quantized, MINIMUM_SIZE_PIXELS, MAXIMUM_SIZE_PIXELS);
 }
 
 /**
@@ -170,21 +145,19 @@ export function getContourPolygonPoints(
  * @param rect Canvas element's bounding rect.
  * @param clientX Pointer's viewport x coordinate.
  * @param clientY Pointer's viewport y coordinate.
- * @param widthPixels Edge length of the slice along u, in pixels.
- * @param heightPixels Edge length of the slice along v, in pixels.
+ * @param sizePixels Edge length of the square slice, in pixels.
  */
 export function getSlicePixelFromRect(
   rect: DOMRect,
   clientX: number,
   clientY: number,
-  widthPixels: number,
-  heightPixels: number
+  sizePixels: number
 ): { x: number; y: number } | null {
   if (rect.width <= 0 || rect.height <= 0) return null;
 
-  const x = Math.floor(((clientX - rect.left) / rect.width) * widthPixels);
-  const y = Math.floor(((clientY - rect.top) / rect.height) * heightPixels);
-  if (x < 0 || y < 0 || x >= widthPixels || y >= heightPixels) return null;
+  const x = Math.floor(((clientX - rect.left) / rect.width) * sizePixels);
+  const y = Math.floor(((clientY - rect.top) / rect.height) * sizePixels);
+  if (x < 0 || y < 0 || x >= sizePixels || y >= sizePixels) return null;
   return { x, y };
 }
 

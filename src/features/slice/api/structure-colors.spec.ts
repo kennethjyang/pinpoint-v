@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { makeTerminologyRow } from "@/test/fixtures";
 import {
   buildStructureColors,
-  buildStructureIndex,
   findStructureByAnnotationValue
 } from "./structure-colors.api";
 
@@ -65,21 +64,5 @@ describe("findStructureByAnnotationValue", () => {
 
   it("returns null for an empty row list", () => {
     expect(findStructureByAnnotationValue([], 8)).toBeNull();
-  });
-});
-
-describe("buildStructureIndex", () => {
-  it("maps each row's annotation value to itself", () => {
-    const rowA = makeTerminologyRow({ annotation_value: 8, identifier: 8 });
-    const rowB = makeTerminologyRow({ annotation_value: 9, identifier: 9 });
-
-    const index = buildStructureIndex([rowA, rowB]);
-
-    expect(index.get(8)).toBe(rowA);
-    expect(index.get(9)).toBe(rowB);
-  });
-
-  it("returns undefined for an unknown value", () => {
-    expect(buildStructureIndex([]).get(999)).toBeUndefined();
   });
 });

@@ -8,8 +8,7 @@ function makeResult(
   overrides: Partial<SampleResult> = {}
 ): SampleResult {
   return {
-    widthPixels: sizePixels,
-    heightPixels: sizePixels,
+    sampleCount: sizePixels * sizePixels,
     annotationValues: new Uint32Array(sizePixels * sizePixels),
     pixels: new Uint8ClampedArray(sizePixels * sizePixels * 4),
     paintedChunkCount: 1,
@@ -50,28 +49,6 @@ function makeCanvasStub(): HTMLCanvasElement & {
 }
 
 describe("useSliceCanvasPainter", () => {
-  it("sizes the backing store independently per axis for a non-square result", async () => {
-    const canvas = ref(makeCanvasStub());
-    const result = ref<SampleResult | null>(null);
-    const probeId = ref("probe-a");
-    const { unmount } = mountWithPainter(canvas, result, probeId);
-    await nextTick();
-
-    result.value = {
-      widthPixels: 4,
-      heightPixels: 16,
-      annotationValues: new Uint32Array(64),
-      pixels: new Uint8ClampedArray(64 * 4),
-      paintedChunkCount: 1,
-      totalChunkCount: 1
-    };
-    await nextTick();
-
-    expect(canvas.value.width).toBe(4);
-    expect(canvas.value.height).toBe(16);
-    unmount();
-  });
-
   it("paints once a result streams in, once mounted", async () => {
     const canvas = ref(makeCanvasStub());
     const result = ref<SampleResult | null>(null);

@@ -35,16 +35,14 @@ describe("getProbeSlicePlane", () => {
     expect(tipPlane.centerMillimeters).toEqual(frame.originMillimeters);
   });
 
-  it("sets equal half-extents and pixel dimensions from the given extent", () => {
+  it("sets halfExtentMillimeters to half the given extent", () => {
     const probe = makeProbe();
     const frame = getProbeFrame(probe, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 4, 32);
 
-    expect(plane.halfWidthMillimeters).toBe(2);
-    expect(plane.halfHeightMillimeters).toBe(2);
-    expect(plane.widthPixels).toBe(32);
-    expect(plane.heightPixels).toBe(32);
+    expect(plane.halfExtentMillimeters).toBe(2);
+    expect(plane.sizePixels).toBe(32);
   });
 
   it("carries the frame's right and up axes through unchanged", () => {
@@ -209,23 +207,17 @@ describe("getSlicePixelFromRect", () => {
   const rect = { left: 0, top: 0, width: 16, height: 16 } as DOMRect;
 
   it("maps a point within the rect to a device pixel", () => {
-    expect(getSlicePixelFromRect(rect, 8, 8, 16, 16)).toEqual({ x: 8, y: 8 });
-  });
-
-  it("maps independently per axis for a non-square slice", () => {
-    // Rect is 16x16 but the slice is 4 wide x 16 tall - x must scale by 4/16,
-    // y by 16/16, so (8, 8) lands at device pixel (2, 8), not (8, 8).
-    expect(getSlicePixelFromRect(rect, 8, 8, 4, 16)).toEqual({ x: 2, y: 8 });
+    expect(getSlicePixelFromRect(rect, 8, 8, 16)).toEqual({ x: 8, y: 8 });
   });
 
   it("returns null outside the rect", () => {
-    expect(getSlicePixelFromRect(rect, -1, 0, 16, 16)).toBeNull();
-    expect(getSlicePixelFromRect(rect, 16, 0, 16, 16)).toBeNull();
+    expect(getSlicePixelFromRect(rect, -1, 0, 16)).toBeNull();
+    expect(getSlicePixelFromRect(rect, 16, 0, 16)).toBeNull();
   });
 
   it("returns null for a degenerate rect", () => {
     const zeroRect = { left: 0, top: 0, width: 0, height: 0 } as DOMRect;
-    expect(getSlicePixelFromRect(zeroRect, 0, 0, 16, 16)).toBeNull();
+    expect(getSlicePixelFromRect(zeroRect, 0, 0, 16)).toBeNull();
   });
 });
 

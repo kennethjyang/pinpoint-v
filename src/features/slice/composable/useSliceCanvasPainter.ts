@@ -1,5 +1,8 @@
 import { onMounted, type Ref, watch } from "vue";
-import { isSampleResultComplete } from "../api/sample-result.api";
+import {
+  getSampleEdgeLength,
+  isSampleResultComplete
+} from "../api/sample-result.api";
 import type { SampleResult } from "../models/sample-result.model";
 
 /**
@@ -35,18 +38,16 @@ export function useSliceCanvasPainter(
   function drawSlice(): void {
     const element = canvas.value;
     const slice = result.value;
-    if (!element || !slice) return;
+    if (!element || !slice?.pixels) return;
 
-    const { widthPixels, heightPixels } = slice;
+    const size = getSampleEdgeLength(slice);
     const isCanvasCurrent =
-      element.width === widthPixels &&
-      element.height === heightPixels &&
-      paintedProbeId === probeId.value;
+      element.width === size && paintedProbeId === probeId.value;
     if (isCanvasCurrent && !isSampleResultComplete(slice)) return;
 
-    if (element.width !== widthPixels || element.height !== heightPixels) {
-      element.width = widthPixels;
-      element.height = heightPixels;
+    if (element.width !== size) {
+      element.width = size;
+      element.height = size;
     }
 
     const context = element.getContext("2d");
@@ -56,11 +57,7 @@ export function useSliceCanvasPainter(
     // that also covers SharedArrayBuffer); `ImageData` only accepts the
     // narrower `ArrayBuffer`-backed variant, so this is a type-only mismatch.
     const pixels = slice.pixels as Uint8ClampedArray<ArrayBuffer>;
-    context.putImageData(
-      new ImageData(pixels, widthPixels, heightPixels),
-      0,
-      0
-    );
+    context.putImageData(new ImageData(pixels, size, size), 0, 0);
     paintedProbeId = probeId.value;
   }
 

@@ -54,17 +54,4 @@ export interface Probe {
    * in probe-local mm.
    */
   sliceCenterHeightMillimeters: number;
-
-  /**
-   * Bottom of the channel map's visible depth range, in probe-local mm off
-   * the tip.
-   */
-  channelMapRangeStartMillimeters: number;
-
-  /**
-   * Top of the channel map's visible depth range, in probe-local mm off the
-   * tip. Null until the user picks a range, so the channel map can default
-   * it to the full contour height instead of a fixed value.
-   */
-  channelMapRangeEndMillimeters: number | null;
 }

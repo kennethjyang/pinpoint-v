@@ -12,9 +12,5 @@ export {
   isProbe,
   isProbeInterfaceProbe
 } from "./api/probe.api";
-export type {
-  ProbeContacts,
-  ProbeContactShape,
-  ProbeContour
-} from "./api/contour.api";
-export { getProbeContacts, getProbeContour } from "./api/contour.api";
+export type { ProbeContour } from "./api/contour.api";
+export { getProbeContour } from "./api/contour.api";
