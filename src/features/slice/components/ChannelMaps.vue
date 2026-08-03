@@ -8,9 +8,8 @@ import {
   getProbeChannelMapWindow,
   setProbeChannelMapWindow
 } from "../api/slice-plane.api";
+import type { ChannelMapsZoom } from "../models/channel-maps-zoom.model";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
-
-type ChannelMapsZoom = "small" | "medium" | "large";
 
 interface ZoomStyles {
   /** Layout classes for the card header. */
@@ -184,6 +183,7 @@ const channelMaps = computed(() =>
                 :height-millimeters="heightMillimeters"
                 :probe="probe"
                 :shanks="shanks"
+                :zoom-selection="zoomSelection"
               />
             </q-intersection>
             <div

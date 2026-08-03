@@ -14,12 +14,15 @@ import {
 } from "../api/slice-plane.api";
 import { useAnnotationSampler } from "../composable/useAnnotationSampler";
 import { useSliceCanvasPainter } from "../composable/useSliceCanvasPainter";
+import type { ChannelMapsZoom } from "../models/channel-maps-zoom.model";
 
-const { probe, shanks, heightMillimeters } = defineProps<{
+const { probe, shanks, heightMillimeters, zoomSelection } = defineProps<{
   probe: Probe;
   shanks: ProbeShank[];
   /** Height of the probe's contour, spanned by every shank. */
   heightMillimeters: number;
+  /** Zoom level controlling whether the contour and contacts overlay render. */
+  zoomSelection: ChannelMapsZoom;
 }>();
 
 const currentExperiment = useCurrentExperimentStore();
@@ -85,6 +88,10 @@ const overlays = computed(() =>
   }))
 );
 
+/** Contour renders at medium and large zoom; contacts only at large zoom. */
+const showContour = computed(() => zoomSelection !== "small");
+const showContacts = computed(() => zoomSelection === "large");
+
 /** Accessible label naming the probe. */
 const ariaLabel = computed(() => t("slice.channelMap", { name: probe.name }));
 
@@ -104,7 +111,7 @@ useSliceCanvasPainter(
       :aria-label="ariaLabel"
     />
     <svg
-      v-if="viewBox"
+      v-if="viewBox && showContour"
       class="fit absolute-top channel-map-canvas__overlay"
       :viewBox="viewBox"
       preserveAspectRatio="none"
@@ -117,7 +124,7 @@ useSliceCanvasPainter(
       >
         <path :d="overlay.outlinePath" class="channel-map-canvas__contour" />
         <path
-          v-if="overlay.contactsPath"
+          v-if="showContacts && overlay.contactsPath"
           :d="overlay.contactsPath"
           class="channel-map-canvas__contacts"
         />

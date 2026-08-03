@@ -85,7 +85,10 @@ function makeSampleResult(
 }
 
 describe("ChannelMapCanvas", () => {
-  function mountCanvas(channelMapWindow: ProbeChannelMapWindow | null = null) {
+  function mountCanvas(
+    channelMapWindow: ProbeChannelMapWindow | null = null,
+    zoomSelection: "small" | "medium" | "large" = "large"
+  ) {
     vi.mocked(getManifest).mockResolvedValue(null);
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     capturedGeometry = null;
@@ -116,7 +119,12 @@ describe("ChannelMapCanvas", () => {
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
+      props: {
+        probe,
+        shanks,
+        heightMillimeters: contour.heightMillimeters,
+        zoomSelection
+      }
     });
     return { wrapper, store, probe, shanks, contour };
   }
@@ -220,7 +228,12 @@ describe("ChannelMapCanvas", () => {
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
+      props: {
+        probe,
+        shanks,
+        heightMillimeters: contour.heightMillimeters,
+        zoomSelection: "large"
+      }
     });
 
     expect(wrapper.find(".channel-map-canvas__contour").exists()).toBe(true);
@@ -253,7 +266,12 @@ describe("ChannelMapCanvas", () => {
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
-      props: { probe, shanks, heightMillimeters: contour.heightMillimeters }
+      props: {
+        probe,
+        shanks,
+        heightMillimeters: contour.heightMillimeters,
+        zoomSelection: "large"
+      }
     });
 
     expect(wrapper.findAll("canvas")).toHaveLength(1);
@@ -289,5 +307,25 @@ describe("ChannelMapCanvas", () => {
     expect(canvas.attributes("aria-label")).toBe(
       `In-plane slice for ${probe.name}`
     );
+  });
+
+  it("renders no overlay at small zoom", () => {
+    const { wrapper } = mountCanvas(null, "small");
+
+    expect(wrapper.find(".channel-map-canvas__overlay").exists()).toBe(false);
+  });
+
+  it("renders the contour but no contacts at medium zoom", () => {
+    const { wrapper } = mountCanvas(null, "medium");
+
+    expect(wrapper.find(".channel-map-canvas__contour").exists()).toBe(true);
+    expect(wrapper.find(".channel-map-canvas__contacts").exists()).toBe(false);
+  });
+
+  it("renders both the contour and contacts at large zoom", () => {
+    const { wrapper } = mountCanvas(null, "large");
+
+    expect(wrapper.find(".channel-map-canvas__contour").exists()).toBe(true);
+    expect(wrapper.find(".channel-map-canvas__contacts").exists()).toBe(true);
   });
 });

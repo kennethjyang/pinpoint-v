@@ -234,6 +234,24 @@ describe("ChannelMaps", () => {
     ).toHaveLength(2);
   });
 
+  it("passes the current zoom selection down to the canvas", async () => {
+    const { wrapper } = mountChannelMaps();
+    await triggerIntersection(true);
+
+    expect(
+      wrapper.findComponent({ name: "ChannelMapCanvas" }).props("zoomSelection")
+    ).toBe("large");
+
+    const mediumButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(btn => btn.text() === "Medium")!;
+    await mediumButton.trigger("click");
+
+    expect(
+      wrapper.findComponent({ name: "ChannelMapCanvas" }).props("zoomSelection")
+    ).toBe("medium");
+  });
+
   it("renders a channel map window slider for the contoured probe only, bound to its full window", () => {
     const { wrapper } = mountChannelMaps();
 
