@@ -25,6 +25,9 @@ const MINIMUM_SIZE_PIXELS = 128;
 const MAXIMUM_SIZE_PIXELS = 1024;
 const SIZE_QUANTUM_PIXELS = 32;
 
+/** Blank device pixels left between adjacent shanks in a packed layout. */
+const SHANK_GAP_PIXELS = 5;
+
 /** A slice zoom range, as log2 mm exponents. */
 export interface SliceZoomExponentRange {
   minimum: number;
@@ -123,7 +126,7 @@ export interface ShankPlacement {
 
 /** A packed multi-shank slice layout: one shared scale plus per-shank placements. */
 export interface ShankLayout {
-  /** Placements left to right, with contiguous `columnOffset`s starting at 0. */
+  /** Placements left to right, starting at columnOffset 0; consecutive placements may leave an unsampled gap between them. */
   placements: ShankPlacement[];
   /** Total output width, in pixels. */
   widthPixels: number;
@@ -136,8 +139,9 @@ export interface ShankLayout {
 }
 
 /**
- * Pack a probe's shanks edge to edge into one output image, at the shanks'
- * true aspect ratio and a height quantized like every other slice canvas.
+ * Pack a probe's shanks left to right into one output image, at the shanks'
+ * true aspect ratio and a height quantized like every other slice canvas,
+ * leaving a blank gap between adjacent shanks.
  * Null while unmeasured or when there is nothing with width to draw.
  * @param shanks Shanks to pack, left to right.
  * @param heightMillimeters Height of the probe's contour, spanned by every shank.
@@ -167,14 +171,19 @@ export function getShankLayout(
   );
   if (totalWidthMillimeters <= 0) return null;
 
+  const totalGapPixels = SHANK_GAP_PIXELS * (shanks.length - 1);
   let pixelsPerMillimeter = heightPixels / heightMillimeters;
-  if (totalWidthMillimeters * pixelsPerMillimeter > MAXIMUM_SIZE_PIXELS) {
-    pixelsPerMillimeter = MAXIMUM_SIZE_PIXELS / totalWidthMillimeters;
+  if (
+    totalWidthMillimeters * pixelsPerMillimeter + totalGapPixels >
+    MAXIMUM_SIZE_PIXELS
+  ) {
+    pixelsPerMillimeter =
+      (MAXIMUM_SIZE_PIXELS - totalGapPixels) / totalWidthMillimeters;
   }
 
   const placements: ShankPlacement[] = [];
   let columnOffset = 0;
-  for (const shank of shanks) {
+  for (const [index, shank] of shanks.entries()) {
     const columnCount = Math.max(
       1,
       Math.round(shank.widthMillimeters * pixelsPerMillimeter)
@@ -187,6 +196,7 @@ export function getShankLayout(
         columnOffset / pixelsPerMillimeter - shank.minimumXMillimeters
     });
     columnOffset += columnCount;
+    if (index < shanks.length - 1) columnOffset += SHANK_GAP_PIXELS;
   }
 
   const widthPixels = columnOffset;

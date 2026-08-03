@@ -115,7 +115,7 @@ describe("getShankLayout", () => {
     expect(layout.pixelsPerMillimeter).toBeCloseTo(57.6, 10);
   });
 
-  it("packs each shank into contiguous columns proportional to its width", () => {
+  it("packs each shank into columns proportional to its width, leaving a 5px gap after each but the last", () => {
     const layout = getShankLayout(
       shanks,
       twoShankContour.heightMillimeters,
@@ -124,9 +124,9 @@ describe("getShankLayout", () => {
     )!;
 
     expect(layout.placements.map(p => p.columnCount)).toEqual([6, 6]);
-    expect(layout.placements.map(p => p.columnOffset)).toEqual([0, 6]);
-    expect(layout.widthPixels).toBe(12);
-    expect(layout.widthMillimeters).toBeCloseTo(0.208333, 5);
+    expect(layout.placements.map(p => p.columnOffset)).toEqual([0, 11]);
+    expect(layout.widthPixels).toBe(17);
+    expect(layout.widthMillimeters).toBeCloseTo(0.295139, 5);
   });
 
   it("offsets each shank's probe-local x into packed overlay space", () => {
@@ -138,7 +138,34 @@ describe("getShankLayout", () => {
     )!;
 
     expect(layout.placements[0]!.offsetMillimeters).toBeCloseTo(1, 5);
-    expect(layout.placements[1]!.offsetMillimeters).toBeCloseTo(-0.795833, 5);
+    expect(layout.placements[1]!.offsetMillimeters).toBeCloseTo(-0.709028, 5);
+  });
+
+  it("has no gap - and no gap-sized offset - for a single shank", () => {
+    const singleShankDefinition = makeProbeInterfaceProbe({
+      si_units: "mm",
+      probe_planar_contour: [
+        [-0.035, 0],
+        [0.035, 0],
+        [0.035, 10],
+        [-0.035, 10]
+      ]
+    });
+    const singleShankContour = getProbeContour(singleShankDefinition)!;
+    const singleShanks = getProbeShanks(
+      singleShankDefinition,
+      singleShankContour
+    );
+
+    const layout = getShankLayout(
+      singleShanks,
+      singleShankContour.heightMillimeters,
+      600,
+      1
+    )!;
+
+    expect(layout.placements).toHaveLength(1);
+    expect(layout.widthPixels).toBe(layout.placements[0]!.columnCount);
   });
 
   it("returns null while unmeasured", () => {

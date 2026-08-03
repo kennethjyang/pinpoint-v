@@ -16,9 +16,10 @@ export interface SampleBand {
 /**
  * An oriented sampling surface through the annotation volume, sampled
  * row-major with row 0 at the +up edge. Horizontally it is one or more bands
- * packed edge to edge across `widthPixels`; a one-band geometry is a plain
- * rectangle, and a square is additionally `halfHeightMillimeters ===
- * bands[0].halfWidthMillimeters` with `heightPixels === widthPixels`.
+ * arranged left to right across `widthPixels`, possibly with unsampled gaps
+ * between them; a one-band geometry with no gap is a plain rectangle, and a
+ * square is additionally `halfHeightMillimeters === bands[0].halfWidthMillimeters`
+ * with `heightPixels === widthPixels`.
  */
 export interface SampleGeometry {
   /** Unit ASR direction of the +u (rightward) axis, shared by every band. */
@@ -27,10 +28,10 @@ export interface SampleGeometry {
   upMillimeters: [number, number, number];
   /** Half the v extent, in mm, shared by every band. */
   halfHeightMillimeters: number;
-  /** Total edge length of the output along u, in pixels - the sum of every band's `columnCount`. */
+  /** Total edge length of the output along u, in pixels - at least the sum of every band's `columnCount`, more if bands leave gaps between them. */
   widthPixels: number;
   /** Edge length of the output along v, in pixels. */
   heightPixels: number;
-  /** Bands packed left to right, with contiguous `columnOffset`s starting at 0. */
+  /** Bands left to right, starting at columnOffset 0; consecutive bands may leave an unsampled gap between them. */
   bands: SampleBand[];
 }

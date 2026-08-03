@@ -234,11 +234,11 @@ describe("ChannelMapCanvas", () => {
     expect(wrapper.findAll("canvas")).toHaveLength(1);
 
     expect(capturedGeometry).not.toBeNull();
-    expect(capturedGeometry!.widthPixels).toBe(12);
+    expect(capturedGeometry!.widthPixels).toBe(17);
     expect(capturedGeometry!.heightPixels).toBe(576);
     expect(capturedGeometry!.bands).toHaveLength(2);
     expect(capturedGeometry!.bands.map(band => band.columnOffset)).toEqual([
-      0, 6
+      0, 11
     ]);
     expect(capturedGeometry!.bands.map(band => band.columnCount)).toEqual([
       6, 6
@@ -258,7 +258,7 @@ describe("ChannelMapCanvas", () => {
     const secondTranslateX = Number(
       groups[1]!.attributes("transform")!.match(/translate\(([^ ]+) /)![1]
     );
-    expect(secondTranslateX).toBeCloseTo(-0.795833, 5);
+    expect(secondTranslateX).toBeCloseTo(-0.709028, 5);
 
     const canvas = wrapper.find("canvas");
     expect(canvas.attributes("aria-label")).toBe(
