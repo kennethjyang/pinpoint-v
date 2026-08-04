@@ -90,6 +90,13 @@ const numberRules: ValidationRule<string>[] = [
   <div class="column q q-gutter-y-md probe-inspector">
     <SliceCanvas :probe="probe" />
 
+    <q-btn-group spread>
+      <q-btn icon="home" />
+      <q-btn icon="content_copy" />
+      <q-btn icon="pin_drop" />
+      <q-btn icon="lock" />
+    </q-btn-group>
+
     <CommittedInput
       v-model="name"
       :label="t('probeInspector.name')"
