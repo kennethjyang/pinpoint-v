@@ -5,7 +5,11 @@ import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 import ChannelMaps from "./ChannelMaps.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  makeProbe,
+  makeProbeInterfaceProbe,
+  makeTerminologyRow
+} from "@/test/fixtures";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
@@ -138,7 +142,7 @@ describe("ChannelMaps", () => {
     expect(viewports).toHaveLength(1);
     const style = viewports[0]!.attributes("style")!;
     expect(style).toContain("height: 70vh");
-    expect(style).toContain("aspect-ratio: 0.056");
+    expect(style).toContain("aspect-ratio: 0.168");
   });
 
   it("resizes the viewport when the zoom toggle changes", async () => {
@@ -149,18 +153,20 @@ describe("ChannelMaps", () => {
       .find(btn => btn.text() === "Small")!;
     await smallButton.trigger("click");
 
-    expect(
-      wrapper.find(".channel-maps__viewport").attributes("style")
-    ).toContain("height: 15vh");
+    // Small hides the label gutter, so the aspect ratio drops to the
+    // shank-only ratio (no `+ gutterMillimeters` term).
+    let style = wrapper.find(".channel-maps__viewport").attributes("style");
+    expect(style).toContain("height: 15vh");
+    expect(style).toContain("aspect-ratio: 0.056");
 
     const mediumButton = wrapper
       .findAllComponents({ name: "QBtn" })
       .find(btn => btn.text() === "Medium")!;
     await mediumButton.trigger("click");
 
-    expect(
-      wrapper.find(".channel-maps__viewport").attributes("style")
-    ).toContain("height: 30vh");
+    style = wrapper.find(".channel-maps__viewport").attributes("style");
+    expect(style).toContain("height: 30vh");
+    expect(style).toContain("aspect-ratio: 0.168");
   });
 
   it("shows the no-contour message and no viewport for a probe without a usable contour", () => {
@@ -221,7 +227,7 @@ describe("ChannelMaps", () => {
     const aspectRatio = Number(
       viewport.attributes("style")!.match(/aspect-ratio: ([\d.]+)/)![1]
     );
-    expect(aspectRatio).toBeCloseTo(0.16, 10);
+    expect(aspectRatio).toBeCloseTo(0.32, 10);
 
     expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(0);
     await triggerIntersection(true);
@@ -301,5 +307,27 @@ describe("ChannelMaps", () => {
     expect(
       wrapper.findComponent({ name: "QRange" }).props("modelValue")
     ).toEqual({ min: 0, max: 7 });
+  });
+
+  it("renders the hovered structure's tooltip, and removes it when the hover clears", async () => {
+    const { wrapper } = mountChannelMaps();
+    await triggerIntersection(true);
+
+    const canvas = wrapper.findComponent({ name: "ChannelMapCanvas" });
+    const structure = makeTerminologyRow({
+      abbreviation: "CTX",
+      name: "Cortex"
+    });
+    canvas.vm.$emit("hover", { structure, clientX: 100, clientY: 50 });
+    await nextTick();
+
+    const tooltip = wrapper.find(".channel-maps__tooltip");
+    expect(tooltip.exists()).toBe(true);
+    expect(tooltip.text()).toBe("CTX - Cortex");
+
+    canvas.vm.$emit("hover", null);
+    await nextTick();
+
+    expect(wrapper.find(".channel-maps__tooltip").exists()).toBe(false);
   });
 });
