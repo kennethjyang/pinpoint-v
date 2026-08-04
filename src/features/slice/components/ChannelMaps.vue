@@ -208,10 +208,6 @@ const channelMaps = computed(() =>
   &__viewport
     min-width: 1px
 
-    // QIntersection renders its slot inside a plain div of its own, which
-    // must stretch for the shank row to fill the sized viewport. Scoped to
-    // the direct child only - going deeper would also force width: 100% onto
-    // each shank's flex cell, defeating flex-grow's proportional sizing.
     :deep(> div)
       width: 100%
       height: 100%
