@@ -35,7 +35,9 @@ const { t } = useI18n();
 
 const square = useTemplateRef<HTMLDivElement>("square");
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
-const { width, height: squareHeight } = useElementSize(square);
+const { width, height: squareHeight } = useElementSize(square, undefined, {
+  box: "border-box"
+});
 const { pixelRatio } = useDevicePixelRatio();
 
 /** Annotation value currently under the pointer, or 0 for background/none. */
@@ -205,7 +207,11 @@ useSliceCanvasPainter(
     />
 
     <div class="col column">
-      <div ref="square" class="slice-canvas__square relative-position">
+      <div
+        ref="square"
+        class="slice-canvas__square relative-position"
+        :style="{ height: `${width}px` }"
+      >
         <canvas
           ref="canvas"
           class="fit slice-canvas__canvas"
@@ -271,7 +277,6 @@ useSliceCanvasPainter(
 
   &__square
     position: relative
-    aspect-ratio: 1
     border: 1px solid $separator-color
     border-radius: $generic-border-radius
     overflow: hidden
