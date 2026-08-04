@@ -90,12 +90,6 @@ const plane = computed(() => {
 const { createStream, structureIndex } = useAnnotationSampler();
 const { result, isLoading } = createStream(plane);
 
-/**
- * Whether to show the loading bar. Sampling is usually fast enough that
- * binding the bar straight to `isLoading` strobes it - a window slider drag
- * replans every frame - so it only appears once loading has run past
- * `LOADING_BAR_DELAY_MILLISECONDS`, and hides the moment loading ends.
- */
 const isLoadingBarVisible = useDelayedFlag(
   isLoading,
   LOADING_BAR_DELAY_MILLISECONDS
