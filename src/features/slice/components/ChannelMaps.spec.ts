@@ -330,4 +330,51 @@ describe("ChannelMaps", () => {
 
     expect(wrapper.find(".channel-maps__tooltip").exists()).toBe(false);
   });
+
+  it("outlines the card of the selected probe only", async () => {
+    const { wrapper, store } = mountChannelMaps();
+    store.selectedInspectable = store.experiment.probes[0]!;
+    await nextTick();
+
+    const cards = wrapper.findAllComponents({ name: "QCard" });
+    const contouredCard = cards.find(card =>
+      card.text().includes("Contoured probe")
+    )!;
+    const contourlessCard = cards.find(card =>
+      card.text().includes("Contourless probe")
+    )!;
+
+    expect(contouredCard.classes()).toContain("channel-maps__card--selected");
+    expect(contourlessCard.classes()).not.toContain(
+      "channel-maps__card--selected"
+    );
+  });
+
+  it("selects the probe when its card is clicked", async () => {
+    const { wrapper, store } = mountChannelMaps();
+
+    const contourlessCard = wrapper
+      .findAllComponents({ name: "QCard" })
+      .find(card => card.text().includes("Contourless probe"))!;
+    await contourlessCard.trigger("click");
+
+    expect(store.selectedInspectable).toEqual(store.experiment.probes[1]);
+  });
+
+  it("selects the probe from its header name button and reflects it in aria-pressed", async () => {
+    const { wrapper, store } = mountChannelMaps();
+
+    const nameButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(btn => btn.text() === "Contoured probe")!;
+    expect(nameButton.attributes("aria-pressed")).toBe("false");
+
+    await nameButton.trigger("click");
+
+    expect(store.selectedInspectable).toEqual(store.experiment.probes[0]);
+    const updatedButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(btn => btn.text() === "Contoured probe")!;
+    expect(updatedButton.attributes("aria-pressed")).toBe("true");
+  });
 });

@@ -179,6 +179,14 @@ const tooltipStyle = computed(() => {
             channelMapWindow
           } of channelMaps"
           :key="probe.id"
+          :class="[
+            'channel-maps__card',
+            {
+              'channel-maps__card--selected':
+                currentExperimentStore.isInspectableSelected(probe)
+            }
+          ]"
+          @click="currentExperimentStore.selectedInspectable = probe"
         >
           <q-card-section :class="styles.header">
             <q-icon
@@ -186,7 +194,17 @@ const tooltipStyle = computed(() => {
               name="radio_button_checked"
               size="sm"
             />
-            <div :class="styles.name">{{ probe.name }}</div>
+            <q-btn
+              :aria-pressed="
+                currentExperimentStore.isInspectableSelected(probe)
+              "
+              flat
+              dense
+              no-caps
+              @click="currentExperimentStore.selectedInspectable = probe"
+            >
+              <div :class="styles.name">{{ probe.name }}</div>
+            </q-btn>
           </q-card-section>
           <q-separator />
           <q-card-section class="flex flex-center q-pa-sm">
@@ -260,6 +278,17 @@ const tooltipStyle = computed(() => {
 .channel-maps
   &__scroll
     overflow-y: auto
+
+  &__card
+    border: 2px solid transparent
+    cursor: pointer
+
+    &:hover
+      border-color: rgba($primary, 0.4)
+
+    &--selected,
+    &--selected:hover
+      border-color: $primary
 
   &__viewport
     min-width: 1px
