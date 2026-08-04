@@ -94,7 +94,7 @@ const numberRules: ValidationRule<string>[] = [
       <q-btn icon="home" />
       <q-btn icon="content_copy" />
       <q-btn icon="pin_drop" />
-      <q-btn icon="lock" />
+      <q-btn icon="sym_o_lock_open_right" />
     </q-btn-group>
 
     <CommittedInput
