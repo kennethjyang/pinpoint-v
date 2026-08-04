@@ -354,16 +354,68 @@ describe("ChannelMapCanvas", () => {
     mockResult.value = result;
     await nextTick();
 
-    // Run spans rows 1-2 of 4, centered at (1 + 3) / (2 * 4) = 50%. happy-dom's
-    // CSSOM rejects the `top` declaration's min()/max() functions outright
-    // (unlike real browsers, which support them), so only the fixed line
-    // box - not the vertical clamp - is checkable here; the clamp is
-    // exercised by `getStructureLabelRuns`'s unit tests and the manual
-    // browser smoke test.
+    // Run spans rows 1-2 of 4, centered at (1 + 3) / (2 * 4) = 50% of the
+    // mocked 600px gutter, minus half a 12px line box: 300 - 6 = 294px.
     const labels = wrapper.findAll(".channel-map-canvas__label");
     expect(labels).toHaveLength(1);
     expect(labels[0]!.text()).toBe("CTX");
     expect(labels[0]!.attributes("style")).toContain("line-height: 12px");
+    expect(labels[0]!.attributes("style")).toContain("top: 294px");
+  });
+
+  it("renders only the largest-area structure when two runs crowd each other", async () => {
+    const cortex = makeTerminologyRow({
+      annotation_value: 8,
+      abbreviation: "CTX",
+      name: "Cortex"
+    });
+    const thalamus = makeTerminologyRow({
+      annotation_value: 9,
+      abbreviation: "TH",
+      name: "Thalamus"
+    });
+    const { wrapper } = mountCanvas(null, "large", [cortex, thalamus]);
+    await flushPromises();
+
+    const result = makeSampleResult(1, 1200);
+    for (let row = 100; row < 120; row++) result.annotationValues[row] = 8;
+    for (let row = 120; row < 160; row++) result.annotationValues[row] = 9;
+    mockResult.value = result;
+    await nextTick();
+
+    // CTX spans 20 rows centred at 220 / 2400 (top 49px), TH spans 40 rows
+    // centred at 280 / 2400 (top 64px): 15px apart, inside the 24px exclusion
+    // gap, so only TH's larger area survives.
+    const labels = wrapper.findAll(".channel-map-canvas__label");
+    expect(labels).toHaveLength(1);
+    expect(labels[0]!.text()).toBe("TH");
+    expect(labels[0]!.attributes("style")).toContain("top: 64px");
+  });
+
+  it("renders both structures when their runs are far apart", async () => {
+    const cortex = makeTerminologyRow({
+      annotation_value: 8,
+      abbreviation: "CTX",
+      name: "Cortex"
+    });
+    const thalamus = makeTerminologyRow({
+      annotation_value: 9,
+      abbreviation: "TH",
+      name: "Thalamus"
+    });
+    const { wrapper } = mountCanvas(null, "large", [cortex, thalamus]);
+    await flushPromises();
+
+    const result = makeSampleResult(1, 1200);
+    for (let row = 0; row < 20; row++) result.annotationValues[row] = 8;
+    for (let row = 1000; row < 1020; row++) result.annotationValues[row] = 9;
+    mockResult.value = result;
+    await nextTick();
+
+    const labels = wrapper.findAll(".channel-map-canvas__label");
+    expect(labels.map(label => label.text())).toEqual(["CTX", "TH"]);
+    expect(labels[0]!.attributes("style")).toContain("top: 0px");
+    expect(labels[1]!.attributes("style")).toContain("top: 499px");
   });
 
   it("renders no labels from a partial result", async () => {

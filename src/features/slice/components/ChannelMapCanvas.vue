@@ -12,6 +12,7 @@ import { useI18n } from "vue-i18n";
 import type { Probe, ProbeShank } from "@/features/probe";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
+  getChannelMapLabels,
   getChannelMapWidths,
   getStructureLabelRuns
 } from "../api/channel-map-label.api";
@@ -145,26 +146,21 @@ const structureIndex = computed(() =>
   buildStructureIndex(currentExperiment.terminologyRows)
 );
 
-/** One left-aligned abbreviation per structure run, centred on the run and kept inside the canvas box. */
+/** One gutter line per structure run, with crowded runs reduced to the largest. */
 const labels = computed(() =>
-  (completeResult.value
-    ? getStructureLabelRuns(completeResult.value)
-    : []
-  ).flatMap(run => {
-    const structure = structureIndex.value.get(run.annotationValue);
-    return structure
-      ? [
-          {
-            key: `${run.annotationValue}-${run.centerFraction}`,
-            abbreviation: structure.abbreviation,
-            style: {
-              lineHeight: `${LABEL_LINE_HEIGHT_PIXELS}px`,
-              top: `min(max(0px, calc(${run.centerFraction * 100}% - ${LABEL_LINE_HEIGHT_PIXELS / 2}px)), calc(100% - ${LABEL_LINE_HEIGHT_PIXELS}px))`
-            }
-          }
-        ]
-      : [];
-  })
+  getChannelMapLabels(
+    completeResult.value ? getStructureLabelRuns(completeResult.value) : [],
+    structureIndex.value,
+    height.value,
+    LABEL_LINE_HEIGHT_PIXELS
+  ).map(({ key, abbreviation, topPixels }) => ({
+    key,
+    abbreviation,
+    style: {
+      lineHeight: `${LABEL_LINE_HEIGHT_PIXELS}px`,
+      top: `${topPixels}px`
+    }
+  }))
 );
 
 /**

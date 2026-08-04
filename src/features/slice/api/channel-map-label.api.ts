@@ -18,6 +18,18 @@ export interface StructureLabelRun {
   annotationValue: number;
   /** Fraction down the sampled image the run's midpoint sits at. */
   centerFraction: number;
+  /** Samples the structure occupies inside the run, across every shank column. */
+  areaPixels: number;
+}
+
+/** One placed line of a channel map's label gutter. */
+export interface ChannelMapLabel {
+  /** Stable key for the line, unique within a gutter. */
+  key: string;
+  /** Abbreviation of the structure the line names. */
+  abbreviation: string;
+  /** Offset from the gutter's top to the line box's top, in CSS pixels. */
+  topPixels: number;
 }
 
 /** Label gutter width, as a multiple of the widest shank's width. */
@@ -25,6 +37,9 @@ const LABEL_GUTTER_SHANK_WIDTHS = 2;
 
 /** CSS pixels between a channel map's right edge and its tooltip's left edge. */
 const TOOLTIP_GAP_PIXELS = 8;
+
+/** Minimum gap between two rendered gutter labels, as a multiple of a label's line height. */
+const LABEL_EXCLUSION_LINE_HEIGHTS = 2;
 
 /**
  * Split a probe's packed shank width into the sampled image and its blank
@@ -52,7 +67,7 @@ export function getChannelMapWidths(shanks: ProbeShank[]): ChannelMapWidths {
 
 /**
  * Scan a sample result for every structure's contiguous vertical run across
- * its shanks, as a union over columns.
+ * its shanks, as a union over columns, with each run's sampled area.
  * @param result Sampled annotation values to scan.
  */
 export function getStructureLabelRuns(
@@ -62,38 +77,101 @@ export function getStructureLabelRuns(
   const runs: StructureLabelRun[] = [];
   if (widthPixels <= 0 || heightPixels <= 0) return runs;
 
-  /** Annotation value to the first row of its still-open run. */
-  const openRows = new Map<number, number>();
-  const rowValues = new Set<number>();
+  /** Annotation value to its still-open run's first row and sample count. */
+  const openRuns = new Map<number, { startRow: number; areaPixels: number }>();
+  const rowCounts = new Map<number, number>();
 
   for (let row = 0; row < heightPixels; row++) {
-    rowValues.clear();
+    rowCounts.clear();
     const rowOffset = row * widthPixels;
     for (let column = 0; column < widthPixels; column++) {
       const value = annotationValues[rowOffset + column]!;
-      if (value !== 0) rowValues.add(value);
+      if (value !== 0) rowCounts.set(value, (rowCounts.get(value) ?? 0) + 1);
     }
 
-    for (const [value, startRow] of openRows) {
-      if (rowValues.has(value)) continue;
+    for (const [value, open] of openRuns) {
+      if (rowCounts.has(value)) continue;
       runs.push({
         annotationValue: value,
-        centerFraction: (startRow + row) / (2 * heightPixels)
+        centerFraction: (open.startRow + row) / (2 * heightPixels),
+        areaPixels: open.areaPixels
       });
-      openRows.delete(value);
+      openRuns.delete(value);
     }
-    for (const value of rowValues) {
-      if (!openRows.has(value)) openRows.set(value, row);
+    for (const [value, count] of rowCounts) {
+      const open = openRuns.get(value);
+      if (open) open.areaPixels += count;
+      else openRuns.set(value, { startRow: row, areaPixels: count });
     }
   }
 
-  for (const [value, startRow] of openRows) {
+  for (const [value, open] of openRuns) {
     runs.push({
       annotationValue: value,
-      centerFraction: (startRow + heightPixels) / (2 * heightPixels)
+      centerFraction: (open.startRow + heightPixels) / (2 * heightPixels),
+      areaPixels: open.areaPixels
     });
   }
   return runs;
+}
+
+/**
+ * Place each structure run on a gutter line, keeping only the largest-area run
+ * wherever two placements land closer than the label exclusion gap.
+ * @param runs Structure runs to place, in scan order.
+ * @param structures Abbreviations by annotation value.
+ * @param gutterHeightPixels Full height of the label gutter, in CSS pixels.
+ * @param lineHeightPixels Height of one label's line box, in CSS pixels.
+ */
+export function getChannelMapLabels(
+  runs: StructureLabelRun[],
+  structures: ReadonlyMap<number, { abbreviation: string }>,
+  gutterHeightPixels: number,
+  lineHeightPixels: number
+): ChannelMapLabel[] {
+  if (gutterHeightPixels <= 0 || lineHeightPixels <= 0) return [];
+
+  const placements = runs.flatMap(run => {
+    const structure = structures.get(run.annotationValue);
+    if (!structure) return [];
+    return [
+      {
+        key: `${run.annotationValue}-${run.centerFraction}`,
+        annotationValue: run.annotationValue,
+        abbreviation: structure.abbreviation,
+        areaPixels: run.areaPixels,
+        topPixels: clamp(
+          run.centerFraction * gutterHeightPixels - lineHeightPixels / 2,
+          0,
+          Math.max(0, gutterHeightPixels - lineHeightPixels)
+        )
+      }
+    ];
+  });
+
+  // Largest area claims its neighbourhood: sweep area-descending and reject any
+  // placement landing inside an already-kept label's exclusion gap.
+  placements.sort(
+    (a, b) =>
+      b.areaPixels - a.areaPixels ||
+      a.topPixels - b.topPixels ||
+      a.annotationValue - b.annotationValue
+  );
+  const exclusionPixels = lineHeightPixels * LABEL_EXCLUSION_LINE_HEIGHTS;
+  const kept: typeof placements = [];
+  for (const placement of placements) {
+    const collides = kept.some(
+      label => Math.abs(label.topPixels - placement.topPixels) < exclusionPixels
+    );
+    if (!collides) kept.push(placement);
+  }
+
+  kept.sort((a, b) => a.topPixels - b.topPixels);
+  return kept.map(({ key, abbreviation, topPixels }) => ({
+    key,
+    abbreviation,
+    topPixels
+  }));
 }
 
 /**
