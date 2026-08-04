@@ -3,10 +3,13 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { type ValidationRule } from "quasar";
 import {
+  copyProbe,
   findProbeInterfaceProbeByIdentifier,
   getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier,
-  Probe
+  homeProbe,
+  Probe,
+  toggleProbeLock
 } from "@/features/probe";
 import { STANDARD_COLORS } from "@/features/scene";
 import { SliceCanvas } from "@/features/slice";
@@ -74,6 +77,14 @@ const roll = useNumericTupleModel(() => probe.rotation, 0);
 const yaw = useNumericTupleModel(() => probe.rotation, 1);
 const pitch = useNumericTupleModel(() => probe.rotation, 2);
 
+const lockIcon = computed(() =>
+  probe.lock ? "lock" : "sym_o_lock_open_right"
+);
+
+const lockLabel = computed(() =>
+  probe.lock ? t("probeInspector.unlock") : t("probeInspector.lock")
+);
+
 const nameRules: ValidationRule<string>[] = [
   value => value.trim().length > 0 || t("probeInspector.nameRequired")
 ];
@@ -91,10 +102,27 @@ const numberRules: ValidationRule<string>[] = [
     <SliceCanvas :probe="probe" />
 
     <q-btn-group spread>
-      <q-btn icon="home" />
-      <q-btn icon="content_copy" />
-      <q-btn icon="pin_drop" />
-      <q-btn icon="sym_o_lock_open_right" />
+      <q-btn
+        :aria-label="t('probeInspector.home')"
+        :disable="probe.lock"
+        icon="home"
+        @click="homeProbe(currentExperimentStore.experiment, probe)"
+      />
+      <q-btn
+        :aria-label="t('probeInspector.copy')"
+        icon="content_copy"
+        @click="copyProbe(currentExperimentStore.experiment, probe)"
+      />
+      <q-btn
+        :aria-label="t('probeInspector.surface')"
+        :disable="probe.lock"
+        icon="pin_drop"
+      />
+      <q-btn
+        :aria-label="lockLabel"
+        :icon="lockIcon"
+        @click="toggleProbeLock(probe)"
+      />
     </q-btn-group>
 
     <CommittedInput
@@ -118,6 +146,7 @@ const numberRules: ValidationRule<string>[] = [
     <div class="row q-gutter-x-sm">
       <CommittedInput
         v-model="ap"
+        :disable="probe.lock"
         :label="t('probeInspector.ap')"
         :rules="numberRules"
         class="col"
@@ -125,6 +154,7 @@ const numberRules: ValidationRule<string>[] = [
       />
       <CommittedInput
         v-model="dv"
+        :disable="probe.lock"
         :label="t('probeInspector.dv')"
         :rules="numberRules"
         class="col"
@@ -132,6 +162,7 @@ const numberRules: ValidationRule<string>[] = [
       />
       <CommittedInput
         v-model="ml"
+        :disable="probe.lock"
         :label="t('probeInspector.ml')"
         :rules="numberRules"
         class="col"
@@ -142,6 +173,7 @@ const numberRules: ValidationRule<string>[] = [
     <div class="row q-gutter-x-sm">
       <CommittedInput
         v-model="roll"
+        :disable="probe.lock"
         :label="t('probeInspector.roll')"
         :rules="numberRules"
         class="col"
@@ -149,6 +181,7 @@ const numberRules: ValidationRule<string>[] = [
       />
       <CommittedInput
         v-model="yaw"
+        :disable="probe.lock"
         :label="t('probeInspector.yaw')"
         :rules="numberRules"
         class="col"
@@ -156,6 +189,7 @@ const numberRules: ValidationRule<string>[] = [
       />
       <CommittedInput
         v-model="pitch"
+        :disable="probe.lock"
         :label="t('probeInspector.pitch')"
         :rules="numberRules"
         class="col"
