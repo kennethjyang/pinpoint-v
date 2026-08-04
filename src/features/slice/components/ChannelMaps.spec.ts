@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, shallowRef } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 import ChannelMaps from "./ChannelMaps.vue";
@@ -30,8 +30,8 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 vi.mock("../composable/useAnnotationSampler", () => ({
   useAnnotationSampler: () => ({
     createStream: () => ({
-      result: { value: null },
-      isLoading: { value: false }
+      result: shallowRef(null),
+      isLoading: shallowRef(false)
     })
   })
 }));
@@ -291,7 +291,7 @@ describe("ChannelMaps", () => {
 
     await wrapper
       .findComponent({ name: "QRange" })
-      .vm.$emit("update:model-value", { min: -1, max: 6 });
+      .vm.$emit("update:modelValue", { min: -1, max: 6 });
     await nextTick();
 
     expect(store.experiment.probes[0]!.channelMapWindow).toEqual({
