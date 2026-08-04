@@ -142,7 +142,7 @@ describe("ChannelMaps", () => {
     expect(viewports).toHaveLength(1);
     const style = viewports[0]!.attributes("style")!;
     expect(style).toContain("height: 70vh");
-    expect(style).toContain("aspect-ratio: 0.168");
+    expect(style).toContain("aspect-ratio: 0.14");
   });
 
   it("resizes the viewport when the zoom toggle changes", async () => {
@@ -166,7 +166,7 @@ describe("ChannelMaps", () => {
 
     style = wrapper.find(".channel-maps__viewport").attributes("style");
     expect(style).toContain("height: 30vh");
-    expect(style).toContain("aspect-ratio: 0.168");
+    expect(style).toContain("aspect-ratio: 0.14");
   });
 
   it("shows the no-contour message and no viewport for a probe without a usable contour", () => {
@@ -227,7 +227,7 @@ describe("ChannelMaps", () => {
     const aspectRatio = Number(
       viewport.attributes("style")!.match(/aspect-ratio: ([\d.]+)/)![1]
     );
-    expect(aspectRatio).toBeCloseTo(0.32, 10);
+    expect(aspectRatio).toBeCloseTo(0.28, 10);
 
     expect(wrapper.findAllComponents(ChannelMapCanvas)).toHaveLength(0);
     await triggerIntersection(true);

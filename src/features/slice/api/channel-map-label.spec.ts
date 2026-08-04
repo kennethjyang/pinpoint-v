@@ -47,21 +47,19 @@ function makeSampleResult(
 }
 
 describe("getChannelMapWidths", () => {
-  it("splits two equal-width shanks into a gutter twice as wide", () => {
+  it("sizes the gutter one and a half times as wide as equal-width shanks", () => {
     const widths = getChannelMapWidths([makeShank(0.1), makeShank(0.1)]);
 
-    expect(widths).toEqual({
-      shankMillimeters: 0.2,
-      gutterMillimeters: 0.2,
-      imageFraction: 0.5
-    });
+    expect(widths.shankMillimeters).toBe(0.2);
+    expect(widths.gutterMillimeters).toBeCloseTo(0.15);
+    expect(widths.imageFraction).toBeCloseTo(0.2 / 0.35);
   });
 
   it("sizes the gutter off the widest shank when shanks differ", () => {
     const widths = getChannelMapWidths([makeShank(0.05), makeShank(0.2)]);
 
     expect(widths.shankMillimeters).toBeCloseTo(0.25);
-    expect(widths.gutterMillimeters).toBeCloseTo(0.4);
+    expect(widths.gutterMillimeters).toBeCloseTo(0.3);
   });
 
   it("returns an un-gutted, full-width split for an empty shank array", () => {

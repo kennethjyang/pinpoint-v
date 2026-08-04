@@ -33,7 +33,7 @@ export interface ChannelMapLabel {
 }
 
 /** Label gutter width, as a multiple of the widest shank's width. */
-const LABEL_GUTTER_SHANK_WIDTHS = 2;
+const LABEL_GUTTER_SHANK_WIDTHS = 1.5;
 
 /** CSS pixels between a channel map's right edge and its tooltip's left edge. */
 const TOOLTIP_GAP_PIXELS = 8;
