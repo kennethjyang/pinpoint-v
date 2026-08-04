@@ -81,6 +81,8 @@ const lockIcon = computed(() =>
   probe.lock ? "lock" : "sym_o_lock_open_right"
 );
 
+const lockColor = computed(() => (probe.lock ? "accent" : ""));
+
 const lockLabel = computed(() =>
   probe.lock ? t("probeInspector.unlock") : t("probeInspector.lock")
 );
@@ -122,6 +124,7 @@ const numberRules: ValidationRule<string>[] = [
         :aria-label="lockLabel"
         :icon="lockIcon"
         @click="toggleProbeLock(probe)"
+        :color="lockColor"
       />
     </q-btn-group>
 
