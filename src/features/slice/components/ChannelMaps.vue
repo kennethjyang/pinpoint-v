@@ -190,7 +190,7 @@ const tooltipStyle = computed(() => {
           </q-card-section>
           <q-separator />
           <q-card-section class="flex flex-center q-pa-sm">
-            <div class="row">
+            <div class="row no-wrap">
               <q-range
                 v-if="shanks.length && zoomSelection !== 'small'"
                 :model-value="channelMapWindow"
