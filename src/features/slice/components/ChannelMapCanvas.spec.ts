@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { nextTick, ref, shallowRef } from "vue";
 import { createPinia, setActivePinia } from "pinia";
+import { flushPromises } from "@vue/test-utils";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  makeManifest,
+  makeProbe,
+  makeProbeInterfaceProbe,
+  makeTerminologyRow
+} from "@/test/fixtures";
+import type { TerminologyRow } from "@/features/atlas";
 import { getManifest, getTerminologyRows } from "@/features/atlas";
 import type { ProbeChannelMapWindow } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
+import { getChannelMapWidths } from "../api/channel-map-label.api";
 import { getProbeFrame, toAtlasMillimeters } from "../api/probe-frame.api";
 import type { SampleGeometry } from "../models/sample-geometry.model";
 import type { SampleResult } from "../models/sample-result.model";
@@ -87,10 +95,13 @@ function makeSampleResult(
 describe("ChannelMapCanvas", () => {
   function mountCanvas(
     channelMapWindow: ProbeChannelMapWindow | null = null,
-    zoomSelection: "small" | "medium" | "large" = "large"
+    zoomSelection: "small" | "medium" | "large" = "large",
+    terminologyRows: TerminologyRow[] = []
   ) {
-    vi.mocked(getManifest).mockResolvedValue(null);
-    vi.mocked(getTerminologyRows).mockResolvedValue([]);
+    vi.mocked(getManifest).mockResolvedValue(
+      terminologyRows.length ? makeManifest() : null
+    );
+    vi.mocked(getTerminologyRows).mockResolvedValue(terminologyRows);
     capturedGeometry = null;
     mockResult.value = null;
     mockIsLoading.value = false;
@@ -327,5 +338,120 @@ describe("ChannelMapCanvas", () => {
 
     expect(wrapper.find(".channel-map-canvas__contour").exists()).toBe(true);
     expect(wrapper.find(".channel-map-canvas__contacts").exists()).toBe(true);
+  });
+
+  it("renders a run's abbreviation in the label gutter", async () => {
+    const structure = makeTerminologyRow({
+      annotation_value: 8,
+      abbreviation: "CTX",
+      name: "Cortex"
+    });
+    const { wrapper } = mountCanvas(null, "large", [structure]);
+    await flushPromises();
+
+    const result = makeSampleResult(1, 4);
+    result.annotationValues.set([0, 8, 8, 0]);
+    mockResult.value = result;
+    await nextTick();
+
+    // Run spans rows 1-2 of 4, centered at (1 + 3) / (2 * 4) = 50%. happy-dom's
+    // CSSOM rejects the `top` declaration's min()/max() functions outright
+    // (unlike real browsers, which support them), so only the fixed line
+    // box - not the vertical clamp - is checkable here; the clamp is
+    // exercised by `getStructureLabelRuns`'s unit tests and the manual
+    // browser smoke test.
+    const labels = wrapper.findAll(".channel-map-canvas__label");
+    expect(labels).toHaveLength(1);
+    expect(labels[0]!.text()).toBe("CTX");
+    expect(labels[0]!.attributes("style")).toContain("line-height: 12px");
+  });
+
+  it("renders no labels from a partial result", async () => {
+    const structure = makeTerminologyRow({ annotation_value: 8 });
+    const { wrapper } = mountCanvas(null, "large", [structure]);
+    await flushPromises();
+
+    const result = makeSampleResult(1, 4);
+    result.annotationValues.set([0, 8, 8, 0]);
+    result.paintedChunkCount = 0;
+    result.totalChunkCount = 1;
+    mockResult.value = result;
+    await nextTick();
+
+    expect(wrapper.find(".channel-map-canvas__label").exists()).toBe(false);
+  });
+
+  it("renders no label gutter at small zoom, and a full-width image", () => {
+    const { wrapper } = mountCanvas(null, "small");
+
+    expect(wrapper.find(".channel-map-canvas__labels").exists()).toBe(false);
+    expect(
+      wrapper.find(".channel-map-canvas__image").attributes("style")
+    ).toContain("width: 100%");
+  });
+
+  it("splits the image and gutter by shank width at medium and large zoom", () => {
+    const { wrapper, shanks } = mountCanvas(null, "medium");
+
+    const imageFraction = getChannelMapWidths(shanks).imageFraction;
+    expect(
+      wrapper.find(".channel-map-canvas__image").attributes("style")
+    ).toContain(`width: ${imageFraction * 100}%`);
+  });
+
+  it("emits the structure under the pointer on pointermove, and null on pointerleave", async () => {
+    const structure = makeTerminologyRow({
+      annotation_value: 8,
+      abbreviation: "CTX",
+      name: "Cortex"
+    });
+    const { wrapper } = mountCanvas(null, "large", [structure]);
+    await flushPromises();
+
+    const result = makeSampleResult(2, 2);
+    result.annotationValues.set([8, 0, 0, 0]);
+    mockResult.value = result;
+    await nextTick();
+
+    const canvasElement = wrapper.find("canvas").element as HTMLCanvasElement;
+    vi.spyOn(canvasElement, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    });
+    vi.spyOn(wrapper.element, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 120,
+      height: 100,
+      right: 120,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    });
+
+    await wrapper.find("canvas").trigger("pointermove", {
+      clientX: 10,
+      clientY: 10
+    });
+
+    const hoverEvents = wrapper.emitted("hover")!;
+    expect(hoverEvents[hoverEvents.length - 1]![0]).toEqual({
+      structure,
+      clientX: 120,
+      clientY: 10
+    });
+
+    await wrapper.find("canvas").trigger("pointerleave");
+
+    const afterLeave = wrapper.emitted("hover")!;
+    expect(afterLeave[afterLeave.length - 1]![0]).toBeNull();
   });
 });

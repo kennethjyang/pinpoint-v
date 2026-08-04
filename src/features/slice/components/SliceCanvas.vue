@@ -19,7 +19,7 @@ import {
   getQuantizedSizePixels,
   getSlicePixelFromRect
 } from "../api/slice-plane.api";
-import { findStructureByAnnotationValue } from "../api/structure-colors.api";
+import { buildStructureIndex } from "../api/structure-colors.api";
 import { useAnnotationSampler } from "../composable/useAnnotationSampler";
 import { useSliceCanvasPainter } from "../composable/useSliceCanvasPainter";
 import { useSliceViewport } from "../composable/useSliceViewport";
@@ -97,13 +97,13 @@ const contourPoints = computed(() =>
     : null
 );
 
-const hoveredStructure = computed<TerminologyRow | null>(() => {
-  if (!hoveredAnnotationValue.value) return null;
-  return findStructureByAnnotationValue(
-    currentExperiment.terminologyRows,
-    hoveredAnnotationValue.value
-  );
-});
+const structureIndex = computed(() =>
+  buildStructureIndex(currentExperiment.terminologyRows)
+);
+
+const hoveredStructure = computed<TerminologyRow | null>(
+  () => structureIndex.value.get(hoveredAnnotationValue.value) ?? null
+);
 
 /**
  * Marker label for a zoom slider tick, converting its log2 exponent back to mm.
