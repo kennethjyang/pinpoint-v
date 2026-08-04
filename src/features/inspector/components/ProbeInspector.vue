@@ -109,14 +109,14 @@ const numberRules: ValidationRule<string>[] = [
         @click="homeProbe(currentExperimentStore.experiment, probe)"
       />
       <q-btn
-        :aria-label="t('probeInspector.copy')"
-        icon="content_copy"
-        @click="copyProbe(currentExperimentStore.experiment, probe)"
-      />
-      <q-btn
         :aria-label="t('probeInspector.surface')"
         :disable="probe.lock"
         icon="pin_drop"
+      />
+      <q-btn
+        :aria-label="t('probeInspector.copy')"
+        icon="content_copy"
+        @click="copyProbe(currentExperimentStore.experiment, probe)"
       />
       <q-btn
         :aria-label="lockLabel"
