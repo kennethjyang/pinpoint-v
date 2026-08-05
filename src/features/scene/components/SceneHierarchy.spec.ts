@@ -232,11 +232,11 @@ describe("SceneHierarchy", () => {
 
     const wrapper = await mountHierarchy(pinia);
 
-    const rows = wrapper.findAll(".q-item");
+    const rows = wrapper.findAll(".probe-list .q-item");
     expect(rows).toHaveLength(2);
-    expect(rows[0]!.classes()).toContain("probe-item--active");
+    expect(rows[0]!.classes()).toContain("hierarchy-item--active");
     expect(rows[0]!.attributes("aria-current")).toBe("true");
-    expect(rows[1]!.classes()).not.toContain("probe-item--active");
+    expect(rows[1]!.classes()).not.toContain("hierarchy-item--active");
     expect(rows[1]!.attributes("aria-current")).toBeUndefined();
   });
 });

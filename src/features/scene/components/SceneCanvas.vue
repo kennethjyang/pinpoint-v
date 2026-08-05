@@ -71,8 +71,6 @@ const isLoadingStructures = ref(false);
 /** Axis guide text renderers, created for the current scene the first time the guides are shown. */
 const axisGuides = shallowRef<AxisGuides | null>(null);
 
-const areAxisGuidesVisible = ref(false);
-
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
 
@@ -155,7 +153,7 @@ watch(runtime.scene, () => {
 // Create the axis guide text renderers the first time they are shown: the
 // MSDF font is fetched remotely, so hidden guides load nothing.
 watch(
-  [runtime.scene, areAxisGuidesVisible],
+  [runtime.scene, () => currentExperiment.areAxisGuidesVisible],
   async ([scene, isVisible]) => {
     if (!scene || !isVisible || axisGuides.value) return;
 
@@ -185,7 +183,7 @@ watchEffect(() => {
   const guides = axisGuides.value;
   if (!scene || !guides) return;
 
-  if (!areAxisGuidesVisible.value) {
+  if (!currentExperiment.areAxisGuidesVisible) {
     clearAxisGuides(scene, guides);
     return;
   }
@@ -247,7 +245,7 @@ watchEffect(() => {
   const selectedInspectable = currentExperiment.selectedInspectable;
   if (
     selectionOutlineLayer &&
-    selectedInspectable &&
+    selectedInspectable?.inspectableKind === "probe" &&
     rebuiltProbeIds.includes(selectedInspectable.id)
   ) {
     selectFromSelectedInspectableState(
@@ -440,11 +438,6 @@ onUnmounted(() => {
   <q-page-sticky :offset="[0, 18]" position="bottom">
     <q-card>
       <q-card-section class="row justify-center gizmo-controls">
-        <q-toggle
-          v-model="areAxisGuidesVisible"
-          :label="$t('sceneCanvas.showAxisGuides')"
-          left-label
-        />
         <q-btn-toggle
           v-model="gizmoMode"
           :aria-label="$t('sceneCanvas.gizmoMode')"

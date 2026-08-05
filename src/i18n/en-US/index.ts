@@ -66,7 +66,6 @@ export default {
     problemLoadingAxisGuides:
       "There was a problem loading the axis guide labels.",
     axisGuidesUnavailable: "The atlas axis labels won't be shown.",
-    showAxisGuides: "Show Axes",
     gizmoMode: "Transform mode",
     gizmoPosition: "Position",
     gizmoRotation: "Rotation",
@@ -136,8 +135,14 @@ export default {
     close: "Close"
   },
   sceneHierarchy: {
+    probes: "Probes",
+    scene: "Scene",
     addProbe: "Add Probe",
-    manageProbes: "Manage probes..."
+    manageProbes: "Manage probes...",
+    camera: "Camera",
+    axisGuides: "Axis Guides",
+    showAxisGuides: "Show axis guides",
+    hideAxisGuides: "Hide axis guides"
   },
   inspector: {
     emptyHint: "Pick something from the scene to inspect."
@@ -164,6 +169,18 @@ export default {
     alignShank: "Align to shank {index}",
     alignCenter: "Align to probe center",
     alignCenterLabel: "C"
+  },
+  cameraInspector: {
+    poseName: "Pose name",
+    defaultPoseName: "Pose",
+    alpha: "Alpha",
+    beta: "Beta",
+    radius: "Radius",
+    savePose: "Save Pose",
+    applyPose: "Move camera to {name}",
+    deletePose: "Delete pose",
+    dragToReorder: "Drag to reorder",
+    noPoses: "No saved camera poses yet."
   },
   slice: {
     zoom: "Zoom",

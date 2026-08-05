@@ -50,3 +50,25 @@ export function orbitCameraTowards(
 
   camera.interpolateTo(alpha, beta);
 }
+
+/**
+ * Read the camera's current orbit as alpha/beta in radians and radius in mm.
+ * @param camera Camera to read the orbit of.
+ */
+export function getCameraOrbit(
+  camera: ArcRotateCamera
+): [number, number, number] {
+  return [camera.alpha, camera.beta, camera.radius];
+}
+
+/**
+ * Animate the camera to an orbit, leaving its target untouched.
+ * @param camera Camera to move.
+ * @param orbit Alpha/beta in radians and radius in mm to interpolate to.
+ */
+export function setCameraOrbit(
+  camera: ArcRotateCamera,
+  orbit: [number, number, number]
+): void {
+  camera.interpolateTo(orbit[0], orbit[1], orbit[2]);
+}
