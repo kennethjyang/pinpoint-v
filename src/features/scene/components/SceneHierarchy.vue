@@ -74,7 +74,7 @@ function removeProbeAndDeselect(probe: Probe) {
       icon="sym_o_acupuncture"
       :label="$t('sceneHierarchy.probes')"
     >
-      <div class="column q-gutter-y-sm q-pa-sm">
+      <div class="column q-gutter-y-sm">
         <q-btn-dropdown
           color="primary"
           dropdown-icon="add"
@@ -140,7 +140,7 @@ function removeProbeAndDeselect(probe: Probe) {
                 <q-icon
                   :style="{ color: probe.color }"
                   name="radio_button_checked"
-                  size="28px"
+                  size="sm"
                 />
               </div>
             </q-item-section>
