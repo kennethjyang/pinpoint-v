@@ -100,23 +100,31 @@ const lockLabel = computed(() =>
         :disable="probe.lock"
         icon="home"
         @click="homeProbe(probe)"
-      />
+      >
+        <q-tooltip>{{ t("probeInspector.home") }}</q-tooltip>
+      </q-btn>
       <q-btn
         :aria-label="t('probeInspector.drop')"
         :disable="probe.lock"
         icon="sym_o_place_item"
-      />
+      >
+        <q-tooltip>{{ t("probeInspector.drop") }}</q-tooltip>
+      </q-btn>
       <q-btn
         :aria-label="t('probeInspector.copy')"
         icon="content_copy"
         @click="copyProbe(currentExperimentStore.experiment, probe)"
-      />
+      >
+        <q-tooltip>{{ t("probeInspector.copy") }}</q-tooltip>
+      </q-btn>
       <q-btn
         :aria-label="lockLabel"
         :icon="lockIcon"
         @click="toggleProbeLock(probe)"
         :color="lockColor"
-      />
+      >
+        <q-tooltip>{{ t("probeInspector.lock") }}</q-tooltip>
+      </q-btn>
     </q-btn-group>
 
     <CommittedInput
