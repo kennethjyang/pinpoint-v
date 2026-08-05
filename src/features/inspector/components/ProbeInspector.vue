@@ -108,7 +108,7 @@ const lockLabel = computed(() =>
         :disable="probe.lock"
         icon="sym_o_place_item"
       >
-        <q-tooltip>{{ t("probeInspector.drop") }}</q-tooltip>
+        <q-tooltip>{{ t("probeInspector.surface") }}</q-tooltip>
       </q-btn>
       <q-btn
         :aria-label="t('probeInspector.copy')"
