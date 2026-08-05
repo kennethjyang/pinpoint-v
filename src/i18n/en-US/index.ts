@@ -158,7 +158,11 @@ export default {
     surfaceUnavailableCaption: "Check your connection to the atlas source.",
     copy: "Duplicate probe",
     lock: "Lock probe",
-    unlock: "Unlock probe"
+    unlock: "Unlock probe",
+    shankAlignment: "Probe alignment",
+    alignShank: "Align to shank {index}",
+    alignCenter: "Align to probe center",
+    alignCenterLabel: "C"
   },
   slice: {
     zoom: "Zoom",
