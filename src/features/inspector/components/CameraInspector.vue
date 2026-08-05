@@ -180,7 +180,7 @@ onMounted(copyFromCurrentCamera);
         @dragover="dragOverRow(index, $event)"
         @drop="dropRow(index)"
       >
-        <q-item-section avatar>
+        <q-item-section side>
           <div
             class="pose-row__handle"
             draggable="true"
@@ -188,7 +188,7 @@ onMounted(copyFromCurrentCamera);
             @dragend="endDrag"
             @dragstart.stop="startDrag(index, $event)"
           >
-            <q-icon name="drag_indicator" />
+            <q-icon name="drag_indicator" size="sm" />
           </div>
         </q-item-section>
         <q-item-section>{{ pose.name }}</q-item-section>

@@ -58,7 +58,7 @@ function installProbe() {
             @dragover="dragOverRow(index, $event)"
             @drop="dropRow(index)"
           >
-            <q-item-section avatar>
+            <q-item-section side>
               <div
                 class="probe-row__handle"
                 draggable="true"
@@ -66,7 +66,7 @@ function installProbe() {
                 @dragend="endDrag"
                 @dragstart="startDrag(index, $event)"
               >
-                <q-icon name="drag_indicator" />
+                <q-icon name="drag_indicator" size="sm" />
               </div>
             </q-item-section>
             <q-item-section>{{
