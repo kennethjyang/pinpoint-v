@@ -129,7 +129,7 @@ function removeProbeAndDeselect(probe: Probe) {
             @dragover="dragOverRow(index, $event)"
             @drop="dropRow(index)"
           >
-            <q-item-section avatar>
+            <q-item-section side>
               <div
                 class="probe-row__handle"
                 draggable="true"
@@ -140,6 +140,7 @@ function removeProbeAndDeselect(probe: Probe) {
                 <q-icon
                   :style="{ color: probe.color }"
                   name="radio_button_checked"
+                  size="28px"
                 />
               </div>
             </q-item-section>
