@@ -28,9 +28,30 @@ const { requiredName: nameRules, optionalNumber: numberRules } =
 const name = ref(t("cameraInspector.defaultPoseName"));
 const orbit = ref<[number, number, number]>([0, 0, 0]);
 
-const alpha = useNumericTupleModel(() => orbit.value, 0);
-const beta = useNumericTupleModel(() => orbit.value, 1);
-const radius = useNumericTupleModel(() => orbit.value, 2);
+// Camera poses store raw radians/mm; the identity conversions and null
+// decimals keep alpha/beta/radius display unconverted and unrounded,
+// unlike ProbeInspector's unit-aware fields.
+const alpha = useNumericTupleModel(
+  () => orbit.value,
+  0,
+  value => value,
+  value => value,
+  () => null
+);
+const beta = useNumericTupleModel(
+  () => orbit.value,
+  1,
+  value => value,
+  value => value,
+  () => null
+);
+const radius = useNumericTupleModel(
+  () => orbit.value,
+  2,
+  value => value,
+  value => value,
+  () => null
+);
 
 const {
   draggedIndex,
