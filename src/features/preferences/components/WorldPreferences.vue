@@ -2,6 +2,9 @@
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { STANDARD_COLORS } from "@/features/scene";
 
+/** Standard palette plus Babylon's default clear color, so it stays pickable after switching away from it. */
+const BACKGROUND_COLOR_PALETTE = [...STANDARD_COLORS, "#33334d"];
+
 const preferences = usePreferencesStore();
 </script>
 
@@ -14,7 +17,7 @@ const preferences = usePreferencesStore();
       <q-color
         v-model="preferences.worldBackgroundColor"
         class="world-preferences__color"
-        :palette="STANDARD_COLORS"
+        :palette="BACKGROUND_COLOR_PALETTE"
         default-view="palette"
       />
     </div>
