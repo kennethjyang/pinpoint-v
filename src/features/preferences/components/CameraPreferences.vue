@@ -31,6 +31,7 @@ const preferences = usePreferencesStore();
             0: $t('preferences.inertiaSnappy'),
             1: $t('preferences.inertiaSmooth')
           }"
+          class="q-px-lg"
           label
         />
       </div>

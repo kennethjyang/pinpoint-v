@@ -39,47 +39,42 @@ const rodLength = useClampedNumberModel(
       <q-input
         v-model="shankThickness"
         :label="$t('preferences.shankThickness')"
+        :min="0.001"
         :suffix="$t('units.millimeter')"
         dense
         outlined
-        step="any"
-        type="number"
       />
       <q-input
         v-model="headStageLength"
         :label="$t('preferences.headStageLength')"
+        :min="0.01"
         :suffix="$t('units.millimeter')"
         dense
         outlined
-        step="any"
-        type="number"
       />
       <q-input
         v-model="headStageCutDepth"
         :label="$t('preferences.headStageCutDepth')"
+        :min="0"
         :suffix="$t('units.millimeter')"
         dense
         outlined
-        step="any"
-        type="number"
       />
       <q-input
         v-model="rodDiameter"
         :label="$t('preferences.rodDiameter')"
+        :min="0.01"
         :suffix="$t('units.millimeter')"
         dense
         outlined
-        step="any"
-        type="number"
       />
       <q-input
         v-model="rodLength"
         :label="$t('preferences.rodLength')"
+        :min="0.01"
         :suffix="$t('units.millimeter')"
         dense
         outlined
-        step="any"
-        type="number"
       />
     </div>
   </div>

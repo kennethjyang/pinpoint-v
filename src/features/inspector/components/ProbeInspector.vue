@@ -393,8 +393,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="positionSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
       <CommittedInput
         v-model="dv"
@@ -404,8 +402,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="positionSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
       <CommittedInput
         v-model="ml"
@@ -415,8 +411,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="positionSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
     </div>
 
@@ -429,8 +423,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="rotationSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
       <CommittedInput
         v-model="yaw"
@@ -440,8 +432,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="rotationSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
       <CommittedInput
         v-model="pitch"
@@ -451,8 +441,6 @@ onUnmounted(cancelMoveToSurface);
         :suffix="rotationSuffix"
         class="col"
         outlined
-        step="any"
-        type="number"
       />
     </div>
 

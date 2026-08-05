@@ -55,8 +55,6 @@ const decimalPrecision = useClampedNumberModel(
         :min="0"
         dense
         outlined
-        step="1"
-        type="number"
       />
     </div>
   </div>

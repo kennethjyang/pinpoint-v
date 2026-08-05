@@ -17,14 +17,14 @@ const tab = ref("scene");
       <q-card-section>
         <div class="text-h5">{{ $t("preferences.title") }}</div>
       </q-card-section>
-      <q-card-section class="column preferences__content q-pt-none">
+      <q-card-section class="column no-wrap preferences__content q-pt-none">
         <q-tabs v-model="tab">
           <q-tab name="scene" :label="$t('preferences.scene')" />
           <q-tab name="probe" :label="$t('preferences.probe')" />
           <q-tab name="reset" :label="$t('preferences.reset')" />
         </q-tabs>
         <q-separator />
-        <q-tab-panels v-model="tab" animated class="col">
+        <q-tab-panels v-model="tab" animated class="col preferences__panels">
           <q-tab-panel name="scene"><ScenePreferences /></q-tab-panel>
           <q-tab-panel name="probe"><ProbePreferences /></q-tab-panel>
           <q-tab-panel name="reset"><ResetPreferences /></q-tab-panel>
@@ -52,5 +52,7 @@ const tab = ref("scene");
   flex: 1 1 auto
   min-height: 0
   max-height: 60vh
-  overflow-y: auto
+
+.preferences__panels
+  overflow-y: auto !important
 </style>

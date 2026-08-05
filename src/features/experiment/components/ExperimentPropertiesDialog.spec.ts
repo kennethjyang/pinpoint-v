@@ -166,14 +166,16 @@ describe("ExperimentPropertiesDialog", () => {
     expect(ap.find("input").element.value).toBe("0.000");
   });
 
-  it("renders the three coordinate fields as numeric inputs", async () => {
+  it("rejects non-numeric coordinate text, leaving the stored value untouched", async () => {
     const wrapper = await mountDialog();
+    const store = useCurrentExperimentStore();
+    const ap = coordinateInputs(wrapper)[0]!;
 
-    for (const input of coordinateInputs(wrapper)) {
-      expect(input.findComponent({ name: "QInput" }).props("type")).toBe(
-        "number"
-      );
-    }
+    await editAndBlur(ap, "abc");
+    await saveButton(wrapper).trigger("click");
+    await flushMicrotasks();
+
+    expect(store.referenceCoordinate[0]).toBe(1);
   });
 
   it("re-seeds the reference coordinate when a different atlas is picked", async () => {

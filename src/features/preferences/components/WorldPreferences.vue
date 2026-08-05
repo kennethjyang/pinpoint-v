@@ -9,7 +9,7 @@ const preferences = usePreferencesStore();
   <div>
     <div class="text-h6">{{ $t("preferences.world") }}</div>
     <div class="column q-gutter-y-md">
-      <div>
+      <div class="q-mb-md">
         <div class="text-body2 q-pb-xs">{{
           $t("preferences.backgroundColor")
         }}</div>

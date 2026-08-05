@@ -44,4 +44,24 @@ describe("ProbePreferences", () => {
 
     expect(preferences.probeShankThicknessMillimeters).toBe(0.001);
   });
+
+  it("clamps a negative value to a non-negative minimum for every geometry field", async () => {
+    const wrapper = mountWithQuasar(ProbePreferences);
+    const preferences = usePreferencesStore();
+    const fields: Array<
+      [string, keyof ReturnType<typeof usePreferencesStore>]
+    > = [
+      [t.shankThickness, "probeShankThicknessMillimeters"],
+      [t.headStageLength, "probeHeadStageLengthMillimeters"],
+      [t.headStageCutDepth, "probeHeadStageCutDepthMillimeters"],
+      [t.rodDiameter, "probeRodDiameterMillimeters"],
+      [t.rodLength, "probeRodLengthMillimeters"]
+    ];
+
+    for (const [label, key] of fields) {
+      await fieldByLabel(wrapper, label).vm.$emit("update:modelValue", "-5");
+
+      expect(preferences[key]).toBeGreaterThanOrEqual(0);
+    }
+  });
 });

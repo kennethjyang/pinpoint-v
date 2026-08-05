@@ -135,8 +135,6 @@ watch(atlas, (newAtlas, oldAtlas) => {
               :label="$t('axis.ap')"
               :rules="coordinateRules"
               :suffix="positionSuffix"
-              step="any"
-              type="number"
             />
             <CommittedInput
               v-model="dv"
@@ -144,8 +142,6 @@ watch(atlas, (newAtlas, oldAtlas) => {
               :label="$t('axis.dv')"
               :rules="coordinateRules"
               :suffix="positionSuffix"
-              step="any"
-              type="number"
             />
             <CommittedInput
               v-model="ml"
@@ -153,8 +149,6 @@ watch(atlas, (newAtlas, oldAtlas) => {
               :label="$t('axis.ml')"
               :rules="coordinateRules"
               :suffix="positionSuffix"
-              step="any"
-              type="number"
             />
           </div>
         </div>

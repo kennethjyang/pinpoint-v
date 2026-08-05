@@ -209,12 +209,14 @@ describe("ProbeInspector", () => {
     expect(probe.rotation[2]).toBeCloseTo(-Math.PI / 4);
   });
 
-  it("renders the six pose fields as numeric inputs", () => {
-    const { wrapper } = mountInspector();
+  it("rejects a non-numeric value in a numeric field", async () => {
+    const { wrapper, probe } = mountInspector();
 
-    for (const label of [axis.ap, axis.dv, axis.ml, t.roll, t.yaw, t.pitch]) {
-      expect(fieldByLabel(wrapper, label).props("type")).toBe("number");
-    }
+    const ap = fieldByLabel(wrapper, axis.ap);
+    await editAndBlur(ap, "abc");
+
+    expect(probe.tipPosition[0]).toBe(0);
+    expect(ap.find("[role='alert']").text()).toBe(validation.mustBeNumber);
   });
 
   it("rounds the display to the preferences store's decimal precision", async () => {
