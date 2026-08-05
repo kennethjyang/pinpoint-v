@@ -83,7 +83,7 @@ const lockIcon = computed(() =>
   probe.lock ? "lock" : "sym_o_lock_open_right"
 );
 
-const lockColor = computed(() => (probe.lock ? "accent" : ""));
+const lockColor = computed(() => (probe.lock ? "accent" : undefined));
 
 const lockLabel = computed(() =>
   probe.lock ? t("probeInspector.unlock") : t("probeInspector.lock")
