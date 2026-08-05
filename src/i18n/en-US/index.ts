@@ -143,7 +143,8 @@ export default {
     camera: "Camera",
     axisGuides: "Axis Guides",
     showAxisGuides: "Show axis guides",
-    hideAxisGuides: "Hide axis guides"
+    hideAxisGuides: "Hide axis guides",
+    dragToReorder: "Drag to reorder"
   },
   inspector: {
     emptyHint: "Pick something from the scene to inspect."
@@ -174,6 +175,7 @@ export default {
   cameraInspector: {
     poseName: "Pose name",
     defaultPoseName: "Pose",
+    copyFromCurrent: "Copy from Current",
     alpha: "Alpha",
     beta: "Beta",
     radius: "Radius",

@@ -12,6 +12,7 @@ import {
   removeInternProbeInterfaceProbe,
   removeProbe,
   reorderCameraPose,
+  reorderProbe,
   setExperimentProperties,
   setProbeInterface,
   setStructureVisibility
@@ -409,6 +410,46 @@ describe("removeProbe", () => {
     removeProbe(experiment, probe);
 
     expect(experiment.probeInterfaceProbes).toEqual({});
+  });
+});
+
+describe("reorderProbe", () => {
+  function makeThreeProbes(experiment: Experiment) {
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const a = makeProbe({ id: "a", name: "A" });
+    const b = makeProbe({ id: "b", name: "B" });
+    const c = makeProbe({ id: "c", name: "C" });
+    addProbe(experiment, a);
+    addProbe(experiment, b);
+    addProbe(experiment, c);
+    return [a, b, c];
+  }
+
+  it("moves a probe to the dropped-on index", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const [a, b, c] = makeThreeProbes(experiment);
+
+    reorderProbe(experiment, 0, 2);
+
+    expect(experiment.probes).toEqual([b, c, a]);
+  });
+
+  it("is a no-op for equal indices", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const probes = makeThreeProbes(experiment);
+
+    reorderProbe(experiment, 1, 1);
+
+    expect(experiment.probes).toEqual(probes);
+  });
+
+  it("is a no-op for an out-of-range index", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const probes = makeThreeProbes(experiment);
+
+    reorderProbe(experiment, 0, 3);
+
+    expect(experiment.probes).toEqual(probes);
   });
 });
 

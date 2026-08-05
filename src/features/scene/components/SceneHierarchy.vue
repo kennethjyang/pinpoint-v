@@ -12,16 +12,29 @@ import {
 } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { useDragReorder } from "@/composable/useDragReorder";
 import {
   addProbe,
   internProbeInterfaceProbe,
-  removeProbe
+  removeProbe,
+  reorderProbe
 } from "@/features/experiment";
 import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
 const currentExperiment = useCurrentExperimentStore();
+
+const {
+  draggedIndex,
+  dropTargetIndex,
+  startDrag,
+  dragOverRow,
+  dropRow,
+  endDrag
+} = useDragReorder((fromIndex, toIndex) =>
+  reorderProbe(currentExperiment.experiment, fromIndex, toIndex)
+);
 
 /** Icon for each probe visibility state. */
 const PROBE_VISIBILITY_ICONS: Record<ProbeVisibility, string> = {
@@ -55,7 +68,11 @@ function removeProbeAndDeselect(probe: Probe) {
 
 <template>
   <q-list>
-    <q-expansion-item default-opened :label="$t('sceneHierarchy.probes')">
+    <q-expansion-item
+      default-opened
+      header-class="text-weight-bold"
+      :label="$t('sceneHierarchy.probes')"
+    >
       <div class="column q-gutter-y-sm q-pa-sm">
         <q-btn-dropdown
           color="primary"
@@ -91,7 +108,7 @@ function removeProbeAndDeselect(probe: Probe) {
         </q-btn-dropdown>
         <q-list class="probe-list" separator>
           <q-item
-            v-for="probe of currentExperiment.probes"
+            v-for="(probe, index) of currentExperiment.probes"
             :key="probe.id"
             v-ripple
             :active="currentExperiment.isInspectableSelected(probe)"
@@ -101,14 +118,29 @@ function removeProbeAndDeselect(probe: Probe) {
                 ? 'true'
                 : undefined
             "
+            :class="{
+              'probe-row--dragging': draggedIndex === index,
+              'probe-row--drop-target':
+                dropTargetIndex === index && draggedIndex !== index
+            }"
             clickable
             @click="currentExperiment.selectedInspectable = probe"
+            @dragover="dragOverRow(index, $event)"
+            @drop="dropRow(index)"
           >
-            <q-item-section side>
-              <q-icon
-                :style="{ color: probe.color }"
-                name="radio_button_checked"
-              />
+            <q-item-section avatar>
+              <div
+                class="probe-row__handle"
+                draggable="true"
+                :title="$t('sceneHierarchy.dragToReorder')"
+                @dragend="endDrag"
+                @dragstart.stop="startDrag(index, $event)"
+              >
+                <q-icon
+                  :style="{ color: probe.color }"
+                  name="radio_button_checked"
+                />
+              </div>
             </q-item-section>
             <q-item-section>{{ probe.name }}</q-item-section>
             <q-item-section side>
@@ -133,7 +165,11 @@ function removeProbeAndDeselect(probe: Probe) {
       </div>
     </q-expansion-item>
     <q-separator />
-    <q-expansion-item default-opened :label="$t('sceneHierarchy.scene')">
+    <q-expansion-item
+      default-opened
+      header-class="text-weight-bold"
+      :label="$t('sceneHierarchy.scene')"
+    >
       <q-list class="scene-list" separator>
         <q-item
           v-ripple
@@ -189,6 +225,17 @@ function removeProbeAndDeselect(probe: Probe) {
 <style lang="sass" scoped>
 .visibility-button
   font-variation-settings: 'FILL' 1
+
+.probe-row__handle
+  cursor: grab
+  display: flex
+
+.probe-row--dragging
+  opacity: 0.5
+
+.probe-row--drop-target
+  outline: 2px solid var(--q-primary)
+  outline-offset: -2px
 
 .hierarchy-item--active
   background: rgba($primary, 0.12)

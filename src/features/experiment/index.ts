@@ -17,6 +17,7 @@ export {
   getInternedProbeInterfaceProbe,
   addProbe,
   removeProbe,
+  reorderProbe,
   setProbeInterface,
   setExperimentProperties,
   addCameraPose,

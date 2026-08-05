@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import CommittedInput from "@/components/CommittedInput.vue";
 import { useDragReorder } from "@/composable/useDragReorder";
-import { useValidationRules } from "@/composable/useValidationRules";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
+import { useUnitLabels } from "@/composable/useUnitLabels";
+import { useValidationRules } from "@/composable/useValidationRules";
 import {
   getCameraOrbit,
   setCameraOrbit,
@@ -18,39 +19,56 @@ import {
   reorderCameraPose
 } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { usePreferencesStore } from "@/stores/preferences.store";
+import {
+  millimetersToPositionUnit,
+  positionUnitToMillimeters,
+  radiansToRotationUnit,
+  rotationUnitToRadians
+} from "@/utils/math";
 
 const { t } = useI18n();
 const currentExperiment = useCurrentExperimentStore();
 const runtime = useBabylonRuntimeService();
+const preferences = usePreferencesStore();
+const unitLabels = useUnitLabels();
 const { requiredName: nameRules, optionalNumber: numberRules } =
   useValidationRules();
 
 const name = ref(t("cameraInspector.defaultPoseName"));
 const orbit = ref<[number, number, number]>([0, 0, 0]);
 
-// Camera poses store raw radians/mm; the identity conversions and null
-// decimals keep alpha/beta/radius display unconverted and unrounded,
-// unlike ProbeInspector's unit-aware fields.
+// Declared next to orbit (the documented exception in AGENTS.md). Camera
+// poses store raw radians/mm; display converts through the same preferences
+// ProbeInspector's rotation/position fields use.
 const alpha = useNumericTupleModel(
   () => orbit.value,
   0,
-  value => value,
-  value => value,
-  () => null
+  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
+  value => rotationUnitToRadians(value, preferences.rotationUnit),
+  () => preferences.decimalPrecision
 );
 const beta = useNumericTupleModel(
   () => orbit.value,
   1,
-  value => value,
-  value => value,
-  () => null
+  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
+  value => rotationUnitToRadians(value, preferences.rotationUnit),
+  () => preferences.decimalPrecision
 );
 const radius = useNumericTupleModel(
   () => orbit.value,
   2,
-  value => value,
-  value => value,
-  () => null
+  millimeters =>
+    millimetersToPositionUnit(millimeters, preferences.positionUnit),
+  value => positionUnitToMillimeters(value, preferences.positionUnit),
+  () => preferences.decimalPrecision
+);
+
+const rotationSuffix = computed(() =>
+  unitLabels.rotation(preferences.rotationUnit)
+);
+const positionSuffix = computed(() =>
+  unitLabels.position(preferences.positionUnit)
 );
 
 const {
@@ -84,11 +102,16 @@ function applyPose(pose: CameraPose): void {
   setCameraOrbit(camera, [pose.alpha, pose.beta, pose.radius]);
 }
 
-onMounted(() => {
+/**
+ * Overwrite the draft with the scene camera's current orbit.
+ */
+function copyFromCurrentCamera(): void {
   const camera = runtime.camera.value;
   if (!camera) return;
   orbit.value = getCameraOrbit(camera);
-});
+}
+
+onMounted(copyFromCurrentCamera);
 </script>
 
 <template>
@@ -99,6 +122,13 @@ onMounted(() => {
       outlined
       :rules="nameRules"
     />
+    <q-btn
+      color="primary"
+      flat
+      icon="content_copy"
+      :label="t('cameraInspector.copyFromCurrent')"
+      @click="copyFromCurrentCamera"
+    />
     <div class="row q-gutter-x-sm">
       <CommittedInput
         v-model="alpha"
@@ -106,6 +136,7 @@ onMounted(() => {
         :label="t('cameraInspector.alpha')"
         outlined
         :rules="numberRules"
+        :suffix="rotationSuffix"
       />
       <CommittedInput
         v-model="beta"
@@ -113,6 +144,7 @@ onMounted(() => {
         :label="t('cameraInspector.beta')"
         outlined
         :rules="numberRules"
+        :suffix="rotationSuffix"
       />
       <CommittedInput
         v-model="radius"
@@ -120,6 +152,7 @@ onMounted(() => {
         :label="t('cameraInspector.radius')"
         outlined
         :rules="numberRules"
+        :suffix="positionSuffix"
       />
     </div>
     <q-btn

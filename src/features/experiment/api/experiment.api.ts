@@ -198,6 +198,30 @@ export function removeProbe(experiment: Experiment, probe: Probe) {
 }
 
 /**
+ * Move a probe within the experiment from one index to another.
+ * @param experiment Experiment holding the probes to reorder.
+ * @param fromIndex Index of the probe to move.
+ * @param toIndex Index to move it to.
+ */
+export function reorderProbe(
+  experiment: Experiment,
+  fromIndex: number,
+  toIndex: number
+) {
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= experiment.probes.length ||
+    toIndex >= experiment.probes.length
+  ) {
+    return;
+  }
+  const [probe] = experiment.probes.splice(fromIndex, 1);
+  experiment.probes.splice(toIndex, 0, probe!);
+}
+
+/**
  * Add a camera pose to the experiment, unless one with the same id already
  * exists.
  * @param experiment Experiment to add a camera pose to.

@@ -6,8 +6,10 @@ import type { ArcRotateCamera } from "@babylonjs/core";
 import CameraInspector from "./CameraInspector.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { usePreferencesStore } from "@/stores/preferences.store";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import { getTerminologyRows } from "@/features/atlas";
+import { millimetersToPositionUnit, radiansToRotationUnit } from "@/utils/math";
 import enUS from "@/i18n/en-US";
 
 const t = enUS.cameraInspector;
@@ -48,6 +50,7 @@ function mountInspector({ camera, interpolateTo } = makeCameraStub()) {
   const pinia = createPinia();
   setActivePinia(pinia);
   const store = useCurrentExperimentStore(pinia);
+  const preferences = usePreferencesStore(pinia);
 
   const wrapper = mountWithQuasar(CameraInspector, {
     pinia,
@@ -59,7 +62,7 @@ function mountInspector({ camera, interpolateTo } = makeCameraStub()) {
       }
     }
   });
-  return { wrapper, store, camera, interpolateTo };
+  return { wrapper, store, preferences, camera, interpolateTo };
 }
 
 function fieldByLabel(wrapper: VueWrapper, label: string) {
@@ -85,13 +88,59 @@ describe("CameraInspector", () => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
   });
 
-  it("seeds the three numeric fields from the camera on mount", async () => {
-    const { wrapper } = mountInspector();
+  it("seeds the three numeric fields from the camera, converted to the preferences store's units, on mount", async () => {
+    const { wrapper, preferences } = mountInspector();
     await wrapper.vm.$nextTick();
 
-    expect(fieldByLabel(wrapper, t.alpha).props("modelValue")).toBe("1");
-    expect(fieldByLabel(wrapper, t.beta).props("modelValue")).toBe("2");
-    expect(fieldByLabel(wrapper, t.radius).props("modelValue")).toBe("3");
+    expect(fieldByLabel(wrapper, t.alpha).props("modelValue")).toBe(
+      radiansToRotationUnit(1, preferences.rotationUnit).toFixed(
+        preferences.decimalPrecision
+      )
+    );
+    expect(fieldByLabel(wrapper, t.beta).props("modelValue")).toBe(
+      radiansToRotationUnit(2, preferences.rotationUnit).toFixed(
+        preferences.decimalPrecision
+      )
+    );
+    expect(fieldByLabel(wrapper, t.radius).props("modelValue")).toBe(
+      millimetersToPositionUnit(3, preferences.positionUnit).toFixed(
+        preferences.decimalPrecision
+      )
+    );
+  });
+
+  it("displays alpha/beta/radius in the preferences store's units and decimal precision", async () => {
+    const { wrapper, preferences } = mountInspector();
+    preferences.rotationUnit = "radian";
+    preferences.positionUnit = "micrometer";
+    preferences.decimalPrecision = 1;
+    await wrapper.vm.$nextTick();
+
+    const alpha = fieldByLabel(wrapper, t.alpha);
+    expect(alpha.props("modelValue")).toBe("1.0");
+    expect(alpha.props("suffix")).toBe(enUS.units.radian);
+    const radius = fieldByLabel(wrapper, t.radius);
+    expect(radius.props("modelValue")).toBe("3000.0");
+    expect(radius.props("suffix")).toBe(enUS.units.micrometer);
+  });
+
+  it("copies the live camera's orbit into the draft when Copy from Current is clicked, without moving the camera", async () => {
+    const { wrapper, camera, interpolateTo } = mountInspector();
+    await wrapper.vm.$nextTick();
+    camera.alpha = 4;
+    camera.beta = 5;
+    camera.radius = 6;
+
+    const copyButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(button => button.text().includes(t.copyFromCurrent))!;
+    await copyButton.trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(fieldByLabel(wrapper, t.radius).props("modelValue")).toBe(
+      millimetersToPositionUnit(6, "millimeter").toFixed(3)
+    );
+    expect(interpolateTo).not.toHaveBeenCalled();
   });
 
   it("shows the empty hint when there are no saved poses", () => {
