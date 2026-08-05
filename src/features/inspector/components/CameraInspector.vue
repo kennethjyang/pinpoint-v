@@ -122,13 +122,6 @@ onMounted(copyFromCurrentCamera);
       outlined
       :rules="nameRules"
     />
-    <q-btn
-      color="primary"
-      flat
-      icon="content_copy"
-      :label="t('cameraInspector.copyFromCurrent')"
-      @click="copyFromCurrentCamera"
-    />
     <div class="row q-gutter-x-sm">
       <CommittedInput
         v-model="alpha"
@@ -155,6 +148,10 @@ onMounted(copyFromCurrentCamera);
         :suffix="positionSuffix"
       />
     </div>
+    <q-btn
+      :label="t('cameraInspector.copyFromCurrent')"
+      @click="copyFromCurrentCamera"
+    />
     <q-btn
       color="primary"
       icon="save"
