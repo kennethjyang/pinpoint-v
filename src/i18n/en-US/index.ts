@@ -149,6 +149,7 @@ export default {
     yaw: "Yaw",
     pitch: "Pitch",
     home: "Reset tip position",
+    drop: "Drop to surface",
     copy: "Duplicate probe",
     lock: "Lock probe",
     unlock: "Unlock probe"

@@ -102,6 +102,11 @@ const lockLabel = computed(() =>
         @click="homeProbe(probe)"
       />
       <q-btn
+        :aria-label="t('probeInspector.drop')"
+        :disable="probe.lock"
+        icon="sym_o_place_item"
+      />
+      <q-btn
         :aria-label="t('probeInspector.copy')"
         icon="content_copy"
         @click="copyProbe(currentExperimentStore.experiment, probe)"
