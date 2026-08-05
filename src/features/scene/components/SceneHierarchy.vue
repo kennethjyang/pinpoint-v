@@ -71,6 +71,7 @@ function removeProbeAndDeselect(probe: Probe) {
     <q-expansion-item
       default-opened
       header-class="text-weight-bold"
+      icon="sym_o_acupuncture"
       :label="$t('sceneHierarchy.probes')"
     >
       <div class="column q-gutter-y-sm q-pa-sm">
@@ -168,6 +169,7 @@ function removeProbeAndDeselect(probe: Probe) {
     <q-expansion-item
       default-opened
       header-class="text-weight-bold"
+      icon="sym_o_deployed_code"
       :label="$t('sceneHierarchy.scene')"
     >
       <q-list class="scene-list" separator>
