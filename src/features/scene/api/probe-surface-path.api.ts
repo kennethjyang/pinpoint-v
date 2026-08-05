@@ -22,7 +22,7 @@ const PROBE_SURFACE_PATH_MESH_PREFIX = "probeSurfacePath_";
 const PROBE_SURFACE_PATH_MATERIAL_SUFFIX = "_material";
 
 /** Diameter of a surface-path tube, in mm. */
-const PROBE_SURFACE_PATH_DIAMETER_MILLIMETERS = 0.1;
+const PROBE_SURFACE_PATH_DIAMETER_MILLIMETERS = 0.2;
 
 /** Radial segments of a surface-path tube. */
 const PROBE_SURFACE_PATH_TESSELLATION = 8;
