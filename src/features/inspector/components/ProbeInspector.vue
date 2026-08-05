@@ -313,16 +313,20 @@ onUnmounted(cancelMoveToSurface);
       outlined
     />
 
-    <q-btn-toggle
-      v-if="shankAlignmentOptions.length"
-      v-model="probe.shankAlignmentIndex"
-      :aria-label="t('probeInspector.shankAlignment')"
-      :disable="probe.lock"
-      :options="shankAlignmentOptions"
-      spread
-      toggle-color="primary"
-      unelevated
-    />
+    <div>
+      <div class="text-body2 q-pb-xs">{{
+        t("probeInspector.centeredShankIndex")
+      }}</div>
+      <q-btn-toggle
+        v-if="shankAlignmentOptions.length"
+        v-model="probe.shankAlignmentIndex"
+        :aria-label="t('probeInspector.shankAlignment')"
+        :disable="probe.lock"
+        :options="shankAlignmentOptions"
+        spread
+        toggle-color="primary"
+      />
+    </div>
 
     <div class="row q-gutter-x-sm">
       <CommittedInput
