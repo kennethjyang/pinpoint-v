@@ -415,4 +415,75 @@ describe("useCurrentExperimentStore", () => {
       expect(rehydratedStore.name).toBe("Renamed");
     });
   });
+
+  describe("probe drag history", () => {
+    it("collapses a drag into one history point", async () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbeInterfaceProbe();
+      internProbeInterfaceProbe(store.experiment, spec);
+      addProbe(store.experiment, buildProbe(spec));
+      await nextTick();
+
+      store.draggedProbeId = store.probes[0]!.id;
+      store.probes[0]!.tipPosition = [1, 0, 0];
+      await nextTick();
+      store.probes[0]!.tipPosition = [2, 0, 0];
+      await nextTick();
+      store.endProbeDrag();
+
+      expect(store.probes[0]!.tipPosition).toEqual([2, 0, 0]);
+
+      store.undo();
+      expect(store.probes[0]!.tipPosition).toEqual([0, 0, 0]);
+    });
+
+    it("redoes a drag as one step", async () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbeInterfaceProbe();
+      internProbeInterfaceProbe(store.experiment, spec);
+      addProbe(store.experiment, buildProbe(spec));
+      await nextTick();
+
+      store.draggedProbeId = store.probes[0]!.id;
+      store.probes[0]!.tipPosition = [1, 0, 0];
+      await nextTick();
+      store.probes[0]!.tipPosition = [2, 0, 0];
+      await nextTick();
+      store.endProbeDrag();
+      store.undo();
+
+      store.redo();
+
+      expect(store.probes[0]!.tipPosition).toEqual([2, 0, 0]);
+    });
+
+    it("records nothing when no drag was in progress", () => {
+      const store = useCurrentExperimentStore();
+
+      store.endProbeDrag();
+
+      expect(store.canUndo).toBe(false);
+      expect(store.draggedProbeId).toBeNull();
+    });
+
+    it("resumes recording once the drag ends", async () => {
+      const store = useCurrentExperimentStore();
+      const spec = makeProbeInterfaceProbe();
+      internProbeInterfaceProbe(store.experiment, spec);
+      addProbe(store.experiment, buildProbe(spec));
+      await nextTick();
+      const defaultName = store.name;
+
+      store.draggedProbeId = store.probes[0]!.id;
+      store.probes[0]!.tipPosition = [1, 0, 0];
+      await nextTick();
+      store.endProbeDrag();
+
+      store.experiment.name = "Renamed";
+      await nextTick();
+      store.undo();
+
+      expect(store.name).toBe(defaultName);
+    });
+  });
 });

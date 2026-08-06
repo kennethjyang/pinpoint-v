@@ -433,7 +433,7 @@ watch(
       }
     );
     const probeDragEndObservers = endProbeGizmoDrag(gizmos, () => {
-      currentExperiment.draggedProbeId = null;
+      currentExperiment.endProbeDrag();
     });
 
     onWatcherCleanup(() => {

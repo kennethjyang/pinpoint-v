@@ -69,7 +69,15 @@ export const useCurrentExperimentStore = defineStore(
       redo: redoExperiment,
       commit: commitHistory,
       clear: clearHistory
-    } = useRefHistory(experiment, { deep: true, clone: cloneExperiment });
+    } = useRefHistory(experiment, {
+      deep: true,
+      clone: cloneExperiment,
+      // A gizmo drag rewrites the probe pose every frame; drop those in-between
+      // states and let `endProbeDrag` record the pose the drag was released at.
+      eventFilter: invoke => {
+        if (!draggedProbeId.value) invoke();
+      }
+    });
 
     /**
      * Get the current experiment name.
@@ -164,6 +172,19 @@ export const useCurrentExperimentStore = defineStore(
     }
 
     /**
+     * Finish the active probe drag, recording the released pose as a single
+     * history point.
+     * @remarks No-op when no drag is in progress, so a gizmo click that never
+     * moved (or a second drag-end from the other gizmo) records nothing.
+     */
+    function endProbeDrag() {
+      if (!draggedProbeId.value) return;
+
+      draggedProbeId.value = null;
+      commitHistory();
+    }
+
+    /**
      * Move the current experiment into recents and load in a new one.
      * @param newExperiment Experiment to load.
      */
@@ -202,7 +223,8 @@ export const useCurrentExperimentStore = defineStore(
       loadExperiment,
       undo,
       redo,
-      resetHistory
+      resetHistory,
+      endProbeDrag
     };
     return { ...state, ...getters, ...actions };
   },
