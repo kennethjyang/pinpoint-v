@@ -177,9 +177,13 @@ function makeRuntimeStub() {
     engine.value = { resize };
     scene.value = built.scene;
     camera.value = {
+      alpha: 0,
+      beta: 0,
       radius: 0,
       inertia: 0.9,
-      onViewMatrixChangedObservable: new Observable()
+      isInterpolating: false,
+      onViewMatrixChangedObservable: new Observable(),
+      onAfterCheckInputsObservable: new Observable()
     } as unknown as ArcRotateCamera;
     gizmoManager.value = built.gizmoManager;
     selectionOutlineLayer.value = built.selectionOutlineLayer;
@@ -549,6 +553,16 @@ describe("SceneCanvas", () => {
     );
   });
 
+  it("stays in perspective when the axis-view tracker fires with no preceding double-tap", async () => {
+    const { runtime } = await mountCanvas();
+
+    (
+      runtime.camera.value!.onAfterCheckInputsObservable as Observable<unknown>
+    ).notifyObservers(undefined);
+
+    expect(usePreferencesStore().cameraProjection).toBe("perspective");
+  });
+
   it("clears the scene when the experiment's atlas changes", async () => {
     await mountCanvas();
     expect(removeAllStructures).not.toHaveBeenCalled();
@@ -802,6 +816,48 @@ describe("SceneCanvas", () => {
     );
 
     expect(store.draggedProbeId).toBeNull();
+  });
+
+  it("collapses a full drag-then-release cycle into one undoable step", async () => {
+    const { runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    const contour = [
+      [-11, 9989],
+      [-11, -11],
+      [24, -220],
+      [59, -11],
+      [59, 9989]
+    ];
+    const probeInterfaceProbe = makeProbeInterfaceProbe({
+      probe_planar_contour: contour
+    });
+    internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
+    const builtProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+    });
+    addProbe(store.experiment, builtProbe);
+    const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
+    await flushPromises();
+
+    const scene = runtime.scene.value!;
+    const gizmoManager = runtime.gizmoManager.value!;
+    const node = getProbeTransformNode(scene, probe.id)!;
+    const positionGizmo = gizmoManager.gizmos.positionGizmo!;
+
+    gizmoManager.attachToNode(node);
+    node.position.set(1, 0, 0);
+    positionGizmo.onDragObservable.notifyObservers({} as never);
+    await flushPromises();
+    node.position.set(2, 0, 0);
+    positionGizmo.onDragObservable.notifyObservers({} as never);
+    await flushPromises();
+    positionGizmo.onDragEndObservable.notifyObservers({} as never);
+    await flushPromises();
+    store.undo();
+
+    const restoredProbe = store.probes.find(p => p.id === builtProbe.id)!;
+    expect(restoredProbe.tipPosition).toEqual([0, 0, 0]);
   });
 
   it("keeps the position gizmo on the probe in global coordinates", async () => {

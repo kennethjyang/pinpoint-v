@@ -129,6 +129,21 @@ onMounted(() => {
             <q-list>
               <q-item
                 clickable
+                :disable="!currentExperimentStore.canUndo"
+                @click="currentExperimentStore.undo()"
+              >
+                <q-item-section>{{ $t("layout.undo") }}</q-item-section>
+              </q-item>
+              <q-item
+                clickable
+                :disable="!currentExperimentStore.canRedo"
+                @click="currentExperimentStore.redo()"
+              >
+                <q-item-section>{{ $t("layout.redo") }}</q-item-section>
+              </q-item>
+              <q-separator />
+              <q-item
+                clickable
                 @click="$q.dialog({ component: ExperimentPropertiesDialog })"
               >
                 <q-item-section>{{
@@ -141,23 +156,13 @@ onMounted(() => {
               >
                 <q-item-section>{{ $t("layout.probeLibrary") }}</q-item-section>
               </q-item>
-              <q-item clickable @click="openPreferencesDialog($q)">
-                <q-item-section>{{ $t("layout.preferences") }}</q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
-
-        <q-btn flat :label="$t('layout.view')">
-          <q-menu auto-close>
-            <q-list>
-              <q-item clickable @click="$q.dialog({ component: SplashDialog })">
-                <q-item-section>{{ $t("layout.splashScreen") }}</q-item-section>
-              </q-item>
               <q-item clickable @click="$q.dark.toggle">
                 <q-item-section>{{
                   $t("layout.toggleDarkMode")
                 }}</q-item-section>
+              </q-item>
+              <q-item clickable @click="openPreferencesDialog($q)">
+                <q-item-section>{{ $t("layout.preferences") }}</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
