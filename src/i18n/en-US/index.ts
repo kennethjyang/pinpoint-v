@@ -237,6 +237,7 @@ export default {
     lightPower: "Light Power",
     specularIntensity: "Specular Intensity",
     specularPower: "Glossiness",
+    hideStructureInteriors: "Hide Interior Surfaces",
 
     unitsTitle: "Units",
     positionUnit: "Position",

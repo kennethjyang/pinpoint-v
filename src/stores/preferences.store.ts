@@ -47,6 +47,9 @@ export const usePreferencesStore = defineStore(
     const worldLightIntensity = ref(1);
     const materialSpecularIntensity = ref(1);
     const materialSpecularPower = ref(64);
+    const areStructureInteriorsHidden = ref(true);
+
+    /** Unit numeric inputs display positions in. */
     const positionUnit = ref<PositionUnit>("millimeter");
     const rotationUnit = ref<RotationUnit>("degree");
     const decimalPrecision = ref(3);
@@ -66,6 +69,7 @@ export const usePreferencesStore = defineStore(
       worldLightIntensity,
       materialSpecularIntensity,
       materialSpecularPower,
+      areStructureInteriorsHidden,
       positionUnit,
       rotationUnit,
       decimalPrecision,
