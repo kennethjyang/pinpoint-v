@@ -106,6 +106,7 @@ function isPreferences(value: unknown): value is Preferences {
     version,
     cameraProjection,
     worldBackgroundColor,
+    areStructureInteriorsHidden,
     positionUnit,
     rotationUnit
   } = value;
@@ -123,6 +124,7 @@ function isPreferences(value: unknown): value is Preferences {
   ) {
     return false;
   }
+  if (typeof areStructureInteriorsHidden !== "boolean") return false;
   if (
     typeof positionUnit !== "string" ||
     !POSITION_UNITS.includes(positionUnit)
@@ -161,6 +163,7 @@ function pickPreferences(source: Preferences, version: string): Preferences {
     worldLightIntensity: source.worldLightIntensity,
     materialSpecularIntensity: source.materialSpecularIntensity,
     materialSpecularPower: source.materialSpecularPower,
+    areStructureInteriorsHidden: source.areStructureInteriorsHidden,
     positionUnit: source.positionUnit,
     rotationUnit: source.rotationUnit,
     decimalPrecision: source.decimalPrecision,

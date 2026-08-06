@@ -20,6 +20,7 @@ function makePreferences(overrides: Partial<Preferences> = {}): Preferences {
     worldLightIntensity: 1,
     materialSpecularIntensity: 1,
     materialSpecularPower: 64,
+    areStructureInteriorsHidden: true,
     positionUnit: "millimeter",
     rotationUnit: "degree",
     decimalPrecision: 3,
@@ -47,12 +48,12 @@ describe("serializePreferences", () => {
     );
   });
 
-  it("writes only the fifteen preference keys", () => {
+  it("writes only the sixteen preference keys", () => {
     const fixture = { ...makePreferences(), junk: 1 } as Preferences;
 
     const keys = Object.keys(JSON.parse(serializePreferences(fixture)));
 
-    expect(keys).toHaveLength(15);
+    expect(keys).toHaveLength(16);
     expect(keys).not.toContain("junk");
   });
 });
@@ -91,6 +92,15 @@ describe("parsePreferencesFile", () => {
 
   it("returns null for a malformed worldBackgroundColor", () => {
     const fixture = { ...makePreferences(), worldBackgroundColor: "red" };
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a non-boolean areStructureInteriorsHidden", () => {
+    const fixture = {
+      ...makePreferences(),
+      areStructureInteriorsHidden: "true"
+    };
 
     expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
   });
@@ -146,6 +156,7 @@ describe("applyPreferences", () => {
       cameraProjection: "orthographic",
       cameraInertia: 0.1,
       worldBackgroundColor: "#ff0000",
+      areStructureInteriorsHidden: false,
       positionUnit: "inch",
       rotationUnit: "radian",
       decimalPrecision: 1,
