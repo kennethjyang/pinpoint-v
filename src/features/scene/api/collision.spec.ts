@@ -35,6 +35,7 @@ import {
 import type { CollisionChange } from "./collision.api";
 import {
   createCollisionState,
+  disposeCollisionBody,
   pruneCollisions,
   syncCollisionHighlight,
   trackCollisions
@@ -241,6 +242,79 @@ describe("scene entity collision bodies", () => {
     for (const mesh of meshesB) {
       expect(highlightLayer.hasMesh(mesh)).toBe(false);
     }
+  });
+
+  it("un-highlights a scene object's own mesh when its collider is disposed while overlapping, unlike a rebuilt probe", async () => {
+    const { scene, gizmoManager, havokPlugin } =
+      await makeTestSceneWithPhysics();
+    const highlightLayer = new HighlightLayer("test_highlight_layer", scene);
+    const { experiment, probe } = makeExperimentWithProbe();
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    probeNode.position = Vector3.Zero();
+
+    const sceneObject = makeSceneObject();
+    const modelFile = await makeTestModelFile();
+    const objectNode = (await buildSceneObjectNode(
+      scene,
+      sceneObject,
+      modelFile,
+      gizmoManager
+    ))!.node;
+    objectNode.position = Vector3.Zero();
+
+    /** Meshes of a colliding entity, whichever kind it is - mirrors `SceneCanvas.vue`. */
+    function entityMeshes(entityId: string) {
+      const probeMeshes = getProbeMeshes(scene, entityId);
+      return probeMeshes.length
+        ? probeMeshes
+        : getSceneObjectMeshes(scene, entityId);
+    }
+
+    const state = createCollisionState();
+    trackCollisions(havokPlugin, state, change => {
+      for (const entityId of change.entityIds) {
+        syncCollisionHighlight(
+          highlightLayer,
+          state,
+          entityId,
+          entityMeshes(entityId)
+        );
+      }
+    });
+
+    for (let step = 0; step < 5; step++) stepPhysics(scene, 1 / 60);
+
+    const objectMeshes = getSceneObjectMeshes(scene, sceneObject.id);
+    expect(objectMeshes).not.toHaveLength(0);
+    expect(highlightLayer.hasMesh(objectMeshes[0]!)).toBe(true);
+
+    // Unlike a probe rebuild, which disposes the old, highlighted mesh along with its
+    // collider, turning a scene object's `collidable` off disposes only the collider - the
+    // render mesh, and its highlight-layer registration, survive.
+    disposeCollisionBody(scene, sceneObject.id, "object");
+
+    // Mirrors `SceneCanvas.vue`'s `syncSceneObjectsFromState`: prune the stale pair, then
+    // resync highlight for both the surviving partner and the changed entity itself.
+    const survivors = pruneCollisions(state, [probe.id]);
+    for (const entityId of new Set([...survivors, sceneObject.id])) {
+      syncCollisionHighlight(
+        highlightLayer,
+        state,
+        entityId,
+        entityMeshes(entityId)
+      );
+    }
+
+    for (const mesh of objectMeshes) {
+      expect(highlightLayer.hasMesh(mesh)).toBe(false);
+    }
+    scene.dispose();
   });
 
   it("offsets the body's world bounds by the shank alignment offset, matching an unaligned build", async () => {

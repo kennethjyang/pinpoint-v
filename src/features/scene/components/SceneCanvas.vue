@@ -494,14 +494,20 @@ async function syncSceneObjectsFromState() {
   // Havok emits no TRIGGER_EXITED when a body is disposed while overlapping
   // (e.g. `collidable` turned off, or a scale change re-cooked the hull), so
   // force-drop any stale pair for these ids rather than leaving them
-  // permanently highlighted/notified as colliding.
+  // permanently highlighted/notified as colliding. Unlike a rebuilt probe -
+  // whose old, highlighted mesh is disposed along with its collider - a
+  // scene object's mesh survives, so its own highlight needs resyncing too.
   const highlightLayer = runtime.highlightLayer.value;
   if (colliderChangedIds.length && highlightLayer) {
     const keptEntityIds = [
       ...currentExperiment.probes.map(({ id }) => id),
       ...currentExperiment.sceneObjects.map(({ id }) => id)
     ].filter(id => !colliderChangedIds.includes(id));
-    for (const entityId of pruneCollisions(collisionState, keptEntityIds)) {
+    const affectedIds = new Set([
+      ...pruneCollisions(collisionState, keptEntityIds),
+      ...colliderChangedIds
+    ]);
+    for (const entityId of affectedIds) {
       syncCollisionHighlight(
         highlightLayer,
         collisionState,
