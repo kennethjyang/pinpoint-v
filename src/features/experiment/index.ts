@@ -5,6 +5,7 @@ export { default as ExperimentPropertiesDialog } from "./components/ExperimentPr
 export { useExperimentFile } from "./composable/useExperimentFile";
 export type { Experiment } from "./models/experiment.model";
 export type { CameraPose } from "./models/camera-pose.model";
+export type { VisibleStructure } from "./models/visible-structure.model";
 export {
   buildCameraPose,
   copyCameraPose,
@@ -21,9 +22,11 @@ export {
 export {
   buildExperiment,
   cloneExperiment,
+  buildDefaultVisibleStructures,
+  getVisibleStructure,
   isStructureVisible,
   setStructureVisibility,
-  clearVisibleStructures,
+  resetStructureVisibility,
   internProbeInterfaceProbe,
   getInternedProbeInterfaceProbe,
   addProbe,
