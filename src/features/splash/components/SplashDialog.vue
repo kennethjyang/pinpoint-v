@@ -27,10 +27,10 @@ onOpened(onDialogOK);
         <div class="column items-center q-gutter-y-sm">
           <img
             class="rounded-borders"
-            :src="`${BASE_URL}icons/favicon-128x128.png`"
+            :src="`${BASE_URL}icons/favicon-96x96.png`"
             alt=""
-            width="128"
-            height="128"
+            width="96"
+            height="96"
           />
           <p class="text-h2">{{ $t("splash.title") }}</p>
         </div>
