@@ -8,6 +8,7 @@ import {
   Scene
 } from "@babylonjs/core";
 import { GLTF2Export } from "@babylonjs/serializers/glTF/2.0";
+import { orientNormalsOutward } from "./mesh-orientation.api";
 
 /** File name handed to the GLB exporter; only its extension matters. */
 const EXPORT_FILE_NAME = "object.glb";
@@ -50,8 +51,9 @@ export async function importModelAsGlb(
     if (!merged) return null;
 
     // Source files can carry stale, missing, or inward-facing normals; recompute
-    // them from the merged topology so lighting reads correctly regardless of origin.
-    merged.createNormals(false);
+    // them from the merged topology, oriented outward, so lighting reads
+    // correctly regardless of origin.
+    orientNormalsOutward(merged);
     merged.material = null;
     for (const material of importedMaterials) material.dispose(false, true);
 

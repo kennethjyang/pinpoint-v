@@ -24,6 +24,7 @@ import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 import { asrToVector3, vector3ToAsr } from "./coordinate-transforms.api";
 import { buildCollisionBody, disposeCollisionBody } from "./collision.api";
+import { orientNormalsOutward } from "./mesh-orientation.api";
 import {
   buildSceneEntityName,
   isSceneEntityName,
@@ -167,8 +168,9 @@ export async function buildSceneObjectNode(
     return null;
   }
   // The re-merge above bakes the loader's handedness conversion into the
-  // vertices, which can leave stale or inward-facing normals; recompute them.
-  merged.createNormals(false);
+  // vertices, which can invert winding and leave stale normals; recompute
+  // them oriented outward.
+  orientNormalsOutward(merged);
 
   merged.name = buildSceneEntityName(sceneObject.id, "object", "mesh");
   merged.material = buildSceneObjectMaterial(scene, sceneObject);
