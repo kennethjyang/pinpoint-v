@@ -18,10 +18,21 @@ import {
   setProbeInterface,
   setStructureVisibility
 } from "./experiment.api";
-import { buildCameraPose } from "./camera-pose.api";
+import { copyCameraPose } from "./camera-pose.api";
+import { referenceRelativeToAtlas } from "./reference-coordinate.api";
 import type { Experiment } from "../models/experiment.model";
 import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
-import { makeAtlas, makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  getAtlasCenter,
+  getAtlasDimensionsMillimeters
+} from "@/features/atlas";
+import {
+  makeAtlas,
+  makeCameraPose,
+  makeManifest,
+  makeProbe,
+  makeProbeInterfaceProbe
+} from "@/test/fixtures";
 
 describe("buildExperiment", () => {
   it("returns a new experiment with the given name, atlas, and reference coordinate", () => {
@@ -36,6 +47,14 @@ describe("buildExperiment", () => {
     expect(experiment.probeInterfaceProbes).toEqual({});
     expect(experiment.probes).toEqual([]);
     expect(experiment.cameraPoses).toEqual([]);
+  });
+
+  it("seeds the camera pose with a target on the atlas centre", () => {
+    const atlas = makeAtlas();
+
+    const experiment = buildExperiment("New Experiment", atlas, [0, 0, 0]);
+
+    expect(experiment.cameraPose.target).toEqual(getAtlasCenter(atlas));
   });
 });
 
@@ -483,7 +502,7 @@ describe("reorderProbe", () => {
 describe("addCameraPose", () => {
   it("adds the pose to the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const pose = buildCameraPose("Dorsal", [1, 2, 3]);
+    const pose = copyCameraPose(makeCameraPose({ alpha: 1 }), "Dorsal");
 
     addCameraPose(experiment, pose);
 
@@ -492,7 +511,10 @@ describe("addCameraPose", () => {
 
   it("does nothing when a pose with the same id already exists", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const pose = { ...buildCameraPose("Dorsal", [1, 2, 3]), id: "dup" };
+    const pose = {
+      ...copyCameraPose(makeCameraPose({ alpha: 1 }), "Dorsal"),
+      id: "dup"
+    };
     addCameraPose(experiment, pose);
 
     addCameraPose(experiment, { ...pose, name: "Other" });
@@ -505,7 +527,7 @@ describe("addCameraPose", () => {
 describe("removeCameraPose", () => {
   it("removes the pose from the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const pose = buildCameraPose("Dorsal", [1, 2, 3]);
+    const pose = copyCameraPose(makeCameraPose({ alpha: 1 }), "Dorsal");
     addCameraPose(experiment, pose);
 
     removeCameraPose(experiment, pose);
@@ -515,7 +537,7 @@ describe("removeCameraPose", () => {
 
   it("is a no-op when the pose's id isn't in the experiment", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    const kept = buildCameraPose("Dorsal", [1, 2, 3]);
+    const kept = copyCameraPose(makeCameraPose({ alpha: 1 }), "Dorsal");
     addCameraPose(experiment, kept);
 
     removeCameraPose(experiment, { ...kept, id: "never-added" });
@@ -526,9 +548,9 @@ describe("removeCameraPose", () => {
 
 describe("reorderCameraPose", () => {
   function makeThreePoses(experiment: Experiment) {
-    const a = buildCameraPose("A", [1, 0, 0]);
-    const b = buildCameraPose("B", [2, 0, 0]);
-    const c = buildCameraPose("C", [3, 0, 0]);
+    const a = copyCameraPose(makeCameraPose({ alpha: 1 }), "A");
+    const b = copyCameraPose(makeCameraPose({ alpha: 2 }), "B");
+    const c = copyCameraPose(makeCameraPose({ alpha: 3 }), "C");
     addCameraPose(experiment, a);
     addCameraPose(experiment, b);
     addCameraPose(experiment, c);
@@ -630,5 +652,91 @@ describe("setExperimentProperties", () => {
     });
 
     expect(experiment.visibleStructures).toEqual([1, 2, 3]);
+  });
+
+  it("shifts every probe tip and the camera target to compensate a reference coordinate move on the same atlas", () => {
+    const atlas = makeAtlas();
+    const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
+    const probe = buildProbe(makeProbeInterfaceProbe());
+    probe.tipPosition = [2, 0, 0];
+    addProbe(experiment, probe);
+    const previousTip = referenceRelativeToAtlas(
+      experiment.referenceCoordinate,
+      probe.tipPosition
+    );
+    const previousTarget = referenceRelativeToAtlas(
+      experiment.referenceCoordinate,
+      experiment.cameraPose.target
+    );
+
+    setExperimentProperties(experiment, {
+      name: experiment.name,
+      atlas,
+      referenceCoordinate: [1, 0, 0]
+    });
+
+    expect(probe.tipPosition).toEqual([1, 0, 0]);
+    expect(
+      referenceRelativeToAtlas(
+        experiment.referenceCoordinate,
+        probe.tipPosition
+      )
+    ).toEqual(previousTip);
+    expect(
+      referenceRelativeToAtlas(
+        experiment.referenceCoordinate,
+        experiment.cameraPose.target
+      )
+    ).toEqual(previousTarget);
+  });
+
+  it("re-frames the camera pose's radius and target when the atlas changes, leaving alpha/beta and cameraPoses untouched", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    experiment.cameraPose.alpha = 1;
+    experiment.cameraPose.beta = 2;
+    const savedPose = copyCameraPose(makeCameraPose(), "Saved");
+    addCameraPose(experiment, savedPose);
+    const newAtlas = makeAtlas({
+      name: "allen_human",
+      manifest: makeManifest({ shape: [[1000, 320, 456]] })
+    });
+
+    setExperimentProperties(experiment, {
+      name: "New",
+      atlas: newAtlas,
+      referenceCoordinate: [0, 0, 0]
+    });
+
+    expect(experiment.cameraPose.radius).toBe(
+      getAtlasDimensionsMillimeters(newAtlas)[0] * 1.5
+    );
+    expect(experiment.cameraPose.target).toEqual(getAtlasCenter(newAtlas));
+    expect(experiment.cameraPose.alpha).toBe(1);
+    expect(experiment.cameraPose.beta).toBe(2);
+    expect(experiment.cameraPoses).toEqual([savedPose]);
+  });
+
+  it("leaves the camera pose's radius and compensated target alone on a same-atlas edit", () => {
+    const atlas = makeAtlas();
+    const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
+    const originalRadius = experiment.cameraPose.radius;
+    const originalWorldTarget = referenceRelativeToAtlas(
+      experiment.referenceCoordinate,
+      experiment.cameraPose.target
+    );
+
+    setExperimentProperties(experiment, {
+      name: "New Name",
+      atlas,
+      referenceCoordinate: experiment.referenceCoordinate
+    });
+
+    expect(experiment.cameraPose.radius).toBe(originalRadius);
+    expect(
+      referenceRelativeToAtlas(
+        experiment.referenceCoordinate,
+        experiment.cameraPose.target
+      )
+    ).toEqual(originalWorldTarget);
   });
 });

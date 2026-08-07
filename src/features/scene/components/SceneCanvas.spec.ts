@@ -46,14 +46,12 @@ import {
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
-import { applyCameraProjection, setInitialZoom } from "../api/camera.api";
+import { applyCameraProjection } from "../api/camera.api";
 import { createAxisGuides } from "../api/axis-guide.api";
 import type * as AxisGuideApi from "../api/axis-guide.api";
-import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 import {
   DEFAULT_ATLAS,
   getAtlasCenter,
-  getAtlasDimensionsMillimeters,
   getTerminologyRows,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
@@ -97,7 +95,7 @@ vi.mock("../api/camera.api", async () => {
     await vi.importActual<typeof import("../api/camera.api")>(
       "../api/camera.api"
     );
-  return { ...actual, applyCameraProjection: vi.fn(), setInitialZoom: vi.fn() };
+  return { ...actual, applyCameraProjection: vi.fn() };
 });
 
 vi.mock("../api/axis-guide.api", async () => {
@@ -185,10 +183,14 @@ function makeRuntimeStub() {
       alpha: 0,
       beta: 0,
       radius: 0,
+      target: Vector3.Zero(),
       inertia: 0.9,
       isInterpolating: false,
       onViewMatrixChangedObservable: new Observable(),
-      onAfterCheckInputsObservable: new Observable()
+      onAfterCheckInputsObservable: new Observable(),
+      stopInterpolation: vi.fn(),
+      setTarget: vi.fn(),
+      interpolateTo: vi.fn()
     } as unknown as ArcRotateCamera;
     gizmoManager.value = built.gizmoManager;
     selectionOutlineLayer.value = built.selectionOutlineLayer;
@@ -278,7 +280,6 @@ describe("SceneCanvas", () => {
     vi.mocked(setAtlasCenterOffset).mockReset();
     vi.mocked(removeAllStructures).mockReset();
     vi.mocked(applyCameraProjection).mockReset();
-    vi.mocked(setInitialZoom).mockReset();
     vi.mocked(createAxisGuides).mockReset();
     vi.mocked(createAxisGuides).mockImplementation(async scene => ({
       renderers: {
@@ -506,15 +507,6 @@ describe("SceneCanvas", () => {
     expect(setAtlasCenterOffset).toHaveBeenCalledWith(
       expect.anything(),
       [1, 1, 1]
-    );
-  });
-
-  it("sets the camera's initial zoom from the current atlas", async () => {
-    const { runtime } = await mountCanvas();
-
-    expect(setInitialZoom).toHaveBeenCalledWith(
-      runtime.camera.value,
-      getAtlasDimensionsMillimeters(DEFAULT_ATLAS)[0]
     );
   });
 
@@ -905,7 +897,7 @@ describe("SceneCanvas", () => {
     const { wrapper } = await mountCanvas();
     const store = useCurrentExperimentStore();
 
-    store.selectedInspectable = CAMERA_INSPECTABLE;
+    store.selectedInspectable = store.experiment.cameraPose;
     await flushPromises();
 
     expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);

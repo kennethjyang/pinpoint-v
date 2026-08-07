@@ -2,6 +2,11 @@ import { toRaw } from "vue";
 import type { Atlas } from "@/features/atlas";
 import { isSameAtlas } from "@/features/atlas";
 import type { CameraPose } from "../models/camera-pose.model";
+import { buildCameraPose, frameCameraPoseOnAtlas } from "./camera-pose.api";
+import {
+  atlasToReferenceRelative,
+  referenceRelativeToAtlas
+} from "./reference-coordinate.api";
 import type { Experiment } from "../models/experiment.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import {
@@ -30,6 +35,7 @@ export function buildExperiment(
     visibleStructures: [],
     probeInterfaceProbes: {},
     probes: [],
+    cameraPose: buildCameraPose(atlas, referenceCoordinate),
     cameraPoses: []
   };
 }
@@ -60,15 +66,46 @@ export function setExperimentProperties(
   }
 ) {
   const { name, atlas, referenceCoordinate } = properties;
+  const isNewAtlas = !isSameAtlas(atlas, experiment.atlas);
 
-  if (!isSameAtlas(atlas, experiment.atlas)) {
-    clearVisibleStructures(experiment);
-  }
+  // Structure identifiers are atlas-specific.
+  if (isNewAtlas) clearVisibleStructures(experiment);
 
   experiment.name = name.trim();
   experiment.atlas = { ...atlas };
+  setReferenceCoordinate(experiment, referenceCoordinate);
+
+  // A different atlas has its own extent and centre, so the saved zoom and
+  // target no longer frame anything; the orbit angles still make sense.
+  if (isNewAtlas) {
+    frameCameraPoseOnAtlas(experiment.cameraPose, atlas, referenceCoordinate);
+  }
+}
+
+/**
+ * Move an experiment's reference coordinate, re-deriving every probe tip and
+ * the camera target so they stay at the same atlas coordinate.
+ * @param experiment Experiment to move the reference coordinate of.
+ * @param referenceCoordinate New reference coordinate, in atlas ASR mm.
+ */
+function setReferenceCoordinate(
+  experiment: Experiment,
+  referenceCoordinate: [number, number, number]
+) {
+  const previous = experiment.referenceCoordinate;
+  for (const probe of experiment.probes) {
+    probe.tipPosition = atlasToReferenceRelative(
+      referenceCoordinate,
+      referenceRelativeToAtlas(previous, probe.tipPosition)
+    );
+  }
+  experiment.cameraPose.target = atlasToReferenceRelative(
+    referenceCoordinate,
+    referenceRelativeToAtlas(previous, experiment.cameraPose.target)
+  );
   experiment.referenceCoordinate = [...referenceCoordinate];
 }
+
 /**
  * Is the structure visible on the atlas in the experiment.
  * @param experiment Experiment to check visibility in.

@@ -11,6 +11,7 @@ import {
   watchEffect
 } from "vue";
 import { useBabylonRuntimeService } from "../composable/useBabylonRuntimeService";
+import { useCameraPoseSync } from "../composable/useCameraPoseSync";
 import {
   removeAllStructures,
   setAtlasCenterOffset,
@@ -25,7 +26,6 @@ import {
 } from "../api/axis-guide.api";
 import {
   applyCameraProjection,
-  setInitialZoom,
   trackAxisViewProjection
 } from "../api/camera.api";
 import type { SurfaceMaterialSettings } from "../api/material.api";
@@ -37,7 +37,6 @@ import type { ProbeGeometry } from "../models/probe-geometry.model";
 import type { StructureEntity } from "@/features/atlas";
 import {
   getAtlasCenter,
-  getAtlasDimensionsMillimeters,
   getDefaultStructureIdentifiers,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
@@ -84,6 +83,12 @@ const { notifyError, notifyWarning } = useNotify();
 const currentExperiment = useCurrentExperimentStore();
 const preferences = usePreferencesStore();
 const runtime = useBabylonRuntimeService();
+useCameraPoseSync(
+  runtime.camera,
+  () => currentExperiment.atlas,
+  () => currentExperiment.referenceCoordinate,
+  () => currentExperiment.experiment.cameraPose
+);
 
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas");
 
@@ -241,16 +246,6 @@ watchEffect(() => {
   }
 
   buildAxisGuides(scene, guides, currentExperiment.atlas);
-});
-
-watchEffect(() => {
-  const camera = runtime.camera.value;
-  if (!camera) return;
-
-  setInitialZoom(
-    camera,
-    getAtlasDimensionsMillimeters(currentExperiment.atlas)[0]
-  );
 });
 
 watch([runtime.scene, runtime.camera], ([scene, camera]) => {

@@ -33,6 +33,9 @@ export interface Experiment {
 
   probes: Probe[];
 
+  /** Live orbit and target of the scene camera. */
+  cameraPose: CameraPose;
+
   /** Saved camera poses, in user-arranged order. */
   cameraPoses: CameraPose[];
 }
