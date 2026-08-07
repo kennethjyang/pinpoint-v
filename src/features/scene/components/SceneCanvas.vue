@@ -65,9 +65,10 @@ import {
   selectSceneObjectFromGizmoAttach,
   setSceneObjectPositionFromGizmoDrag,
   setSceneObjectRotationFromGizmoDrag,
+  setSceneObjectScaleFromGizmoDrag,
   syncSceneObjects
 } from "../api/scene-object-node.api";
-import { getSceneObjectGlb } from "../api/scene-object-glb.api";
+import { getSceneObjectModel } from "../api/scene-object-model.api";
 import { setGizmoControls } from "../api/gizmo.api";
 import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
@@ -169,6 +170,28 @@ const isGizmoToolbarVisible = computed(() => {
   if (!selected || selected.inspectableKind === "camera") return false;
   return !selected.lock;
 });
+
+/** Whether the selection can be scaled: only scene objects can. */
+const isScaleGizmoAvailable = computed(
+  () => currentExperiment.selectedInspectable?.inspectableKind === "sceneObject"
+);
+
+/** Transform-mode toggle options, offering scale only for scene objects. */
+const gizmoModeOptions = computed(() => [
+  {
+    label: t("sceneCanvas.gizmoPosition"),
+    value: "position",
+    icon: "sym_o_point_scan"
+  },
+  {
+    label: t("sceneCanvas.gizmoRotation"),
+    value: "rotation",
+    icon: "flip_camera_android"
+  },
+  ...(isScaleGizmoAvailable.value
+    ? [{ label: t("sceneCanvas.gizmoScale"), value: "scale", icon: "pan_zoom" }]
+    : [])
+]);
 
 /** Meshes of a colliding entity, whichever kind it is. */
 function collisionEntityMeshes(scene: Scene, entityId: string): Mesh[] {
@@ -446,7 +469,7 @@ async function syncSceneObjectsFromState() {
     gizmoManager,
     sceneObjectSyncState,
     currentExperiment.draggedSceneObjectId,
-    getSceneObjectGlb
+    getSceneObjectModel
   );
   if (failedIds.length) {
     notifyError(
@@ -580,6 +603,13 @@ watch(runtime.scene, scene => {
   onWatcherCleanup(() => observer.remove());
 });
 
+// Reset the toggle to position if the selection stops being scalable (e.g. a
+// probe is selected) while the scale gizmo is active, so the toggle never
+// ends up with no active option and a scale gizmo left attached.
+watch(isScaleGizmoAvailable, available => {
+  if (!available && gizmoMode.value === "scale") gizmoMode.value = "position";
+});
+
 // Configure the gizmos from the control bar and keep the probe and scene
 // object drag observers on them.
 watch(
@@ -630,6 +660,13 @@ watch(
           currentExperiment.draggedSceneObjectId = sceneObjectId;
         }
       );
+    const sceneObjectScaleDraggingObserver = setSceneObjectScaleFromGizmoDrag(
+      gizmos.scaleGizmo,
+      sceneObjects,
+      sceneObjectId => {
+        currentExperiment.draggedSceneObjectId = sceneObjectId;
+      }
+    );
     const sceneObjectDragEndObservers = endSceneObjectGizmoDrag(gizmos, () => {
       currentExperiment.endSceneObjectDrag();
     });
@@ -640,6 +677,7 @@ watch(
       probeDragEndObservers.forEach(observer => observer.remove());
       sceneObjectPositionDraggingObserver.remove();
       sceneObjectRotationDraggingObserver.remove();
+      sceneObjectScaleDraggingObserver.remove();
       sceneObjectDragEndObservers.forEach(observer => observer.remove());
     });
   }
@@ -746,18 +784,7 @@ onUnmounted(() => {
         <q-btn-toggle
           v-model="gizmoMode"
           :aria-label="$t('sceneCanvas.gizmoMode')"
-          :options="[
-            {
-              label: $t('sceneCanvas.gizmoPosition'),
-              value: 'position',
-              icon: 'sym_o_point_scan'
-            },
-            {
-              label: $t('sceneCanvas.gizmoRotation'),
-              value: 'rotation',
-              icon: 'flip_camera_android'
-            }
-          ]"
+          :options="gizmoModeOptions"
           toggle-color="primary"
         />
         <q-btn-toggle

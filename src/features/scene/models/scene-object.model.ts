@@ -42,4 +42,12 @@ export interface SceneObject {
    * - In radians.
    */
   rotation: [number, number, number];
+
+  /**
+   * Internal scale representation of the object.
+   * - AP, DV, ML order.
+   * - ASR orientation.
+   * - Unitless multiplier; 1 is the model's own size.
+   */
+  scale: [number, number, number];
 }

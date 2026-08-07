@@ -30,7 +30,7 @@ const MAXIMUM_FILE_NAME_LENGTH = 64;
 /** Name every experiment zip stores its experiment JSON under. */
 const EXPERIMENT_ENTRY_NAME = "experiment.json";
 
-/** Directory inside an experiment zip holding one GLB per scene object. */
+/** Directory inside an experiment zip holding one model file per scene object. */
 const SCENE_OBJECT_DIRECTORY = "objects";
 
 /** Deflate level for the experiment JSON entry. */
@@ -39,11 +39,19 @@ const JSON_DEFLATE_LEVEL = 6;
 /** MIME type of a written experiment file. */
 export const EXPERIMENT_FILE_MIME_TYPE = "application/zip";
 
-/** An experiment read out of an experiment zip, with its scene object GLBs. */
+/** A scene object's model file as carried by an experiment zip. */
+export interface SceneObjectModel {
+  /** Original file name the model was imported under, which decides its loader. */
+  fileName: string;
+  /** File bytes, byte-for-byte as imported. */
+  bytes: Uint8Array;
+}
+
+/** An experiment read out of an experiment zip, with its scene object model files. */
 export interface ExperimentArchive {
   experiment: Experiment;
-  /** GLB bytes keyed by scene object id, for the objects the zip carried. */
-  sceneObjectGlbs: Map<string, Uint8Array>;
+  /** Model files keyed by scene object id, for the objects the zip carried. */
+  sceneObjectModels: Map<string, SceneObjectModel>;
 }
 
 /**
@@ -71,28 +79,29 @@ function parseExperimentFile(text: string): Experiment | null {
 }
 
 /**
- * Build a zip containing an experiment's JSON and one GLB per given scene
- * object, uncompressed since GLB is already binary and barely compressible.
+ * Build a zip containing an experiment's JSON and one model file per given
+ * scene object, deflated with the JSON, since text formats like `.obj`
+ * compress well.
  * @param experiment Experiment to zip.
- * @param sceneObjectGlbs GLB bytes keyed by scene object id, for the objects to include.
+ * @param sceneObjectModels Model files keyed by scene object id, for the objects to include.
  */
 export function zipExperiment(
   experiment: Experiment,
-  sceneObjectGlbs: Map<string, Uint8Array>
+  sceneObjectModels: Map<string, SceneObjectModel>
 ): Uint8Array {
   const entries: Zippable = {
     [EXPERIMENT_ENTRY_NAME]: strToU8(serializeExperiment(experiment))
   };
-  for (const [id, glbBytes] of sceneObjectGlbs) {
-    entries[`${SCENE_OBJECT_DIRECTORY}/${id}.glb`] = [glbBytes, { level: 0 }];
+  for (const [id, { fileName, bytes }] of sceneObjectModels) {
+    entries[`${SCENE_OBJECT_DIRECTORY}/${id}/${fileName}`] = bytes;
   }
 
   return zipSync(entries, { level: JSON_DEFLATE_LEVEL });
 }
 
 /**
- * Read an experiment zip back into its experiment and the scene object GLBs
- * it carried, or null when the bytes aren't a well-formed experiment zip.
+ * Read an experiment zip back into its experiment and the scene object model
+ * files it carried, or null when the bytes aren't a well-formed experiment zip.
  * @param zipBytes Zip bytes read from an experiment file.
  */
 export function unzipExperiment(
@@ -111,13 +120,19 @@ export function unzipExperiment(
   const experiment = parseExperimentFile(strFromU8(experimentEntry));
   if (!experiment) return null;
 
-  const sceneObjectGlbs = new Map<string, Uint8Array>();
+  const sceneObjectModels = new Map<string, SceneObjectModel>();
   for (const sceneObject of experiment.sceneObjects) {
-    const glb = entries[`${SCENE_OBJECT_DIRECTORY}/${sceneObject.id}.glb`];
-    if (glb) sceneObjectGlbs.set(sceneObject.id, glb);
+    const prefix = `${SCENE_OBJECT_DIRECTORY}/${sceneObject.id}/`;
+    const entry = Object.entries(entries).find(([name]) =>
+      name.startsWith(prefix)
+    );
+    if (!entry) continue;
+    const fileName = entry[0].slice(prefix.length);
+    if (fileName)
+      sceneObjectModels.set(sceneObject.id, { fileName, bytes: entry[1] });
   }
 
-  return { experiment, sceneObjectGlbs };
+  return { experiment, sceneObjectModels };
 }
 
 /**

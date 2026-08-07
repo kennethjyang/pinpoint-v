@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { Color3, Vector3 } from "@babylonjs/core";
-import type { StandardMaterial } from "@babylonjs/core";
+import type { Mesh, StandardMaterial } from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 import { addSceneObject, buildExperiment } from "@/features/experiment";
 import { makeAtlas, makeSceneObject } from "@/test/fixtures";
 import {
-  makeTestGlbBytes,
+  makeTestModelFile,
   makeTestSceneWithPhysics,
   tickScene
 } from "@/test/mount-helper";
@@ -20,7 +20,7 @@ import {
   syncSceneObjects
 } from "./scene-object-node.api";
 
-// `buildSceneObjectNode` imports the stored GLB through `ImportMeshAsync`,
+// `buildSceneObjectNode` imports the stored model file through `ImportMeshAsync`,
 // which needs the glTF plugin factory registered, mirroring the app boot.
 registerBuiltInLoaders();
 
@@ -38,15 +38,15 @@ function makeExperimentWithSceneObject(
 }
 
 describe("buildSceneObjectNode", () => {
-  it("builds a transform node holding one colored merged mesh, registered as gizmo-attachable", async () => {
+  it("builds a transform node holding one colored part mesh, registered as gizmo-attachable", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const sceneObject = makeSceneObject({ color: "#00ff00" });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
 
     const built = await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     );
 
@@ -56,10 +56,10 @@ describe("buildSceneObjectNode", () => {
     expect(node.name).toBe(`${sceneObject.id}_object_node`);
     expect(node.parent!.name).toBe("referenceCoordinate_node");
 
-    const meshes = node.getChildMeshes();
+    const meshes = getSceneObjectMeshes(scene, sceneObject.id);
     expect(meshes).toHaveLength(1);
     const mesh = meshes[0]!;
-    expect(mesh.name).toBe(`${sceneObject.id}_object_mesh`);
+    expect(mesh.name).toBe(`${sceneObject.id}_object_mesh0`);
     const material = mesh.material as StandardMaterial;
     expect(material.name).toBe(`${sceneObject.id}_object_material`);
     expect(material.diffuseColor.equals(Color3.FromHexString("#00ff00"))).toBe(
@@ -69,21 +69,40 @@ describe("buildSceneObjectNode", () => {
     expect(gizmoManager.attachableMeshes).toContain(mesh);
   });
 
+  it("preserves the loader's hierarchy under one root, instead of merging it into a single primitive", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const sceneObject = makeSceneObject();
+    const modelFile = await makeTestModelFile();
+
+    const built = await buildSceneObjectNode(
+      scene,
+      sceneObject,
+      modelFile,
+      gizmoManager
+    );
+
+    const root = built!.node.getChildren()[0]!;
+    expect(root.name).toBe(`${sceneObject.id}_object_root`);
+    const mesh = root.getChildren()[0] as Mesh;
+    expect(mesh.name).toBe(`${sceneObject.id}_object_mesh0`);
+    expect(mesh.getTotalVertices()).toBeGreaterThan(0);
+  });
+
   it("returns the existing node without rebuilding when already built", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const sceneObject = makeSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
 
     const first = await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     );
     const second = await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     );
 
@@ -95,13 +114,13 @@ describe("disposeSceneObjectNode", () => {
   it("removes the node, mesh, material, and collider node", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const sceneObject = makeSceneObject();
-    const glbBytes = await makeTestGlbBytes();
-    await buildSceneObjectNode(scene, sceneObject, glbBytes, gizmoManager);
+    const modelFile = await makeTestModelFile();
+    await buildSceneObjectNode(scene, sceneObject, modelFile, gizmoManager);
 
     disposeSceneObjectNode(scene, sceneObject.id, gizmoManager);
 
     expect(getSceneObjectTransformNode(scene, sceneObject.id)).toBeNull();
-    expect(scene.getMeshByName(`${sceneObject.id}_object_mesh`)).toBeNull();
+    expect(scene.getMeshByName(`${sceneObject.id}_object_mesh0`)).toBeNull();
     expect(
       scene.getMaterialByName(`${sceneObject.id}_object_material`)
     ).toBeNull();
@@ -118,7 +137,7 @@ describe("syncSceneObjects", () => {
       position: [1, 2, 3],
       rotation: [0.1, 0.2, 0.3]
     });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
 
     await syncSceneObjects(
@@ -127,20 +146,21 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      async () => glbBytes
+      async () => modelFile
     );
 
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
     expect(node.position.equals(asrToVector3(sceneObject.position))).toBe(true);
     expect(node.rotation.equals(asrToVector3(sceneObject.rotation))).toBe(true);
+    expect(node.scaling.equals(asrToVector3(sceneObject.scale))).toBe(true);
   });
 
   it("interpolates an existing object's pose change over time", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -148,7 +168,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     sceneObject.position = [5, 0, 0];
     await syncSceneObjects(
@@ -157,7 +177,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
@@ -175,9 +195,9 @@ describe("syncSceneObjects", () => {
     const { experiment, sceneObject } = makeExperimentWithSceneObject({
       color: "#ff0000"
     });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -185,7 +205,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     sceneObject.color = "#0000ff";
     await syncSceneObjects(
@@ -194,7 +214,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     const material = scene.getMaterialByName(
@@ -208,9 +228,9 @@ describe("syncSceneObjects", () => {
   it("disables the mesh but keeps the collider physics body when hidden", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -218,7 +238,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     sceneObject.visibility = "hidden";
     await syncSceneObjects(
@@ -227,7 +247,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     const mesh = getSceneObjectMeshes(scene, sceneObject.id)[0]!;
@@ -241,9 +261,9 @@ describe("syncSceneObjects", () => {
   it("removes the collider body when collidable turns off, keeping the mesh", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -251,7 +271,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(
       scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
@@ -264,7 +284,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     expect(
@@ -278,9 +298,9 @@ describe("syncSceneObjects", () => {
     const { experiment, sceneObject } = makeExperimentWithSceneObject({
       collidable: false
     });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -288,7 +308,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(
       scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
@@ -301,7 +321,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     expect(
@@ -309,12 +329,13 @@ describe("syncSceneObjects", () => {
     ).not.toBeNull();
   });
 
-  it("skips pose updates for the object being dragged", async () => {
+  it("re-cooks the collider when the object's scale changes", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
+    const colliderName = `${sceneObject.id}_object_collider`;
 
     await syncSceneObjects(
       scene,
@@ -322,7 +343,42 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
+    );
+    const firstCollider = scene.getTransformNodeByName(colliderName);
+    expect(firstCollider).not.toBeNull();
+    expect(state.colliderScales.get(sceneObject.id)).toEqual([1, 1, 1]);
+
+    sceneObject.scale = [2, 2, 2];
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadModel
+    );
+
+    const secondCollider = scene.getTransformNodeByName(colliderName);
+    expect(secondCollider).not.toBeNull();
+    expect(secondCollider).not.toBe(firstCollider);
+    expect(state.colliderScales.get(sceneObject.id)).toEqual([2, 2, 2]);
+  });
+
+  it("skips pose updates for the object being dragged", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const { experiment, sceneObject } = makeExperimentWithSceneObject();
+    const modelFile = await makeTestModelFile();
+    const state = createSceneObjectSyncState();
+    const loadModel = async () => modelFile;
+
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadModel
     );
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
     node.position = Vector3.Zero();
@@ -334,7 +390,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       sceneObject.id,
-      loadGlb
+      loadModel
     );
 
     expect(node.position.equals(Vector3.Zero())).toBe(true);
@@ -343,9 +399,9 @@ describe("syncSceneObjects", () => {
   it("disposes a node whose scene object left the experiment", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
-    const loadGlb = async () => glbBytes;
+    const loadModel = async () => modelFile;
 
     await syncSceneObjects(
       scene,
@@ -353,7 +409,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     experiment.sceneObjects = [];
     await syncSceneObjects(
@@ -362,17 +418,17 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
 
     expect(getSceneObjectTransformNode(scene, sceneObject.id)).toBeNull();
   });
 
-  it("records a missing GLB as failed and returns it once, without retrying on the next sync", async () => {
+  it("records a missing model file as failed and returns it once, without retrying on the next sync", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
     const state = createSceneObjectSyncState();
-    const loadGlb = vi.fn(async () => null);
+    const loadModel = vi.fn(async () => null);
 
     const firstFailures = await syncSceneObjects(
       scene,
@@ -380,10 +436,10 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(firstFailures.failedIds).toEqual([sceneObject.id]);
-    expect(loadGlb).toHaveBeenCalledTimes(1);
+    expect(loadModel).toHaveBeenCalledTimes(1);
 
     const secondFailures = await syncSceneObjects(
       scene,
@@ -391,17 +447,17 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(secondFailures.failedIds).toEqual([]);
-    expect(loadGlb).toHaveBeenCalledTimes(1);
+    expect(loadModel).toHaveBeenCalledTimes(1);
   });
 
   it("forgets a failure once the object leaves the experiment", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
     const state = createSceneObjectSyncState();
-    const loadGlb = vi.fn(async () => null);
+    const loadModel = vi.fn(async () => null);
 
     await syncSceneObjects(
       scene,
@@ -409,7 +465,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(state.failedIds.has(sceneObject.id)).toBe(true);
 
@@ -420,7 +476,7 @@ describe("syncSceneObjects", () => {
       gizmoManager,
       state,
       null,
-      loadGlb
+      loadModel
     );
     expect(state.failedIds.has(sceneObject.id)).toBe(false);
   });
@@ -431,11 +487,11 @@ describe("attachSceneObjectSelection", () => {
     const { scene, gizmoManager, selectionOutlineLayer } =
       await makeTestSceneWithPhysics();
     const sceneObject = makeSceneObject({ lock: true });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const node = (await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     ))!.node;
 
@@ -447,7 +503,7 @@ describe("attachSceneObjectSelection", () => {
     );
 
     expect(gizmoManager.attachedNode).toBeNull();
-    for (const mesh of node.getChildMeshes()) {
+    for (const mesh of getSceneObjectMeshes(scene, sceneObject.id)) {
       expect(selectionOutlineLayer.hasMesh(mesh)).toBe(true);
     }
   });
@@ -456,11 +512,11 @@ describe("attachSceneObjectSelection", () => {
     const { scene, gizmoManager, selectionOutlineLayer } =
       await makeTestSceneWithPhysics();
     const sceneObject = makeSceneObject({ lock: false });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const node = (await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     ))!.node;
 

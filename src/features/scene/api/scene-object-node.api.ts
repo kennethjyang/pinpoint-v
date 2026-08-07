@@ -6,6 +6,7 @@ import type {
   IGizmo,
   IPositionGizmo,
   IRotationGizmo,
+  IScaleGizmo,
   Nullable,
   Observer,
   Scene,
@@ -14,17 +15,19 @@ import type {
 import {
   Color3,
   ImportMeshAsync,
+  Matrix,
   Mesh,
   PhysicsShapeConvexHull,
   StandardMaterial,
-  TransformNode
+  TransformNode,
+  Vector3,
+  VertexBuffer
 } from "@babylonjs/core";
 import type { Experiment } from "@/features/experiment";
 import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
 import { asrToVector3, vector3ToAsr } from "./coordinate-transforms.api";
 import { buildCollisionBody, disposeCollisionBody } from "./collision.api";
-import { orientNormalsOutward } from "./mesh-orientation.api";
 import {
   buildSceneEntityName,
   isSceneEntityName,
@@ -40,20 +43,20 @@ import type { TransformGizmos } from "../models/gizmo.model";
 
 /** Suffix applied to a scene object's id to name its parenting transform node. */
 const SCENE_OBJECT_NODE_SUFFIX = sceneEntityNameSuffix("object", "node");
-/** Suffix applied to a scene object's id to name its merged mesh. */
-const SCENE_OBJECT_MESH_SUFFIX = sceneEntityNameSuffix("object", "mesh");
 
-/** Load bookkeeping for scene object GLBs, so a re-sync neither double-builds nor retries forever. */
+/** Load bookkeeping for scene object models, so a re-sync neither double-builds nor retries forever. */
 export interface SceneObjectSyncState {
-  /** Ids whose GLB is being loaded right now. */
+  /** Ids whose model file is being loaded right now. */
   loadingIds: Set<string>;
-  /** Ids whose GLB failed to load, cleared when the id leaves the experiment. */
+  /** Ids whose model file failed to load, cleared when the id leaves the experiment. */
   failedIds: Set<string>;
   /**
    * Ids whose collider failed to build, so a sync doesn't retry every tick.
    * Cleared when the id leaves the experiment or `collidable` turns off.
    */
   colliderFailedIds: Set<string>;
+  /** Scale each object's collider was cooked at, so a scale change re-cooks it. */
+  colliderScales: Map<string, [number, number, number]>;
 }
 
 /** Build empty scene object load bookkeeping. */
@@ -61,7 +64,8 @@ export function createSceneObjectSyncState(): SceneObjectSyncState {
   return {
     loadingIds: new Set(),
     failedIds: new Set(),
-    colliderFailedIds: new Set()
+    colliderFailedIds: new Set(),
+    colliderScales: new Map()
   };
 }
 
@@ -80,7 +84,7 @@ export function getSceneObjectTransformNode(
 }
 
 /**
- * A scene object's meshes, or an empty list when the object is not built.
+ * A scene object's part meshes, or an empty list when the object is not built.
  * @param scene Scene the object was built in.
  * @param sceneObjectId Scene object id whose meshes to get.
  */
@@ -91,7 +95,10 @@ export function getSceneObjectMeshes(
   return (
     getSceneObjectTransformNode(scene, sceneObjectId)
       ?.getChildMeshes(false)
-      .filter((mesh): mesh is Mesh => mesh instanceof Mesh) ?? []
+      .filter(
+        (mesh): mesh is Mesh =>
+          mesh instanceof Mesh && mesh.getTotalVertices() > 0
+      ) ?? []
   );
 }
 
@@ -125,18 +132,97 @@ export interface SceneObjectBuild {
 }
 
 /**
- * Build a scene object's merged mesh from its stored GLB, or return its
+ * Build one mesh holding every part's vertices in the object node's frame at the
+ * given scale, for cooking a single convex hull. Caller disposes it.
+ * @param scene Scene to build the mesh in.
+ * @param node Object transform node the positions are expressed relative to.
+ * @param sceneObjectId Scene object id the hull mesh is named after.
+ * @param meshes Part meshes whose vertices to collect.
+ * @param scaling Scale to bake into the positions.
+ */
+function buildSceneObjectHullMesh(
+  scene: Scene,
+  node: TransformNode,
+  sceneObjectId: string,
+  meshes: Mesh[],
+  scaling: Vector3
+): Mesh {
+  const worldToNode = Matrix.Invert(node.computeWorldMatrix(true));
+  const scale = Matrix.Scaling(scaling.x, scaling.y, scaling.z);
+
+  const positions: number[] = [];
+  const transformed = new Vector3();
+  for (const mesh of meshes) {
+    const toHull = mesh
+      .computeWorldMatrix(true)
+      .multiply(worldToNode)
+      .multiply(scale);
+    const meshPositions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!meshPositions) continue;
+    for (let i = 0; i < meshPositions.length; i += 3) {
+      Vector3.TransformCoordinatesFromFloatsToRef(
+        meshPositions[i]!,
+        meshPositions[i + 1]!,
+        meshPositions[i + 2]!,
+        toHull,
+        transformed
+      );
+      positions.push(transformed.x, transformed.y, transformed.z);
+    }
+  }
+
+  const hull = new Mesh(
+    buildSceneEntityName(sceneObjectId, "object", "hull"),
+    scene
+  );
+  hull.setVerticesData(VertexBuffer.PositionKind, positions);
+  return hull;
+}
+
+/**
+ * Cook the object's single convex-hull trigger collider from its parts.
+ * @param scene Scene the object was built in.
+ * @param node Object transform node to parent the collider to.
+ * @param sceneObjectId Scene object id the collider belongs to.
+ * @param meshes Part meshes to enclose.
+ * @param scaling Scale to cook the hull at.
+ */
+function buildSceneObjectCollider(
+  scene: Scene,
+  node: TransformNode,
+  sceneObjectId: string,
+  meshes: Mesh[],
+  scaling: Vector3
+): void {
+  const hull = buildSceneObjectHullMesh(
+    scene,
+    node,
+    sceneObjectId,
+    meshes,
+    scaling
+  );
+  try {
+    buildCollisionBody(node, sceneObjectId, "object", () => [
+      { shape: new PhysicsShapeConvexHull(hull, scene), mesh: hull }
+    ]);
+  } finally {
+    hull.dispose();
+  }
+}
+
+/**
+ * Build a scene object's visuals from its stored model file, or return its
  * existing transform node if already built. The collider is a convex hull
- * around the merged mesh, or none when the object's `collidable` is off.
+ * around its parts, or none when the object's `collidable` is off.
  * @param scene Scene to build the object in.
  * @param sceneObject Scene object to build.
- * @param glbBytes GLB bytes to import the object's geometry from.
- * @param gizmoManager Gizmo manager to add the object's mesh to.
+ * @param modelFile Model file to import the object's geometry from, exactly as the user picked it.
+ * @param gizmoManager Gizmo manager to add the object's meshes to.
  */
 export async function buildSceneObjectNode(
   scene: Scene,
   sceneObject: SceneObject,
-  glbBytes: Uint8Array,
+  modelFile: File,
   gizmoManager: GizmoManager
 ): Promise<SceneObjectBuild | null> {
   const existing = getSceneObjectTransformNode(scene, sceneObject.id);
@@ -148,62 +234,71 @@ export async function buildSceneObjectNode(
   );
   node.parent = buildReferenceCoordinateNode(scene);
 
-  const result = await ImportMeshAsync(glbBytes, scene, {
-    pluginExtension: ".glb",
-    name: `${sceneObject.id}.glb`
-  });
+  const result = await ImportMeshAsync(modelFile, scene, {});
   const meshes = result.meshes.filter(
     (mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0
   );
-  // Merge even for the single primitive the stored GLB holds: it bakes the glTF
-  // loader's `__root__` right-to-left-handed conversion into the vertices, which a
-  // plain reparent would drop and mirror the model.
-  const merged = meshes.length
-    ? Mesh.MergeMeshes(meshes, true, true, undefined, false, false)
-    : null;
-  if (!merged) {
+  if (meshes.length === 0) {
     for (const mesh of result.meshes) if (!mesh.isDisposed()) mesh.dispose();
-    for (const transformNode of result.transformNodes) transformNode.dispose();
+    for (const transformNode of result.transformNodes) {
+      transformNode.dispose();
+    }
     node.dispose();
     return null;
   }
-  // The re-merge above bakes the loader's handedness conversion into the
-  // vertices, which can invert winding and leave stale normals; recompute
-  // them oriented outward.
-  orientNormalsOutward(merged);
 
-  merged.name = buildSceneEntityName(sceneObject.id, "object", "mesh");
-  merged.material = buildSceneObjectMaterial(scene, sceneObject);
-  merged.parent = node;
-  for (const mesh of result.meshes) if (!mesh.isDisposed()) mesh.dispose();
-  for (const transformNode of result.transformNodes) transformNode.dispose();
+  // Reparent the loader's own roots (glTF's `__root__` handedness conversion,
+  // or the bare meshes an OBJ produces) under the object node, verbatim --
+  // this is what makes the geometry render exactly as the loader intended.
+  for (const root of [...result.meshes, ...result.transformNodes]) {
+    if (root.parent) continue;
+    root.name = buildSceneEntityName(sceneObject.id, "object", "root");
+    root.parent = node;
+  }
+
+  // Name and skin every part with one shared material; the object's colour
+  // picker is the single source of its appearance, so a source file's own
+  // materials are dropped here.
+  const material = buildSceneObjectMaterial(scene, sceneObject);
+  const loadedMaterials = new Set(
+    meshes.map(mesh => mesh.material).filter(loaded => loaded !== null)
+  );
+  meshes.forEach((mesh, index) => {
+    mesh.name = buildSceneEntityName(sceneObject.id, "object", `mesh${index}`);
+    mesh.material = material;
+  });
+  for (const loaded of loadedMaterials) loaded.dispose(false, true);
 
   // No physics engine on the scene, or `collidable` turned off, keeps this
-  // feature additive: `buildShapes` is never called, so it never throws, and
-  // `colliderFailed` stays false. Some merged topologies (e.g. degenerate
-  // geometry) can't be cooked into a Havok hull; the object still gets
-  // placed, without a collider.
+  // feature additive: the hull is never cooked, so it never throws, and
+  // `colliderFailed` stays false. Some topologies (e.g. degenerate geometry)
+  // can't be cooked into a Havok hull; the object still gets placed, without
+  // a collider.
   let colliderFailed = false;
   if (sceneObject.collidable) {
     try {
-      buildCollisionBody(node, sceneObject.id, "object", () => [
-        { shape: new PhysicsShapeConvexHull(merged, scene), mesh: merged }
-      ]);
+      buildSceneObjectCollider(
+        scene,
+        node,
+        sceneObject.id,
+        meshes,
+        asrToVector3(sceneObject.scale)
+      );
     } catch {
       colliderFailed = true;
     }
   }
 
   gizmoManager.attachableMeshes ??= [];
-  gizmoManager.attachableMeshes.push(merged);
+  gizmoManager.attachableMeshes.push(...meshes);
   return { node, colliderFailed };
 }
 
 /**
- * Dispose a scene object's transform node, its mesh, and its own material.
+ * Dispose a scene object's transform node, its meshes, and its own material.
  * @param scene Scene the object was built in.
  * @param sceneObjectId Scene object ID to remove any existing entity for.
- * @param gizmoManager Gizmo manager to remove the object's mesh from.
+ * @param gizmoManager Gizmo manager to remove the object's meshes from.
  */
 export function disposeSceneObjectNode(
   scene: Scene,
@@ -217,7 +312,7 @@ export function disposeSceneObjectNode(
 
   if (node) stopNodePoseInterpolation(node);
   disposeCollisionBody(scene, sceneObjectId, "object");
-  // `true` for `disposeMaterialAndTextures`, unlike probes: the flag propagates to the
+  // `true` for `disposeMaterialAndTextures`, unlike probes: the flag propagates to every
   // child mesh, and the object's `StandardMaterial` belongs to it alone.
   node?.dispose(false, true);
   gizmoManager.attachableMeshes = (gizmoManager.attachableMeshes ?? []).filter(
@@ -225,15 +320,23 @@ export function disposeSceneObjectNode(
   );
 }
 
+/** Do two scale triples match, treating a missing one as no match. */
+function isSameScale(
+  cooked: [number, number, number] | undefined,
+  scale: [number, number, number]
+): boolean {
+  return !!cooked && cooked.every((value, index) => value === scale[index]);
+}
+
 /**
  * Synchronize the scene object entities with their states, building,
- * recoloring, repositioning, and disposing them as needed.
- * @param scene Scene to sync the scene objects of.
- * @param experiment Experiment to pull scene object data to sync from.
- * @param gizmoManager Gizmo manager for controlling scene objects.
- * @param state Load bookkeeping to update in place.
- * @param draggedSceneObjectId ID of the scene object being dragged (if any).
- * @param loadGlb Loader for a scene object's stored GLB bytes.
+ * recoloring, repositioning, rescaling, and disposing them as needed.
+ * @param scene Scene holding the scene object entities.
+ * @param experiment Experiment whose scene objects to sync.
+ * @param gizmoManager Gizmo manager to add fresh objects' meshes to.
+ * @param state Load bookkeeping, mutated in place.
+ * @param draggedSceneObjectId Scene object id currently under a gizmo drag, skipped for pose updates.
+ * @param loadModel Loader for a scene object's stored model file.
  */
 export async function syncSceneObjects(
   scene: Scene,
@@ -241,7 +344,7 @@ export async function syncSceneObjects(
   gizmoManager: GizmoManager,
   state: SceneObjectSyncState,
   draggedSceneObjectId: string | null,
-  loadGlb: (sceneObjectId: string) => Promise<Uint8Array | null>
+  loadModel: (sceneObjectId: string) => Promise<File | null>
 ): Promise<{ failedIds: string[]; colliderFailedIds: string[] }> {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const sceneObjectsById = new Map(
@@ -264,6 +367,9 @@ export async function syncSceneObjects(
   for (const id of state.colliderFailedIds) {
     if (!sceneObjectsById.has(id)) state.colliderFailedIds.delete(id);
   }
+  for (const id of state.colliderScales.keys()) {
+    if (!sceneObjectsById.has(id)) state.colliderScales.delete(id);
+  }
 
   const failedIds: string[] = [];
   const colliderFailedIds: string[] = [];
@@ -279,16 +385,19 @@ export async function syncSceneObjects(
       }
       state.loadingIds.add(sceneObject.id);
       try {
-        const glbBytes = await loadGlb(sceneObject.id);
-        const built = glbBytes
+        const modelFile = await loadModel(sceneObject.id);
+        const built = modelFile
           ? await buildSceneObjectNode(
               scene,
               sceneObject,
-              glbBytes,
+              modelFile,
               gizmoManager
             )
           : null;
         node = built?.node ?? null;
+        if (built && sceneObject.collidable && !built.colliderFailed) {
+          state.colliderScales.set(sceneObject.id, [...sceneObject.scale]);
+        }
         if (built?.colliderFailed) {
           state.colliderFailedIds.add(sceneObject.id);
           colliderFailedIds.push(sceneObject.id);
@@ -298,7 +407,7 @@ export async function syncSceneObjects(
       } finally {
         state.loadingIds.delete(sceneObject.id);
       }
-      // The scene can be torn down while a GLB loads.
+      // The scene can be torn down while a model loads.
       if (scene.isDisposed) return { failedIds, colliderFailedIds };
       if (!node) {
         state.failedIds.add(sceneObject.id);
@@ -307,74 +416,86 @@ export async function syncSceneObjects(
       }
     }
 
-    const mesh = node
-      .getChildMeshes(false)
-      .find((child): child is Mesh =>
-        child.name.endsWith(SCENE_OBJECT_MESH_SUFFIX)
-      );
-    const material = mesh?.material;
+    const meshes = getSceneObjectMeshes(scene, sceneObject.id);
+
+    const material = scene.getMaterialByName(
+      buildSceneEntityName(sceneObject.id, "object", "material")
+    );
     if (material instanceof StandardMaterial) {
       setMaterialDiffuseColor(
         material,
         Color3.FromHexString(sceneObject.color)
       );
     }
-    // The collider node is a sibling of the mesh, so a hidden object still collides.
-    mesh?.setEnabled(sceneObject.visibility === "visible");
+    // The collider node is a sibling of the meshes, so a hidden object still collides.
+    for (const mesh of meshes) {
+      mesh.setEnabled(sceneObject.visibility === "visible");
+    }
 
-    // Build or dispose the collider when `collidable` changes on an object
-    // that already exists; a fresh build already decided this above.
-    if (!isFresh) {
-      const hasCollider = !!scene.getTransformNodeByName(
-        buildSceneEntityName(sceneObject.id, "object", "collider")
-      );
-      if (!sceneObject.collidable) {
-        state.colliderFailedIds.delete(sceneObject.id);
-        if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
-      } else if (
-        mesh &&
-        !hasCollider &&
-        !state.colliderFailedIds.has(sceneObject.id)
-      ) {
-        try {
-          buildCollisionBody(node, sceneObject.id, "object", () => [
-            { shape: new PhysicsShapeConvexHull(mesh, scene), mesh }
-          ]);
-        } catch {
-          state.colliderFailedIds.add(sceneObject.id);
-          colliderFailedIds.push(sceneObject.id);
-        }
+    // Skip pose and collider updates for the object being dragged: a
+    // scale-gizmo drag must not re-cook the hull every frame. Once
+    // `endSceneObjectDrag` clears `draggedSceneObjectId`, this watcher
+    // re-runs and the collider re-cooks once at the released scale.
+    if (sceneObject.id === draggedSceneObjectId) continue;
+
+    const hasCollider = !!scene.getTransformNodeByName(
+      buildSceneEntityName(sceneObject.id, "object", "collider")
+    );
+    if (!sceneObject.collidable) {
+      state.colliderFailedIds.delete(sceneObject.id);
+      state.colliderScales.delete(sceneObject.id);
+      if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
+    } else if (
+      meshes.length &&
+      !state.colliderFailedIds.has(sceneObject.id) &&
+      !isSameScale(state.colliderScales.get(sceneObject.id), sceneObject.scale)
+    ) {
+      if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
+      try {
+        buildSceneObjectCollider(
+          scene,
+          node,
+          sceneObject.id,
+          meshes,
+          asrToVector3(sceneObject.scale)
+        );
+        state.colliderScales.set(sceneObject.id, [...sceneObject.scale]);
+      } catch {
+        state.colliderFailedIds.add(sceneObject.id);
+        colliderFailedIds.push(sceneObject.id);
       }
     }
 
-    if (sceneObject.id === draggedSceneObjectId) continue;
-
     const goalPosition = asrToVector3(sceneObject.position);
     const goalRotation = asrToVector3(sceneObject.rotation);
+    const goalScaling = asrToVector3(sceneObject.scale);
     if (isFresh) {
       node.position = goalPosition;
       node.rotation = goalRotation;
+      node.scaling = goalScaling;
       continue;
     }
     if (
       node.position.equals(goalPosition) &&
-      node.rotation.equals(goalRotation)
+      node.rotation.equals(goalRotation) &&
+      node.scaling.equals(goalScaling)
     ) {
       continue;
     }
     interpolateNodePose(scene, node, {
       position: goalPosition,
-      rotation: goalRotation
+      rotation: goalRotation,
+      scaling: goalScaling
     });
   }
   return { failedIds, colliderFailedIds };
 }
 
 /**
- * Attach the gizmo to a scene object's transform node and select its mesh,
+ * Attach the gizmo to a scene object's transform node and select its meshes,
  * leaving a locked object outlined but without a gizmo.
- * @param gizmoManager Gizmo manager to attach to the object's node.
- * @param selectionOutlineLayer Selection outline layer to add the object's mesh to.
+ * @param gizmoManager Gizmo manager to attach to the object's transform node.
+ * @param selectionOutlineLayer Selection outline layer to add the object's meshes to.
  * @param sceneObject Scene object being selected, whose lock decides whether a gizmo attaches.
  * @param sceneObjectTransformNode Scene object transform node to attach and select.
  */
@@ -386,7 +507,11 @@ export function attachSceneObjectSelection(
 ): void {
   gizmoManager.attachToNode(sceneObject.lock ? null : sceneObjectTransformNode);
   selectionOutlineLayer.clearSelection();
-  selectionOutlineLayer.addSelection(sceneObjectTransformNode.getChildMeshes());
+  selectionOutlineLayer.addSelection(
+    sceneObjectTransformNode
+      .getChildMeshes()
+      .filter(mesh => mesh.getTotalVertices() > 0)
+  );
 }
 
 /**
@@ -493,9 +618,29 @@ export function setSceneObjectRotationFromGizmoDrag(
 }
 
 /**
- * Callback filter for when dragging finishes on a scene object, from either
- * the position or the rotation gizmo.
- * @param gizmos Position and rotation gizmos to track dragging on.
+ * Update a scene object's scale from a gizmo drag.
+ * @param scaleGizmo Scale gizmo to track dragging on.
+ * @param sceneObjects Experiment scene objects to resolve the attached mesh against.
+ * @param onDrag Callback invoked with the scene object id the drag is happening to.
+ */
+export function setSceneObjectScaleFromGizmoDrag(
+  scaleGizmo: IScaleGizmo,
+  sceneObjects: SceneObject[],
+  onDrag: (sceneObjectId: string) => void
+): Observer<DragEvent> {
+  return scaleGizmo.onDragObservable.add(() => {
+    const attached = attachedSceneObjectFromGizmo(scaleGizmo, sceneObjects);
+    if (!attached) return;
+    stopNodePoseInterpolation(attached.node);
+    attached.sceneObject.scale = vector3ToAsr(attached.node.scaling);
+    onDrag(attached.sceneObject.id);
+  });
+}
+
+/**
+ * Callback filter for when dragging finishes on a scene object, from the
+ * position, rotation, or scale gizmo.
+ * @param gizmos Position, rotation, and scale gizmos to track dragging on.
  * @param onDragEnd Callback invoked to confirm the scene object drag ended.
  */
 export function endSceneObjectGizmoDrag(
@@ -510,6 +655,7 @@ export function endSceneObjectGizmoDrag(
 
   return [
     gizmos.positionGizmo.onDragEndObservable.add(onEnd(gizmos.positionGizmo)),
-    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo))
+    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo)),
+    gizmos.scaleGizmo.onDragEndObservable.add(onEnd(gizmos.scaleGizmo))
   ];
 }

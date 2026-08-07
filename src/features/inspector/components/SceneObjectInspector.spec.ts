@@ -30,6 +30,17 @@ function fieldByLabel(wrapper: VueWrapper, label: string) {
     .find(field => field.props("label") === label)!;
 }
 
+/** Finds a scale field by label, disambiguated from the position row by its `×` suffix. */
+function scaleFieldByLabel(wrapper: VueWrapper, label: string) {
+  return wrapper
+    .findAllComponents({ name: "QInput" })
+    .find(
+      field =>
+        field.props("label") === label &&
+        field.props("suffix") === t.scaleSuffix
+    )!;
+}
+
 function buttonByLabel(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAll("button")
@@ -92,11 +103,14 @@ describe("SceneObjectInspector", () => {
     expect(sceneObject.lock).toBe(true);
   });
 
-  it("disables the position/rotation fields while locked, leaving the name field editable", () => {
+  it("disables the position/rotation/scale fields while locked, leaving the name field editable", () => {
     const { wrapper } = mountInspector(makeSceneObject({ lock: true }));
 
     for (const label of [axis.ap, axis.dv, axis.ml, t.roll, t.yaw, t.pitch]) {
       expect(fieldByLabel(wrapper, label).props("disable")).toBe(true);
+    }
+    for (const label of [axis.ap, axis.dv, axis.ml]) {
+      expect(scaleFieldByLabel(wrapper, label).props("disable")).toBe(true);
     }
     expect(fieldByLabel(wrapper, t.name).props("disable")).toBeFalsy();
   });

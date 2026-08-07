@@ -25,8 +25,11 @@ const { sceneObject } = defineProps<{
 
 const preferences = usePreferencesStore();
 const unitLabels = useUnitLabels();
-const { requiredName: nameRules, optionalNumber: numberRules } =
-  useValidationRules();
+const {
+  requiredName: nameRules,
+  optionalNumber: numberRules,
+  positiveNumber: scaleRules
+} = useValidationRules();
 const { t } = useI18n();
 
 const positionSuffix = computed(() =>
@@ -86,6 +89,28 @@ const pitch = useNumericTupleModel(
   2,
   radians => radiansToRotationUnit(radians, preferences.rotationUnit),
   value => rotationUnitToRadians(value, preferences.rotationUnit),
+  () => preferences.decimalPrecision
+);
+
+const scaleAp = useNumericTupleModel(
+  () => sceneObject.scale,
+  0,
+  value => value,
+  value => value,
+  () => preferences.decimalPrecision
+);
+const scaleDv = useNumericTupleModel(
+  () => sceneObject.scale,
+  1,
+  value => value,
+  value => value,
+  () => preferences.decimalPrecision
+);
+const scaleMl = useNumericTupleModel(
+  () => sceneObject.scale,
+  2,
+  value => value,
+  value => value,
   () => preferences.decimalPrecision
 );
 
@@ -181,6 +206,36 @@ const lockLabel = computed(() =>
         :label="t('sceneObjectInspector.pitch')"
         :rules="numberRules"
         :suffix="rotationSuffix"
+        class="col"
+        outlined
+      />
+    </div>
+
+    <div class="row q-gutter-x-sm">
+      <CommittedInput
+        v-model="scaleAp"
+        :disable="sceneObject.lock"
+        :label="t('axis.ap')"
+        :rules="scaleRules"
+        :suffix="t('sceneObjectInspector.scaleSuffix')"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="scaleDv"
+        :disable="sceneObject.lock"
+        :label="t('axis.dv')"
+        :rules="scaleRules"
+        :suffix="t('sceneObjectInspector.scaleSuffix')"
+        class="col"
+        outlined
+      />
+      <CommittedInput
+        v-model="scaleMl"
+        :disable="sceneObject.lock"
+        :label="t('axis.ml')"
+        :rules="scaleRules"
+        :suffix="t('sceneObjectInspector.scaleSuffix')"
         class="col"
         outlined
       />

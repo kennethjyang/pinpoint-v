@@ -53,10 +53,11 @@ export function makeTestScene(): Scene {
 }
 
 /**
- * Build GLB bytes for a 1 mm box, for tests that import a real model without
- * touching the network.
+ * Build a `.glb` model file for a 1 mm box, for tests that import a real
+ * model without touching the network.
+ * @param fileName Name the file is given, which decides its loader.
  */
-export async function makeTestGlbBytes(): Promise<Uint8Array> {
+export async function makeTestModelFile(fileName = "box.glb"): Promise<File> {
   const scene = makeTestScene();
   try {
     MeshBuilder.CreateBox("box", { size: 1 }, scene);
@@ -64,7 +65,9 @@ export async function makeTestGlbBytes(): Promise<Uint8Array> {
       exportWithoutWaitingForScene: true
     });
     const glb = Object.values(data.files).find(value => value instanceof Blob);
-    return new Uint8Array(await (glb as Blob).arrayBuffer());
+    return new File([await (glb as Blob).arrayBuffer()], fileName, {
+      type: "model/gltf-binary"
+    });
   } finally {
     scene.dispose();
   }
@@ -132,7 +135,7 @@ export function stepPhysics(scene: Scene, deltaSeconds: number): void {
 }
 
 /**
- * Build a real Babylon `Scene`, `GizmoManager` (both gizmos enabled), and
+ * Build a real Babylon `Scene`, `GizmoManager` (all three gizmos enabled), and
  * `SelectionOutlineLayer`, for tests exercising probe gizmo attachment.
  */
 export function makeTestSceneWithGizmo(): {
@@ -149,6 +152,7 @@ export function makeTestSceneWithGizmo(): {
   );
   gizmoManager.positionGizmoEnabled = true;
   gizmoManager.rotationGizmoEnabled = true;
+  gizmoManager.scaleGizmoEnabled = true;
   const selectionOutlineLayer = new SelectionOutlineLayer(
     "selection_outline_layer",
     scene

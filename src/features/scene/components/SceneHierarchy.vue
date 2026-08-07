@@ -31,8 +31,8 @@ import {
   buildSceneObject,
   toggleSceneObjectVisibility
 } from "../api/scene-object.api";
-import { putSceneObjectGlb } from "../api/scene-object-glb.api";
-import { importModelAsGlb } from "../api/model-import.api";
+import { putSceneObjectModel } from "../api/scene-object-model.api";
+import { canLoadModelFile } from "../api/model-file.api";
 import type { SceneObject } from "../models/scene-object.model";
 import type { SceneObjectVisibility } from "../models/scene-object-visibility.model";
 import { useBabylonRuntimeService } from "../composable/useBabylonRuntimeService";
@@ -132,8 +132,7 @@ onModelFileChange(async files => {
 
   isImportingModel.value = true;
   try {
-    const glbBytes = await importModelAsGlb(engine, file);
-    if (!glbBytes) {
+    if (!(await canLoadModelFile(engine, file))) {
       notifyError(
         t("sceneHierarchy.invalidModelFile"),
         t("sceneHierarchy.invalidModelFileCaption")
@@ -142,7 +141,7 @@ onModelFileChange(async files => {
     }
 
     const sceneObject = buildSceneObject(crypto.randomUUID(), file.name);
-    await putSceneObjectGlb(sceneObject.id, glbBytes);
+    await putSceneObjectModel(sceneObject.id, file);
     addSceneObject(currentExperiment.experiment, sceneObject);
     currentExperiment.selectedInspectable = sceneObject;
   } catch {

@@ -315,7 +315,8 @@ export function syncProbes(
 
     interpolateNodePose(scene, node, {
       position: goalPosition,
-      rotation: goalRotation
+      rotation: goalRotation,
+      scaling: node.scaling
     });
   }
 

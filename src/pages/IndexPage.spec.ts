@@ -6,7 +6,7 @@ import { createWrapperRegistry, mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useRecentExperimentsStore } from "@/stores/recent-experiments.store";
 import { makeSceneObject } from "@/test/fixtures";
-import { pruneSceneObjectGlbs } from "@/features/scene";
+import { pruneSceneObjectModels } from "@/features/scene";
 
 // Mock the leaf module (not the `@/features/atlas` barrel) -- the store's
 // `terminologyRows` is a `computedAsync` and fetches on store creation, so
@@ -23,8 +23,8 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 
 // Mock the leaf module the `@/features/scene` barrel re-exports, not the
 // barrel itself.
-vi.mock("@/features/scene/api/scene-object-glb.api", () => ({
-  pruneSceneObjectGlbs: vi.fn().mockResolvedValue([])
+vi.mock("@/features/scene/api/scene-object-model.api", () => ({
+  pruneSceneObjectModels: vi.fn().mockResolvedValue([])
 }));
 
 const wrappers = createWrapperRegistry();
@@ -52,7 +52,7 @@ function pressUndoRedoKey(
 describe("IndexPage", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    vi.mocked(pruneSceneObjectGlbs).mockClear();
+    vi.mocked(pruneSceneObjectModels).mockClear();
   });
 
   afterEach(() => {
@@ -100,7 +100,7 @@ describe("IndexPage", () => {
     expect(store.name).toBe("Renamed");
   });
 
-  it("sweeps unreferenced scene object GLBs on unmount", async () => {
+  it("sweeps unreferenced scene object models on unmount", async () => {
     const wrapper = mountWithQuasar(IndexPage, { shallow: true });
     const currentExperimentStore = useCurrentExperimentStore();
     const recentExperimentsStore = useRecentExperimentsStore();
@@ -117,9 +117,9 @@ describe("IndexPage", () => {
 
     wrapper.unmount();
 
-    expect(pruneSceneObjectGlbs).toHaveBeenCalledTimes(1);
-    expect(new Set(vi.mocked(pruneSceneObjectGlbs).mock.calls[0]![0])).toEqual(
-      new Set([currentSceneObject.id, recentSceneObject.id])
-    );
+    expect(pruneSceneObjectModels).toHaveBeenCalledTimes(1);
+    expect(
+      new Set(vi.mocked(pruneSceneObjectModels).mock.calls[0]![0])
+    ).toEqual(new Set([currentSceneObject.id, recentSceneObject.id]));
   });
 });

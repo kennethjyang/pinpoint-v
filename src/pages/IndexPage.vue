@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
 import { onKeyStroke } from "@vueuse/core";
 import {
-  pruneSceneObjectGlbs,
+  pruneSceneObjectModels,
   SceneCanvas,
   SceneHierarchy
 } from "@/features/scene";
@@ -144,7 +144,7 @@ onUnmounted(() => {
     currentExperimentStore.experiment,
     ...recentExperimentsStore.recents
   ].flatMap(experiment => experiment.sceneObjects.map(({ id }) => id));
-  void pruneSceneObjectGlbs(referencedIds);
+  void pruneSceneObjectModels(referencedIds);
 });
 </script>
 

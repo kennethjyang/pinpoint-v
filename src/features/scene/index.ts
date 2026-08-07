@@ -24,10 +24,10 @@ export {
   toggleSceneObjectVisibility
 } from "./api/scene-object.api";
 export {
-  getSceneObjectGlb,
-  pruneSceneObjectGlbs,
-  putSceneObjectGlb
-} from "./api/scene-object-glb.api";
+  getSceneObjectModel,
+  pruneSceneObjectModels,
+  putSceneObjectModel
+} from "./api/scene-object-model.api";
 export type { SceneObject } from "./models/scene-object.model";
 export type { SceneObjectVisibility } from "./models/scene-object-visibility.model";
-export { importModelAsGlb } from "./api/model-import.api";
+export { canLoadModelFile } from "./api/model-file.api";

@@ -23,7 +23,7 @@ import {
 } from "@/test/fixtures";
 import {
   initializeTestCSG2,
-  makeTestGlbBytes,
+  makeTestModelFile,
   makeTestSceneWithPhysics,
   stepPhysics
 } from "@/test/mount-helper";
@@ -319,11 +319,11 @@ describe("scene entity collision bodies", () => {
     probeNode.position = Vector3.Zero();
 
     const sceneObject = makeSceneObject();
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const objectNode = (await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     ))!.node;
     objectNode.position = Vector3.Zero();
@@ -355,11 +355,11 @@ describe("scene entity collision bodies", () => {
     probeNode.position = Vector3.Zero();
 
     const sceneObject = makeSceneObject({ visibility: "hidden" });
-    const glbBytes = await makeTestGlbBytes();
+    const modelFile = await makeTestModelFile();
     const objectNode = (await buildSceneObjectNode(
       scene,
       sceneObject,
-      glbBytes,
+      modelFile,
       gizmoManager
     ))!.node;
     objectNode.position = Vector3.Zero();

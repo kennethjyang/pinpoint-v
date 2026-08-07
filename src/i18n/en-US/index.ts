@@ -22,7 +22,8 @@ export default {
   },
   validation: {
     nameRequired: "Name is required.",
-    mustBeNumber: "Must be a number."
+    mustBeNumber: "Must be a number.",
+    mustBePositiveNumber: "Must be greater than zero."
   },
   axis: {
     ap: "AP",
@@ -80,6 +81,7 @@ export default {
     gizmoMode: "Transform mode",
     gizmoPosition: "Position",
     gizmoRotation: "Rotation",
+    gizmoScale: "Scale",
     gizmoCoordinateSpace: "Coordinate space",
     gizmoLocal: "Local",
     gizmoGlobal: "Global"
@@ -200,6 +202,7 @@ export default {
     roll: "Roll",
     yaw: "Yaw",
     pitch: "Pitch",
+    scaleSuffix: "×",
     lock: "Lock 3D object",
     unlock: "Unlock 3D object",
     collisionDetection: "Collision detection"

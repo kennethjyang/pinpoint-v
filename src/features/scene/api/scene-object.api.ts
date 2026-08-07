@@ -25,7 +25,8 @@ export function buildSceneObject(id: string, fileName: string): SceneObject {
     lock: false,
     collidable: true,
     position: [0, 0, 0],
-    rotation: [0, 0, 0]
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1]
   };
 }
 
@@ -72,6 +73,7 @@ export function isSceneObject(value: unknown): value is SceneObject {
     typeof value.lock === "boolean" &&
     typeof value.collidable === "boolean" &&
     isFiniteTriple(value.position) &&
-    isFiniteTriple(value.rotation)
+    isFiniteTriple(value.rotation) &&
+    isFiniteTriple(value.scale)
   );
 }

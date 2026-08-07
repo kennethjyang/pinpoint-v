@@ -25,6 +25,7 @@ describe("buildSceneObject", () => {
     expect(sceneObject.lock).toBe(false);
     expect(sceneObject.position).toEqual([0, 0, 0]);
     expect(sceneObject.rotation).toEqual([0, 0, 0]);
+    expect(sceneObject.scale).toEqual([1, 1, 1]);
     expect(STANDARD_COLORS).toContain(sceneObject.color);
   });
 
@@ -119,6 +120,11 @@ describe("isSceneObject", () => {
 
   it("rejects a non-triple position", () => {
     const sceneObject = { ...makeSceneObject(), position: [0, 0] };
+    expect(isSceneObject(sceneObject)).toBe(false);
+  });
+
+  it("rejects a non-triple scale", () => {
+    const sceneObject = { ...makeSceneObject(), scale: [1, 1] };
     expect(isSceneObject(sceneObject)).toBe(false);
   });
 

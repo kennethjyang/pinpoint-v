@@ -46,18 +46,42 @@ function zipRawExperiment(data: unknown): Uint8Array {
 }
 
 describe("zipExperiment / unzipExperiment", () => {
-  it("round-trips an experiment and its scene object GLBs", () => {
+  it("round-trips an experiment and its scene object model files", () => {
     const experiment = makeFullExperiment();
     const sceneObject = makeSceneObject();
     experiment.sceneObjects = [sceneObject];
-    const glbBytes = new Uint8Array([1, 2, 3, 4]);
+    const bytes = new Uint8Array([1, 2, 3, 4]);
 
     const archive = unzipExperiment(
-      zipExperiment(experiment, new Map([[sceneObject.id, glbBytes]]))
+      zipExperiment(
+        experiment,
+        new Map([[sceneObject.id, { fileName: "model.obj", bytes }]])
+      )
     );
 
     expect(archive?.experiment).toEqual(experiment);
-    expect(archive?.sceneObjectGlbs.get(sceneObject.id)).toEqual(glbBytes);
+    expect(archive?.sceneObjectModels.get(sceneObject.id)).toEqual({
+      fileName: "model.obj",
+      bytes
+    });
+  });
+
+  it("preserves an original file name unchanged through the zip round trip", () => {
+    const experiment = makeFullExperiment();
+    const sceneObject = makeSceneObject();
+    experiment.sceneObjects = [sceneObject];
+    const bytes = new Uint8Array([9, 8, 7]);
+
+    const archive = unzipExperiment(
+      zipExperiment(
+        experiment,
+        new Map([[sceneObject.id, { fileName: "imagingWell.obj", bytes }]])
+      )
+    );
+
+    expect(archive?.sceneObjectModels.get(sceneObject.id)?.fileName).toBe(
+      "imagingWell.obj"
+    );
   });
 
   it("does not leak markRaw's non-enumerable marker into the output", () => {
@@ -84,17 +108,17 @@ describe("zipExperiment / unzipExperiment", () => {
     expect(unzipExperiment(zipRawExperiment({}))).toBeNull();
   });
 
-  it("parses and omits a GLB entry for a scene object the experiment does not reference", () => {
+  it("parses and omits a model entry for a scene object the experiment does not reference", () => {
     const experiment = makeFullExperiment();
     const entries = {
       "experiment.json": strToU8(JSON.stringify(experiment)),
-      "objects/unreferenced-id.glb": new Uint8Array([9, 9, 9])
+      "objects/unreferenced-id/model.glb": new Uint8Array([9, 9, 9])
     };
 
     const archive = unzipExperiment(zipSync(entries));
 
     expect(archive?.experiment).toEqual(experiment);
-    expect(archive?.sceneObjectGlbs.size).toBe(0);
+    expect(archive?.sceneObjectModels.size).toBe(0);
   });
 
   it("returns null when id is missing", () => {

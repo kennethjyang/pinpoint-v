@@ -4,10 +4,11 @@ import { useI18n } from "vue-i18n";
 import {
   buildExperimentFileName,
   EXPERIMENT_FILE_MIME_TYPE,
+  type SceneObjectModel,
   unzipExperiment,
   zipExperiment
 } from "../api/experiment-file.api";
-import { getSceneObjectGlb, putSceneObjectGlb } from "@/features/scene";
+import { getSceneObjectModel, putSceneObjectModel } from "@/features/scene";
 import { useNotify } from "@/composable/useNotify";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { compareFileVersion, type VersionRelation } from "@/utils/version";
@@ -90,19 +91,24 @@ export function useExperimentFile() {
 
   /**
    * Download the current experiment as a zip file containing its JSON and
-   * one GLB per referenced scene object still in IndexedDB.
+   * one model file per referenced scene object still in IndexedDB.
    */
   async function downloadExperiment() {
     const { experiment } = currentExperimentStore;
-    const sceneObjectGlbs = new Map<string, Uint8Array>();
+    const sceneObjectModels = new Map<string, SceneObjectModel>();
     for (const { id } of experiment.sceneObjects) {
-      const glbBytes = await getSceneObjectGlb(id);
-      if (glbBytes) sceneObjectGlbs.set(id, glbBytes);
+      const modelFile = await getSceneObjectModel(id);
+      if (modelFile) {
+        sceneObjectModels.set(id, {
+          fileName: modelFile.name,
+          bytes: new Uint8Array(await modelFile.arrayBuffer())
+        });
+      }
     }
 
     const result = exportFile(
       buildExperimentFileName(experiment),
-      zipExperiment(experiment, sceneObjectGlbs),
+      zipExperiment(experiment, sceneObjectModels),
       EXPERIMENT_FILE_MIME_TYPE
     );
 
@@ -127,8 +133,8 @@ export function useExperimentFile() {
       }
 
       // Written before `loadExperiment`, so the scene sync's first run finds them.
-      for (const [id, glbBytes] of archive.sceneObjectGlbs) {
-        await putSceneObjectGlb(id, glbBytes);
+      for (const [id, { fileName, bytes }] of archive.sceneObjectModels) {
+        await putSceneObjectModel(id, new File([bytes.slice()], fileName));
       }
 
       notifyVersionMismatch(

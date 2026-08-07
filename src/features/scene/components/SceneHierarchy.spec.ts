@@ -18,8 +18,8 @@ import {
   makeSceneObject
 } from "@/test/fixtures";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
-import { importModelAsGlb } from "../api/model-import.api";
-import { putSceneObjectGlb } from "../api/scene-object-glb.api";
+import { canLoadModelFile } from "../api/model-file.api";
+import { putSceneObjectModel } from "../api/scene-object-model.api";
 
 // `useCurrentExperimentStore`'s `manifest`/`terminologyRows` are
 // `computedAsync` and fetch on store creation -- mock the leaf module (not
@@ -38,11 +38,11 @@ vi.mock("@/features/atlas/api/source.api", async () => {
 
 // Mock the leaf modules the model-file picker's handler calls, not the
 // `@/features/scene` barrel, mirroring `current-experiment.store.spec.ts`.
-vi.mock("../api/model-import.api", () => ({
-  importModelAsGlb: vi.fn()
+vi.mock("../api/model-file.api", () => ({
+  canLoadModelFile: vi.fn()
 }));
-vi.mock("../api/scene-object-glb.api", () => ({
-  putSceneObjectGlb: vi.fn()
+vi.mock("../api/scene-object-model.api", () => ({
+  putSceneObjectModel: vi.fn()
 }));
 
 // `useFileDialog`'s input is never attached to the DOM, so it can't be
@@ -124,8 +124,8 @@ describe("SceneHierarchy", () => {
     vi.mocked(getAtlasCenter).mockReturnValue([0, 0, 0]);
     openModelFileDialogSpy.mockReset();
     capturedOnModelFileChange = null;
-    vi.mocked(importModelAsGlb).mockReset();
-    vi.mocked(putSceneObjectGlb).mockReset();
+    vi.mocked(canLoadModelFile).mockReset();
+    vi.mocked(putSceneObjectModel).mockReset();
   });
 
   afterEach(() => {
@@ -345,13 +345,12 @@ describe("SceneHierarchy", () => {
   });
 
   describe("scene objects", () => {
-    it("adds a scene object named after a picked file, selects it, and stores its GLB", async () => {
+    it("adds a scene object named after a picked file, selects it, and stores its model file", async () => {
       const pinia = createPinia();
       setActivePinia(pinia);
       const currentExperiment = useCurrentExperimentStore(pinia);
-      const glbBytes = new Uint8Array([1, 2, 3]);
-      vi.mocked(importModelAsGlb).mockResolvedValue(glbBytes);
-      const file = new File([glbBytes], "Brain Model.glb", {
+      vi.mocked(canLoadModelFile).mockResolvedValue(true);
+      const file = new File([new Uint8Array([1, 2, 3])], "Brain Model.glb", {
         type: "model/gltf-binary"
       });
 
@@ -363,14 +362,14 @@ describe("SceneHierarchy", () => {
       const [sceneObject] = currentExperiment.sceneObjects;
       expect(sceneObject!.name).toBe("Brain Model");
       expect(currentExperiment.selectedInspectable).toEqual(sceneObject);
-      expect(putSceneObjectGlb).toHaveBeenCalledWith(sceneObject!.id, glbBytes);
+      expect(putSceneObjectModel).toHaveBeenCalledWith(sceneObject!.id, file);
     });
 
     it("notifies and adds nothing when the model file can't be imported", async () => {
       const pinia = createPinia();
       setActivePinia(pinia);
       const currentExperiment = useCurrentExperimentStore(pinia);
-      vi.mocked(importModelAsGlb).mockResolvedValue(null);
+      vi.mocked(canLoadModelFile).mockResolvedValue(false);
       const file = new File(["not a model"], "broken.glb", {
         type: "model/gltf-binary"
       });

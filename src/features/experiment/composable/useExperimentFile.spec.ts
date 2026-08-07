@@ -14,7 +14,7 @@ import { makeAtlas, makeSceneObject } from "@/test/fixtures";
 import { zipExperiment } from "../api/experiment-file.api";
 import { buildExperiment } from "../api/experiment.api";
 import type { Experiment } from "../models/experiment.model";
-import { getSceneObjectGlb } from "@/features/scene";
+import { getSceneObjectModel } from "@/features/scene";
 import enUS from "@/i18n/en-US";
 
 // Mock the leaf module (not the `@/features/atlas` barrel), matching the
@@ -29,15 +29,15 @@ vi.mock("@/features/atlas/api/source.api", async () => {
   };
 });
 
-// `getSceneObjectGlb`/`putSceneObjectGlb` go through `idb-keyval`, which
+// `getSceneObjectModel`/`putSceneObjectModel` go through `idb-keyval`, which
 // needs a real IndexedDB the test environment doesn't provide. Replace it
-// with an in-memory map, matching `scene-object-glb.spec.ts`.
-const sceneObjectGlbMemoryStore = new Map<string, unknown>();
+// with an in-memory map, matching `scene-object-model.spec.ts`.
+const sceneObjectModelMemoryStore = new Map<string, unknown>();
 vi.mock("idb-keyval", () => ({
   createStore: () => "fake-store",
-  get: async (key: string) => sceneObjectGlbMemoryStore.get(key),
+  get: async (key: string) => sceneObjectModelMemoryStore.get(key),
   set: async (key: string, value: unknown) => {
-    sceneObjectGlbMemoryStore.set(key, value);
+    sceneObjectModelMemoryStore.set(key, value);
   }
 }));
 
@@ -307,16 +307,16 @@ describe("useExperimentFile", () => {
       );
     });
 
-    it("writes a scene object's GLB before loading the experiment", async () => {
+    it("writes a scene object's model file before loading the experiment", async () => {
       const experiment = buildExperiment("Loaded", makeAtlas(), [0, 0, 0]);
       const sceneObject = makeSceneObject();
       experiment.sceneObjects = [sceneObject];
-      const glbBytes = new Uint8Array([1, 2, 3, 4]);
+      const bytes = new Uint8Array([1, 2, 3, 4]);
       const file = new File(
         [
           zipExperiment(
             experiment,
-            new Map([[sceneObject.id, glbBytes]])
+            new Map([[sceneObject.id, { fileName: "model.obj", bytes }]])
           ).slice()
         ],
         "e.zip",
@@ -327,7 +327,9 @@ describe("useExperimentFile", () => {
       await capturedOnChange!(makeFileList(file));
       await flushMicrotasks();
 
-      expect(await getSceneObjectGlb(sceneObject.id)).toEqual(glbBytes);
+      const stored = await getSceneObjectModel(sceneObject.id);
+      expect(stored?.name).toBe("model.obj");
+      expect(new Uint8Array(await stored!.arrayBuffer())).toEqual(bytes);
     });
   });
 
