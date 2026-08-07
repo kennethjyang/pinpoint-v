@@ -278,7 +278,7 @@ describe("syncSceneObjects", () => {
     ).not.toBeNull();
 
     sceneObject.collidable = false;
-    await syncSceneObjects(
+    const result = await syncSceneObjects(
       scene,
       experiment,
       gizmoManager,
@@ -286,6 +286,8 @@ describe("syncSceneObjects", () => {
       null,
       loadModel
     );
+
+    expect(result.colliderChangedIds).toEqual([sceneObject.id]);
 
     expect(
       scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
@@ -350,7 +352,7 @@ describe("syncSceneObjects", () => {
     expect(state.colliderScales.get(sceneObject.id)).toEqual([1, 1, 1]);
 
     sceneObject.scale = [2, 2, 2];
-    await syncSceneObjects(
+    const result = await syncSceneObjects(
       scene,
       experiment,
       gizmoManager,
@@ -358,6 +360,7 @@ describe("syncSceneObjects", () => {
       null,
       loadModel
     );
+    expect(result.colliderChangedIds).toEqual([sceneObject.id]);
 
     const secondCollider = scene.getTransformNodeByName(colliderName);
     expect(secondCollider).not.toBeNull();

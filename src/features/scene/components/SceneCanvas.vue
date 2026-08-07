@@ -189,7 +189,13 @@ const gizmoModeOptions = computed(() => [
     icon: "flip_camera_android"
   },
   ...(isScaleGizmoAvailable.value
-    ? [{ label: t("sceneCanvas.gizmoScale"), value: "scale", icon: "pan_zoom" }]
+    ? [
+        {
+          label: t("sceneCanvas.gizmoScale"),
+          value: "scale",
+          icon: "sym_o_pan_zoom"
+        }
+      ]
     : [])
 ]);
 
@@ -456,21 +462,22 @@ watchEffect(() => {
 
 /**
  * Sync scene objects from state: builds each object's node from its stored
- * GLB (loading it lazily), then applies color, visibility, and pose.
+ * model file (loading it lazily), then applies color, visibility, and pose.
  */
 async function syncSceneObjectsFromState() {
   const scene = runtime.scene.value;
   const gizmoManager = runtime.gizmoManager.value;
   if (!scene || !gizmoManager) return;
 
-  const { failedIds, colliderFailedIds } = await syncSceneObjects(
-    scene,
-    currentExperiment.experiment,
-    gizmoManager,
-    sceneObjectSyncState,
-    currentExperiment.draggedSceneObjectId,
-    getSceneObjectModel
-  );
+  const { failedIds, colliderFailedIds, colliderChangedIds } =
+    await syncSceneObjects(
+      scene,
+      currentExperiment.experiment,
+      gizmoManager,
+      sceneObjectSyncState,
+      currentExperiment.draggedSceneObjectId,
+      getSceneObjectModel
+    );
   if (failedIds.length) {
     notifyError(
       t("sceneCanvas.sceneObjectUnavailable"),
@@ -482,6 +489,26 @@ async function syncSceneObjectsFromState() {
       t("sceneCanvas.sceneObjectColliderUnavailable"),
       t("sceneCanvas.sceneObjectColliderUnavailableCaption")
     );
+  }
+
+  // Havok emits no TRIGGER_EXITED when a body is disposed while overlapping
+  // (e.g. `collidable` turned off, or a scale change re-cooked the hull), so
+  // force-drop any stale pair for these ids rather than leaving them
+  // permanently highlighted/notified as colliding.
+  const highlightLayer = runtime.highlightLayer.value;
+  if (colliderChangedIds.length && highlightLayer) {
+    const keptEntityIds = [
+      ...currentExperiment.probes.map(({ id }) => id),
+      ...currentExperiment.sceneObjects.map(({ id }) => id)
+    ].filter(id => !colliderChangedIds.includes(id));
+    for (const entityId of pruneCollisions(collisionState, keptEntityIds)) {
+      syncCollisionHighlight(
+        highlightLayer,
+        collisionState,
+        entityId,
+        collisionEntityMeshes(scene, entityId)
+      );
+    }
   }
 }
 

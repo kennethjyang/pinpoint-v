@@ -345,7 +345,11 @@ export async function syncSceneObjects(
   state: SceneObjectSyncState,
   draggedSceneObjectId: string | null,
   loadModel: (sceneObjectId: string) => Promise<File | null>
-): Promise<{ failedIds: string[]; colliderFailedIds: string[] }> {
+): Promise<{
+  failedIds: string[];
+  colliderFailedIds: string[];
+  colliderChangedIds: string[];
+}> {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const sceneObjectsById = new Map(
     experiment.sceneObjects.map(sceneObject => [sceneObject.id, sceneObject])
@@ -373,6 +377,10 @@ export async function syncSceneObjects(
 
   const failedIds: string[] = [];
   const colliderFailedIds: string[] = [];
+  // Ids whose collider was disposed this pass (turned off, or re-cooked for a
+  // new scale). Havok emits no TRIGGER_EXITED when a body is disposed while
+  // overlapping, so the caller must force-drop any stale pair for these ids.
+  const colliderChangedIds: string[] = [];
   for (const sceneObject of experiment.sceneObjects) {
     let node = getSceneObjectTransformNode(scene, sceneObject.id);
     const isFresh = !node;
@@ -408,7 +416,9 @@ export async function syncSceneObjects(
         state.loadingIds.delete(sceneObject.id);
       }
       // The scene can be torn down while a model loads.
-      if (scene.isDisposed) return { failedIds, colliderFailedIds };
+      if (scene.isDisposed) {
+        return { failedIds, colliderFailedIds, colliderChangedIds };
+      }
       if (!node) {
         state.failedIds.add(sceneObject.id);
         failedIds.push(sceneObject.id);
@@ -444,13 +454,19 @@ export async function syncSceneObjects(
     if (!sceneObject.collidable) {
       state.colliderFailedIds.delete(sceneObject.id);
       state.colliderScales.delete(sceneObject.id);
-      if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
+      if (hasCollider) {
+        disposeCollisionBody(scene, sceneObject.id, "object");
+        colliderChangedIds.push(sceneObject.id);
+      }
     } else if (
       meshes.length &&
       !state.colliderFailedIds.has(sceneObject.id) &&
       !isSameScale(state.colliderScales.get(sceneObject.id), sceneObject.scale)
     ) {
-      if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
+      if (hasCollider) {
+        disposeCollisionBody(scene, sceneObject.id, "object");
+        colliderChangedIds.push(sceneObject.id);
+      }
       try {
         buildSceneObjectCollider(
           scene,
@@ -488,7 +504,7 @@ export async function syncSceneObjects(
       scaling: goalScaling
     });
   }
-  return { failedIds, colliderFailedIds };
+  return { failedIds, colliderFailedIds, colliderChangedIds };
 }
 
 /**

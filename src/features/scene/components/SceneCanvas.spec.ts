@@ -999,7 +999,10 @@ describe("SceneCanvas", () => {
 
     const options = modeToggle.props("options") as { value: string }[];
     expect(options).toHaveLength(3);
-    expect(options[2]).toMatchObject({ value: "scale", icon: "pan_zoom" });
+    expect(options[2]).toMatchObject({
+      value: "scale",
+      icon: "sym_o_pan_zoom"
+    });
 
     await modeToggle.vm.$emit("update:modelValue", "scale");
     await flushPromises();
