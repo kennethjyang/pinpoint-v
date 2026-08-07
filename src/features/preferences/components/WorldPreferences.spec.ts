@@ -81,23 +81,23 @@ describe("WorldPreferences", () => {
     expect(preferences.areStructureInteriorsHidden).toBe(false);
   });
 
-  it("the ambient-occlusion toggle starts at true", () => {
+  it("the ambient-occlusion toggle starts at false", () => {
     const wrapper = mountWithQuasar(WorldPreferences);
 
     expect(findToggle(wrapper, t.ambientOcclusion).props("modelValue")).toBe(
-      true
+      false
     );
   });
 
-  it("toggling ambient occlusion off writes isSsaoEnabled to false", async () => {
+  it("toggling ambient occlusion on writes isSsaoEnabled to true", async () => {
     const wrapper = mountWithQuasar(WorldPreferences);
     const preferences = usePreferencesStore();
 
     await findToggle(wrapper, t.ambientOcclusion).vm.$emit(
       "update:modelValue",
-      false
+      true
     );
 
-    expect(preferences.isSsaoEnabled).toBe(false);
+    expect(preferences.isSsaoEnabled).toBe(true);
   });
 });
