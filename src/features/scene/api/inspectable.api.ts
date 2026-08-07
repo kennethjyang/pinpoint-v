@@ -6,9 +6,11 @@ import type { Inspectable } from "../models/inspectable.model";
  * @param b Second entity to compare.
  */
 export function isSameInspectable(a: Inspectable, b: Inspectable): boolean {
+  if (a.inspectableKind !== b.inspectableKind) return false;
   // The scene has exactly one camera, so any two camera inspectables match.
+  // Checking both narrows `a` and `b` to `Probe | SceneObject` below.
   if (a.inspectableKind === "camera" || b.inspectableKind === "camera") {
-    return a.inspectableKind === b.inspectableKind;
+    return true;
   }
   return a.id === b.id;
 }

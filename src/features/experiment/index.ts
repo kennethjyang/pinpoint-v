@@ -24,6 +24,9 @@ export {
   reorderProbe,
   setProbeInterface,
   setExperimentProperties,
+  addSceneObject,
+  removeSceneObject,
+  reorderSceneObject,
   addCameraPose,
   removeCameraPose,
   reorderCameraPose

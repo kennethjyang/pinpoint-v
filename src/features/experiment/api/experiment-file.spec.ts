@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import {
   buildExperimentFileName,
-  parseExperimentFile,
-  serializeExperiment
+  unzipExperiment,
+  zipExperiment
 } from "./experiment-file.api";
 import {
   addCameraPose,
@@ -12,7 +13,11 @@ import {
 } from "./experiment.api";
 import { buildCameraPose } from "./camera-pose.api";
 import { buildProbe, detachProbeInterfaceProbe } from "@/features/probe";
-import { makeAtlas, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  makeAtlas,
+  makeProbeInterfaceProbe,
+  makeSceneObject
+} from "@/test/fixtures";
 import type { Experiment } from "../models/experiment.model";
 
 /**
@@ -30,17 +35,29 @@ function makeFullExperiment(): Experiment {
   return experiment;
 }
 
-describe("serializeExperiment", () => {
-  it("pretty-prints with 2-space indentation", () => {
-    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
-    expect(serializeExperiment(experiment)).toContain('\n  "name"');
-  });
+/**
+ * Build zip bytes carrying arbitrary experiment JSON under the fixed entry
+ * name, bypassing `zipExperiment`'s typed `Experiment` parameter so malformed
+ * shapes can exercise `unzipExperiment`'s validation.
+ * @param data Value to serialize as the zip's `experiment.json` entry.
+ */
+function zipRawExperiment(data: unknown): Uint8Array {
+  return zipSync({ "experiment.json": strToU8(JSON.stringify(data)) });
+}
 
-  it("round-trips through parseExperimentFile", () => {
+describe("zipExperiment / unzipExperiment", () => {
+  it("round-trips an experiment and its scene object GLBs", () => {
     const experiment = makeFullExperiment();
-    expect(parseExperimentFile(serializeExperiment(experiment))).toEqual(
-      experiment
+    const sceneObject = makeSceneObject();
+    experiment.sceneObjects = [sceneObject];
+    const glbBytes = new Uint8Array([1, 2, 3, 4]);
+
+    const archive = unzipExperiment(
+      zipExperiment(experiment, new Map([[sceneObject.id, glbBytes]]))
     );
+
+    expect(archive?.experiment).toEqual(experiment);
+    expect(archive?.sceneObjectGlbs.get(sceneObject.id)).toEqual(glbBytes);
   });
 
   it("does not leak markRaw's non-enumerable marker into the output", () => {
@@ -50,59 +67,72 @@ describe("serializeExperiment", () => {
       experiment.probeInterfaceProbes[identifier]!
     );
 
-    expect(serializeExperiment(experiment)).not.toContain("__v_skip");
-  });
-});
-
-describe("parseExperimentFile", () => {
-  it("returns null for invalid JSON", () => {
-    expect(parseExperimentFile("not json")).toBeNull();
+    const entries = unzipSync(zipExperiment(experiment, new Map()));
+    expect(strFromU8(entries["experiment.json"]!)).not.toContain("__v_skip");
   });
 
-  it("returns null when parsed JSON is an array", () => {
-    expect(parseExperimentFile("[]")).toBeNull();
+  it("returns null for non-zip bytes", () => {
+    expect(unzipExperiment(new Uint8Array([1, 2, 3]))).toBeNull();
   });
 
-  it("returns null when parsed JSON is null", () => {
-    expect(parseExperimentFile("null")).toBeNull();
+  it("returns null when the zip has no experiment.json entry", () => {
+    const zipBytes = zipSync({ "data.json": strToU8("{}") });
+    expect(unzipExperiment(zipBytes)).toBeNull();
+  });
+
+  it("returns null when experiment.json fails validation", () => {
+    expect(unzipExperiment(zipRawExperiment({}))).toBeNull();
+  });
+
+  it("parses and omits a GLB entry for a scene object the experiment does not reference", () => {
+    const experiment = makeFullExperiment();
+    const entries = {
+      "experiment.json": strToU8(JSON.stringify(experiment)),
+      "objects/unreferenced-id.glb": new Uint8Array([9, 9, 9])
+    };
+
+    const archive = unzipExperiment(zipSync(entries));
+
+    expect(archive?.experiment).toEqual(experiment);
+    expect(archive?.sceneObjectGlbs.size).toBe(0);
   });
 
   it("returns null when id is missing", () => {
     const { id: _id, ...rest } = makeFullExperiment();
-    expect(parseExperimentFile(JSON.stringify(rest))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
   });
 
   it("returns null when version is missing", () => {
     const { version: _version, ...rest } = makeFullExperiment();
-    expect(parseExperimentFile(JSON.stringify(rest))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
   });
 
   it("returns null when name is missing", () => {
     const { name: _name, ...rest } = makeFullExperiment();
-    expect(parseExperimentFile(JSON.stringify(rest))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
   });
 
   it("returns null when name has the wrong type", () => {
     const experiment = { ...makeFullExperiment(), name: 5 };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when atlas is missing", () => {
     const { atlas: _atlas, ...rest } = makeFullExperiment();
-    expect(parseExperimentFile(JSON.stringify(rest))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
   });
 
   it("returns null when atlas.source has the wrong type", () => {
     const experiment = makeFullExperiment();
     experiment.atlas = { ...experiment.atlas, source: 5 as unknown as string };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when atlas.manifest is missing", () => {
     const experiment = makeFullExperiment();
     const { manifest: _manifest, ...atlasWithoutManifest } = experiment.atlas;
     experiment.atlas = atlasWithoutManifest as Experiment["atlas"];
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when referenceCoordinate has the wrong length", () => {
@@ -110,7 +140,7 @@ describe("parseExperimentFile", () => {
       ...makeFullExperiment(),
       referenceCoordinate: [1, 2] as unknown as [number, number, number]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when referenceCoordinate contains a non-number", () => {
@@ -118,7 +148,7 @@ describe("parseExperimentFile", () => {
       ...makeFullExperiment(),
       referenceCoordinate: [1, 2, "3"] as unknown as [number, number, number]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when visibleStructures contains a non-number id", () => {
@@ -126,7 +156,7 @@ describe("parseExperimentFile", () => {
       ...makeFullExperiment(),
       visibleStructures: ["1"] as unknown as Experiment["visibleStructures"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a visible structure is missing isTransparent", () => {
@@ -136,7 +166,7 @@ describe("parseExperimentFile", () => {
         { id: 1 }
       ] as unknown as Experiment["visibleStructures"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a visible structure's id has the wrong type", () => {
@@ -146,7 +176,7 @@ describe("parseExperimentFile", () => {
         { id: "1", isTransparent: true }
       ] as unknown as Experiment["visibleStructures"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when two visible structures share an id", () => {
@@ -157,7 +187,7 @@ describe("parseExperimentFile", () => {
         { id: 1, isTransparent: false }
       ]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when probeInterfaceProbes is an array", () => {
@@ -165,7 +195,7 @@ describe("parseExperimentFile", () => {
       ...makeFullExperiment(),
       probeInterfaceProbes: [] as unknown as Experiment["probeInterfaceProbes"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe interface definition is missing annotations", () => {
@@ -176,7 +206,7 @@ describe("parseExperimentFile", () => {
     experiment.probeInterfaceProbes[identifier] =
       definition as Experiment["probeInterfaceProbes"][string];
 
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe interface definition's key does not match its derived identifier", () => {
@@ -188,7 +218,7 @@ describe("parseExperimentFile", () => {
     // dispose and rebuild the probe's meshes on every sync pass.
     experiment.probeInterfaceProbes["wrong identifier"] = definition;
 
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when probes is not an array", () => {
@@ -196,7 +226,7 @@ describe("parseExperimentFile", () => {
       ...makeFullExperiment(),
       probes: {} as unknown as Experiment["probes"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe has an invalid inspectableKind", () => {
@@ -205,7 +235,7 @@ describe("parseExperimentFile", () => {
       ...experiment.probes[0]!,
       inspectableKind: "atlas" as "probe"
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe has an unknown visibility", () => {
@@ -214,13 +244,13 @@ describe("parseExperimentFile", () => {
       ...experiment.probes[0]!,
       visibility: "invisible" as Experiment["probes"][number]["visibility"]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe has an invalid color", () => {
     const experiment = makeFullExperiment();
     experiment.probes[0] = { ...experiment.probes[0]!, color: "red" };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe has a short tipPosition", () => {
@@ -229,14 +259,14 @@ describe("parseExperimentFile", () => {
       ...experiment.probes[0]!,
       tipPosition: [0, 0] as unknown as [number, number, number]
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe is missing slice-view fields, e.g. from an experiment saved before they existed", () => {
     const experiment = makeFullExperiment();
     const { sliceExtentMillimeters: _extent, ...probe } = experiment.probes[0]!;
     experiment.probes[0] = probe as Experiment["probes"][number];
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when two probes share an id", () => {
@@ -248,7 +278,7 @@ describe("parseExperimentFile", () => {
     const duplicate = { ...buildProbe(spec), id: experiment.probes[0]!.id };
     experiment.probes.push(duplicate);
 
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when a probe's probeInterfaceIdentifier is dangling", () => {
@@ -257,12 +287,30 @@ describe("parseExperimentFile", () => {
       ...experiment.probes[0]!,
       probeInterfaceIdentifier: "missing identifier"
     };
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
+  });
+
+  it("returns null when sceneObjects is missing", () => {
+    const { sceneObjects: _sceneObjects, ...rest } = makeFullExperiment();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
+  });
+
+  it("returns null when a scene object is malformed", () => {
+    const experiment = makeFullExperiment();
+    experiment.sceneObjects = [{ ...makeSceneObject(), color: "red" }];
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
+  });
+
+  it("returns null when two scene objects share an id", () => {
+    const experiment = makeFullExperiment();
+    const sceneObject = makeSceneObject();
+    experiment.sceneObjects = [sceneObject, { ...sceneObject, name: "Other" }];
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when cameraPoses is missing", () => {
     const { cameraPoses: _cameraPoses, ...rest } = makeFullExperiment();
-    expect(parseExperimentFile(JSON.stringify(rest))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
   });
 
   it("returns null when a camera pose is malformed", () => {
@@ -273,20 +321,30 @@ describe("parseExperimentFile", () => {
         alpha: "1" as unknown as number
       }
     ];
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("returns null when two camera poses share an id", () => {
     const experiment = makeFullExperiment();
     const pose = buildCameraPose("Dorsal", [1, 2, 3]);
     experiment.cameraPoses = [pose, { ...pose, name: "Ventral" }];
-    expect(parseExperimentFile(JSON.stringify(experiment))).toBeNull();
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
   it("accepts an experiment with a valid camera pose", () => {
     const experiment = makeFullExperiment();
     addCameraPose(experiment, buildCameraPose("Dorsal", [1, 2, 3]));
-    expect(parseExperimentFile(JSON.stringify(experiment))).toEqual(experiment);
+    expect(unzipExperiment(zipRawExperiment(experiment))?.experiment).toEqual(
+      experiment
+    );
+  });
+
+  it("accepts an experiment with a valid scene object", () => {
+    const experiment = makeFullExperiment();
+    experiment.sceneObjects = [makeSceneObject()];
+    expect(unzipExperiment(zipRawExperiment(experiment))?.experiment).toEqual(
+      experiment
+    );
   });
 
   it("accepts a probe interface definition without a probe_planar_contour", () => {
@@ -300,45 +358,47 @@ describe("parseExperimentFile", () => {
     // buildProbeContour (src/features/scene/api/probe.api.ts) already
     // degrades to `null` for missing contour geometry, so this is left
     // unvalidated here.
-    expect(parseExperimentFile(JSON.stringify(experiment))).toEqual(experiment);
+    expect(unzipExperiment(zipRawExperiment(experiment))?.experiment).toEqual(
+      experiment
+    );
   });
 });
 
 describe("buildExperimentFileName", () => {
   it("replaces spaces with dashes", () => {
     const experiment = buildExperiment("My Experiment", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("My-Experiment.json");
+    expect(buildExperimentFileName(experiment)).toBe("My-Experiment.zip");
   });
 
   it("collapses runs of unsafe characters into a single dash", () => {
     const experiment = buildExperiment("a/b:c*d", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("a-b-c-d.json");
+    expect(buildExperimentFileName(experiment)).toBe("a-b-c-d.zip");
   });
 
   it("falls back to a default name when nothing safe remains", () => {
     const experiment = buildExperiment("   ", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("experiment.json");
+    expect(buildExperimentFileName(experiment)).toBe("experiment.zip");
   });
 
   it("falls back to a default name for a name with no ASCII characters", () => {
     const experiment = buildExperiment("🧠🧠", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("experiment.json");
+    expect(buildExperimentFileName(experiment)).toBe("experiment.zip");
   });
 
   it("strips a leading dot so the file isn't hidden", () => {
     const experiment = buildExperiment(".hidden", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("hidden.json");
+    expect(buildExperimentFileName(experiment)).toBe("hidden.zip");
   });
 
   it("truncates a long name without leaving a trailing dash", () => {
     const experiment = buildExperiment("a".repeat(200), makeAtlas(), [0, 0, 0]);
     const fileName = buildExperimentFileName(experiment);
-    expect(fileName).toBe(`${"a".repeat(64)}.json`);
-    expect(fileName).not.toMatch(/-\.json$/);
+    expect(fileName).toBe(`${"a".repeat(64)}.zip`);
+    expect(fileName).not.toMatch(/-\.zip$/);
   });
 
-  it("appends .json even when the name already ends in .json", () => {
-    const experiment = buildExperiment("exp.json", makeAtlas(), [0, 0, 0]);
-    expect(buildExperimentFileName(experiment)).toBe("exp.json.json");
+  it("appends .zip even when the name already ends in .zip", () => {
+    const experiment = buildExperiment("exp.zip", makeAtlas(), [0, 0, 0]);
+    expect(buildExperimentFileName(experiment)).toBe("exp.zip.zip");
   });
 });

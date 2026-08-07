@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isSameInspectable } from "./inspectable.api";
 import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
-import { makeProbe } from "@/test/fixtures";
+import { makeProbe, makeSceneObject } from "@/test/fixtures";
 
 describe("isSameInspectable", () => {
   it("returns true for two probes with the same id, even with different names", () => {
@@ -16,6 +16,13 @@ describe("isSameInspectable", () => {
     const b = makeProbe({ id: "B", name: "Probe" });
 
     expect(isSameInspectable(a, b)).toBe(false);
+  });
+
+  it("returns false for a probe and a scene object with the same id", () => {
+    const probe = makeProbe({ id: "A" });
+    const sceneObject = makeSceneObject({ id: "A" });
+
+    expect(isSameInspectable(probe, sceneObject)).toBe(false);
   });
 
   it("returns true for two camera inspectables", () => {

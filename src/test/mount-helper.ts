@@ -14,6 +14,7 @@ import {
   HavokPlugin,
   InitializeCSG2Async,
   IsCSG2Ready,
+  MeshBuilder,
   NullEngine,
   Scene,
   SelectionOutlineLayer,
@@ -21,6 +22,7 @@ import {
   Vector3,
   WorkerPool
 } from "@babylonjs/core";
+import { GLTF2Export } from "@babylonjs/serializers/glTF/2.0";
 import type { INodeLike, ParagraphOptions } from "@babylonjs/addons";
 import { FontAsset } from "@babylonjs/addons";
 import HavokPhysics, { type HavokPhysicsWithBindings } from "@babylonjs/havok";
@@ -48,6 +50,24 @@ function createTestI18n() {
  */
 export function makeTestScene(): Scene {
   return new Scene(new NullEngine());
+}
+
+/**
+ * Build GLB bytes for a 1 mm box, for tests that import a real model without
+ * touching the network.
+ */
+export async function makeTestGlbBytes(): Promise<Uint8Array> {
+  const scene = makeTestScene();
+  try {
+    MeshBuilder.CreateBox("box", { size: 1 }, scene);
+    const data = await GLTF2Export.GLBAsync(scene, "box.glb", {
+      exportWithoutWaitingForScene: true
+    });
+    const glb = Object.values(data.files).find(value => value instanceof Blob);
+    return new Uint8Array(await (glb as Blob).arrayBuffer());
+  } finally {
+    scene.dispose();
+  }
 }
 
 /**

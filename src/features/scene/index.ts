@@ -16,3 +16,17 @@ export type {
 } from "./models/gizmo.model";
 export type { CameraProjection } from "./models/camera.model";
 export type { ProbeGeometry } from "./models/probe-geometry.model";
+export {
+  buildSceneObject,
+  isSceneObject,
+  toggleSceneObjectLock,
+  toggleSceneObjectVisibility
+} from "./api/scene-object.api";
+export {
+  getSceneObjectGlb,
+  pruneSceneObjectGlbs,
+  putSceneObjectGlb
+} from "./api/scene-object-glb.api";
+export type { SceneObject } from "./models/scene-object.model";
+export type { SceneObjectVisibility } from "./models/scene-object-visibility.model";
+export { importModelAsGlb } from "./api/model-import.api";

@@ -1,3 +1,11 @@
+import {
+  strFromU8,
+  strToU8,
+  type Unzipped,
+  unzipSync,
+  type Zippable,
+  zipSync
+} from "fflate";
 import type { Experiment } from "../models/experiment.model";
 import type { VisibleStructure } from "../models/visible-structure.model";
 import { isAtlas } from "@/features/atlas";
@@ -7,6 +15,7 @@ import {
   isProbe,
   isProbeInterfaceProbe
 } from "@/features/probe";
+import { isSceneObject } from "@/features/scene";
 import { isFiniteNumber, isFiniteTriple, isRecord } from "@/utils/type-guards";
 
 /** Indentation for written experiment files, so they stay human-diffable. */
@@ -15,14 +24,33 @@ const FILE_INDENT = 2;
 /** Slug used when an experiment name has no filename-safe characters. */
 const FALLBACK_FILE_NAME = "experiment";
 
-/** Longest slug kept from an experiment name, before the `.json` suffix. */
+/** Longest slug kept from an experiment name, before the `.zip` suffix. */
 const MAXIMUM_FILE_NAME_LENGTH = 64;
+
+/** Name every experiment zip stores its experiment JSON under. */
+const EXPERIMENT_ENTRY_NAME = "experiment.json";
+
+/** Directory inside an experiment zip holding one GLB per scene object. */
+const SCENE_OBJECT_DIRECTORY = "objects";
+
+/** Deflate level for the experiment JSON entry. */
+const JSON_DEFLATE_LEVEL = 6;
+
+/** MIME type of a written experiment file. */
+export const EXPERIMENT_FILE_MIME_TYPE = "application/zip";
+
+/** An experiment read out of an experiment zip, with its scene object GLBs. */
+export interface ExperimentArchive {
+  experiment: Experiment;
+  /** GLB bytes keyed by scene object id, for the objects the zip carried. */
+  sceneObjectGlbs: Map<string, Uint8Array>;
+}
 
 /**
  * Serialize an experiment to the JSON text written to an experiment file.
  * @param experiment Experiment to serialize.
  */
-export function serializeExperiment(experiment: Experiment): string {
+function serializeExperiment(experiment: Experiment): string {
   return JSON.stringify(experiment, null, FILE_INDENT);
 }
 
@@ -31,7 +59,7 @@ export function serializeExperiment(experiment: Experiment): string {
  * well-formed experiment.
  * @param text Raw contents of an experiment JSON file.
  */
-export function parseExperimentFile(text: string): Experiment | null {
+function parseExperimentFile(text: string): Experiment | null {
   let data: unknown;
   try {
     data = JSON.parse(text);
@@ -43,7 +71,57 @@ export function parseExperimentFile(text: string): Experiment | null {
 }
 
 /**
- * Build a filesystem-safe `.json` file name from an experiment's name.
+ * Build a zip containing an experiment's JSON and one GLB per given scene
+ * object, uncompressed since GLB is already binary and barely compressible.
+ * @param experiment Experiment to zip.
+ * @param sceneObjectGlbs GLB bytes keyed by scene object id, for the objects to include.
+ */
+export function zipExperiment(
+  experiment: Experiment,
+  sceneObjectGlbs: Map<string, Uint8Array>
+): Uint8Array {
+  const entries: Zippable = {
+    [EXPERIMENT_ENTRY_NAME]: strToU8(serializeExperiment(experiment))
+  };
+  for (const [id, glbBytes] of sceneObjectGlbs) {
+    entries[`${SCENE_OBJECT_DIRECTORY}/${id}.glb`] = [glbBytes, { level: 0 }];
+  }
+
+  return zipSync(entries, { level: JSON_DEFLATE_LEVEL });
+}
+
+/**
+ * Read an experiment zip back into its experiment and the scene object GLBs
+ * it carried, or null when the bytes aren't a well-formed experiment zip.
+ * @param zipBytes Zip bytes read from an experiment file.
+ */
+export function unzipExperiment(
+  zipBytes: Uint8Array
+): ExperimentArchive | null {
+  let entries: Unzipped;
+  try {
+    entries = unzipSync(zipBytes);
+  } catch {
+    return null;
+  }
+
+  const experimentEntry = entries[EXPERIMENT_ENTRY_NAME];
+  if (!experimentEntry) return null;
+
+  const experiment = parseExperimentFile(strFromU8(experimentEntry));
+  if (!experiment) return null;
+
+  const sceneObjectGlbs = new Map<string, Uint8Array>();
+  for (const sceneObject of experiment.sceneObjects) {
+    const glb = entries[`${SCENE_OBJECT_DIRECTORY}/${sceneObject.id}.glb`];
+    if (glb) sceneObjectGlbs.set(sceneObject.id, glb);
+  }
+
+  return { experiment, sceneObjectGlbs };
+}
+
+/**
+ * Build a filesystem-safe `.zip` file name from an experiment's name.
  * @param experiment Experiment to name the file after.
  */
 export function buildExperimentFileName(experiment: Experiment): string {
@@ -54,7 +132,7 @@ export function buildExperimentFileName(experiment: Experiment): string {
     .slice(0, MAXIMUM_FILE_NAME_LENGTH)
     .replace(/^[-.]+|[-.]+$/g, "");
 
-  return `${slug || FALLBACK_FILE_NAME}.json`;
+  return `${slug || FALLBACK_FILE_NAME}.zip`;
 }
 
 /**
@@ -74,6 +152,7 @@ function isExperiment(value: unknown): value is Experiment {
     visibleStructures,
     probeInterfaceProbes,
     probes,
+    sceneObjects,
     cameraPoses
   } = value;
 
@@ -103,6 +182,16 @@ function isExperiment(value: unknown): value is Experiment {
 
   if (!Array.isArray(probes) || !probes.every(isProbe)) return false;
   if (new Set(probes.map(probe => probe.id)).size !== probes.length) {
+    return false;
+  }
+
+  if (!Array.isArray(sceneObjects) || !sceneObjects.every(isSceneObject)) {
+    return false;
+  }
+  if (
+    new Set(sceneObjects.map(sceneObject => sceneObject.id)).size !==
+    sceneObjects.length
+  ) {
     return false;
   }
 

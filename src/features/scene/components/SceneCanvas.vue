@@ -43,6 +43,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useI18n } from "vue-i18n";
+import type { Mesh, Scene } from "@babylonjs/core";
 import {
   endProbeGizmoDrag,
   getProbeMeshes,
@@ -52,11 +53,21 @@ import {
   syncProbes
 } from "../api/probe.api";
 import {
-  createProbeCollisionState,
-  pruneProbeCollisions,
-  syncProbeCollisionHighlight,
-  trackProbeCollisions
-} from "../api/probe-collision.api";
+  createCollisionState,
+  pruneCollisions,
+  syncCollisionHighlight,
+  trackCollisions
+} from "../api/collision.api";
+import {
+  createSceneObjectSyncState,
+  endSceneObjectGizmoDrag,
+  getSceneObjectMeshes,
+  selectSceneObjectFromGizmoAttach,
+  setSceneObjectPositionFromGizmoDrag,
+  setSceneObjectRotationFromGizmoDrag,
+  syncSceneObjects
+} from "../api/scene-object-node.api";
+import { getSceneObjectGlb } from "../api/scene-object-glb.api";
 import { setGizmoControls } from "../api/gizmo.api";
 import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
@@ -92,8 +103,11 @@ const isLoadingStructures = ref(false);
 /** Axis guide text renderers, created for the current scene the first time the guides are shown. */
 const axisGuides = shallowRef<AxisGuides | null>(null);
 
-/** Overlap bookkeeping for probe trigger events, read and mutated in place. */
-const collisionState = createProbeCollisionState();
+/** Overlap bookkeeping for scene entity trigger events, read and mutated in place. */
+const collisionState = createCollisionState();
+
+/** Load bookkeeping for scene object GLBs, read and mutated in place. */
+const sceneObjectSyncState = createSceneObjectSyncState();
 
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
@@ -146,11 +160,32 @@ const probeGeometry = computed<ProbeGeometry>(() => ({
   rodLengthMillimeters: preferences.probeRodLengthMillimeters
 }));
 
-/** Whether the gizmo toolbar is shown: the camera has no gizmo to drive. */
+/**
+ * Whether the gizmo toolbar is shown: the camera has no gizmo to drive, and a
+ * locked probe or scene object gets none either.
+ */
 const isGizmoToolbarVisible = computed(() => {
   const selected = currentExperiment.selectedInspectable;
-  return !!selected && selected.inspectableKind !== "camera";
+  if (!selected || selected.inspectableKind === "camera") return false;
+  return !selected.lock;
 });
+
+/** Meshes of a colliding entity, whichever kind it is. */
+function collisionEntityMeshes(scene: Scene, entityId: string): Mesh[] {
+  const probeMeshes = getProbeMeshes(scene, entityId);
+  return probeMeshes.length
+    ? probeMeshes
+    : getSceneObjectMeshes(scene, entityId);
+}
+
+/** Display name of a colliding entity, or null when it is gone. */
+function collisionEntityName(entityId: string): string | null {
+  return (
+    currentExperiment.probes.find(({ id }) => id === entityId)?.name ??
+    currentExperiment.sceneObjects.find(({ id }) => id === entityId)?.name ??
+    null
+  );
+}
 
 /**
  * Trigger engine resizing on page area resize.
@@ -381,51 +416,100 @@ watchEffect(() => {
 
   const highlightLayer = runtime.highlightLayer.value;
   if (highlightLayer) {
-    const keptProbeIds = currentExperiment.probes
-      .map(({ id }) => id)
-      .filter(id => !rebuiltProbeIds.includes(id));
-    for (const probeId of pruneProbeCollisions(collisionState, keptProbeIds)) {
-      syncProbeCollisionHighlight(
+    const keptEntityIds = [
+      ...currentExperiment.probes.map(({ id }) => id),
+      ...currentExperiment.sceneObjects.map(({ id }) => id)
+    ].filter(id => !rebuiltProbeIds.includes(id));
+    for (const entityId of pruneCollisions(collisionState, keptEntityIds)) {
+      syncCollisionHighlight(
         highlightLayer,
         collisionState,
-        probeId,
-        getProbeMeshes(scene, probeId)
+        entityId,
+        collisionEntityMeshes(scene, entityId)
       );
     }
   }
 });
 
-// Highlight and warn about probes whose bodies overlap.
+/**
+ * Sync scene objects from state: builds each object's node from its stored
+ * GLB (loading it lazily), then applies color, visibility, and pose.
+ */
+async function syncSceneObjectsFromState() {
+  const scene = runtime.scene.value;
+  const gizmoManager = runtime.gizmoManager.value;
+  if (!scene || !gizmoManager) return;
+
+  const failedIds = await syncSceneObjects(
+    scene,
+    currentExperiment.experiment,
+    gizmoManager,
+    sceneObjectSyncState,
+    currentExperiment.draggedSceneObjectId,
+    getSceneObjectGlb
+  );
+  if (failedIds.length) {
+    notifyError(
+      t("sceneCanvas.sceneObjectUnavailable"),
+      t("sceneCanvas.sceneObjectUnavailableCaption")
+    );
+  }
+}
+
+// Re-run the sync when the scene/gizmo manager become ready or the dragged
+// id changes, and separately on any scene object data change. Split across
+// two watchers so `deep: true` only ever traverses the plain-object
+// `sceneObjects` state -- deep-watching `runtime.scene`/`runtime.gizmoManager`
+// would walk into the live Babylon `Scene`/`GizmoManager` instances and trip
+// getters with real side effects (e.g. `Scene.depthPeelingRenderer` lazily
+// building a renderer).
+watch(
+  [
+    runtime.scene,
+    runtime.gizmoManager,
+    () => currentExperiment.draggedSceneObjectId
+  ],
+  syncSceneObjectsFromState,
+  { immediate: true }
+);
+watch(() => currentExperiment.sceneObjects, syncSceneObjectsFromState, {
+  deep: true
+});
+
+// A reopened experiment can supply a model that was missing last time.
+watch(
+  () => currentExperiment.experiment.id,
+  () => sceneObjectSyncState.failedIds.clear()
+);
+
+// Highlight and warn about scene entities whose bodies overlap.
 watch(
   [runtime.havokPlugin, runtime.highlightLayer, runtime.scene],
   ([plugin, highlightLayer, scene]) => {
     if (!plugin || !highlightLayer || !scene) return;
 
     collisionState.pairCounts.clear();
-    const observer = trackProbeCollisions(plugin, collisionState, change => {
-      for (const probeId of change.probeIds) {
-        syncProbeCollisionHighlight(
+    const observer = trackCollisions(plugin, collisionState, change => {
+      for (const entityId of change.entityIds) {
+        syncCollisionHighlight(
           highlightLayer,
           collisionState,
-          probeId,
-          getProbeMeshes(scene, probeId)
+          entityId,
+          collisionEntityMeshes(scene, entityId)
         );
       }
       if (change.kind !== "entered") return;
 
-      // The lexicographically lower probe id comes first, so exactly one probe of the pair
+      // The lexicographically lower entity id comes first, so exactly one entity of the pair
       // names itself as the notification's subject.
-      const [firstId, secondId] = change.probeIds;
-      const first = currentExperiment.probes.find(({ id }) => id === firstId);
-      const second = currentExperiment.probes.find(({ id }) => id === secondId);
+      const [firstId, secondId] = change.entityIds;
+      const first = collisionEntityName(firstId);
+      const second = collisionEntityName(secondId);
       if (!first || !second) return;
 
       notifyError(
-        t("sceneCanvas.probeCollision", {
-          first: first.name,
-          second: second.name
-        }),
-        t("sceneCanvas.probeCollisionCaption")
+        t("sceneCanvas.entityCollision", { first, second }),
+        t("sceneCanvas.entityCollisionCaption")
       );
     });
     onWatcherCleanup(() => observer.remove());
@@ -490,16 +574,17 @@ watch(runtime.scene, scene => {
   onWatcherCleanup(() => observer.remove());
 });
 
-// Configure the gizmos from the control bar and keep the probe drag
-// observers on them.
+// Configure the gizmos from the control bar and keep the probe and scene
+// object drag observers on them.
 watch(
   [
     runtime.gizmoManager,
     () => currentExperiment.probes,
+    () => currentExperiment.sceneObjects,
     gizmoMode,
     gizmoCoordinateSpace
   ],
-  ([gizmoManager, probes, mode, coordinateSpace]) => {
+  ([gizmoManager, probes, sceneObjects, mode, coordinateSpace]) => {
     if (!gizmoManager) return;
 
     const gizmos = setGizmoControls(gizmoManager, mode, coordinateSpace);
@@ -523,10 +608,33 @@ watch(
       currentExperiment.endProbeDrag();
     });
 
+    const sceneObjectPositionDraggingObserver =
+      setSceneObjectPositionFromGizmoDrag(
+        gizmos.positionGizmo,
+        sceneObjects,
+        sceneObjectId => {
+          currentExperiment.draggedSceneObjectId = sceneObjectId;
+        }
+      );
+    const sceneObjectRotationDraggingObserver =
+      setSceneObjectRotationFromGizmoDrag(
+        gizmos.rotationGizmo,
+        sceneObjects,
+        sceneObjectId => {
+          currentExperiment.draggedSceneObjectId = sceneObjectId;
+        }
+      );
+    const sceneObjectDragEndObservers = endSceneObjectGizmoDrag(gizmos, () => {
+      currentExperiment.endSceneObjectDrag();
+    });
+
     onWatcherCleanup(() => {
       probePositionDraggingObserver.remove();
       probeRotationDraggingObserver.remove();
       probeDragEndObservers.forEach(observer => observer.remove());
+      sceneObjectPositionDraggingObserver.remove();
+      sceneObjectRotationDraggingObserver.remove();
+      sceneObjectDragEndObservers.forEach(observer => observer.remove());
     });
   }
 );
@@ -538,9 +646,10 @@ watch(
     runtime.scene,
     runtime.gizmoManager,
     runtime.selectionOutlineLayer,
-    () => currentExperiment.probes
+    () => currentExperiment.probes,
+    () => currentExperiment.sceneObjects
   ],
-  ([scene, gizmoManager, selectionOutlineLayer, probes]) => {
+  ([scene, gizmoManager, selectionOutlineLayer, probes, sceneObjects]) => {
     if (!scene || !gizmoManager || !selectionOutlineLayer) return;
 
     const probeSelectionObserver = selectProbeFromGizmoAttach(
@@ -550,6 +659,16 @@ watch(
       probes,
       probe => {
         currentExperiment.selectedInspectable = probe;
+      }
+    );
+
+    const sceneObjectSelectionObserver = selectSceneObjectFromGizmoAttach(
+      scene,
+      gizmoManager,
+      selectionOutlineLayer,
+      sceneObjects,
+      sceneObject => {
+        currentExperiment.selectedInspectable = sceneObject;
       }
     );
 
@@ -564,6 +683,7 @@ watch(
 
     onWatcherCleanup(() => {
       probeSelectionObserver.remove();
+      sceneObjectSelectionObserver.remove();
       sceneDeselectObserver.remove();
     });
   }

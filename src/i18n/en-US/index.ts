@@ -67,9 +67,12 @@ export default {
     problemLoadingAxisGuides:
       "There was a problem loading the axis guide labels.",
     axisGuidesUnavailable: "The atlas axis labels won't be shown.",
-    probeCollision: "Probe {first} can collide with probe {second}.",
-    probeCollisionCaption:
+    entityCollision: "{first} can collide with {second}.",
+    entityCollisionCaption:
       "Move one of them so their bodies no longer overlap.",
+    sceneObjectUnavailable: "Unable to load a 3D object's model.",
+    sceneObjectUnavailableCaption:
+      "Its model file is missing from this browser's storage.",
     gizmoMode: "Transform mode",
     gizmoPosition: "Position",
     gizmoRotation: "Rotation",
@@ -94,7 +97,7 @@ export default {
   experimentFile: {
     invalidExperimentFile: "Unable to read experiment file.",
     invalidExperimentFileCaption:
-      "Check that the file is a Pinpoint experiment JSON file.",
+      "Check that the file is a Pinpoint experiment zip file containing experiment.json.",
     downloadFailed: "Unable to download experiment.",
     downloadFailedCaption:
       "Check your browser's download settings and try again.",
@@ -152,7 +155,14 @@ export default {
     axisGuides: "Axis Guides",
     showAxisGuides: "Show axis guides",
     hideAxisGuides: "Hide axis guides",
-    dragToReorder: "Drag to reorder"
+    dragToReorder: "Drag to reorder",
+    addSceneObject: "Add 3D Object",
+    removeSceneObject: "Remove 3D object",
+    showSceneObject: "Show 3D object",
+    hideSceneObject: "Hide 3D object",
+    invalidModelFile: "Unable to import that 3D model.",
+    invalidModelFileCaption:
+      "Check that the file is a glTF, GLB, OBJ, STL, FBX, or Babylon model with at least one mesh."
   },
   inspector: {
     emptyHint: "Pick something from the scene to inspect."
@@ -179,6 +189,15 @@ export default {
     alignShank: "Align to shank {index}",
     alignCenter: "Align to probe center",
     alignCenterLabel: "C"
+  },
+
+  sceneObjectInspector: {
+    name: "Name",
+    roll: "Roll",
+    yaw: "Yaw",
+    pitch: "Pitch",
+    lock: "Lock 3D object",
+    unlock: "Unlock 3D object"
   },
   cameraInspector: {
     poseName: "Pose name",
