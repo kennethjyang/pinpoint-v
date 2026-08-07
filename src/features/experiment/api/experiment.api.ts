@@ -73,22 +73,27 @@ export function setExperimentProperties(
 
   experiment.name = name.trim();
   experiment.atlas = { ...atlas };
-  setReferenceCoordinate(experiment, referenceCoordinate);
 
-  // A different atlas has its own extent and centre, so the saved zoom and
-  // target no longer frame anything; the orbit angles still make sense.
   if (isNewAtlas) {
+    // Probe tips and the camera target are offsets from the reference
+    // coordinate, and a new atlas brings its own landmark, so those offsets
+    // carry over untouched. Only the camera's framing is absolute to the
+    // volume, so it is rebuilt.
+    experiment.referenceCoordinate = [...referenceCoordinate];
     frameCameraPoseOnAtlas(experiment.cameraPose, atlas, referenceCoordinate);
+    return;
   }
+
+  moveReferenceCoordinate(experiment, referenceCoordinate);
 }
 
 /**
- * Move an experiment's reference coordinate, re-deriving every probe tip and
- * the camera target so they stay at the same atlas coordinate.
+ * Move an experiment's reference coordinate within one atlas, re-deriving every
+ * probe tip and the camera target so they stay at the same atlas coordinate.
  * @param experiment Experiment to move the reference coordinate of.
  * @param referenceCoordinate New reference coordinate, in atlas ASR mm.
  */
-function setReferenceCoordinate(
+function moveReferenceCoordinate(
   experiment: Experiment,
   referenceCoordinate: [number, number, number]
 ) {

@@ -716,6 +716,24 @@ describe("setExperimentProperties", () => {
     expect(experiment.cameraPoses).toEqual([savedPose]);
   });
 
+  it("leaves every probe's tipPosition byte-identical when the atlas changes with a re-seeded reference coordinate", () => {
+    const atlas = makeAtlas();
+    const experiment = buildExperiment("Exp", atlas, [5.7, 0.44, 5.4]);
+    const probe = buildProbe(makeProbeInterfaceProbe());
+    probe.tipPosition = [2, 0, 0];
+    addProbe(experiment, probe);
+    const newAtlas = makeAtlas({ name: "allen_human" });
+
+    setExperimentProperties(experiment, {
+      name: experiment.name,
+      atlas: newAtlas,
+      referenceCoordinate: [116.5, 94.5, 98.5]
+    });
+
+    expect(probe.tipPosition).toEqual([2, 0, 0]);
+    expect(experiment.referenceCoordinate).toEqual([116.5, 94.5, 98.5]);
+  });
+
   it("leaves the camera pose's radius and compensated target alone on a same-atlas edit", () => {
     const atlas = makeAtlas();
     const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
