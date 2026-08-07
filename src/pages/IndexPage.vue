@@ -21,6 +21,8 @@ import { ChannelMaps } from "@/features/slice";
 /** Widest a drawer can be resized to, as a fraction of the window width. */
 const MAXIMUM_DRAWER_WIDTH_RATIO = 0.4;
 const BASE_URL = import.meta.env.BASE_URL;
+/** Is the platform macOS, where shortcut hints use symbol glyphs instead of word labels. */
+const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
 
 const $q = useQuasar();
 const currentExperimentStore = useCurrentExperimentStore();
@@ -173,6 +175,13 @@ onMounted(() => {
                 @click="currentExperimentStore.undo()"
               >
                 <q-item-section>{{ $t("layout.undo") }}</q-item-section>
+                <q-item-section side class="shortcut-hint">
+                  <template v-if="isMac"><kbd>⌘</kbd><kbd>Z</kbd></template>
+                  <template v-else>
+                    <kbd>{{ $t("layout.ctrlKey") }}</kbd
+                    >+<kbd>Z</kbd>
+                  </template>
+                </q-item-section>
               </q-item>
               <q-item
                 clickable
@@ -180,6 +189,16 @@ onMounted(() => {
                 @click="currentExperimentStore.redo()"
               >
                 <q-item-section>{{ $t("layout.redo") }}</q-item-section>
+                <q-item-section side class="shortcut-hint">
+                  <template v-if="isMac">
+                    <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd>
+                  </template>
+                  <template v-else>
+                    <kbd>{{ $t("layout.ctrlKey") }}</kbd
+                    >+<kbd>{{ $t("layout.shiftKey") }}</kbd
+                    >+<kbd>Z</kbd>
+                  </template>
+                </q-item-section>
               </q-item>
               <q-separator />
               <q-item
@@ -312,4 +331,23 @@ body.body--dark .q-drawer__resizer
 
 .column
   flex-wrap: nowrap
+
+.shortcut-hint
+  flex-direction: row
+  align-items: center
+  gap: 2px
+
+kbd
+  font-family: inherit
+  font-size: 0.75rem
+  line-height: 1
+  padding: 2px 5px
+  border-radius: 3px
+  border: 1px solid $grey-5
+  background-color: $grey-2
+  color: inherit
+
+body.body--dark kbd
+  border-color: $grey-8
+  background-color: $grey-9
 </style>
