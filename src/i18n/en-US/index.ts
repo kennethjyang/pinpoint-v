@@ -212,7 +212,6 @@ export default {
     goHome: "Go Home"
   },
   units: {
-    inch: "in",
     centimeter: "cm",
     millimeter: "mm",
     micrometer: "µm",
