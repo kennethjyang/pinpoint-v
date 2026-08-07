@@ -24,12 +24,13 @@ onOpened(onDialogOK);
   <q-dialog ref="dialogRef" @hide="onDialogHide">
     <q-card class="splash">
       <q-card-section class="column full-width items-center">
-        <div class="row items-center q-gutter-x-sm">
+        <div class="column items-center q-gutter-y-sm">
           <img
-            :src="`${BASE_URL}icons/favicon-96x96.png`"
+            class="rounded-borders"
+            :src="`${BASE_URL}icons/favicon-128x128.png`"
             alt=""
-            width="48"
-            height="48"
+            width="128"
+            height="128"
           />
           <p class="text-h2">{{ $t("splash.title") }}</p>
         </div>
