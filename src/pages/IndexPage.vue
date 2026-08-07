@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, type Ref } from "vue";
+import { onKeyStroke } from "@vueuse/core";
 import { SceneCanvas, SceneHierarchy } from "@/features/scene";
 import { type TouchPanValue, useQuasar } from "quasar";
 import {
@@ -82,6 +83,45 @@ function fixedQPageHeight(offset: number) {
     height
   };
 }
+
+/**
+ * Is a keyboard event's target an editable element, where the browser's own
+ * undo/redo should take priority over the app's.
+ * @param target Event target to check.
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA")
+  );
+}
+
+// Ctrl/Cmd+Z undoes the current experiment, unless an editable element is
+// focused, in which case the browser's native text-field undo takes over.
+onKeyStroke(
+  event =>
+    (event.ctrlKey || event.metaKey) &&
+    !event.shiftKey &&
+    event.code === "KeyZ",
+  event => {
+    if (isEditableTarget(event.target)) return;
+    event.preventDefault();
+    currentExperimentStore.undo();
+  }
+);
+
+// Ctrl/Cmd+Shift+Z redoes the current experiment, same editable-target guard.
+onKeyStroke(
+  event =>
+    (event.ctrlKey || event.metaKey) && event.shiftKey && event.code === "KeyZ",
+  event => {
+    if (isEditableTarget(event.target)) return;
+    event.preventDefault();
+    currentExperimentStore.redo();
+  }
+);
 
 onMounted(() => {
   // Show splash.
