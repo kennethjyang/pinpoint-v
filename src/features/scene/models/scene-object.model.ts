@@ -24,6 +24,9 @@ export interface SceneObject {
    */
   lock: boolean;
 
+  /** Does the object's body participate in collision detection with probes and other objects. */
+  collidable: boolean;
+
   /**
    * Internal position representation of the object's origin.
    * - AP, DV, ML order.

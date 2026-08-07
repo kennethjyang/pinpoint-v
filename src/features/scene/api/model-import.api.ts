@@ -49,6 +49,9 @@ export async function importModelAsGlb(
     );
     if (!merged) return null;
 
+    // Source files can carry stale, missing, or inward-facing normals; recompute
+    // them from the merged topology so lighting reads correctly regardless of origin.
+    merged.createNormals(false);
     merged.material = null;
     for (const material of importedMaterials) material.dispose(false, true);
 

@@ -100,4 +100,14 @@ describe("SceneObjectInspector", () => {
     }
     expect(fieldByLabel(wrapper, t.name).props("disable")).toBeFalsy();
   });
+
+  it("toggles collidable when the collision detection toggle changes", async () => {
+    const { wrapper, sceneObject } = mountInspector(
+      makeSceneObject({ collidable: true })
+    );
+
+    await wrapper.findComponent({ name: "QToggle" }).setValue(false);
+
+    expect(sceneObject.collidable).toBe(false);
+  });
 });

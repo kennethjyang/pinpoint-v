@@ -48,11 +48,20 @@ export interface SceneObjectSyncState {
   loadingIds: Set<string>;
   /** Ids whose GLB failed to load, cleared when the id leaves the experiment. */
   failedIds: Set<string>;
+  /**
+   * Ids whose collider failed to build, so a sync doesn't retry every tick.
+   * Cleared when the id leaves the experiment or `collidable` turns off.
+   */
+  colliderFailedIds: Set<string>;
 }
 
 /** Build empty scene object load bookkeeping. */
 export function createSceneObjectSyncState(): SceneObjectSyncState {
-  return { loadingIds: new Set(), failedIds: new Set() };
+  return {
+    loadingIds: new Set(),
+    failedIds: new Set(),
+    colliderFailedIds: new Set()
+  };
 }
 
 /**
@@ -103,10 +112,21 @@ function buildSceneObjectMaterial(
   return material;
 }
 
+/** Result of building a scene object's node. */
+export interface SceneObjectBuild {
+  node: TransformNode;
+  /**
+   * True when the object's trigger collider couldn't be created from its mesh.
+   * The object still renders, moves, and can be selected normally; it just
+   * never participates in collision detection.
+   */
+  colliderFailed: boolean;
+}
+
 /**
  * Build a scene object's merged mesh from its stored GLB, or return its
  * existing transform node if already built. The collider is a convex hull
- * around the merged mesh, not an exact triangle-mesh shape.
+ * around the merged mesh, or none when the object's `collidable` is off.
  * @param scene Scene to build the object in.
  * @param sceneObject Scene object to build.
  * @param glbBytes GLB bytes to import the object's geometry from.
@@ -117,9 +137,9 @@ export async function buildSceneObjectNode(
   sceneObject: SceneObject,
   glbBytes: Uint8Array,
   gizmoManager: GizmoManager
-): Promise<TransformNode | null> {
+): Promise<SceneObjectBuild | null> {
   const existing = getSceneObjectTransformNode(scene, sceneObject.id);
-  if (existing) return existing;
+  if (existing) return { node: existing, colliderFailed: false };
 
   const node = new TransformNode(
     buildSceneEntityName(sceneObject.id, "object", "node"),
@@ -146,6 +166,9 @@ export async function buildSceneObjectNode(
     node.dispose();
     return null;
   }
+  // The re-merge above bakes the loader's handedness conversion into the
+  // vertices, which can leave stale or inward-facing normals; recompute them.
+  merged.createNormals(false);
 
   merged.name = buildSceneEntityName(sceneObject.id, "object", "mesh");
   merged.material = buildSceneObjectMaterial(scene, sceneObject);
@@ -153,17 +176,25 @@ export async function buildSceneObjectNode(
   for (const mesh of result.meshes) if (!mesh.isDisposed()) mesh.dispose();
   for (const transformNode of result.transformNodes) transformNode.dispose();
 
-  // Ignore the return value: no physics engine on the scene keeps this feature additive.
-  // A convex hull, not an exact `PhysicsShapeMesh`, approximates the collider: Havok's
-  // triangle-mesh trigger shapes proved unstable (observed hangs) when they coexist with
-  // another entity's shapes in the same physics world.
-  buildCollisionBody(node, sceneObject.id, "object", () => [
-    { shape: new PhysicsShapeConvexHull(merged, scene), mesh: merged }
-  ]);
+  // No physics engine on the scene, or `collidable` turned off, keeps this
+  // feature additive: `buildShapes` is never called, so it never throws, and
+  // `colliderFailed` stays false. Some merged topologies (e.g. degenerate
+  // geometry) can't be cooked into a Havok hull; the object still gets
+  // placed, without a collider.
+  let colliderFailed = false;
+  if (sceneObject.collidable) {
+    try {
+      buildCollisionBody(node, sceneObject.id, "object", () => [
+        { shape: new PhysicsShapeConvexHull(merged, scene), mesh: merged }
+      ]);
+    } catch {
+      colliderFailed = true;
+    }
+  }
 
   gizmoManager.attachableMeshes ??= [];
   gizmoManager.attachableMeshes.push(merged);
-  return node;
+  return { node, colliderFailed };
 }
 
 /**
@@ -209,7 +240,7 @@ export async function syncSceneObjects(
   state: SceneObjectSyncState,
   draggedSceneObjectId: string | null,
   loadGlb: (sceneObjectId: string) => Promise<Uint8Array | null>
-): Promise<string[]> {
+): Promise<{ failedIds: string[]; colliderFailedIds: string[] }> {
   const referenceCoordinateNode = buildReferenceCoordinateNode(scene);
   const sceneObjectsById = new Map(
     experiment.sceneObjects.map(sceneObject => [sceneObject.id, sceneObject])
@@ -228,8 +259,12 @@ export async function syncSceneObjects(
   for (const id of state.loadingIds) {
     if (!sceneObjectsById.has(id)) state.loadingIds.delete(id);
   }
+  for (const id of state.colliderFailedIds) {
+    if (!sceneObjectsById.has(id)) state.colliderFailedIds.delete(id);
+  }
 
-  const newlyFailedIds: string[] = [];
+  const failedIds: string[] = [];
+  const colliderFailedIds: string[] = [];
   for (const sceneObject of experiment.sceneObjects) {
     let node = getSceneObjectTransformNode(scene, sceneObject.id);
     const isFresh = !node;
@@ -243,7 +278,7 @@ export async function syncSceneObjects(
       state.loadingIds.add(sceneObject.id);
       try {
         const glbBytes = await loadGlb(sceneObject.id);
-        node = glbBytes
+        const built = glbBytes
           ? await buildSceneObjectNode(
               scene,
               sceneObject,
@@ -251,23 +286,30 @@ export async function syncSceneObjects(
               gizmoManager
             )
           : null;
+        node = built?.node ?? null;
+        if (built?.colliderFailed) {
+          state.colliderFailedIds.add(sceneObject.id);
+          colliderFailedIds.push(sceneObject.id);
+        }
       } catch {
         node = null;
       } finally {
         state.loadingIds.delete(sceneObject.id);
       }
       // The scene can be torn down while a GLB loads.
-      if (scene.isDisposed) return newlyFailedIds;
+      if (scene.isDisposed) return { failedIds, colliderFailedIds };
       if (!node) {
         state.failedIds.add(sceneObject.id);
-        newlyFailedIds.push(sceneObject.id);
+        failedIds.push(sceneObject.id);
         continue;
       }
     }
 
     const mesh = node
       .getChildMeshes(false)
-      .find(child => child.name.endsWith(SCENE_OBJECT_MESH_SUFFIX));
+      .find((child): child is Mesh =>
+        child.name.endsWith(SCENE_OBJECT_MESH_SUFFIX)
+      );
     const material = mesh?.material;
     if (material instanceof StandardMaterial) {
       setMaterialDiffuseColor(
@@ -277,6 +319,31 @@ export async function syncSceneObjects(
     }
     // The collider node is a sibling of the mesh, so a hidden object still collides.
     mesh?.setEnabled(sceneObject.visibility === "visible");
+
+    // Build or dispose the collider when `collidable` changes on an object
+    // that already exists; a fresh build already decided this above.
+    if (!isFresh) {
+      const hasCollider = !!scene.getTransformNodeByName(
+        buildSceneEntityName(sceneObject.id, "object", "collider")
+      );
+      if (!sceneObject.collidable) {
+        state.colliderFailedIds.delete(sceneObject.id);
+        if (hasCollider) disposeCollisionBody(scene, sceneObject.id, "object");
+      } else if (
+        mesh &&
+        !hasCollider &&
+        !state.colliderFailedIds.has(sceneObject.id)
+      ) {
+        try {
+          buildCollisionBody(node, sceneObject.id, "object", () => [
+            { shape: new PhysicsShapeConvexHull(mesh, scene), mesh }
+          ]);
+        } catch {
+          state.colliderFailedIds.add(sceneObject.id);
+          colliderFailedIds.push(sceneObject.id);
+        }
+      }
+    }
 
     if (sceneObject.id === draggedSceneObjectId) continue;
 
@@ -298,7 +365,7 @@ export async function syncSceneObjects(
       rotation: goalRotation
     });
   }
-  return newlyFailedIds;
+  return { failedIds, colliderFailedIds };
 }
 
 /**

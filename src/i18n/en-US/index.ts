@@ -73,6 +73,10 @@ export default {
     sceneObjectUnavailable: "Unable to load a 3D object's model.",
     sceneObjectUnavailableCaption:
       "Its model file is missing from this browser's storage.",
+    sceneObjectColliderUnavailable:
+      "A 3D object's model couldn't be turned into a collision shape.",
+    sceneObjectColliderUnavailableCaption:
+      "It won't collide with probes or other 3D objects.",
     gizmoMode: "Transform mode",
     gizmoPosition: "Position",
     gizmoRotation: "Rotation",
@@ -197,7 +201,8 @@ export default {
     yaw: "Yaw",
     pitch: "Pitch",
     lock: "Lock 3D object",
-    unlock: "Unlock 3D object"
+    unlock: "Unlock 3D object",
+    collisionDetection: "Collision detection"
   },
   cameraInspector: {
     poseName: "Pose name",

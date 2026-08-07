@@ -440,7 +440,7 @@ async function syncSceneObjectsFromState() {
   const gizmoManager = runtime.gizmoManager.value;
   if (!scene || !gizmoManager) return;
 
-  const failedIds = await syncSceneObjects(
+  const { failedIds, colliderFailedIds } = await syncSceneObjects(
     scene,
     currentExperiment.experiment,
     gizmoManager,
@@ -452,6 +452,12 @@ async function syncSceneObjectsFromState() {
     notifyError(
       t("sceneCanvas.sceneObjectUnavailable"),
       t("sceneCanvas.sceneObjectUnavailableCaption")
+    );
+  }
+  if (colliderFailedIds.length) {
+    notifyWarning(
+      t("sceneCanvas.sceneObjectColliderUnavailable"),
+      t("sceneCanvas.sceneObjectColliderUnavailableCaption")
     );
   }
 }

@@ -19,6 +19,7 @@ export type { ProbeGeometry } from "./models/probe-geometry.model";
 export {
   buildSceneObject,
   isSceneObject,
+  toggleSceneObjectCollidable,
   toggleSceneObjectLock,
   toggleSceneObjectVisibility
 } from "./api/scene-object.api";

@@ -22,6 +22,7 @@ export function makeSceneObject(
     color: "#ffffff",
     visibility: "visible",
     lock: false,
+    collidable: true,
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     ...overrides

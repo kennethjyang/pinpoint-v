@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import {
   STANDARD_COLORS,
   type SceneObject,
+  toggleSceneObjectCollidable,
   toggleSceneObjectLock
 } from "@/features/scene";
 import { usePreferencesStore } from "@/stores/preferences.store";
@@ -101,17 +102,22 @@ const lockLabel = computed(() =>
 
 <template>
   <div class="column q-gutter-y-md">
-    <div>
-      <q-btn
-        :aria-label="lockLabel"
-        :color="lockColor"
-        :icon="lockIcon"
-        outline
-        @click="toggleSceneObjectLock(sceneObject)"
-      >
-        <q-tooltip>{{ lockLabel }}</q-tooltip>
-      </q-btn>
-    </div>
+    <q-btn
+      :aria-label="lockLabel"
+      class="full-width"
+      :color="lockColor"
+      :icon="lockIcon"
+      :label="lockLabel"
+      @click="toggleSceneObjectLock(sceneObject)"
+    >
+      <q-tooltip>{{ lockLabel }}</q-tooltip>
+    </q-btn>
+
+    <q-toggle
+      :label="t('sceneObjectInspector.collisionDetection')"
+      :model-value="sceneObject.collidable"
+      @update:model-value="toggleSceneObjectCollidable(sceneObject)"
+    />
 
     <CommittedInput
       v-model="name"

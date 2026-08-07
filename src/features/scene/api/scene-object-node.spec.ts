@@ -43,18 +43,20 @@ describe("buildSceneObjectNode", () => {
     const sceneObject = makeSceneObject({ color: "#00ff00" });
     const glbBytes = await makeTestGlbBytes();
 
-    const node = await buildSceneObjectNode(
+    const built = await buildSceneObjectNode(
       scene,
       sceneObject,
       glbBytes,
       gizmoManager
     );
 
-    expect(node).not.toBeNull();
-    expect(node!.name).toBe(`${sceneObject.id}_object_node`);
-    expect(node!.parent!.name).toBe("referenceCoordinate_node");
+    expect(built).not.toBeNull();
+    expect(built!.colliderFailed).toBe(false);
+    const node = built!.node;
+    expect(node.name).toBe(`${sceneObject.id}_object_node`);
+    expect(node.parent!.name).toBe("referenceCoordinate_node");
 
-    const meshes = node!.getChildMeshes();
+    const meshes = node.getChildMeshes();
     expect(meshes).toHaveLength(1);
     const mesh = meshes[0]!;
     expect(mesh.name).toBe(`${sceneObject.id}_object_mesh`);
@@ -85,7 +87,7 @@ describe("buildSceneObjectNode", () => {
       gizmoManager
     );
 
-    expect(second).toBe(first);
+    expect(second!.node).toBe(first!.node);
   });
 });
 
@@ -236,6 +238,77 @@ describe("syncSceneObjects", () => {
     ).not.toBeNull();
   });
 
+  it("removes the collider body when collidable turns off, keeping the mesh", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const { experiment, sceneObject } = makeExperimentWithSceneObject();
+    const glbBytes = await makeTestGlbBytes();
+    const state = createSceneObjectSyncState();
+    const loadGlb = async () => glbBytes;
+
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadGlb
+    );
+    expect(
+      scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
+    ).not.toBeNull();
+
+    sceneObject.collidable = false;
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadGlb
+    );
+
+    expect(
+      scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
+    ).toBeNull();
+    expect(getSceneObjectMeshes(scene, sceneObject.id)).toHaveLength(1);
+  });
+
+  it("builds no collider for a fresh object with collidable off, then builds one once it turns on", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const { experiment, sceneObject } = makeExperimentWithSceneObject({
+      collidable: false
+    });
+    const glbBytes = await makeTestGlbBytes();
+    const state = createSceneObjectSyncState();
+    const loadGlb = async () => glbBytes;
+
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadGlb
+    );
+    expect(
+      scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
+    ).toBeNull();
+
+    sceneObject.collidable = true;
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadGlb
+    );
+
+    expect(
+      scene.getTransformNodeByName(`${sceneObject.id}_object_collider`)
+    ).not.toBeNull();
+  });
+
   it("skips pose updates for the object being dragged", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject();
@@ -309,7 +382,7 @@ describe("syncSceneObjects", () => {
       null,
       loadGlb
     );
-    expect(firstFailures).toEqual([sceneObject.id]);
+    expect(firstFailures.failedIds).toEqual([sceneObject.id]);
     expect(loadGlb).toHaveBeenCalledTimes(1);
 
     const secondFailures = await syncSceneObjects(
@@ -320,7 +393,7 @@ describe("syncSceneObjects", () => {
       null,
       loadGlb
     );
-    expect(secondFailures).toEqual([]);
+    expect(secondFailures.failedIds).toEqual([]);
     expect(loadGlb).toHaveBeenCalledTimes(1);
   });
 
@@ -364,7 +437,7 @@ describe("attachSceneObjectSelection", () => {
       sceneObject,
       glbBytes,
       gizmoManager
-    ))!;
+    ))!.node;
 
     attachSceneObjectSelection(
       gizmoManager,
@@ -389,7 +462,7 @@ describe("attachSceneObjectSelection", () => {
       sceneObject,
       glbBytes,
       gizmoManager
-    ))!;
+    ))!.node;
 
     attachSceneObjectSelection(
       gizmoManager,

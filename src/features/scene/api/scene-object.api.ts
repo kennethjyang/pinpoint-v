@@ -23,9 +23,18 @@ export function buildSceneObject(id: string, fileName: string): SceneObject {
     color: STANDARD_COLORS[Math.floor(Math.random() * STANDARD_COLORS.length)]!,
     visibility: "visible",
     lock: false,
+    collidable: true,
     position: [0, 0, 0],
     rotation: [0, 0, 0]
   };
+}
+
+/**
+ * Toggle whether a scene object's body participates in collision detection.
+ * @param sceneObject Scene object to toggle collision detection for.
+ */
+export function toggleSceneObjectCollidable(sceneObject: SceneObject) {
+  sceneObject.collidable = !sceneObject.collidable;
 }
 
 /**
@@ -61,6 +70,7 @@ export function isSceneObject(value: unknown): value is SceneObject {
     typeof value.visibility === "string" &&
     SCENE_OBJECT_VISIBILITIES.includes(value.visibility) &&
     typeof value.lock === "boolean" &&
+    typeof value.collidable === "boolean" &&
     isFiniteTriple(value.position) &&
     isFiniteTriple(value.rotation)
   );

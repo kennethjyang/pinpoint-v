@@ -325,7 +325,7 @@ describe("scene entity collision bodies", () => {
       sceneObject,
       glbBytes,
       gizmoManager
-    ))!;
+    ))!.node;
     objectNode.position = Vector3.Zero();
 
     const state = createCollisionState();
@@ -361,7 +361,7 @@ describe("scene entity collision bodies", () => {
       sceneObject,
       glbBytes,
       gizmoManager
-    ))!;
+    ))!.node;
     objectNode.position = Vector3.Zero();
     for (const mesh of getSceneObjectMeshes(scene, sceneObject.id)) {
       mesh.setEnabled(false);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSceneObject,
   isSceneObject,
+  toggleSceneObjectCollidable,
   toggleSceneObjectLock,
   toggleSceneObjectVisibility
 } from "./scene-object.api";
@@ -64,6 +65,18 @@ describe("toggleSceneObjectLock", () => {
   });
 });
 
+describe("toggleSceneObjectCollidable", () => {
+  it("flips collidable true -> false -> true", () => {
+    const sceneObject = makeSceneObject({ collidable: true });
+
+    toggleSceneObjectCollidable(sceneObject);
+    expect(sceneObject.collidable).toBe(false);
+
+    toggleSceneObjectCollidable(sceneObject);
+    expect(sceneObject.collidable).toBe(true);
+  });
+});
+
 describe("isSceneObject", () => {
   it("accepts a well-formed scene object", () => {
     expect(isSceneObject(makeSceneObject())).toBe(true);
@@ -96,6 +109,11 @@ describe("isSceneObject", () => {
 
   it("rejects a non-boolean lock", () => {
     const sceneObject = { ...makeSceneObject(), lock: "yes" };
+    expect(isSceneObject(sceneObject)).toBe(false);
+  });
+
+  it("rejects a non-boolean collidable", () => {
+    const sceneObject = { ...makeSceneObject(), collidable: "yes" };
     expect(isSceneObject(sceneObject)).toBe(false);
   });
 
