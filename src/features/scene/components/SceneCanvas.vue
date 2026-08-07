@@ -13,7 +13,6 @@ import {
 import { useBabylonRuntimeService } from "../composable/useBabylonRuntimeService";
 import { useCameraPoseSync } from "../composable/useCameraPoseSync";
 import {
-  removeAllStructures,
   setAtlasCenterOffset,
   setStructureInteriorsHidden,
   syncStructuresVisibility
@@ -180,6 +179,7 @@ watchEffect(async () => {
   try {
     await syncStructuresVisibility(
       scene,
+      currentExperiment.atlas,
       alwaysPresentStructures.value,
       visibleStructureEntities.value
     );
@@ -325,17 +325,6 @@ watch(runtime.scene, scene => {
   );
   onWatcherCleanup(() => observer.remove());
 });
-
-// Clear the scene whenever the atlas changes, but not on the scene's own
-// first availability.
-watch(
-  [runtime.scene, () => currentExperiment.atlas],
-  ([newScene], [oldScene]) => {
-    if (!newScene || !oldScene) return;
-
-    removeAllStructures(newScene);
-  }
-);
 
 watchEffect(() => {
   const scene = runtime.scene.value;

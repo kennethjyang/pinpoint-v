@@ -9,14 +9,20 @@ import {
   VertexData
 } from "@babylonjs/core";
 import axios from "axios";
-import type { StructureEntity } from "@/features/atlas";
+import type { Atlas, StructureEntity } from "@/features/atlas";
+import { isSameAtlas } from "@/features/atlas";
 import { asrToBabylon } from "./coordinate-transforms.api";
-import { setMaterialAlpha } from "./material.api";
+import { setMaterialAlpha, setMaterialDiffuseColor } from "./material.api";
 
 /** Decoded structure geometry, in millimeters. */
 interface DecodedMeshData {
   positions: Float32Array;
   indices: Uint32Array;
+}
+
+/** Atlas a scene's structure meshes were built for, stamped on the atlas root. */
+interface AtlasRootMetadata {
+  structureAtlas?: Atlas;
 }
 
 const ATLAS_ROOT_NODE_NAME = "atlasRoot_node";
@@ -67,15 +73,30 @@ export function setAtlasCenterOffset(
  * Sync the scene's structures with the given visibility, fading
  * always-present structures instead of removing them.
  * @param scene Scene to sync.
+ * @param atlas Atlas the structures belong to.
  * @param alwaysPresentStructures Structures to keep in the scene at all times.
  * @param visibleStructures Structures that should be fully visible.
  */
 export async function syncStructuresVisibility(
   scene: Scene,
+  atlas: Atlas,
   alwaysPresentStructures: StructureEntity[],
   visibleStructures: StructureEntity[]
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
+
+  // Structure meshes are named by identifier alone and identifiers collide
+  // across atlases, so a switch has to drop them all before presence is
+  // checked -- otherwise the previous atlas's geometry and colour get reused.
+  const metadata = atlasRootNode.metadata as AtlasRootMetadata | null;
+  if (
+    !metadata?.structureAtlas ||
+    !isSameAtlas(metadata.structureAtlas, atlas)
+  ) {
+    removeAllStructures(scene);
+    atlasRootNode.metadata = { ...metadata, structureAtlas: { ...atlas } };
+  }
+
   const presentMeshes = childStructureMeshes(atlasRootNode);
 
   const visibleIdentifiers = new Set(
@@ -113,13 +134,19 @@ export async function syncStructuresVisibility(
 
   for (const [meshName, structure] of desiredStructures) {
     const material = desiredMeshes.get(meshName)?.material;
-    if (material) {
-      setMaterialAlpha(
-        material,
-        visibleIdentifiers.has(structure.identifier)
-          ? STRUCTURE_VISIBLE_ALPHA
-          : STRUCTURE_FADED_ALPHA
-      );
+    if (!material) continue;
+
+    setMaterialAlpha(
+      material,
+      visibleIdentifiers.has(structure.identifier)
+        ? STRUCTURE_VISIBLE_ALPHA
+        : STRUCTURE_FADED_ALPHA
+    );
+    // Repaint every pass, as syncProbes does for a probe's colour: a mesh built
+    // while the terminology rows still belonged to the previous atlas would
+    // otherwise keep that atlas's colour until a page reload.
+    if (material instanceof StandardMaterial) {
+      setMaterialDiffuseColor(material, structure.color);
     }
   }
 

@@ -42,7 +42,6 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import {
   buildAtlasRootNode,
-  removeAllStructures,
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
@@ -85,8 +84,7 @@ vi.mock("../api/structures.api", async () => {
   return {
     ...actual,
     syncStructuresVisibility: vi.fn(),
-    setAtlasCenterOffset: vi.fn(),
-    removeAllStructures: vi.fn()
+    setAtlasCenterOffset: vi.fn()
   };
 });
 
@@ -278,7 +276,6 @@ describe("SceneCanvas", () => {
     vi.mocked(syncStructuresVisibility).mockReset();
     vi.mocked(syncStructuresVisibility).mockResolvedValue(undefined);
     vi.mocked(setAtlasCenterOffset).mockReset();
-    vi.mocked(removeAllStructures).mockReset();
     vi.mocked(applyCameraProjection).mockReset();
     vi.mocked(createAxisGuides).mockReset();
     vi.mocked(createAxisGuides).mockImplementation(async scene => ({
@@ -339,6 +336,7 @@ describe("SceneCanvas", () => {
     await mountCanvas();
 
     expect(syncStructuresVisibility).toHaveBeenCalledWith(
+      expect.anything(),
       expect.anything(),
       [],
       []
@@ -562,19 +560,20 @@ describe("SceneCanvas", () => {
     expect(usePreferencesStore().cameraProjection).toBe("perspective");
   });
 
-  it("clears the scene when the experiment's atlas changes", async () => {
+  it("resyncs structures with the new atlas when the experiment's atlas changes", async () => {
     await mountCanvas();
-    expect(removeAllStructures).not.toHaveBeenCalled();
 
     const store = useCurrentExperimentStore();
-    store.experiment = buildExperiment(
-      "New Experiment",
-      makeAtlas({ name: "allen_human" }),
-      [0, 0, 0]
-    );
+    const newAtlas = makeAtlas({ name: "allen_human" });
+    store.experiment = buildExperiment("New Experiment", newAtlas, [0, 0, 0]);
     await flushPromises();
 
-    expect(removeAllStructures).toHaveBeenCalledTimes(1);
+    expect(syncStructuresVisibility).toHaveBeenCalledWith(
+      expect.anything(),
+      newAtlas,
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   it("resizes the engine when the resize observer fires", async () => {
