@@ -7,6 +7,7 @@ import {
   getProbeContour,
   getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier,
+  getProbeShankBasePositionMillimeters,
   getProbeShanks,
   homeProbe,
   type Probe,
@@ -66,10 +67,6 @@ const { requiredName: nameRules, optionalNumber: numberRules } =
 const { t } = useI18n();
 const { notifyWarning } = useNotify();
 const { findTargets } = useProbeSurface();
-const { isImporting: isImportingBodyModel, open: openBodyModelFile } =
-  useModelFileImport(modelId => {
-    probe.bodyModel = buildSceneModel(modelId);
-  });
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
@@ -108,13 +105,38 @@ const probeTypeOptions = computed<ProbeTypeOption[]>(() =>
   }))
 );
 
-const shanks = computed(() => {
-  const definition =
-    currentExperimentStore.probeInterfaceProbes[probe.probeInterfaceIdentifier];
-  if (!definition) return [];
-  const contour = getProbeContour(definition);
-  return contour ? getProbeShanks(definition, contour) : [];
-});
+/** This probe's interned interface definition, or null when the experiment has none. */
+const probeInterfaceProbe = computed(
+  () =>
+    currentExperimentStore.probeInterfaceProbes[
+      probe.probeInterfaceIdentifier
+    ] ?? null
+);
+
+/** This probe's contour in probe-local mm, or null when its definition has none. */
+const contour = computed(() =>
+  probeInterfaceProbe.value ? getProbeContour(probeInterfaceProbe.value) : null
+);
+
+const shanks = computed(() =>
+  probeInterfaceProbe.value && contour.value
+    ? getProbeShanks(probeInterfaceProbe.value, contour.value)
+    : []
+);
+
+// Declared with its derived inputs: an imported model starts at the shank base.
+const { isImporting: isImportingBodyModel, open: openBodyModelFile } =
+  useModelFileImport(modelId => {
+    const model = buildSceneModel(modelId);
+    if (contour.value) {
+      model.position = getProbeShankBasePositionMillimeters(
+        contour.value,
+        shanks.value,
+        probe.shankAlignmentIndex
+      );
+    }
+    probe.bodyModel = model;
+  });
 
 /**
  * One button per shank, left to right, with the center option inserted in the
@@ -484,6 +506,7 @@ onUnmounted(cancelMoveToSurface);
         <ProbeBodyModelInspector
           :body-model="probe.bodyModel"
           :disable="probe.lock"
+          :probe-id="probe.id"
         />
         <q-btn
           :aria-label="t('probeInspector.removeBodyModel')"

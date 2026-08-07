@@ -55,6 +55,9 @@ export const useCurrentExperimentStore = defineStore(
     /** ID of the scene object currently being dragged, or null. */
     const draggedSceneObjectId = ref<string | null>(null);
 
+    /** Probe id whose body model currently holds the transform gizmo, or null. */
+    const bodyModelGizmoProbeId = ref<string | null>(null);
+
     /** Pending surface-move choice awaiting the user's pick, or null. */
     const probeSurfaceChoice = ref<ProbeSurfaceChoice | null>(null);
 
@@ -250,6 +253,7 @@ export const useCurrentExperimentStore = defineStore(
       selectedInspectable.value = null;
       draggedProbeId.value = null;
       draggedSceneObjectId.value = null;
+      bodyModelGizmoProbeId.value = null;
     }
 
     const state = {
@@ -257,6 +261,7 @@ export const useCurrentExperimentStore = defineStore(
       selectedInspectable,
       draggedProbeId,
       draggedSceneObjectId,
+      bodyModelGizmoProbeId,
       probeSurfaceChoice,
       isTerminologyRowsEvaluating,
       areAxisGuidesVisible,

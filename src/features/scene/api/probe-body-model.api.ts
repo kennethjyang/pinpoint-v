@@ -1,4 +1,14 @@
-import type { GizmoManager, Scene } from "@babylonjs/core";
+import type {
+  DragEvent,
+  DragStartEndEvent,
+  GizmoManager,
+  IGizmo,
+  IPositionGizmo,
+  IRotationGizmo,
+  IScaleGizmo,
+  Observer,
+  Scene
+} from "@babylonjs/core";
 import {
   ImportMeshAsync,
   Mesh,
@@ -10,13 +20,24 @@ import {
 import type { Experiment } from "@/features/experiment";
 import type { Probe } from "@/features/probe";
 import type { SceneModel } from "../models/scene-model.model";
+import type { TransformGizmos } from "../models/gizmo.model";
 import {
   buildCollisionBody,
   buildHullMesh,
   disposeCollisionBody
 } from "./collision.api";
-import { buildSceneEntityName } from "./scene-entity.api";
+import {
+  buildSceneEntityName,
+  sceneEntityIdFromName,
+  sceneEntityNameSuffix
+} from "./scene-entity.api";
 import { getProbeShankMesh, getProbeTransformNode } from "./probe.api";
+
+/** Suffix applied to a probe's id to name its body model transform node. */
+const BODY_MODEL_NODE_SUFFIX = sceneEntityNameSuffix(
+  "probe",
+  "body-model_node"
+);
 
 /** Load bookkeeping for probe body models, so a re-sync neither double-builds nor retries forever. */
 export interface ProbeBodyModelSyncState {
@@ -69,6 +90,103 @@ export function getProbeBodyModelMeshes(scene: Scene, probeId: string): Mesh[] {
           mesh instanceof Mesh && mesh.getTotalVertices() > 0
       ) ?? []
   );
+}
+
+/**
+ * Node a probe's gizmo attaches to: its body model node while that model holds
+ * the gizmo, otherwise the probe's own node.
+ * @param scene Scene the probe was built in.
+ * @param probe Probe whose gizmo target to resolve.
+ * @param probeNode Probe transform node, returned when no body model gizmo applies.
+ * @param bodyModelGizmoProbeId Probe id whose body model holds the gizmo, or null.
+ */
+export function getProbeGizmoNode(
+  scene: Scene,
+  probe: Probe,
+  probeNode: TransformNode,
+  bodyModelGizmoProbeId: string | null
+): TransformNode {
+  if (probe.id !== bodyModelGizmoProbeId || !probe.bodyModel) return probeNode;
+  return getProbeBodyModelNode(scene, probe.id) ?? probeNode;
+}
+
+/**
+ * Update a probe's body model position from a gizmo drag.
+ * @param positionGizmo Position gizmo to track dragging on.
+ * @param probes Experiment probes to resolve the attached node against.
+ * @param onDrag Callback invoked with the probe id the drag is happening to.
+ */
+export function setProbeBodyModelPositionFromGizmoDrag(
+  positionGizmo: IPositionGizmo,
+  probes: Probe[],
+  onDrag: (probeId: string) => void
+): Observer<DragEvent> {
+  return positionGizmo.onDragObservable.add(() => {
+    const attached = attachedProbeBodyModelFromGizmo(positionGizmo, probes);
+    if (!attached) return;
+    attached.bodyModel.position = vector3ToTriple(attached.node.position);
+    onDrag(attached.probe.id);
+  });
+}
+
+/**
+ * Update a probe's body model orientation from a gizmo drag.
+ * @param rotationGizmo Rotation gizmo to track dragging on.
+ * @param probes Experiment probes to resolve the attached node against.
+ * @param onDrag Callback invoked with the probe id the drag is happening to.
+ */
+export function setProbeBodyModelRotationFromGizmoDrag(
+  rotationGizmo: IRotationGizmo,
+  probes: Probe[],
+  onDrag: (probeId: string) => void
+): Observer<DragEvent> {
+  return rotationGizmo.onDragObservable.add(() => {
+    const attached = attachedProbeBodyModelFromGizmo(rotationGizmo, probes);
+    if (!attached) return;
+    attached.bodyModel.rotation = vector3ToTriple(attached.node.rotation);
+    onDrag(attached.probe.id);
+  });
+}
+
+/**
+ * Update a probe's body model scale from a gizmo drag.
+ * @param scaleGizmo Scale gizmo to track dragging on.
+ * @param probes Experiment probes to resolve the attached node against.
+ * @param onDrag Callback invoked with the probe id the drag is happening to.
+ */
+export function setProbeBodyModelScaleFromGizmoDrag(
+  scaleGizmo: IScaleGizmo,
+  probes: Probe[],
+  onDrag: (probeId: string) => void
+): Observer<DragEvent> {
+  return scaleGizmo.onDragObservable.add(() => {
+    const attached = attachedProbeBodyModelFromGizmo(scaleGizmo, probes);
+    if (!attached) return;
+    attached.bodyModel.scale = vector3ToTriple(attached.node.scaling);
+    onDrag(attached.probe.id);
+  });
+}
+
+/**
+ * Callback filter for when dragging finishes on a probe's body model, from
+ * the position, rotation, or scale gizmo.
+ * @param gizmos Position, rotation, and scale gizmos to track dragging on.
+ * @param onDragEnd Callback invoked to confirm the body model drag ended.
+ */
+export function endProbeBodyModelGizmoDrag(
+  gizmos: TransformGizmos,
+  onDragEnd: () => void
+): Observer<DragStartEndEvent>[] {
+  const onEnd = (gizmo: IGizmo) => () => {
+    if (!gizmo.attachedNode?.name.endsWith(BODY_MODEL_NODE_SUFFIX)) return;
+    onDragEnd();
+  };
+
+  return [
+    gizmos.positionGizmo.onDragEndObservable.add(onEnd(gizmos.positionGizmo)),
+    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo)),
+    gizmos.scaleGizmo.onDragEndObservable.add(onEnd(gizmos.scaleGizmo))
+  ];
 }
 
 /**
@@ -190,6 +308,7 @@ function buildProbeBodyModelCollisionBody(
  * @param experiment Experiment whose probes to sync.
  * @param gizmoManager Gizmo manager to add fresh body models' meshes to.
  * @param state Load bookkeeping, mutated in place.
+ * @param draggedProbeId Probe id whose body model is under a gizmo drag, skipped for pose and collider updates.
  * @param loadModel Loader for a stored model file, by model id.
  */
 export async function syncProbeBodyModels(
@@ -197,6 +316,7 @@ export async function syncProbeBodyModels(
   experiment: Experiment,
   gizmoManager: GizmoManager,
   state: ProbeBodyModelSyncState,
+  draggedProbeId: string | null,
   loadModel: (modelId: string) => Promise<File | null>
 ): Promise<{
   failedIds: string[];
@@ -275,6 +395,12 @@ export async function syncProbeBodyModels(
     // "shanks" and "hidden".
     node.setEnabled(probe.visibility === "visible");
 
+    // Skip pose and collider updates for the body model being dragged: a
+    // gizmo drag must not re-cook the hull every frame. Once `endProbeDrag`
+    // clears `draggedProbeId`, the watcher re-runs and it re-cooks once at
+    // the released pose.
+    if (probe.id === draggedProbeId) continue;
+
     // Applied verbatim, not through `asrToVector3`: these are Babylon local
     // XYZ relative to the probe node, not ASR. Set before cooking the hull,
     // which reads world matrices.
@@ -317,4 +443,29 @@ export async function syncProbeBodyModels(
   }
 
   return { failedIds, colliderFailedIds, colliderChangedIds };
+}
+
+/** Babylon local vector as a plain triple, matching a body model's verbatim pose fields. */
+function vector3ToTriple(vector: Vector3): [number, number, number] {
+  return [vector.x, vector.y, vector.z];
+}
+
+/**
+ * Resolve the probe body model and node currently attached to the gizmo, or
+ * null when something else is attached.
+ * @param gizmo Gizmo to read the attached node from.
+ * @param probes Experiment probes to resolve the attached node against.
+ */
+function attachedProbeBodyModelFromGizmo(
+  gizmo: IGizmo,
+  probes: Probe[]
+): { probe: Probe; bodyModel: SceneModel; node: TransformNode } | null {
+  const node = gizmo.attachedNode;
+  if (!node?.name.endsWith(BODY_MODEL_NODE_SUFFIX)) return null;
+
+  const probeId = sceneEntityIdFromName(node.name, "probe");
+  const probe = probes.find(probe => probe.id === probeId);
+  if (!probe?.bodyModel) return null;
+
+  return { probe, bodyModel: probe.bodyModel, node: node as TransformNode };
 }

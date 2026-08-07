@@ -347,14 +347,16 @@ export function syncProbes(
  * @param selectionOutlineLayer Selection outline layer to add the probe's meshes to.
  * @param probe Probe being selected, whose lock decides whether a gizmo attaches.
  * @param probeTransformNode Probe transform node to attach and select.
+ * @param gizmoNode Node the gizmo attaches to - the probe's node, or its body model's while that gizmo is attached.
  */
 export function attachProbeSelection(
   gizmoManager: GizmoManager,
   selectionOutlineLayer: SelectionOutlineLayer,
   probe: Probe,
-  probeTransformNode: TransformNode
+  probeTransformNode: TransformNode,
+  gizmoNode: TransformNode
 ): void {
-  gizmoManager.attachToNode(probe.lock ? null : probeTransformNode);
+  gizmoManager.attachToNode(probe.lock ? null : gizmoNode);
   selectionOutlineLayer.clearSelection();
   selectionOutlineLayer.addSelection(probeTransformNode.getChildMeshes());
 }
@@ -365,6 +367,7 @@ export function attachProbeSelection(
  * @param gizmoManager Gizmo manager to update.
  * @param selectionOutlineLayer Selection outline layer to add probe to selection.
  * @param probes Experiment probes to resolve the attached mesh against.
+ * @param resolveGizmoNode Resolve the node the gizmo attaches to for a selected probe.
  * @param onSelect Callback invoked with the probe whose mesh was attached to.
  */
 export function selectProbeFromGizmoAttach(
@@ -372,6 +375,10 @@ export function selectProbeFromGizmoAttach(
   gizmoManager: GizmoManager,
   selectionOutlineLayer: SelectionOutlineLayer,
   probes: Probe[],
+  resolveGizmoNode: (
+    probe: Probe,
+    probeTransformNode: TransformNode
+  ) => TransformNode,
   onSelect: (probe: Probe) => void
 ): Observer<Nullable<AbstractMesh>> {
   return gizmoManager.onAttachedToMeshObservable.add(mesh => {
@@ -389,7 +396,8 @@ export function selectProbeFromGizmoAttach(
       gizmoManager,
       selectionOutlineLayer,
       probe,
-      probeTransformNode
+      probeTransformNode,
+      resolveGizmoNode(probe, probeTransformNode)
     );
     onSelect(probe);
   });
@@ -447,8 +455,7 @@ export function endProbeGizmoDrag(
   onDragEnd: () => void
 ): Observer<DragStartEndEvent>[] {
   const onEnd = (gizmo: IGizmo) => () => {
-    if (!gizmo.attachedNode) return;
-    if (!isSceneEntityName(gizmo.attachedNode.name, "probe")) return;
+    if (!gizmo.attachedNode?.name.endsWith(PROBE_NODE_SUFFIX)) return;
     onDragEnd();
   };
 
@@ -469,7 +476,7 @@ function attachedProbeFromGizmo(
   probes: Probe[]
 ): { probe: Probe; node: TransformNode } | null {
   const node = gizmo.attachedNode;
-  if (!node || !isSceneEntityName(node.name, "probe")) return null;
+  if (!node?.name.endsWith(PROBE_NODE_SUFFIX)) return null;
 
   const probeId = sceneEntityIdFromName(node.name, "probe");
   const probe = probes.find(probe => probe.id === probeId);

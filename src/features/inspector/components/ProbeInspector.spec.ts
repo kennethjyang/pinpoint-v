@@ -17,6 +17,7 @@ import {
 import { getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
 import {
+  getProbeContour,
   getProbeInterfaceDisplayName,
   getProbeInterfaceIdentifier
 } from "@/features/probe";
@@ -904,6 +905,50 @@ describe("ProbeInspector", () => {
       expect(putSceneModel).toHaveBeenCalledWith(probe.bodyModel!.id, file);
     });
 
+    it("places a freshly uploaded body model at the base of the probe's shanks", async () => {
+      vi.mocked(canLoadModelFile).mockResolvedValue(true);
+      const pinia = createPinia();
+      setActivePinia(pinia);
+      useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
+      const store = useCurrentExperimentStore(pinia);
+      const probeInterfaceProbe = makeProbeInterfaceProbe({
+        si_units: "mm",
+        probe_planar_contour: [
+          [-0.035, 0],
+          [0.035, 0],
+          [0.035, 10],
+          [-0.035, 10]
+        ],
+        contact_positions: [[0, 1]],
+        contact_shapes: ["square"],
+        contact_shape_params: [{ width: 0.02 }]
+      });
+      internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
+      const probe = makeProbe({
+        probeInterfaceIdentifier:
+          getProbeInterfaceIdentifier(probeInterfaceProbe)
+      });
+      store.experiment.probes = [probe];
+      mountWithQuasar(ProbeInspector, {
+        pinia,
+        props: { probe: store.experiment.probes[0]! },
+        global: { provide: babylonRuntimeProvide }
+      });
+      const file = new File([new Uint8Array([1, 2, 3])], "Body.glb", {
+        type: "model/gltf-binary"
+      });
+
+      await capturedOnModelFileChange!(makeFileList(file));
+      await flushPromises();
+
+      const contour = getProbeContour(probeInterfaceProbe)!;
+      expect(probe.bodyModel!.position).toEqual([
+        0,
+        0,
+        contour.heightMillimeters
+      ]);
+    });
+
     it("clears the probe's body model when the remove button is clicked", async () => {
       const { wrapper, probe } = mountInspector(
         makeProbe({ bodyModel: makeSceneModel() })
@@ -960,6 +1005,34 @@ describe("ProbeInspector", () => {
           bodyModelLabel("bodyModelPosition", axis.x)
         ).props("disable")
       ).toBe(true);
+    });
+
+    it("toggles the gizmo attachment on the probe's body model", async () => {
+      const { wrapper, store, probe } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel() })
+      );
+
+      await buttonByLabel(wrapper, t.attachBodyModelGizmo).trigger("click");
+      expect(store.bodyModelGizmoProbeId).toBe(probe.id);
+      expect(buttonByLabel(wrapper, t.detachBodyModelGizmo).exists()).toBe(
+        true
+      );
+
+      await buttonByLabel(wrapper, t.detachBodyModelGizmo).trigger("click");
+      expect(store.bodyModelGizmoProbeId).toBeNull();
+      expect(buttonByLabel(wrapper, t.attachBodyModelGizmo).exists()).toBe(
+        true
+      );
+    });
+
+    it("disables the gizmo attach button while the probe is locked", () => {
+      const { wrapper } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel(), lock: true })
+      );
+
+      expect(
+        buttonByLabel(wrapper, t.attachBodyModelGizmo).attributes("disabled")
+      ).toBeDefined();
     });
   });
 });

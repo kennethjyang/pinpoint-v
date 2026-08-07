@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import type { DragEvent, DragStartEndEvent, Scene } from "@babylonjs/core";
+import { TransformNode } from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 import {
   addProbe,
@@ -17,14 +19,20 @@ import {
 } from "@/test/fixtures";
 import {
   makeTestModelFile,
+  makeTestSceneWithGizmo,
   makeTestSceneWithPhysics
 } from "@/test/mount-helper";
 import { buildProbe, getProbeTransformNode } from "./probe.api";
 import {
   buildProbeBodyModelNode,
   createProbeBodyModelSyncState,
+  endProbeBodyModelGizmoDrag,
   getProbeBodyModelMeshes,
   getProbeBodyModelNode,
+  getProbeGizmoNode,
+  setProbeBodyModelPositionFromGizmoDrag,
+  setProbeBodyModelRotationFromGizmoDrag,
+  setProbeBodyModelScaleFromGizmoDrag,
   syncProbeBodyModels
 } from "./probe-body-model.api";
 
@@ -142,6 +150,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       async () => modelFile
     );
 
@@ -172,6 +181,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     const node = getProbeBodyModelNode(scene, probe.id)!;
@@ -183,6 +193,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(node.isEnabled()).toBe(false);
@@ -193,6 +204,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(node.isEnabled()).toBe(false);
@@ -213,6 +225,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     const firstCollider = scene.getTransformNodeByName(colliderName);
@@ -223,6 +236,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(unchanged.colliderChangedIds).toEqual([]);
@@ -234,6 +248,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(changed.colliderChangedIds).toEqual([probe.id]);
@@ -255,6 +270,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(first.failedIds).toEqual([probe.id]);
@@ -265,6 +281,7 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
     expect(second.failedIds).toEqual([]);
@@ -285,11 +302,342 @@ describe("syncProbeBodyModels", () => {
       experiment,
       gizmoManager,
       state,
+      null,
       loadModel
     );
 
     expect(result.failedIds).toEqual([]);
     expect(loadModel).not.toHaveBeenCalled();
     expect(state.failedIds.has(probe.id)).toBe(false);
+  });
+});
+
+describe("getProbeGizmoNode", () => {
+  it("returns the body model node when bodyModelGizmoProbeId matches the probe", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const bodyModel = makeSceneModel();
+    const { experiment, probe } = makeExperimentWithProbe({ bodyModel });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    const modelFile = await makeTestModelFile();
+    const bodyModelNode = await buildProbeBodyModelNode(
+      scene,
+      probe,
+      modelFile,
+      gizmoManager
+    );
+
+    expect(getProbeGizmoNode(scene, probe, probeNode, probe.id)).toBe(
+      bodyModelNode
+    );
+  });
+
+  it("returns the probe node when bodyModelGizmoProbeId does not match the probe", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const bodyModel = makeSceneModel();
+    const { experiment, probe } = makeExperimentWithProbe({ bodyModel });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    const modelFile = await makeTestModelFile();
+    await buildProbeBodyModelNode(scene, probe, modelFile, gizmoManager);
+
+    expect(getProbeGizmoNode(scene, probe, probeNode, null)).toBe(probeNode);
+    expect(getProbeGizmoNode(scene, probe, probeNode, "other-id")).toBe(
+      probeNode
+    );
+  });
+
+  it("returns the probe node when the body model node was never built", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const bodyModel = makeSceneModel();
+    const { experiment, probe } = makeExperimentWithProbe({ bodyModel });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+
+    expect(getProbeGizmoNode(scene, probe, probeNode, probe.id)).toBe(
+      probeNode
+    );
+  });
+});
+
+/**
+ * Build a bare transform node named like a probe's body model node, without
+ * importing a real model file - the drag handlers resolve purely by name.
+ * @param scene Scene to build the node in.
+ * @param probeId Probe id the node's name is derived from.
+ */
+function makeBodyModelNode(scene: Scene, probeId: string) {
+  return new TransformNode(`${probeId}_probe_body-model_node`, scene);
+}
+
+describe("setProbeBodyModelPositionFromGizmoDrag", () => {
+  it("writes the attached body model's local position and notifies onDrag", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { probe } = makeExperimentWithProbe({ bodyModel: makeSceneModel() });
+    const node = makeBodyModelNode(scene, probe.id);
+    gizmoManager.attachToNode(node);
+    node.position.set(1, 2, 3);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelPositionFromGizmoDrag(
+      gizmoManager.gizmos.positionGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(probe.bodyModel!.position).toEqual([1, 2, 3]);
+    expect(onDrag).toHaveBeenCalledWith(probe.id);
+  });
+
+  it("ignores a gizmo attached to the probe's own node", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      bodyModel: makeSceneModel()
+    });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    gizmoManager.attachToNode(probeNode);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelPositionFromGizmoDrag(
+      gizmoManager.gizmos.positionGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(onDrag).not.toHaveBeenCalled();
+  });
+});
+
+describe("setProbeBodyModelRotationFromGizmoDrag", () => {
+  it("writes the attached body model's local rotation and notifies onDrag", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { probe } = makeExperimentWithProbe({ bodyModel: makeSceneModel() });
+    const node = makeBodyModelNode(scene, probe.id);
+    gizmoManager.attachToNode(node);
+    node.rotation.set(0.1, 0.2, 0.3);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelRotationFromGizmoDrag(
+      gizmoManager.gizmos.rotationGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.rotationGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(probe.bodyModel!.rotation).toEqual([0.1, 0.2, 0.3]);
+    expect(onDrag).toHaveBeenCalledWith(probe.id);
+  });
+
+  it("ignores a gizmo attached to the probe's own node", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      bodyModel: makeSceneModel()
+    });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    gizmoManager.attachToNode(probeNode);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelRotationFromGizmoDrag(
+      gizmoManager.gizmos.rotationGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.rotationGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(onDrag).not.toHaveBeenCalled();
+  });
+});
+
+describe("setProbeBodyModelScaleFromGizmoDrag", () => {
+  it("writes the attached body model's local scale and notifies onDrag", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { probe } = makeExperimentWithProbe({ bodyModel: makeSceneModel() });
+    const node = makeBodyModelNode(scene, probe.id);
+    gizmoManager.attachToNode(node);
+    node.scaling.set(2, 3, 4);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelScaleFromGizmoDrag(
+      gizmoManager.gizmos.scaleGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.scaleGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(probe.bodyModel!.scale).toEqual([2, 3, 4]);
+    expect(onDrag).toHaveBeenCalledWith(probe.id);
+  });
+
+  it("ignores a gizmo attached to the probe's own node", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      bodyModel: makeSceneModel()
+    });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    gizmoManager.attachToNode(probeNode);
+    const onDrag = vi.fn();
+
+    setProbeBodyModelScaleFromGizmoDrag(
+      gizmoManager.gizmos.scaleGizmo!,
+      [probe],
+      onDrag
+    );
+    gizmoManager.gizmos.scaleGizmo!.onDragObservable.notifyObservers(
+      {} as DragEvent
+    );
+
+    expect(onDrag).not.toHaveBeenCalled();
+  });
+});
+
+describe("endProbeBodyModelGizmoDrag", () => {
+  it("fires the callback for a body-model node on all three gizmos", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { probe } = makeExperimentWithProbe();
+    const node = makeBodyModelNode(scene, probe.id);
+    const gizmos = {
+      positionGizmo: gizmoManager.gizmos.positionGizmo!,
+      rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
+      scaleGizmo: gizmoManager.gizmos.scaleGizmo!
+    };
+    const onDragEnd = vi.fn();
+    endProbeBodyModelGizmoDrag(gizmos, onDragEnd);
+
+    gizmoManager.attachToNode(node);
+    gizmos.positionGizmo.onDragEndObservable.notifyObservers(
+      {} as DragStartEndEvent
+    );
+    gizmos.rotationGizmo.onDragEndObservable.notifyObservers(
+      {} as DragStartEndEvent
+    );
+    gizmos.scaleGizmo.onDragEndObservable.notifyObservers(
+      {} as DragStartEndEvent
+    );
+
+    expect(onDragEnd).toHaveBeenCalledTimes(3);
+  });
+
+  it("never fires for the probe's own node", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      bodyModel: makeSceneModel()
+    });
+    const probeNode = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    )!;
+    const gizmos = {
+      positionGizmo: gizmoManager.gizmos.positionGizmo!,
+      rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
+      scaleGizmo: gizmoManager.gizmos.scaleGizmo!
+    };
+    const onDragEnd = vi.fn();
+    endProbeBodyModelGizmoDrag(gizmos, onDragEnd);
+
+    gizmoManager.attachToNode(probeNode);
+    gizmos.positionGizmo.onDragEndObservable.notifyObservers(
+      {} as DragStartEndEvent
+    );
+
+    expect(onDragEnd).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncProbeBodyModels with draggedProbeId", () => {
+  it("skips pose and collider updates while dragged, then re-cooks once released", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const bodyModel = makeSceneModel();
+    const { experiment, probe } = makeExperimentWithProbe({ bodyModel });
+    buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
+    const modelFile = await makeTestModelFile();
+    const state = createProbeBodyModelSyncState();
+    const loadModel = async () => modelFile;
+
+    await syncProbeBodyModels(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadModel
+    );
+    const node = getProbeBodyModelNode(scene, probe.id)!;
+
+    probe.bodyModel!.position = [5, 6, 7];
+    const dragged = await syncProbeBodyModels(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      probe.id,
+      loadModel
+    );
+
+    expect([node.position.x, node.position.y, node.position.z]).toEqual([
+      0, 0, 0
+    ]);
+    expect(dragged.colliderChangedIds).toEqual([]);
+
+    const released = await syncProbeBodyModels(
+      scene,
+      experiment,
+      gizmoManager,
+      state,
+      null,
+      loadModel
+    );
+
+    expect([node.position.x, node.position.y, node.position.z]).toEqual([
+      5, 6, 7
+    ]);
+    expect(released.colliderChangedIds).toEqual([probe.id]);
   });
 });

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { SceneModel } from "@/features/scene";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
 import { useUnitLabels } from "@/composable/useUnitLabels";
@@ -14,11 +15,17 @@ import {
   rotationUnitToRadians
 } from "@/utils/math";
 
-const { bodyModel, disable = false } = defineProps<{
+const {
+  probeId,
+  bodyModel,
+  disable = false
+} = defineProps<{
+  probeId: string;
   bodyModel: SceneModel;
   disable?: boolean;
 }>();
 
+const currentExperiment = useCurrentExperimentStore();
 const preferences = usePreferencesStore();
 const unitLabels = useUnitLabels();
 const { optionalNumber: numberRules, positiveNumber: scaleRules } =
@@ -31,6 +38,16 @@ const positionSuffix = computed(() =>
 
 const rotationSuffix = computed(() =>
   unitLabels.rotation(preferences.rotationUnit)
+);
+
+const isGizmoAttached = computed(
+  () => currentExperiment.bodyModelGizmoProbeId === probeId
+);
+
+const gizmoButtonLabel = computed(() =>
+  isGizmoAttached.value
+    ? t("probeInspector.detachBodyModelGizmo")
+    : t("probeInspector.attachBodyModelGizmo")
 );
 
 const positionX = useNumericTupleModel(
@@ -101,10 +118,25 @@ const scaleZ = useNumericTupleModel(
   value => value,
   () => preferences.decimalPrecision
 );
+
+/** Attach the transform gizmo to this probe's body model, or detach it again. */
+function toggleGizmo() {
+  currentExperiment.bodyModelGizmoProbeId = isGizmoAttached.value
+    ? null
+    : probeId;
+}
 </script>
 
 <template>
   <div class="column q-gutter-y-md">
+    <q-btn
+      :aria-label="gizmoButtonLabel"
+      :color="isGizmoAttached ? 'primary' : undefined"
+      :disable="disable"
+      icon="sym_o_drag_pan"
+      :label="gizmoButtonLabel"
+      @click="toggleGizmo"
+    />
     <div class="row q-gutter-x-sm">
       <CommittedInput
         v-model="positionX"

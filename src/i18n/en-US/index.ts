@@ -216,6 +216,8 @@ export default {
     uploadBodyModel: "Upload body 3D model",
     replaceBodyModel: "Replace body 3D model",
     removeBodyModel: "Remove body 3D model",
+    attachBodyModelGizmo: "Attach gizmo",
+    detachBodyModelGizmo: "Detach gizmo",
     bodyModelPosition: "Position {axis}",
     bodyModelRotation: "Rotation {axis}",
     bodyModelScale: "Scale {axis}",

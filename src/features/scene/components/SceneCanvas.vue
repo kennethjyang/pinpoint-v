@@ -69,6 +69,11 @@ import {
 } from "../api/scene-object-node.api";
 import {
   createProbeBodyModelSyncState,
+  endProbeBodyModelGizmoDrag,
+  getProbeGizmoNode,
+  setProbeBodyModelPositionFromGizmoDrag,
+  setProbeBodyModelRotationFromGizmoDrag,
+  setProbeBodyModelScaleFromGizmoDrag,
   syncProbeBodyModels
 } from "../api/probe-body-model.api";
 import { getSceneModel } from "../api/scene-model.api";
@@ -183,9 +188,11 @@ const isGizmoToolbarVisible = computed(() => {
   return !selected.lock;
 });
 
-/** Whether the selection can be scaled: only scene objects can. */
+/** Whether the selection can be scaled: scene objects, and a body model under the gizmo. */
 const isScaleGizmoAvailable = computed(
-  () => currentExperiment.selectedInspectable?.inspectableKind === "sceneObject"
+  () =>
+    currentExperiment.selectedInspectable?.inspectableKind === "sceneObject" ||
+    currentExperiment.bodyModelGizmoProbeId !== null
 );
 
 /** Transform-mode toggle options, offering scale only for scene objects. */
@@ -421,6 +428,15 @@ watchEffect(() => {
     probeGeometry.value
   );
 
+  // A rebuilt probe loses its body model node, so the gizmo cannot stay on it.
+  const bodyModelGizmoProbeId = currentExperiment.bodyModelGizmoProbeId;
+  if (
+    bodyModelGizmoProbeId &&
+    rebuiltProbeIds.includes(bodyModelGizmoProbeId)
+  ) {
+    currentExperiment.bodyModelGizmoProbeId = null;
+  }
+
   const selectedInspectable = currentExperiment.selectedInspectable;
   if (
     selectionOutlineLayer &&
@@ -431,7 +447,8 @@ watchEffect(() => {
       scene,
       gizmoManager,
       selectionOutlineLayer,
-      selectedInspectable
+      selectedInspectable,
+      currentExperiment.bodyModelGizmoProbeId
     );
   }
 
@@ -546,6 +563,7 @@ async function syncProbeBodyModelsFromState() {
       currentExperiment.experiment,
       gizmoManager,
       probeBodyModelSyncState,
+      currentExperiment.draggedProbeId,
       getSceneModel
     );
   if (failedIds.length) {
@@ -586,9 +604,11 @@ async function syncProbeBodyModelsFromState() {
   }
 }
 
-watch([runtime.scene, runtime.gizmoManager], syncProbeBodyModelsFromState, {
-  immediate: true
-});
+watch(
+  [runtime.scene, runtime.gizmoManager, () => currentExperiment.draggedProbeId],
+  syncProbeBodyModelsFromState,
+  { immediate: true }
+);
 watch(() => currentExperiment.probes, syncProbeBodyModelsFromState, {
   deep: true
 });
@@ -661,6 +681,25 @@ watchEffect(() => {
   );
   if (!probe || !isProbeSurfaceChoiceCurrent(choice, probe)) {
     currentExperiment.probeSurfaceChoice = null;
+  }
+});
+
+// Drop the body model gizmo when its probe stops being the selected, unlocked
+// probe that still carries a model - deselecting, locking, or undoing the
+// model away all leave the gizmo with nothing to drive.
+watchEffect(() => {
+  const probeId = currentExperiment.bodyModelGizmoProbeId;
+  if (!probeId) return;
+
+  const selected = currentExperiment.selectedInspectable;
+  const probe = currentExperiment.probes.find(({ id }) => id === probeId);
+  if (
+    selected?.inspectableKind !== "probe" ||
+    selected.id !== probeId ||
+    !probe?.bodyModel ||
+    probe.lock
+  ) {
+    currentExperiment.bodyModelGizmoProbeId = null;
   }
 });
 
@@ -762,6 +801,33 @@ watch(
       currentExperiment.endSceneObjectDrag();
     });
 
+    const bodyModelPositionDraggingObserver =
+      setProbeBodyModelPositionFromGizmoDrag(
+        gizmos.positionGizmo,
+        probes,
+        probeId => {
+          currentExperiment.draggedProbeId = probeId;
+        }
+      );
+    const bodyModelRotationDraggingObserver =
+      setProbeBodyModelRotationFromGizmoDrag(
+        gizmos.rotationGizmo,
+        probes,
+        probeId => {
+          currentExperiment.draggedProbeId = probeId;
+        }
+      );
+    const bodyModelScaleDraggingObserver = setProbeBodyModelScaleFromGizmoDrag(
+      gizmos.scaleGizmo,
+      probes,
+      probeId => {
+        currentExperiment.draggedProbeId = probeId;
+      }
+    );
+    const bodyModelDragEndObservers = endProbeBodyModelGizmoDrag(gizmos, () => {
+      currentExperiment.endProbeDrag();
+    });
+
     onWatcherCleanup(() => {
       probePositionDraggingObserver.remove();
       probeRotationDraggingObserver.remove();
@@ -770,6 +836,10 @@ watch(
       sceneObjectRotationDraggingObserver.remove();
       sceneObjectScaleDraggingObserver.remove();
       sceneObjectDragEndObservers.forEach(observer => observer.remove());
+      bodyModelPositionDraggingObserver.remove();
+      bodyModelRotationDraggingObserver.remove();
+      bodyModelScaleDraggingObserver.remove();
+      bodyModelDragEndObservers.forEach(observer => observer.remove());
     });
   }
 );
@@ -792,6 +862,13 @@ watch(
       gizmoManager,
       selectionOutlineLayer,
       probes,
+      (probe, probeNode) =>
+        getProbeGizmoNode(
+          scene,
+          probe,
+          probeNode,
+          currentExperiment.bodyModelGizmoProbeId
+        ),
       probe => {
         currentExperiment.selectedInspectable = probe;
       }
@@ -834,7 +911,8 @@ watchEffect(() => {
     scene,
     gizmoManager,
     selectionOutlineLayer,
-    currentExperiment.selectedInspectable
+    currentExperiment.selectedInspectable,
+    currentExperiment.bodyModelGizmoProbeId
   );
 });
 
