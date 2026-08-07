@@ -49,6 +49,7 @@ import {
 import { applyCameraProjection, setInitialZoom } from "../api/camera.api";
 import { createAxisGuides } from "../api/axis-guide.api";
 import type * as AxisGuideApi from "../api/axis-guide.api";
+import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 import {
   DEFAULT_ATLAS,
   getAtlasCenter,
@@ -829,6 +830,8 @@ describe("SceneCanvas", () => {
     addProbe(store.experiment, builtProbe);
     const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
     await flushPromises();
+    store.selectedInspectable = probe;
+    await flushPromises();
 
     const modeToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -900,6 +903,9 @@ describe("SceneCanvas", () => {
 
   it("keeps the position gizmo on the probe in global coordinates", async () => {
     const { wrapper, runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    store.selectedInspectable = makeProbe();
+    await flushPromises();
 
     const coordinateSpaceToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -919,6 +925,37 @@ describe("SceneCanvas", () => {
       gizmoManager.gizmos.positionGizmo!.xGizmo
         .updateGizmoRotationToMatchAttachedMesh
     ).toBe(false);
+  });
+
+  it("hides the gizmo toolbar while nothing is selected", async () => {
+    const { wrapper } = await mountCanvas();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
+  });
+
+  it("hides the gizmo toolbar while the camera is selected", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = CAMERA_INSPECTABLE;
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
+  });
+
+  it("shows the gizmo toolbar while a probe is selected and hides it again on deselect", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = makeProbe();
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(2);
+
+    store.selectedInspectable = null;
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
   });
 
   describe("move to surface", () => {
