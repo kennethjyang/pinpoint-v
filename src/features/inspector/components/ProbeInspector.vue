@@ -13,8 +13,13 @@ import {
   setProbeTipMillimeters,
   toggleProbeLock
 } from "@/features/probe";
-import { STANDARD_COLORS } from "@/features/scene";
+import {
+  buildSceneModel,
+  STANDARD_COLORS,
+  useModelFileImport
+} from "@/features/scene";
 import { SliceCanvas, useProbeSurface } from "@/features/slice";
+import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
@@ -61,6 +66,10 @@ const { requiredName: nameRules, optionalNumber: numberRules } =
 const { t } = useI18n();
 const { notifyWarning } = useNotify();
 const { findTargets } = useProbeSurface();
+const { isImporting: isImportingBodyModel, open: openBodyModelFile } =
+  useModelFileImport(modelId => {
+    probe.bodyModel = buildSceneModel(modelId);
+  });
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
@@ -193,6 +202,12 @@ const lockColor = computed(() => (probe.lock ? "accent" : undefined));
 
 const lockLabel = computed(() =>
   probe.lock ? t("probeInspector.unlock") : t("probeInspector.lock")
+);
+
+const bodyModelButtonLabel = computed(() =>
+  probe.bodyModel
+    ? t("probeInspector.replaceBodyModel")
+    : t("probeInspector.uploadBodyModel")
 );
 
 /**
@@ -450,6 +465,32 @@ onUnmounted(cancelMoveToSurface);
         :palette="STANDARD_COLORS"
         default-view="palette"
       />
+    </div>
+
+    <div class="column q-gutter-y-md">
+      <div class="text-body2">{{ t("probeInspector.bodyModel") }}</div>
+      <q-btn
+        :aria-label="bodyModelButtonLabel"
+        class="full-width"
+        icon="sym_o_upload_file"
+        :label="bodyModelButtonLabel"
+        :loading="isImportingBodyModel"
+        @click="openBodyModelFile"
+      />
+      <template v-if="probe.bodyModel">
+        <ProbeBodyModelInspector
+          :body-model="probe.bodyModel"
+          :disable="probe.lock"
+        />
+        <q-btn
+          :aria-label="t('probeInspector.removeBodyModel')"
+          class="full-width"
+          color="negative"
+          icon="delete"
+          :label="t('probeInspector.removeBodyModel')"
+          @click="probe.bodyModel = null"
+        />
+      </template>
     </div>
   </div>
 </template>

@@ -2,13 +2,14 @@
 import { onMounted, onUnmounted, ref, type Ref } from "vue";
 import { onKeyStroke } from "@vueuse/core";
 import {
-  pruneSceneObjectModels,
+  pruneSceneModels,
   SceneCanvas,
   SceneHierarchy
 } from "@/features/scene";
 import { type TouchPanValue, useQuasar } from "quasar";
 import {
   ExperimentPropertiesDialog,
+  getExperimentModelIds,
   NewExperimentDialog,
   RecentExperimentsDialog,
   useExperimentFile
@@ -143,8 +144,8 @@ onUnmounted(() => {
   const referencedIds = [
     currentExperimentStore.experiment,
     ...recentExperimentsStore.recents
-  ].flatMap(experiment => experiment.sceneObjects.map(({ id }) => id));
-  void pruneSceneObjectModels(referencedIds);
+  ].flatMap(getExperimentModelIds);
+  void pruneSceneModels(referencedIds);
 });
 </script>
 

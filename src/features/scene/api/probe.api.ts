@@ -98,6 +98,18 @@ export function getProbeMeshes(scene: Scene, probeId: string): Mesh[] {
 }
 
 /**
+ * A probe's shank mesh, or null when the probe is not built.
+ * @param scene Scene the probe was built in.
+ * @param probeId Probe id whose shank mesh to get.
+ */
+export function getProbeShankMesh(scene: Scene, probeId: string): Mesh | null {
+  const mesh = scene.getMeshByName(
+    buildSceneEntityName(probeId, "probe", "shank_mesh")
+  );
+  return mesh instanceof Mesh ? mesh : null;
+}
+
+/**
  * Build a probe's shank, head stage, and rod meshes, or return its existing
  * transform node if already built.
  * @param scene Scene to build the probe in.
@@ -130,7 +142,8 @@ export function buildProbe(
   const probeMetadata: ProbeMetadata = {
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     shankAlignmentIndex: probe.shankAlignmentIndex,
-    geometry
+    geometry,
+    bodyModelId: probe.bodyModel?.id ?? null
   };
 
   const node = new TransformNode(
@@ -147,40 +160,43 @@ export function buildProbe(
     buildSceneEntityName(probe.id, "probe", "shank_mesh"),
     geometry
   );
-  const headStageMesh = buildHeadStageMesh(
-    scene,
-    contour,
-    buildSceneEntityName(probe.id, "probe", "head-stage_mesh"),
-    geometry
-  );
-  for (const mesh of [shankMesh, headStageMesh]) {
-    mesh.material = material;
-    mesh.parent = node;
-  }
-
-  const rodMesh = buildRodMesh(
-    scene,
-    contour,
-    buildSceneEntityName(probe.id, "probe", "rod_mesh"),
-    geometry
-  );
-  rodMesh.material = buildRodMaterial(scene);
-  rodMesh.parent = node;
-
+  shankMesh.material = material;
+  shankMesh.parent = node;
   // Mesh vertices are in contour coords; this puts the aligned shank's tip on the node.
-  for (const mesh of [shankMesh, headStageMesh, rodMesh]) {
-    mesh.position.x += alignmentOffsetMillimeters;
-  }
+  shankMesh.position.x += alignmentOffsetMillimeters;
 
-  // Ignore the return value: no physics engine on the scene keeps this feature additive.
-  buildCollisionBody(node, probe.id, "probe", () =>
-    buildProbeCollisionShapes(scene, [rodMesh, headStageMesh], shankMesh)
-  );
+  gizmoManager.attachableMeshes ??= [];
+  gizmoManager.attachableMeshes.push(shankMesh);
 
-  if (!gizmoManager.attachableMeshes) {
-    gizmoManager.attachableMeshes = [];
+  // A body model replaces the head stage and rod, and its own convex hull
+  // replaces their collision shapes once `syncProbeBodyModels` has imported it.
+  if (!probe.bodyModel) {
+    const headStageMesh = buildHeadStageMesh(
+      scene,
+      contour,
+      buildSceneEntityName(probe.id, "probe", "head-stage_mesh"),
+      geometry
+    );
+    headStageMesh.material = material;
+    headStageMesh.parent = node;
+    headStageMesh.position.x += alignmentOffsetMillimeters;
+
+    const rodMesh = buildRodMesh(
+      scene,
+      contour,
+      buildSceneEntityName(probe.id, "probe", "rod_mesh"),
+      geometry
+    );
+    rodMesh.material = buildRodMaterial(scene);
+    rodMesh.parent = node;
+    rodMesh.position.x += alignmentOffsetMillimeters;
+
+    // Ignore the return value: no physics engine on the scene keeps this feature additive.
+    buildCollisionBody(node, probe.id, "probe", () =>
+      buildProbeCollisionShapes(scene, [rodMesh, headStageMesh], shankMesh)
+    );
+    gizmoManager.attachableMeshes.push(headStageMesh, rodMesh);
   }
-  gizmoManager.attachableMeshes.push(shankMesh, headStageMesh, rodMesh);
 
   return node;
 }
@@ -245,7 +261,8 @@ export function syncProbes(
       !probe ||
       probe.probeInterfaceIdentifier !== metadata.probeInterfaceIdentifier ||
       probe.shankAlignmentIndex !== metadata.shankAlignmentIndex ||
-      !isSameProbeGeometry(metadata.geometry, geometry)
+      !isSameProbeGeometry(metadata.geometry, geometry) ||
+      (probe.bodyModel?.id ?? null) !== metadata.bodyModelId
     ) {
       disposeProbe(scene, id, gizmoManager);
       if (probe) rebuiltProbeIds.push(id);

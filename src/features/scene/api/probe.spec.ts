@@ -18,13 +18,16 @@ import {
   makeAtlas,
   makeProbe,
   makeProbeGeometry,
-  makeProbeInterfaceProbe
+  makeProbeInterfaceProbe,
+  makeSceneModel
 } from "@/test/fixtures";
 import {
   initializeTestCSG2,
   makeTestSceneWithGizmo,
+  makeTestSceneWithPhysics,
   tickScene
 } from "@/test/mount-helper";
+import type { ProbeMetadata } from "../models/probe-metadata.model";
 import {
   attachProbeSelection,
   buildProbe,
@@ -632,6 +635,31 @@ describe("buildProbe", () => {
 
     expect(unknownBounds).toEqual(knownBounds);
   });
+
+  it("builds only the shank, records the body model id, and skips the collider when a body model is attached", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const bodyModel = makeSceneModel();
+    const { experiment, probe } = makeExperimentWithProbe({ bodyModel });
+
+    const node = buildProbe(
+      scene,
+      probe,
+      experiment,
+      gizmoManager,
+      makeProbeGeometry()
+    );
+
+    const names = probeMeshNames(probe.id);
+    const children = node!.getChildMeshes().map(mesh => mesh.name);
+    expect(children).toEqual([names.shank]);
+    expect(scene.getMeshByName(names.headStage)).toBeNull();
+    expect(scene.getMeshByName(names.rod)).toBeNull();
+    const metadata = node!.metadata as ProbeMetadata;
+    expect(metadata.bodyModelId).toBe(bodyModel.id);
+    expect(
+      scene.getTransformNodeByName(`${probe.id}_probe_collider`)
+    ).toBeNull();
+  });
 });
 
 describe("disposeProbe", () => {
@@ -808,6 +836,39 @@ describe("syncProbes", () => {
     expect(oldNode.isDisposed()).toBe(true);
     expect(getProbeTransformNode(scene, probe.id)).not.toBeNull();
     expect(getProbeTransformNode(scene, probe.id)).not.toBe(oldNode);
+  });
+
+  it("returns the ids of probes it disposed and rebuilt due to a body model being attached, then removed", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe();
+    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    const builtNode = getProbeTransformNode(scene, probe.id)!;
+
+    probe.bodyModel = makeSceneModel();
+    const rebuiltOnAttach = syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      null,
+      makeProbeGeometry()
+    );
+
+    expect(rebuiltOnAttach).toEqual([probe.id]);
+    expect(builtNode.isDisposed()).toBe(true);
+    const attachedNode = getProbeTransformNode(scene, probe.id)!;
+
+    probe.bodyModel = null;
+    const rebuiltOnRemove = syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      null,
+      makeProbeGeometry()
+    );
+
+    expect(rebuiltOnRemove).toEqual([probe.id]);
+    expect(attachedNode.isDisposed()).toBe(true);
+    expect(getProbeTransformNode(scene, probe.id)).not.toBeNull();
   });
 
   it("disposes and rebuilds a probe node whose metadata is null", () => {

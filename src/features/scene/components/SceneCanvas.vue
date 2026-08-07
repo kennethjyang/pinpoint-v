@@ -67,7 +67,11 @@ import {
   setSceneObjectScaleFromGizmoDrag,
   syncSceneObjects
 } from "../api/scene-object-node.api";
-import { getSceneObjectModel } from "../api/scene-object-model.api";
+import {
+  createProbeBodyModelSyncState,
+  syncProbeBodyModels
+} from "../api/probe-body-model.api";
+import { getSceneModel } from "../api/scene-model.api";
 import { setGizmoControls } from "../api/gizmo.api";
 import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
@@ -114,6 +118,9 @@ const collisionState = createCollisionState();
 
 /** Load bookkeeping for scene object GLBs, read and mutated in place. */
 const sceneObjectSyncState = createSceneObjectSyncState();
+
+/** Load bookkeeping for probe body models, read and mutated in place. */
+const probeBodyModelSyncState = createProbeBodyModelSyncState();
 
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
@@ -461,7 +468,7 @@ async function syncSceneObjectsFromState() {
       gizmoManager,
       sceneObjectSyncState,
       currentExperiment.draggedSceneObjectId,
-      getSceneObjectModel
+      getSceneModel
     );
   if (failedIds.length) {
     notifyError(
@@ -523,10 +530,76 @@ watch(() => currentExperiment.sceneObjects, syncSceneObjectsFromState, {
   deep: true
 });
 
+/**
+ * Sync probe body models from state: builds each from its stored file
+ * (loading it lazily), then applies visibility and local pose, and cooks the
+ * probe's convex-hull collider.
+ */
+async function syncProbeBodyModelsFromState() {
+  const scene = runtime.scene.value;
+  const gizmoManager = runtime.gizmoManager.value;
+  if (!scene || !gizmoManager) return;
+
+  const { failedIds, colliderFailedIds, colliderChangedIds } =
+    await syncProbeBodyModels(
+      scene,
+      currentExperiment.experiment,
+      gizmoManager,
+      probeBodyModelSyncState,
+      getSceneModel
+    );
+  if (failedIds.length) {
+    notifyError(
+      t("sceneCanvas.probeBodyModelUnavailable"),
+      t("sceneCanvas.probeBodyModelUnavailableCaption")
+    );
+  }
+  if (colliderFailedIds.length) {
+    notifyWarning(
+      t("sceneCanvas.probeBodyModelColliderUnavailable"),
+      t("sceneCanvas.probeBodyModelColliderUnavailableCaption")
+    );
+  }
+
+  // Havok emits no TRIGGER_EXITED when a body is disposed while overlapping
+  // (e.g. attaching, replacing, or re-cooking the hull for a new pose), so
+  // force-drop any stale pair for these ids rather than leaving them
+  // permanently highlighted/notified as colliding.
+  const highlightLayer = runtime.highlightLayer.value;
+  if (colliderChangedIds.length && highlightLayer) {
+    const keptEntityIds = [
+      ...currentExperiment.probes.map(({ id }) => id),
+      ...currentExperiment.sceneObjects.map(({ id }) => id)
+    ].filter(id => !colliderChangedIds.includes(id));
+    const affectedIds = new Set([
+      ...pruneCollisions(collisionState, keptEntityIds),
+      ...colliderChangedIds
+    ]);
+    for (const entityId of affectedIds) {
+      syncCollisionHighlight(
+        highlightLayer,
+        collisionState,
+        entityId,
+        collisionEntityMeshes(scene, entityId)
+      );
+    }
+  }
+}
+
+watch([runtime.scene, runtime.gizmoManager], syncProbeBodyModelsFromState, {
+  immediate: true
+});
+watch(() => currentExperiment.probes, syncProbeBodyModelsFromState, {
+  deep: true
+});
+
 // A reopened experiment can supply a model that was missing last time.
 watch(
   () => currentExperiment.experiment.id,
-  () => sceneObjectSyncState.failedIds.clear()
+  () => {
+    sceneObjectSyncState.failedIds.clear();
+    probeBodyModelSyncState.failedIds.clear();
+  }
 );
 
 // Highlight and warn about scene entities whose bodies overlap.

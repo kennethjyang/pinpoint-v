@@ -3,12 +3,17 @@ import { shallowRef } from "vue";
 import { flushPromises } from "@vue/test-utils";
 import type { VueWrapper } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import type { AbstractEngine } from "@babylonjs/core";
 import ProbeInspector from "./ProbeInspector.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
-import { makeProbe, makeProbeInterfaceProbe } from "@/test/fixtures";
+import {
+  makeProbe,
+  makeProbeInterfaceProbe,
+  makeSceneModel
+} from "@/test/fixtures";
 import { getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
 import {
@@ -16,11 +21,20 @@ import {
   getProbeInterfaceIdentifier
 } from "@/features/probe";
 import { useProbeSurface, type ProbeSurfaceTargets } from "@/features/slice";
+import { canLoadModelFile, putSceneModel } from "@/features/scene";
+import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import enUS from "@/i18n/en-US";
 
 const t = enUS.probeInspector;
 const axis = enUS.axis;
 const validation = enUS.validation;
+
+/** Injected Babylon runtime, so `useModelFileImport` can read `engine.value`. */
+const babylonRuntimeProvide = {
+  [BabylonRuntimeServiceKey as symbol]: {
+    engine: { value: {} as AbstractEngine }
+  }
+};
 
 // `useCurrentExperimentStore`'s `manifest`/`terminologyRows` are
 // `computedAsync` and fetch on store creation -- mock the leaf module (not
@@ -57,6 +71,59 @@ vi.mock("@/features/slice/composable/useProbeSurface", () => ({
   useProbeSurface: vi.fn()
 }));
 
+// Mock the leaf modules the model-file picker's handler calls, not the
+// `@/features/scene` barrel, mirroring `SceneHierarchy.spec.ts`. `scene-model.api`
+// keeps its other real exports (`ProbeInspector` imports `buildSceneModel`
+// from the same barrel), only `putSceneModel` is a spy.
+vi.mock("@/features/scene/api/model-file.api", () => ({
+  canLoadModelFile: vi.fn()
+}));
+vi.mock("@/features/scene/api/scene-model.api", async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import("@/features/scene/api/scene-model.api")
+    >();
+  return {
+    ...actual,
+    putSceneModel: vi.fn()
+  };
+});
+
+// `useFileDialog`'s input is never attached to the DOM, so it can't be
+// driven through a queryable `<input type="file">`. Replace it with a fake
+// that records the registered `onChange` callback and an `open` spy,
+// mirroring `SceneHierarchy.spec.ts`.
+const openModelFileDialogSpy = vi.fn();
+let capturedOnModelFileChange:
+  | ((files: FileList | null) => void | Promise<void>)
+  | null = null;
+
+vi.mock("@vueuse/core", async importOriginal => {
+  const actual = await importOriginal<typeof import("@vueuse/core")>();
+  return {
+    ...actual,
+    useFileDialog: () => ({
+      files: { value: null },
+      open: openModelFileDialogSpy,
+      reset: vi.fn(),
+      onChange: (
+        callback: (files: FileList | null) => void | Promise<void>
+      ) => {
+        capturedOnModelFileChange = callback;
+      },
+      onCancel: vi.fn()
+    })
+  };
+});
+
+/**
+ * Build a fake `FileList` containing a single file, matching what a real
+ * file input's `change` event would provide.
+ */
+function makeFileList(file: File): FileList {
+  return { 0: file, length: 1, item: () => file } as unknown as FileList;
+}
+
 function fieldByLabel(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAllComponents({ name: "QInput" })
@@ -92,6 +159,10 @@ describe("ProbeInspector", () => {
   beforeEach(() => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     vi.mocked(useProbeSurface).mockReturnValue({ findTargets: vi.fn() });
+    openModelFileDialogSpy.mockReset();
+    capturedOnModelFileChange = null;
+    vi.mocked(canLoadModelFile).mockReset();
+    vi.mocked(putSceneModel).mockReset();
   });
 
   function mountInspector(probe = makeProbe()) {
@@ -104,7 +175,8 @@ describe("ProbeInspector", () => {
 
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
-      props: { probe: store.experiment.probes[0]! }
+      props: { probe: store.experiment.probes[0]! },
+      global: { provide: babylonRuntimeProvide }
     });
     return { wrapper, store, probe: store.experiment.probes[0]! };
   }
@@ -156,7 +228,8 @@ describe("ProbeInspector", () => {
     ];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
-      props: { probe: store.experiment.probes[0]! }
+      props: { probe: store.experiment.probes[0]! },
+      global: { provide: babylonRuntimeProvide }
     });
 
     const name = fieldByLabel(wrapper, t.name);
@@ -278,7 +351,8 @@ describe("ProbeInspector", () => {
     store.experiment.probes = [a, b];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
-      props: { probe: a }
+      props: { probe: a },
+      global: { provide: babylonRuntimeProvide }
     });
 
     // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
@@ -315,7 +389,8 @@ describe("ProbeInspector", () => {
       internProbeInterfaceProbe(store.experiment, spec);
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe }
+        props: { probe },
+        global: { provide: babylonRuntimeProvide }
       });
 
       const select = wrapper.findComponent({ name: "QSelect" });
@@ -339,7 +414,8 @@ describe("ProbeInspector", () => {
 
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe }
+        props: { probe },
+        global: { provide: babylonRuntimeProvide }
       });
 
       expect(wrapper.findComponent({ name: "QSelect" }).text()).toContain(
@@ -367,7 +443,8 @@ describe("ProbeInspector", () => {
       internProbeInterfaceProbe(store.experiment, oldSpec);
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe }
+        props: { probe },
+        global: { provide: babylonRuntimeProvide }
       });
 
       wrapper
@@ -396,7 +473,8 @@ describe("ProbeInspector", () => {
       internProbeInterfaceProbe(store.experiment, oldSpec);
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe }
+        props: { probe },
+        global: { provide: babylonRuntimeProvide }
       });
 
       wrapper
@@ -732,7 +810,8 @@ describe("ProbeInspector", () => {
 
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe: store.experiment.probes[0]! }
+        props: { probe: store.experiment.probes[0]! },
+        global: { provide: babylonRuntimeProvide }
       });
       return { wrapper, probe: store.experiment.probes[0]! };
     }
@@ -761,7 +840,8 @@ describe("ProbeInspector", () => {
 
       const wrapper = mountWithQuasar(ProbeInspector, {
         pinia,
-        props: { probe: store.experiment.probes[0]! }
+        props: { probe: store.experiment.probes[0]! },
+        global: { provide: babylonRuntimeProvide }
       });
       return { wrapper, probe: store.experiment.probes[0]! };
     }
@@ -800,6 +880,85 @@ describe("ProbeInspector", () => {
           option => option.label
         )
       ).toEqual(["0", t.alignCenterLabel, "1"]);
+    });
+  });
+
+  describe("body model", () => {
+    /** Resolve `{axis}` in a body-model input label the way vue-i18n would. */
+    function bodyModelLabel(key: keyof typeof t, axisLabel: string): string {
+      return (t[key] as string).replace("{axis}", axisLabel);
+    }
+
+    it("stores a valid picked file and points the probe's body model at it", async () => {
+      vi.mocked(canLoadModelFile).mockResolvedValue(true);
+      const { probe } = mountInspector();
+      const file = new File([new Uint8Array([1, 2, 3])], "Body.glb", {
+        type: "model/gltf-binary"
+      });
+
+      await capturedOnModelFileChange!(makeFileList(file));
+      await flushPromises();
+
+      expect(probe.bodyModel).not.toBeNull();
+      expect(putSceneModel).toHaveBeenCalledWith(probe.bodyModel!.id, file);
+    });
+
+    it("clears the probe's body model when the remove button is clicked", async () => {
+      const { wrapper, probe } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel() })
+      );
+
+      await buttonByLabel(wrapper, t.removeBodyModel).trigger("click");
+
+      expect(probe.bodyModel).toBeNull();
+    });
+
+    it("hides the nine pose inputs when no body model is attached", () => {
+      const { wrapper } = mountInspector(makeProbe({ bodyModel: null }));
+
+      expect(
+        fieldByLabel(wrapper, bodyModelLabel("bodyModelPosition", axis.x))
+      ).toBeUndefined();
+    });
+
+    it("writes Position X, Rotation Y, and Scale Z back to the body model, respecting unit preferences", async () => {
+      const { wrapper, probe } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel() })
+      );
+      const preferences = usePreferencesStore();
+      preferences.positionUnit = "millimeter";
+      preferences.rotationUnit = "degree";
+      await wrapper.vm.$nextTick();
+
+      await editAndBlur(
+        fieldByLabel(wrapper, bodyModelLabel("bodyModelPosition", axis.x)),
+        "5"
+      );
+      await editAndBlur(
+        fieldByLabel(wrapper, bodyModelLabel("bodyModelRotation", axis.y)),
+        "90"
+      );
+      await editAndBlur(
+        fieldByLabel(wrapper, bodyModelLabel("bodyModelScale", axis.z)),
+        "2"
+      );
+
+      expect(probe.bodyModel!.position[0]).toBe(5);
+      expect(probe.bodyModel!.rotation[1]).toBeCloseTo(Math.PI / 2);
+      expect(probe.bodyModel!.scale[2]).toBe(2);
+    });
+
+    it("disables the nine pose inputs while the probe is locked", () => {
+      const { wrapper } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel(), lock: true })
+      );
+
+      expect(
+        fieldByLabel(
+          wrapper,
+          bodyModelLabel("bodyModelPosition", axis.x)
+        ).props("disable")
+      ).toBe(true);
     });
   });
 });
