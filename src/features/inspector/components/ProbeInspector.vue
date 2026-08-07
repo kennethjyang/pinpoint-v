@@ -384,12 +384,11 @@ onUnmounted(cancelMoveToSurface);
       outlined
     />
 
-    <div>
+    <div v-if="shankAlignmentOptions.length">
       <div class="text-body2 q-pb-xs">{{
         t("probeInspector.centeredShankIndex")
       }}</div>
       <q-btn-toggle
-        v-if="shankAlignmentOptions.length"
         v-model="probe.shankAlignmentIndex"
         :aria-label="t('probeInspector.shankAlignment')"
         :disable="probe.lock"
@@ -468,15 +467,19 @@ onUnmounted(cancelMoveToSurface);
     </div>
 
     <div class="column q-gutter-y-md">
-      <div class="text-body2">{{ t("probeInspector.bodyModel") }}</div>
-      <q-btn
-        :aria-label="bodyModelButtonLabel"
-        class="full-width"
-        icon="sym_o_upload_file"
-        :label="bodyModelButtonLabel"
-        :loading="isImportingBodyModel"
-        @click="openBodyModelFile"
-      />
+      <div>
+        <div class="text-body2 q-pb-xs">{{
+          t("probeInspector.bodyModel")
+        }}</div>
+        <q-btn
+          :aria-label="bodyModelButtonLabel"
+          class="full-width"
+          icon="sym_o_upload_file"
+          :label="bodyModelButtonLabel"
+          :loading="isImportingBodyModel"
+          @click="openBodyModelFile"
+        />
+      </div>
       <template v-if="probe.bodyModel">
         <ProbeBodyModelInspector
           :body-model="probe.bodyModel"

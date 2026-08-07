@@ -291,6 +291,7 @@ onUnmounted(() => {
       v-model="rightDrawerOpen"
       :width="rightDrawerWidth"
       bordered
+      class="q-pa-md"
       show-if-above
       side="right"
       no-swipe-close

@@ -846,7 +846,7 @@ describe("ProbeInspector", () => {
       return { wrapper, probe: store.experiment.probes[0]! };
     }
 
-    it("renders no alignment toggle for a single-shank definition", () => {
+    it("renders no alignment toggle or label for a single-shank definition", () => {
       const { wrapper } = mountSingleShank();
 
       expect(wrapper.findComponent({ name: "QBtnToggle" }).exists()).toBe(
@@ -857,6 +857,7 @@ describe("ProbeInspector", () => {
           .findAll("button")
           .some(button => button.attributes("aria-label") === t.alignCenter)
       ).toBe(false);
+      expect(wrapper.text()).not.toContain(t.centeredShankIndex);
     });
 
     it("renders one button per shank plus a center option for a two-shank definition, and selecting a shank writes its index", async () => {

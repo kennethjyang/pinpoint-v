@@ -28,7 +28,7 @@ const isCameraSelected = computed(
 </script>
 
 <template>
-  <div class="q-pa-md full-height column">
+  <div class="full-height column">
     <ProbeInspector v-if="selectedProbe" :probe="selectedProbe" />
     <SceneObjectInspector
       v-else-if="selectedSceneObject"
