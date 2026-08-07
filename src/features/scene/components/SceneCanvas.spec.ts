@@ -12,6 +12,8 @@ import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import type {
   GizmoManager,
+  HavokPlugin,
+  HighlightLayer,
   PickingInfo,
   Scene,
   SelectionOutlineLayer
@@ -47,6 +49,7 @@ import {
 import { applyCameraProjection, setInitialZoom } from "../api/camera.api";
 import { createAxisGuides } from "../api/axis-guide.api";
 import type * as AxisGuideApi from "../api/axis-guide.api";
+import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 import {
   DEFAULT_ATLAS,
   getAtlasCenter,
@@ -169,6 +172,8 @@ function makeRuntimeStub() {
   const camera = shallowRef<ArcRotateCamera | null>(null);
   const gizmoManager = shallowRef<GizmoManager | null>(null);
   const selectionOutlineLayer = shallowRef<SelectionOutlineLayer | null>(null);
+  const havokPlugin = shallowRef<HavokPlugin | null>(null);
+  const highlightLayer = shallowRef<HighlightLayer | null>(null);
   const resize = vi.fn();
   const dispose = vi.fn();
 
@@ -202,6 +207,8 @@ function makeRuntimeStub() {
     camera,
     gizmoManager,
     selectionOutlineLayer,
+    havokPlugin,
+    highlightLayer,
     init,
     dispose,
     resize,
@@ -534,6 +541,38 @@ describe("SceneCanvas", () => {
     );
   });
 
+  it("does no atlas-derived scene work when an undo leaves the atlas unchanged", async () => {
+    await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.experiment.name = "Renamed";
+    await flushPromises();
+    vi.mocked(setInitialZoom).mockClear();
+    vi.mocked(setAtlasCenterOffset).mockClear();
+    vi.mocked(removeAllStructures).mockClear();
+
+    store.undo();
+    await flushPromises();
+
+    expect(setInitialZoom).not.toHaveBeenCalled();
+    expect(setAtlasCenterOffset).not.toHaveBeenCalled();
+    expect(removeAllStructures).not.toHaveBeenCalled();
+  });
+
+  it("still re-zooms when an undo restores a different atlas", async () => {
+    await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.experiment.atlas = makeAtlas({ name: "allen_human" });
+    await flushPromises();
+    vi.mocked(setInitialZoom).mockClear();
+
+    store.undo();
+    await flushPromises();
+
+    expect(setInitialZoom).toHaveBeenCalled();
+  });
+
   it("applies the camera's inertia from the preferences store", async () => {
     const { runtime } = await mountCanvas();
 
@@ -814,6 +853,8 @@ describe("SceneCanvas", () => {
     addProbe(store.experiment, builtProbe);
     const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
     await flushPromises();
+    store.selectedInspectable = probe;
+    await flushPromises();
 
     const modeToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -885,6 +926,9 @@ describe("SceneCanvas", () => {
 
   it("keeps the position gizmo on the probe in global coordinates", async () => {
     const { wrapper, runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    store.selectedInspectable = makeProbe();
+    await flushPromises();
 
     const coordinateSpaceToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -904,6 +948,37 @@ describe("SceneCanvas", () => {
       gizmoManager.gizmos.positionGizmo!.xGizmo
         .updateGizmoRotationToMatchAttachedMesh
     ).toBe(false);
+  });
+
+  it("hides the gizmo toolbar while nothing is selected", async () => {
+    const { wrapper } = await mountCanvas();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
+  });
+
+  it("hides the gizmo toolbar while the camera is selected", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = CAMERA_INSPECTABLE;
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
+  });
+
+  it("shows the gizmo toolbar while a probe is selected and hides it again on deselect", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = makeProbe();
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(2);
+
+    store.selectedInspectable = null;
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
   });
 
   describe("move to surface", () => {
