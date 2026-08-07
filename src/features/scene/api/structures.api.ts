@@ -174,8 +174,14 @@ export function setStructureInteriorsHidden(
     const material = mesh.material;
     if (!material) continue;
 
-    material.needDepthPrePass =
+    const needsDepthPrePass =
       areHidden && material.alpha < STRUCTURE_VISIBLE_ALPHA;
+    if (material.needDepthPrePass === needsDepthPrePass) continue;
+
+    // Mirrors setMaterialAlpha's skip-when-unchanged, force-rebind pattern
+    // for consistency.
+    material.needDepthPrePass = needsDepthPrePass;
+    material.markDirty(true);
   }
 }
 
@@ -239,7 +245,6 @@ function buildStructureMesh(
   );
   material.diffuseColor = structure.color;
   mesh.material = material;
-  material.freeze();
 
   return mesh;
 }

@@ -586,47 +586,7 @@ describe("syncStructuresVisibility", () => {
     expect(mesh.isVisible).toBe(true);
   });
 
-  it("freezes an imported structure's material", async () => {
-    const scene = makeTestScene();
-    const decodeSpy = stubDecode(scene);
-    const structure = makeStructureEntity({ identifier: 1 });
-
-    await syncStructuresVisibility(scene, atlas, [], [structure]);
-
-    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    const mesh = atlasRootNode
-      .getChildren()
-      .find(c => c.name === "1_structure_mesh") as Mesh;
-    expect(mesh.material!.isFrozen).toBe(true);
-
-    decodeSpy.mockRestore();
-  });
-
-  it("freezes a structure's material before its geometry has loaded", async () => {
-    const scene = makeTestScene();
-    stubDecode(scene);
-    const structure = makeStructureEntity({ identifier: 1 });
-
-    let resolveFetch!: (value: { data: ArrayBuffer }) => void;
-    mockedGet.mockImplementation(
-      () => new Promise(resolve => (resolveFetch = resolve))
-    );
-
-    const syncPromise = syncStructuresVisibility(scene, atlas, [], [structure]);
-    await Promise.resolve();
-
-    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
-    const mesh = atlasRootNode
-      .getChildren()
-      .find(c => c.name === "1_structure_mesh") as Mesh;
-    expect(mesh.material!.isFrozen).toBe(true);
-    expect(mesh.isVisible).toBe(false);
-
-    resolveFetch({ data: new ArrayBuffer(0) });
-    await syncPromise;
-  });
-
-  it("applies a changed alpha to a frozen material and forces it to rebind", async () => {
+  it("applies a changed alpha and forces the material to rebind", async () => {
     const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
@@ -643,13 +603,12 @@ describe("syncStructuresVisibility", () => {
     await syncStructuresVisibility(scene, atlas, [structure], []);
 
     expect(material.alpha).toBe(0.1);
-    expect(material.isFrozen).toBe(true);
     expect(markDirtySpy).toHaveBeenCalledWith(true);
 
     decodeSpy.mockRestore();
   });
 
-  it("leaves a frozen material untouched when its alpha is unchanged", async () => {
+  it("leaves the material untouched when its alpha is unchanged", async () => {
     const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
@@ -837,7 +796,7 @@ describe("removeAllStructures", () => {
 });
 
 describe("setStructureInteriorsHidden", () => {
-  it("sets needDepthPrePass on a faded structure's frozen material", async () => {
+  it("sets needDepthPrePass on a faded structure's material", async () => {
     const scene = makeTestScene();
     const decodeSpy = stubDecode(scene);
     const structure = makeStructureEntity({ identifier: 1 });
@@ -852,7 +811,6 @@ describe("setStructureInteriorsHidden", () => {
     setStructureInteriorsHidden(scene, true);
 
     expect(material.needDepthPrePass).toBe(true);
-    expect(material.isFrozen).toBe(true);
   });
 
   it("leaves a fully visible structure's material without a depth pre-pass", async () => {
@@ -894,6 +852,42 @@ describe("setStructureInteriorsHidden", () => {
     const scene = makeTestScene();
 
     expect(() => setStructureInteriorsHidden(scene, true)).not.toThrow();
+  });
+
+  it("forces the material to rebind when needDepthPrePass changes", async () => {
+    const scene = makeTestScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+    await syncStructuresVisibility(scene, atlas, [structure], []);
+    decodeSpy.mockRestore();
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure_mesh") as Mesh;
+    const markDirtySpy = vi.spyOn(mesh.material!, "markDirty");
+
+    setStructureInteriorsHidden(scene, true);
+
+    expect(markDirtySpy).toHaveBeenCalledWith(true);
+  });
+
+  it("leaves the material untouched when needDepthPrePass is unchanged", async () => {
+    const scene = makeTestScene();
+    const decodeSpy = stubDecode(scene);
+    const structure = makeStructureEntity({ identifier: 1 });
+    await syncStructuresVisibility(scene, atlas, [], [structure]);
+    decodeSpy.mockRestore();
+    const atlasRootNode = scene.getTransformNodeByName("atlasRoot_node")!;
+    const mesh = atlasRootNode
+      .getChildren()
+      .find(c => c.name === "1_structure_mesh") as Mesh;
+    const markDirtySpy = vi.spyOn(mesh.material!, "markDirty");
+
+    // A fully visible structure's alpha already keeps needDepthPrePass
+    // false, so enabling interior-hiding doesn't change it.
+    setStructureInteriorsHidden(scene, true);
+
+    expect(markDirtySpy).not.toHaveBeenCalled();
   });
 });
 
