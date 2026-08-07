@@ -37,7 +37,6 @@ import type { StructureEntity } from "@/features/atlas";
 import {
   getAtlasCenter,
   getAtlasDimensionsMillimeters,
-  getDefaultStructureIdentifiers,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
@@ -98,28 +97,28 @@ const terminologyRows = computed(() =>
 );
 
 /**
- * Atlas structures that must always be present in the scene, faded out when
- * not visible instead of being removed.
+ * Structures kept in the scene but faded out.
  */
-const alwaysPresentStructures = computed<StructureEntity[]>(() =>
-  structureEntitiesFromIdentifiers(
-    currentExperiment.atlas,
-    terminologyRows.value,
-    getDefaultStructureIdentifiers(
-      currentExperiment.atlas.name,
-      terminologyRows.value
-    )
-  )
-);
-
-/**
- * Structures the current experiment has marked visible.
- */
-const visibleStructureEntities = computed<StructureEntity[]>(() =>
+const fadedStructures = computed<StructureEntity[]>(() =>
   structureEntitiesFromIdentifiers(
     currentExperiment.atlas,
     terminologyRows.value,
     currentExperiment.visibleStructures
+      .filter(({ isTransparent }) => isTransparent)
+      .map(({ id }) => id)
+  )
+);
+
+/**
+ * Structures drawn fully opaque.
+ */
+const opaqueStructures = computed<StructureEntity[]>(() =>
+  structureEntitiesFromIdentifiers(
+    currentExperiment.atlas,
+    terminologyRows.value,
+    currentExperiment.visibleStructures
+      .filter(({ isTransparent }) => !isTransparent)
+      .map(({ id }) => id)
   )
 );
 
@@ -156,8 +155,8 @@ watchEffect(async () => {
   try {
     await syncStructuresVisibility(
       scene,
-      alwaysPresentStructures.value,
-      visibleStructureEntities.value
+      fadedStructures.value,
+      opaqueStructures.value
     );
   } catch {
     notifyWarning(
