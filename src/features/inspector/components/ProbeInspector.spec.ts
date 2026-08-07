@@ -182,6 +182,16 @@ describe("ProbeInspector", () => {
     return { wrapper, store, probe: store.experiment.probes[0]! };
   }
 
+  it("groups the inspector into slice, properties, and body model sections", () => {
+    const { wrapper } = mountInspector();
+
+    expect(
+      wrapper
+        .findAllComponents({ name: "QExpansionItem" })
+        .map(item => item.props("label"))
+    ).toEqual([t.inPlaneSlice, t.properties, t.bodyModel]);
+  });
+
   it("does not mutate the name while typing, before blur or enter", async () => {
     const { wrapper, probe } = mountInspector(makeProbe({ name: "A" }));
 

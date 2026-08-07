@@ -344,155 +344,182 @@ onUnmounted(cancelMoveToSurface);
 </script>
 
 <template>
-  <div class="column q-gutter-y-md probe-inspector">
-    <SliceCanvas :probe="probe" />
+  <q-list class="probe-inspector">
+    <q-expansion-item
+      default-opened
+      header-class="text-weight-bold"
+      icon="sym_o_transition_chop"
+      :label="t('probeInspector.inPlaneSlice')"
+    >
+      <div class="column probe-inspector__section">
+        <SliceCanvas :probe="probe" />
+      </div>
+    </q-expansion-item>
+    <q-separator />
+    <q-expansion-item
+      default-opened
+      header-class="text-weight-bold"
+      icon="sym_o_page_info"
+      :label="t('probeInspector.properties')"
+    >
+      <div class="column probe-inspector__section">
+        <div>
+          <q-btn-group spread>
+            <q-btn
+              :aria-label="t('probeInspector.home')"
+              :disable="probe.lock"
+              icon="home"
+              @click="homeProbe(probe)"
+            >
+              <q-tooltip>{{ t("probeInspector.home") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              :aria-label="surfaceLabel"
+              :disable="probe.lock && !isMovingToSurface"
+              :icon="surfaceIcon"
+              @click="onSurfaceClick"
+            >
+              <q-tooltip>{{ surfaceLabel }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              :aria-label="t('probeInspector.copy')"
+              icon="content_copy"
+              @click="copyProbe(currentExperimentStore.experiment, probe)"
+            >
+              <q-tooltip>{{ t("probeInspector.copy") }}</q-tooltip>
+            </q-btn>
+            <q-btn
+              :aria-label="lockLabel"
+              :icon="lockIcon"
+              @click="toggleProbeLock(probe)"
+              :color="lockColor"
+            >
+              <q-tooltip>{{ t("probeInspector.lock") }}</q-tooltip>
+            </q-btn>
+          </q-btn-group>
 
-    <div>
-      <q-btn-group spread>
-        <q-btn
-          :aria-label="t('probeInspector.home')"
-          :disable="probe.lock"
-          icon="home"
-          @click="homeProbe(probe)"
-        >
-          <q-tooltip>{{ t("probeInspector.home") }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          :aria-label="surfaceLabel"
-          :disable="probe.lock && !isMovingToSurface"
-          :icon="surfaceIcon"
-          @click="onSurfaceClick"
-        >
-          <q-tooltip>{{ surfaceLabel }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          :aria-label="t('probeInspector.copy')"
-          icon="content_copy"
-          @click="copyProbe(currentExperimentStore.experiment, probe)"
-        >
-          <q-tooltip>{{ t("probeInspector.copy") }}</q-tooltip>
-        </q-btn>
-        <q-btn
-          :aria-label="lockLabel"
-          :icon="lockIcon"
-          @click="toggleProbeLock(probe)"
-          :color="lockColor"
-        >
-          <q-tooltip>{{ t("probeInspector.lock") }}</q-tooltip>
-        </q-btn>
-      </q-btn-group>
+          <q-linear-progress
+            v-if="isMovingToSurface"
+            indeterminate
+            color="primary"
+            size="sm"
+          />
+        </div>
 
-      <q-linear-progress
-        v-if="isMovingToSurface"
-        indeterminate
-        color="primary"
-        size="sm"
-      />
-    </div>
+        <CommittedInput
+          v-model="name"
+          :label="t('probeInspector.name')"
+          hide-bottom-space
+          outlined
+          :rules="nameRules"
+        />
 
-    <CommittedInput
-      v-model="name"
-      :label="t('probeInspector.name')"
-      outlined
-      :rules="nameRules"
-    />
+        <q-select
+          v-model="probeIdentifier"
+          emit-value
+          :label="t('probeInspector.probeType')"
+          map-options
+          :options="probeTypeOptions"
+          outlined
+        />
 
-    <q-select
-      v-model="probeIdentifier"
-      emit-value
-      :label="t('probeInspector.probeType')"
-      map-options
-      :options="probeTypeOptions"
-      outlined
-    />
+        <div v-if="shankAlignmentOptions.length">
+          <div class="text-body2 q-pb-xs">{{
+            t("probeInspector.centeredShankIndex")
+          }}</div>
+          <q-btn-toggle
+            v-model="probe.shankAlignmentIndex"
+            :aria-label="t('probeInspector.shankAlignment')"
+            :disable="probe.lock"
+            :options="shankAlignmentOptions"
+            spread
+            toggle-color="primary"
+          />
+        </div>
 
-    <div v-if="shankAlignmentOptions.length">
-      <div class="text-body2 q-pb-xs">{{
-        t("probeInspector.centeredShankIndex")
-      }}</div>
-      <q-btn-toggle
-        v-model="probe.shankAlignmentIndex"
-        :aria-label="t('probeInspector.shankAlignment')"
-        :disable="probe.lock"
-        :options="shankAlignmentOptions"
-        spread
-        toggle-color="primary"
-      />
-    </div>
+        <div class="row q-gutter-x-sm">
+          <CommittedInput
+            v-model="ap"
+            :disable="probe.lock"
+            :label="t('axis.ap')"
+            :rules="numberRules"
+            :suffix="positionSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+          <CommittedInput
+            v-model="dv"
+            :disable="probe.lock"
+            :label="t('axis.dv')"
+            :rules="numberRules"
+            :suffix="positionSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+          <CommittedInput
+            v-model="ml"
+            :disable="probe.lock"
+            :label="t('axis.ml')"
+            :rules="numberRules"
+            :suffix="positionSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+        </div>
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="ap"
-        :disable="probe.lock"
-        :label="t('axis.ap')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        outlined
-      />
-      <CommittedInput
-        v-model="dv"
-        :disable="probe.lock"
-        :label="t('axis.dv')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        outlined
-      />
-      <CommittedInput
-        v-model="ml"
-        :disable="probe.lock"
-        :label="t('axis.ml')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        outlined
-      />
-    </div>
+        <div class="row q-gutter-x-sm">
+          <CommittedInput
+            v-model="roll"
+            :disable="probe.lock"
+            :label="t('probeInspector.roll')"
+            :rules="numberRules"
+            :suffix="rotationSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+          <CommittedInput
+            v-model="yaw"
+            :disable="probe.lock"
+            :label="t('probeInspector.yaw')"
+            :rules="numberRules"
+            :suffix="rotationSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+          <CommittedInput
+            v-model="pitch"
+            :disable="probe.lock"
+            :label="t('probeInspector.pitch')"
+            :rules="numberRules"
+            :suffix="rotationSuffix"
+            class="col"
+            hide-bottom-space
+            outlined
+          />
+        </div>
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="roll"
-        :disable="probe.lock"
-        :label="t('probeInspector.roll')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        outlined
-      />
-      <CommittedInput
-        v-model="yaw"
-        :disable="probe.lock"
-        :label="t('probeInspector.yaw')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        outlined
-      />
-      <CommittedInput
-        v-model="pitch"
-        :disable="probe.lock"
-        :label="t('probeInspector.pitch')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        outlined
-      />
-    </div>
-
-    <div>
-      <q-color
-        v-model="probe.color"
-        :palette="STANDARD_COLORS"
-        default-view="palette"
-      />
-    </div>
-
-    <div class="column q-gutter-y-md">
-      <div>
-        <div class="text-body2 q-pb-xs">{{
-          t("probeInspector.bodyModel")
-        }}</div>
+        <div>
+          <q-color
+            v-model="probe.color"
+            :palette="STANDARD_COLORS"
+            default-view="palette"
+          />
+        </div>
+      </div>
+    </q-expansion-item>
+    <q-separator />
+    <q-expansion-item
+      default-opened
+      header-class="text-weight-bold"
+      icon="sym_o_deployed_code"
+      :label="t('probeInspector.bodyModel')"
+    >
+      <div class="column probe-inspector__section">
         <q-btn
           :aria-label="bodyModelButtonLabel"
           class="full-width"
@@ -501,24 +528,24 @@ onUnmounted(cancelMoveToSurface);
           :loading="isImportingBodyModel"
           @click="openBodyModelFile"
         />
+        <template v-if="probe.bodyModel">
+          <ProbeBodyModelInspector
+            :body-model="probe.bodyModel"
+            :disable="probe.lock"
+            :probe-id="probe.id"
+          />
+          <q-btn
+            :aria-label="t('probeInspector.removeBodyModel')"
+            class="full-width"
+            color="negative"
+            icon="delete"
+            :label="t('probeInspector.removeBodyModel')"
+            @click="probe.bodyModel = null"
+          />
+        </template>
       </div>
-      <template v-if="probe.bodyModel">
-        <ProbeBodyModelInspector
-          :body-model="probe.bodyModel"
-          :disable="probe.lock"
-          :probe-id="probe.id"
-        />
-        <q-btn
-          :aria-label="t('probeInspector.removeBodyModel')"
-          class="full-width"
-          color="negative"
-          icon="delete"
-          :label="t('probeInspector.removeBodyModel')"
-          @click="probe.bodyModel = null"
-        />
-      </template>
-    </div>
-  </div>
+    </q-expansion-item>
+  </q-list>
 </template>
 
 <style lang="sass" scoped>
@@ -526,6 +553,18 @@ onUnmounted(cancelMoveToSurface);
 // this flex item to grow past its drawer's width instead of wrapping/eliding.
 .probe-inspector
   width: 100%
+
+  // `gap`, not `q-gutter-y-md`: the gutter class spaces children with a
+  // negative margin on the parent, which cancels out when a child is itself a
+  // gutter container. `flex-wrap: nowrap` overrides Quasar's `.column` utility
+  // (which defaults to `wrap`) -- combined with `gap` on an auto-height
+  // flex-wrap column, Chromium under-computes the container's height, so the
+  // last child (e.g. the color picker) renders taller than its allotted box
+  // and bleeds into the next section's header.
+  &__section
+    flex-wrap: nowrap
+    gap: 16px
+    padding: 8px 0
 
   :deep(.q-select)
     width: 100%
