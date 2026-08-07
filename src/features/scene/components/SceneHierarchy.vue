@@ -26,7 +26,6 @@ import {
   reorderProbe,
   reorderSceneObject
 } from "@/features/experiment";
-import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 import {
   buildSceneObject,
   toggleSceneObjectVisibility
@@ -274,16 +273,23 @@ onModelFileChange(async files => {
           <q-item
             v-ripple
             :active="
-              currentExperiment.isInspectableSelected(CAMERA_INSPECTABLE)
+              currentExperiment.isInspectableSelected(
+                currentExperiment.cameraPose
+              )
             "
             active-class="hierarchy-item--active"
             :aria-current="
-              currentExperiment.isInspectableSelected(CAMERA_INSPECTABLE)
+              currentExperiment.isInspectableSelected(
+                currentExperiment.cameraPose
+              )
                 ? 'true'
                 : undefined
             "
             clickable
-            @click="currentExperiment.selectedInspectable = CAMERA_INSPECTABLE"
+            @click="
+              currentExperiment.selectedInspectable =
+                currentExperiment.cameraPose
+            "
           >
             <q-item-section side
               ><q-icon name="sym_o_videocam"

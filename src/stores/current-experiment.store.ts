@@ -4,7 +4,7 @@ import { computedAsync, useRefHistory } from "@vueuse/core";
 import { i18n } from "@/services/i18n.service";
 import {
   ALLEN_MOUSE_REFERENCE_COORDINATE,
-  buildDefaultVisibleStructures,
+  buildExperiment,
   cloneExperiment,
   type Experiment
 } from "@/features/experiment";
@@ -35,22 +35,16 @@ export const useCurrentExperimentStore = defineStore(
     /**
      * Current experiment instance.
      */
-    const experiment = ref<Experiment>({
-      id: crypto.randomUUID(),
-      version: import.meta.env.APP_VERSION,
-      name: i18n.global.t("currentExperiment.defaultName"),
-      atlas: structuredClone(DEFAULT_ATLAS),
-      referenceCoordinate: [...ALLEN_MOUSE_REFERENCE_COORDINATE],
-      // `allen_mouse` has a known default-structure list, so no terminology
-      // rows are needed to resolve it.
-      visibleStructures: buildDefaultVisibleStructures(
+    const experiment = ref<Experiment>(
+      buildExperiment(
+        i18n.global.t("currentExperiment.defaultName"),
+        structuredClone(DEFAULT_ATLAS),
+        [...ALLEN_MOUSE_REFERENCE_COORDINATE],
+        // `allen_mouse` has a known default-structure list, so no terminology
+        // rows are needed to resolve it.
         getDefaultStructureIdentifiers(DEFAULT_ATLAS.name, [])
-      ),
-      probeInterfaceProbes: {},
-      probes: [],
-      sceneObjects: [],
-      cameraPoses: []
-    });
+      )
+    );
 
     /** Currently selected inspectable, or null if nothing is selected. */
     const selectedInspectable = ref<Inspectable | null>(null);
@@ -66,6 +60,9 @@ export const useCurrentExperimentStore = defineStore(
 
     /** Are the atlas axis guides shown in the scene. */
     const areAxisGuidesVisible = ref(false);
+
+    /** Is a brain region's mesh being resolved for a region-center move. */
+    const isLoadingRegionCenter = ref(false);
 
     /**
      * Flag for when the terminology rows are being updated to match the new atlas.
@@ -156,6 +153,9 @@ export const useCurrentExperimentStore = defineStore(
     /** Saved camera poses in the current experiment. */
     const cameraPoses = computed(() => experiment.value.cameraPoses);
 
+    /** Live camera pose in the current experiment. */
+    const cameraPose = computed(() => experiment.value.cameraPose);
+
     /**
      * Is the passed entity the actively selected one.
      * @param entity Entity to compare against the current selection.
@@ -190,21 +190,25 @@ export const useCurrentExperimentStore = defineStore(
     }
 
     /**
-     * Re-point the selection at the matching probe in the current experiment,
-     * clearing it when that probe is no longer there.
+     * Re-point the selection at the matching entity in the current experiment,
+     * clearing it when that entity is no longer there.
      */
     function resyncSelectedInspectable() {
       const selected = selectedInspectable.value;
-      if (selected?.inspectableKind === "probe") {
+      if (!selected) return;
+
+      if (selected.inspectableKind === "camera") {
+        selectedInspectable.value = experiment.value.cameraPose;
+        return;
+      }
+      if (selected.inspectableKind === "probe") {
         selectedInspectable.value =
           experiment.value.probes.find(({ id }) => id === selected.id) ?? null;
         return;
       }
-      if (selected?.inspectableKind === "sceneObject") {
-        selectedInspectable.value =
-          experiment.value.sceneObjects.find(({ id }) => id === selected.id) ??
-          null;
-      }
+      selectedInspectable.value =
+        experiment.value.sceneObjects.find(({ id }) => id === selected.id) ??
+        null;
     }
 
     /**
@@ -255,7 +259,8 @@ export const useCurrentExperimentStore = defineStore(
       draggedSceneObjectId,
       probeSurfaceChoice,
       isTerminologyRowsEvaluating,
-      areAxisGuidesVisible
+      areAxisGuidesVisible,
+      isLoadingRegionCenter
     };
     const getters = {
       name,
@@ -266,6 +271,7 @@ export const useCurrentExperimentStore = defineStore(
       probeInterfaceProbes,
       probes,
       sceneObjects,
+      cameraPose,
       cameraPoses,
       canUndo,
       canRedo

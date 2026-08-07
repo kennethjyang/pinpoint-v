@@ -42,18 +42,15 @@ import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import {
   buildAtlasRootNode,
-  removeAllStructures,
   setAtlasCenterOffset,
   syncStructuresVisibility
 } from "../api/structures.api";
-import { applyCameraProjection, setInitialZoom } from "../api/camera.api";
+import { applyCameraProjection } from "../api/camera.api";
 import { createAxisGuides } from "../api/axis-guide.api";
 import type * as AxisGuideApi from "../api/axis-guide.api";
-import { CAMERA_INSPECTABLE } from "../models/camera-inspectable.model";
 import {
   DEFAULT_ATLAS,
   getAtlasCenter,
-  getAtlasDimensionsMillimeters,
   getTerminologyRows,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
@@ -88,8 +85,7 @@ vi.mock("../api/structures.api", async () => {
   return {
     ...actual,
     syncStructuresVisibility: vi.fn(),
-    setAtlasCenterOffset: vi.fn(),
-    removeAllStructures: vi.fn()
+    setAtlasCenterOffset: vi.fn()
   };
 });
 
@@ -98,7 +94,7 @@ vi.mock("../api/camera.api", async () => {
     await vi.importActual<typeof import("../api/camera.api")>(
       "../api/camera.api"
     );
-  return { ...actual, applyCameraProjection: vi.fn(), setInitialZoom: vi.fn() };
+  return { ...actual, applyCameraProjection: vi.fn() };
 });
 
 vi.mock("../api/axis-guide.api", async () => {
@@ -186,10 +182,14 @@ function makeRuntimeStub() {
       alpha: 0,
       beta: 0,
       radius: 0,
+      target: Vector3.Zero(),
       inertia: 0.9,
       isInterpolating: false,
       onViewMatrixChangedObservable: new Observable(),
-      onAfterCheckInputsObservable: new Observable()
+      onAfterCheckInputsObservable: new Observable(),
+      stopInterpolation: vi.fn(),
+      setTarget: vi.fn(),
+      interpolateTo: vi.fn()
     } as unknown as ArcRotateCamera;
     gizmoManager.value = built.gizmoManager;
     selectionOutlineLayer.value = built.selectionOutlineLayer;
@@ -277,9 +277,7 @@ describe("SceneCanvas", () => {
     vi.mocked(syncStructuresVisibility).mockReset();
     vi.mocked(syncStructuresVisibility).mockResolvedValue(undefined);
     vi.mocked(setAtlasCenterOffset).mockReset();
-    vi.mocked(removeAllStructures).mockReset();
     vi.mocked(applyCameraProjection).mockReset();
-    vi.mocked(setInitialZoom).mockReset();
     vi.mocked(createAxisGuides).mockReset();
     vi.mocked(createAxisGuides).mockImplementation(async scene => ({
       renderers: {
@@ -363,6 +361,7 @@ describe("SceneCanvas", () => {
 
     expect(syncStructuresVisibility).toHaveBeenCalledWith(
       expect.anything(),
+      expect.anything(),
       [],
       []
     );
@@ -387,6 +386,28 @@ describe("SceneCanvas", () => {
 
     resolveSync();
     await flushPromises();
+
+    expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
+      false
+    );
+  });
+
+  it("shows the loading bar for a region-center load, with no delay", async () => {
+    const { wrapper } = await mountCanvas();
+
+    expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
+      false
+    );
+
+    useCurrentExperimentStore().isLoadingRegionCenter = true;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
+      true
+    );
+
+    useCurrentExperimentStore().isLoadingRegionCenter = false;
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
       false
@@ -533,45 +554,20 @@ describe("SceneCanvas", () => {
     );
   });
 
-  it("sets the camera's initial zoom from the current atlas", async () => {
-    const { runtime } = await mountCanvas();
-
-    expect(setInitialZoom).toHaveBeenCalledWith(
-      runtime.camera.value,
-      getAtlasDimensionsMillimeters(DEFAULT_ATLAS)[0]
-    );
-  });
-
   it("does no atlas-derived scene work when an undo leaves the atlas unchanged", async () => {
     await mountCanvas();
     const store = useCurrentExperimentStore();
 
     store.experiment.name = "Renamed";
     await flushPromises();
-    vi.mocked(setInitialZoom).mockClear();
+    vi.mocked(syncStructuresVisibility).mockClear();
     vi.mocked(setAtlasCenterOffset).mockClear();
-    vi.mocked(removeAllStructures).mockClear();
 
     store.undo();
     await flushPromises();
 
-    expect(setInitialZoom).not.toHaveBeenCalled();
+    expect(syncStructuresVisibility).not.toHaveBeenCalled();
     expect(setAtlasCenterOffset).not.toHaveBeenCalled();
-    expect(removeAllStructures).not.toHaveBeenCalled();
-  });
-
-  it("still re-zooms when an undo restores a different atlas", async () => {
-    await mountCanvas();
-    const store = useCurrentExperimentStore();
-
-    store.experiment.atlas = makeAtlas({ name: "allen_human" });
-    await flushPromises();
-    vi.mocked(setInitialZoom).mockClear();
-
-    store.undo();
-    await flushPromises();
-
-    expect(setInitialZoom).toHaveBeenCalled();
   });
 
   it("applies the camera's inertia from the preferences store", async () => {
@@ -626,19 +622,20 @@ describe("SceneCanvas", () => {
     expect(usePreferencesStore().cameraProjection).toBe("perspective");
   });
 
-  it("clears the scene when the experiment's atlas changes", async () => {
+  it("resyncs structures with the new atlas when the experiment's atlas changes", async () => {
     await mountCanvas();
-    expect(removeAllStructures).not.toHaveBeenCalled();
 
     const store = useCurrentExperimentStore();
-    store.experiment = buildExperiment(
-      "New Experiment",
-      makeAtlas({ name: "allen_human" }),
-      [0, 0, 0]
-    );
+    const newAtlas = makeAtlas({ name: "allen_human" });
+    store.experiment = buildExperiment("New Experiment", newAtlas, [0, 0, 0]);
     await flushPromises();
 
-    expect(removeAllStructures).toHaveBeenCalledTimes(1);
+    expect(syncStructuresVisibility).toHaveBeenCalledWith(
+      expect.anything(),
+      newAtlas,
+      expect.anything(),
+      expect.anything()
+    );
   });
 
   it("resizes the engine when the resize observer fires", async () => {
@@ -961,7 +958,7 @@ describe("SceneCanvas", () => {
     const { wrapper } = await mountCanvas();
     const store = useCurrentExperimentStore();
 
-    store.selectedInspectable = CAMERA_INSPECTABLE;
+    store.selectedInspectable = store.experiment.cameraPose;
     await flushPromises();
 
     expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);

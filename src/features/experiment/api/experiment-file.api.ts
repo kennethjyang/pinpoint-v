@@ -168,6 +168,7 @@ function isExperiment(value: unknown): value is Experiment {
     probeInterfaceProbes,
     probes,
     sceneObjects,
+    cameraPose,
     cameraPoses
   } = value;
 
@@ -210,6 +211,7 @@ function isExperiment(value: unknown): value is Experiment {
     return false;
   }
 
+  if (!isCameraPose(cameraPose)) return false;
   if (!Array.isArray(cameraPoses) || !cameraPoses.every(isCameraPose)) {
     return false;
   }

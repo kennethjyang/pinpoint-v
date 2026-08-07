@@ -35,6 +35,9 @@ export interface Experiment {
 
   probes: Probe[];
 
+  /** Live orbit and target of the scene camera. */
+  cameraPose: CameraPose;
+
   /** Arbitrary 3D models placed in the scene, in user-arranged order. */
   sceneObjects: SceneObject[];
 

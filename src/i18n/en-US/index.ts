@@ -15,7 +15,12 @@ export default {
   atlasHierarchy: {
     search: "Search",
     enabledOnly: "Enabled only",
-    clear: "Clear"
+    clear: "Clear",
+    regionMeshUnavailable: "Could not load region mesh",
+    regionMeshUnavailableCaption: "Check your connection to the atlas source.",
+    regionCenterUnavailable: "No center in this hemisphere",
+    regionCenterUnavailableCaption:
+      "{name} has no geometry on that side of the midline."
   },
   currentExperiment: {
     defaultName: "My First Experiment"
@@ -210,10 +215,12 @@ export default {
   cameraInspector: {
     poseName: "Pose name",
     defaultPoseName: "Pose",
-    copyFromCurrent: "Copy from Current",
     alpha: "Alpha",
     beta: "Beta",
     radius: "Radius",
+    orbit: "Orbit",
+    target: "Target",
+    poses: "Saved Poses",
     projection: "Projection",
     perspective: "Perspective",
     orthographic: "Orthographic",
@@ -240,7 +247,6 @@ export default {
     goHome: "Go Home"
   },
   units: {
-    inch: "in",
     centimeter: "cm",
     millimeter: "mm",
     micrometer: "µm",

@@ -1,4 +1,9 @@
-import type { AbstractMesh, IndicesArray, Scene } from "@babylonjs/core";
+import type {
+  AbstractMesh,
+  FloatArray,
+  IndicesArray,
+  Scene
+} from "@babylonjs/core";
 import {
   DracoDecoder,
   Mesh,
@@ -9,14 +14,20 @@ import {
   VertexData
 } from "@babylonjs/core";
 import axios from "axios";
-import type { StructureEntity } from "@/features/atlas";
+import type { Atlas, StructureEntity } from "@/features/atlas";
+import { isSameAtlas } from "@/features/atlas";
 import { asrToBabylon } from "./coordinate-transforms.api";
-import { setMaterialAlpha } from "./material.api";
+import { setMaterialAlpha, setMaterialDiffuseColor } from "./material.api";
 
 /** Decoded structure geometry, in millimeters. */
 interface DecodedMeshData {
   positions: Float32Array;
   indices: Uint32Array;
+}
+
+/** Atlas a scene's structure meshes were built for, stamped on the atlas root. */
+interface AtlasRootMetadata {
+  structureAtlas?: Atlas;
 }
 
 const ATLAS_ROOT_NODE_NAME = "atlasRoot_node";
@@ -67,15 +78,30 @@ export function setAtlasCenterOffset(
  * Sync the scene's structures, fading the transparent ones instead of
  * removing them.
  * @param scene Scene to sync.
+ * @param atlas Atlas the structures belong to.
  * @param fadedStructures Structures to keep in the scene faded out.
  * @param opaqueStructures Structures to draw fully opaque.
  */
 export async function syncStructuresVisibility(
   scene: Scene,
+  atlas: Atlas,
   fadedStructures: StructureEntity[],
   opaqueStructures: StructureEntity[]
 ) {
   const atlasRootNode = buildAtlasRootNode(scene);
+
+  // Structure meshes are named by identifier alone and identifiers collide
+  // across atlases, so a switch has to drop them all before presence is
+  // checked -- otherwise the previous atlas's geometry and colour get reused.
+  const metadata = atlasRootNode.metadata as AtlasRootMetadata | null;
+  if (
+    !metadata?.structureAtlas ||
+    !isSameAtlas(metadata.structureAtlas, atlas)
+  ) {
+    removeAllStructures(scene);
+    atlasRootNode.metadata = { ...metadata, structureAtlas: { ...atlas } };
+  }
+
   const presentMeshes = childStructureMeshes(atlasRootNode);
 
   const opaqueIdentifiers = new Set(
@@ -113,13 +139,19 @@ export async function syncStructuresVisibility(
 
   for (const [meshName, structure] of desiredStructures) {
     const material = desiredMeshes.get(meshName)?.material;
-    if (material) {
-      setMaterialAlpha(
-        material,
-        opaqueIdentifiers.has(structure.identifier)
-          ? STRUCTURE_VISIBLE_ALPHA
-          : STRUCTURE_FADED_ALPHA
-      );
+    if (!material) continue;
+
+    setMaterialAlpha(
+      material,
+      opaqueIdentifiers.has(structure.identifier)
+        ? STRUCTURE_VISIBLE_ALPHA
+        : STRUCTURE_FADED_ALPHA
+    );
+    // Repaint every pass, as syncProbes does for a probe's colour: a mesh built
+    // while the terminology rows still belonged to the previous atlas would
+    // otherwise keep that atlas's colour until a page reload.
+    if (material instanceof StandardMaterial) {
+      setMaterialDiffuseColor(material, structure.color);
     }
   }
 
@@ -147,8 +179,14 @@ export function setStructureInteriorsHidden(
     const material = mesh.material;
     if (!material) continue;
 
-    material.needDepthPrePass =
+    const needsDepthPrePass =
       areHidden && material.alpha < STRUCTURE_VISIBLE_ALPHA;
+    if (material.needDepthPrePass === needsDepthPrePass) continue;
+
+    // Mirrors setMaterialAlpha's skip-when-unchanged, force-rebind pattern
+    // for consistency.
+    material.needDepthPrePass = needsDepthPrePass;
+    material.markDirty(true);
   }
 }
 
@@ -163,6 +201,31 @@ export function removeAllStructures(scene: Scene) {
   )) {
     mesh.dispose(false, true);
   }
+}
+
+/**
+ * Read a structure's vertex positions in atlas-local mm (ML, DV, AP), reusing its
+ * in-scene mesh when that already has geometry and otherwise fetching and decoding
+ * its Draco mesh without adding anything drawable to the scene.
+ * @param scene Scene to decode into and to look for an existing mesh in.
+ * @param structure Entity information for the structure.
+ */
+export async function getStructureVertexPositions(
+  scene: Scene,
+  structure: StructureEntity
+): Promise<FloatArray> {
+  const existing = childStructureMeshes(buildAtlasRootNode(scene)).get(
+    structureMeshName(structure.identifier)
+  );
+  const present = existing?.getVerticesData(VertexBuffer.PositionKind);
+  if (present && present.length > 0) return present;
+
+  const decoded = await decodeMesh(
+    scene,
+    `${structure.identifier}_center_geometry`,
+    await fetchMeshData(structure.meshPath)
+  );
+  return decoded.positions;
 }
 
 /**
@@ -212,7 +275,6 @@ function buildStructureMesh(
   );
   material.diffuseColor = structure.color;
   mesh.material = material;
-  material.freeze();
 
   return mesh;
 }
