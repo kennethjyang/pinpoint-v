@@ -273,6 +273,10 @@ export default {
     hideStructureInteriors: "Hide Interior Surfaces",
     backToPreferences: "Back to Preferences"
   },
+  coordinateSystemInspector: {
+    name: "Name",
+    addTransform: "Add Transform"
+  },
   slice: {
     zoom: "Zoom",
     center: "Center along probe",
@@ -378,11 +382,12 @@ export default {
       'This deletes the saved "{name}" data from this browser and then reloads Pinpoint so the store starts from its defaults. The deletion is permanent - the data cannot be recovered.',
     confirmResetAllTitle: "Reset everything?",
     confirmResetAll:
-      "This deletes all saved Pinpoint data from this browser - experiments, recents, probe library, favorite atlases, and preferences - and then reloads Pinpoint so every store starts from its defaults. The deletion is permanent - the data cannot be recovered.",
+      "This deletes all saved Pinpoint data from this browser - experiments, recents, probe library, coordinate system library, favorite atlases, and preferences - and then reloads Pinpoint so every store starts from its defaults. The deletion is permanent - the data cannot be recovered.",
     confirmOk: "Clear",
     storeCurrentExperiment: "Current Experiment",
     storeRecentExperiments: "Recent Experiments",
     storeProbeLibrary: "Probe Library",
+    storeCoordinateSystemLibrary: "Coordinate System Library",
     storeFavoriteAtlases: "Favorite Atlases",
     storePreferences: "Preferences"
   }

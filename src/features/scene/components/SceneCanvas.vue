@@ -193,15 +193,16 @@ const probeGeometry = computed<ProbeGeometry>(() => ({
 }));
 
 /**
- * Whether the gizmo toolbar is shown: the camera and the world have no
- * gizmo, and a locked probe or scene object gets none either.
+ * Whether the gizmo toolbar is shown: the camera, the world, and a coordinate
+ * system have no gizmo, and a locked probe or scene object gets none either.
  */
 const isGizmoToolbarVisible = computed(() => {
   const selected = currentExperiment.selectedInspectable;
   if (
     !selected ||
     selected.inspectableKind === "camera" ||
-    selected.inspectableKind === "world"
+    selected.inspectableKind === "world" ||
+    selected.inspectableKind === "coordinateSystem"
   ) {
     return false;
   }

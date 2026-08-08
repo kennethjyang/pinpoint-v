@@ -66,6 +66,7 @@ import type { BabylonRuntimeService } from "@/services/babylon-runtime.service";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import {
   makeAtlas,
+  makeCoordinateSystem,
   makeManifest,
   makeProbe,
   makeProbeInterfaceProbe,
@@ -984,6 +985,16 @@ describe("SceneCanvas", () => {
     const store = useCurrentExperimentStore();
 
     store.selectedInspectable = store.experiment.cameraPose;
+    await flushPromises();
+
+    expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);
+  });
+
+  it("hides the gizmo toolbar while a coordinate system is selected", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = makeCoordinateSystem();
     await flushPromises();
 
     expect(wrapper.findAllComponents({ name: "QBtnToggle" })).toHaveLength(0);

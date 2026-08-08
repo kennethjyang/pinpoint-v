@@ -25,7 +25,7 @@ export function isSameInspectable(a: Inspectable, b: Inspectable): boolean {
 /**
  * Move an inspectable onto a point in atlas ASR mm: a probe's tip, a scene
  * object's origin, or the camera's orbit target with its orbit left alone.
- * The world has no position, so it is left alone too.
+ * The world and coordinate systems have no position, so they are left alone too.
  * @param inspectable Inspectable to move, mutated in place.
  * @param atlasMillimeters Destination, in atlas ASR mm.
  * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
@@ -35,8 +35,13 @@ export function moveInspectableToMillimeters(
   atlasMillimeters: [number, number, number],
   referenceCoordinate: [number, number, number]
 ): void {
-  // The world has no position to move.
-  if (inspectable.inspectableKind === "world") return;
+  // The world and a coordinate system have no position to move.
+  if (
+    inspectable.inspectableKind === "world" ||
+    inspectable.inspectableKind === "coordinateSystem"
+  ) {
+    return;
+  }
 
   if (inspectable.inspectableKind === "camera") {
     setCameraPose(

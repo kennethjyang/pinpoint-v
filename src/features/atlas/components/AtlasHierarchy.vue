@@ -105,12 +105,18 @@ const hasStructureChanges = computed(
 );
 
 /**
- * Can a row click move the selection: something is selected, and a selected probe is
- * not locked against pose edits.
+ * Can a row click move the selection: something with a position is selected, and a
+ * selected probe is not locked against pose edits.
  */
 const canMoveToRegion = computed(() => {
   const selected = currentExperiment.selectedInspectable;
-  if (!selected || selected.inspectableKind === "world") return false;
+  if (
+    !selected ||
+    selected.inspectableKind === "world" ||
+    selected.inspectableKind === "coordinateSystem"
+  ) {
+    return false;
+  }
   return selected.inspectableKind === "camera" || !selected.lock;
 });
 

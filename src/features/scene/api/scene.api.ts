@@ -39,6 +39,7 @@ export function selectFromSelectedInspectableState(
     case undefined:
     case "camera":
     case "world":
+    case "coordinateSystem":
       gizmoManager.attachToNode(null);
       return;
     case "probe": {

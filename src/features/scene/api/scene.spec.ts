@@ -16,6 +16,7 @@ import { getProbeInterfaceIdentifier } from "@/features/probe";
 import {
   makeAtlas,
   makeCameraPose,
+  makeCoordinateSystem,
   makeProbe,
   makeProbeGeometry,
   makeProbeInterfaceProbe
@@ -113,6 +114,26 @@ describe("selectFromSelectedInspectableState", () => {
       gizmoManager,
       selectionOutlineLayer,
       makeCameraPose(),
+      null
+    );
+
+    expect(gizmoManager.attachedNode).toBeNull();
+    for (const mesh of node.getChildMeshes()) {
+      expect(selectionOutlineLayer.hasMesh(mesh)).toBe(false);
+    }
+  });
+
+  it("detaches the gizmo and clears the outline when a coordinate system is selected", () => {
+    const { scene, gizmoManager, selectionOutlineLayer, node } =
+      makeProbeInScene();
+    gizmoManager.attachToNode(node);
+    selectionOutlineLayer.addSelection(node.getChildMeshes());
+
+    selectFromSelectedInspectableState(
+      scene,
+      gizmoManager,
+      selectionOutlineLayer,
+      makeCoordinateSystem(),
       null
     );
 
