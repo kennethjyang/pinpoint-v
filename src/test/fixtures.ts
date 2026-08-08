@@ -4,6 +4,7 @@ import type {
   Manifest,
   TerminologyRow
 } from "@/features/atlas";
+import type { CoordinateSystem } from "@/features/coordinate-system";
 import type { ProbeGeometry, SceneModel, SceneObject } from "@/features/scene";
 import type { CameraPose } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
@@ -125,6 +126,35 @@ export function makeProbe(overrides: Partial<Probe> = {}): Probe {
     channelMapWindow: null,
     shankAlignmentIndex: null,
     bodyModel: null,
+    ...overrides
+  };
+}
+
+/**
+ * Build a fixture coordinate system with a single all-zero unfixed node.
+ * @param overrides Fields to override on the default coordinate system.
+ */
+export function makeCoordinateSystem(
+  overrides: Partial<CoordinateSystem> = {}
+): CoordinateSystem {
+  return {
+    inspectableKind: "coordinateSystem",
+    id: crypto.randomUUID(),
+    name: "Fixture Coordinate System",
+    chain: [
+      {
+        position: [
+          { name: "ML", value: 0, fixed: false, bounds: null },
+          { name: "DV", value: 0, fixed: false, bounds: null },
+          { name: "AP", value: 0, fixed: false, bounds: null }
+        ],
+        rotation: [
+          { name: "Pitch", value: 0, fixed: false, bounds: null },
+          { name: "Yaw", value: 0, fixed: false, bounds: null },
+          { name: "Roll", value: 0, fixed: false, bounds: null }
+        ]
+      }
+    ],
     ...overrides
   };
 }

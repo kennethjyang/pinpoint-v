@@ -221,9 +221,21 @@ export const useCoordinateSystemLibraryStore = defineStore(
       }
     ]);
 
-    const state = { library };
+    /**
+     * Remove a coordinate system from the library by id.
+     * @param coordinateSystem Coordinate system to remove.
+     */
+    function remove(coordinateSystem: CoordinateSystem) {
+      const index = library.value.findIndex(
+        ({ id }) => id === coordinateSystem.id
+      );
+      if (index === -1) return;
+      library.value.splice(index, 1);
+    }
 
-    return { ...state };
+    const state = { library };
+    const actions = { remove };
+    return { ...state, ...actions };
   },
   { persist: true }
 );

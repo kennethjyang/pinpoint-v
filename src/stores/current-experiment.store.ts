@@ -213,6 +213,10 @@ export const useCurrentExperimentStore = defineStore(
       // The world lives outside the experiment, so history never invalidates it.
       if (selected.inspectableKind === "world") return;
 
+      // Coordinate systems live in the library store, not the experiment, so
+      // history never invalidates them either.
+      if (selected.inspectableKind === "coordinateSystem") return;
+
       if (selected.inspectableKind === "camera") {
         selectedInspectable.value = experiment.value.cameraPose;
         return;

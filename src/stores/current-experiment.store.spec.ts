@@ -19,6 +19,7 @@ import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
 import { WORLD_INSPECTABLE } from "@/features/scene";
 import {
   makeAtlas,
+  makeCoordinateSystem,
   makeProbe,
   makeProbeInterfaceProbe,
   makeTerminologyRows
@@ -402,6 +403,18 @@ describe("useCurrentExperimentStore", () => {
       store.undo();
 
       expect(store.selectedInspectable).toEqual(WORLD_INSPECTABLE);
+    });
+
+    it("leaves a coordinate system selected after undo", async () => {
+      const store = useCurrentExperimentStore();
+      const coordinateSystem = makeCoordinateSystem();
+      store.selectedInspectable = coordinateSystem;
+
+      store.experiment.name = "Renamed";
+      await nextTick();
+      store.undo();
+
+      expect(store.selectedInspectable).toEqual(coordinateSystem);
     });
 
     it("clears the selection when undo removes the selected probe", async () => {

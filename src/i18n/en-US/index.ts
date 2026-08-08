@@ -152,6 +152,7 @@ export default {
     shiftKey: "Shift",
     experimentProperties: "Experiment Properties",
     probeLibrary: "Probe Library",
+    coordinateSystemLibrary: "Coordinate System Library",
     preferences: "Preferences",
     view: "View",
     splashScreen: "Splash Screen",
@@ -164,6 +165,16 @@ export default {
     title: "Probe Library",
     installProbe: "Install Probe",
     dragToReorder: "Drag to reorder",
+    close: "Close"
+  },
+  coordinateSystemLibrary: {
+    title: "Coordinate System Library",
+    clickToInspectHint:
+      "Click a coordinate system to open it in the inspector.",
+    deleteCoordinateSystem: 'Delete "{name}"',
+    confirmDelete: 'Are you sure you wish to delete "{name}"?',
+    delete: "Delete",
+    cancel: "Cancel",
     close: "Close"
   },
   modelFile: {
