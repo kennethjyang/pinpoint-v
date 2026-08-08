@@ -2,6 +2,9 @@ interface CoordinateSystemValue {
   name: string;
   value: number;
   fixed: boolean;
+
+  // Is ignored if fixed = true. Null means unbounded.
+  bounds: [number, number] | null;
 }
 interface CoordinateSystemNode {
   position: [
