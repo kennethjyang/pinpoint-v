@@ -32,11 +32,12 @@ const name = computed({
     />
     <q-btn
       class="full-width"
+      color="primary"
       icon="add"
       :label="t('coordinateSystemInspector.addTransform')"
       @click="addCoordinateSystemTransform(coordinateSystem)"
     />
-    <q-list bordered class="col scroll" separator></q-list>
+    <q-list class="col scroll" separator></q-list>
   </div>
 </template>
 
