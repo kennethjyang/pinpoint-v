@@ -260,6 +260,7 @@ export default {
     specularIntensity: "Specular Intensity",
     specularPower: "Glossiness",
     ambientOcclusion: "Ambient Occlusion",
+    structureFadedAlpha: "Structure Transparency",
     hideStructureInteriors: "Hide Interior Surfaces",
     backToPreferences: "Back to Preferences"
   },

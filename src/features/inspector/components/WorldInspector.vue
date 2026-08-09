@@ -73,6 +73,20 @@ function returnToPreferences(): void {
       />
     </div>
     <q-separator />
+    <div>
+      <div class="text-body2 q-pb-xs">{{
+        $t("worldInspector.structureFadedAlpha")
+      }}</div>
+      <q-slider
+        v-model="preferences.structureFadedAlpha"
+        :aria-label="$t('worldInspector.structureFadedAlpha')"
+        :min="0.01"
+        :max="1"
+        :step="0.01"
+        label
+      />
+    </div>
+    <q-separator />
     <q-toggle
       v-model="preferences.isSsaoEnabled"
       :label="$t('worldInspector.ambientOcclusion')"

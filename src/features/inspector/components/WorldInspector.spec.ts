@@ -80,24 +80,24 @@ describe("WorldInspector", () => {
     expect(preferences.materialSpecularIntensity).toBe(0);
   });
 
-  it("the hide-interiors toggle starts at true", () => {
+  it("the hide-interiors toggle starts at false", () => {
     const wrapper = mountWithQuasar(WorldInspector);
 
     expect(
       findToggle(wrapper, t.hideStructureInteriors).props("modelValue")
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("toggling off writes areStructureInteriorsHidden to false", async () => {
+  it("toggling on writes areStructureInteriorsHidden to true", async () => {
     const wrapper = mountWithQuasar(WorldInspector);
     const preferences = usePreferencesStore();
 
     await findToggle(wrapper, t.hideStructureInteriors).vm.$emit(
       "update:modelValue",
-      false
+      true
     );
 
-    expect(preferences.areStructureInteriorsHidden).toBe(false);
+    expect(preferences.areStructureInteriorsHidden).toBe(true);
   });
 
   it("the ambient-occlusion toggle starts at false", () => {
