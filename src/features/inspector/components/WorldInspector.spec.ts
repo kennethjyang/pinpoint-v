@@ -46,13 +46,14 @@ describe("WorldInspector", () => {
     expect(preferences.worldBackgroundColor).toBe("#123456");
   });
 
-  it("appends Babylon's default clear color to the standard palette", () => {
+  it("appends Babylon's default clear color and black to the standard palette, filling whole swatch rows", () => {
     const wrapper = mountWithQuasar(WorldInspector);
 
-    expect(wrapper.findComponent({ name: "QColor" }).props("palette")).toEqual([
-      ...STANDARD_COLORS,
-      "#33334d"
-    ]);
+    const palette = wrapper.findComponent({ name: "QColor" }).props("palette");
+    expect(palette).toEqual([...STANDARD_COLORS, "#33334d", "#000000"]);
+    // Quasar lays swatches out ten to a row; a partial row renders its
+    // leftover cells as unclickable dead swatches.
+    expect(palette.length % 10).toBe(0);
   });
 
   it("the glossiness slider starts at 64", () => {

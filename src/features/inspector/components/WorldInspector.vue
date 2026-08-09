@@ -5,8 +5,12 @@ import { STANDARD_COLORS } from "@/features/scene";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 
-/** Standard palette plus Babylon's default clear color, so it stays pickable after switching away from it. */
-const BACKGROUND_COLOR_PALETTE = [...STANDARD_COLORS, "#33334d"];
+/**
+ * Standard palette plus black and Babylon's default clear color, so both stay
+ * pickable. Quasar lays palette swatches out ten to a row, so the length must
+ * stay a multiple of ten or the row's leftover cells read as dead swatches.
+ */
+const BACKGROUND_COLOR_PALETTE = [...STANDARD_COLORS, "#33334d", "#000000"];
 
 const $q = useQuasar();
 const currentExperiment = useCurrentExperimentStore();
