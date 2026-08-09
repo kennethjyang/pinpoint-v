@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCameraPose,
   copyCameraPose,
+  getAtlasFramingRadiusMillimeters,
   isCameraPose,
   setCameraPose
 } from "./camera-pose.api";
@@ -9,7 +10,21 @@ import {
   getAtlasCenter,
   getAtlasDimensionsMillimeters
 } from "@/features/atlas";
-import { makeAtlas, makeCameraPose } from "@/test/fixtures";
+import { makeAtlas, makeCameraPose, makeManifest } from "@/test/fixtures";
+
+describe("getAtlasFramingRadiusMillimeters", () => {
+  it("frames the radius at 1.5x the atlas AP length", () => {
+    expect(getAtlasFramingRadiusMillimeters(makeAtlas())).toBe(19.8);
+  });
+
+  it("returns 0 when the manifest has no resolutions or shape", () => {
+    const atlas = makeAtlas({
+      manifest: makeManifest({ resolutions: [], shape: [] })
+    });
+
+    expect(getAtlasFramingRadiusMillimeters(atlas)).toBe(0);
+  });
+});
 
 describe("buildCameraPose", () => {
   it("frames the radius at 1.5x the atlas AP length", () => {

@@ -2,7 +2,10 @@ import { toRaw } from "vue";
 import type { Atlas } from "@/features/atlas";
 import { getAtlasCenter, isSameAtlas } from "@/features/atlas";
 import type { CameraPose } from "../models/camera-pose.model";
-import { buildCameraPose } from "./camera-pose.api";
+import {
+  buildCameraPose,
+  getAtlasFramingRadiusMillimeters
+} from "./camera-pose.api";
 import type { VisibleStructure } from "../models/visible-structure.model";
 import type { Experiment } from "../models/experiment.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
@@ -97,12 +100,15 @@ export function setExperimentProperties(
 
   if (isNewAtlas) {
     rebaseOntoAtlasOrigin(experiment, previousCenter, getAtlasCenter(atlas));
+    experiment.cameraPose.radius = getAtlasFramingRadiusMillimeters(atlas);
   }
 }
 
 /**
- * Shift every atlas-origin-relative coordinate by how far the scene origin
- * moved, so nothing changes place in Babylon world space.
+ * Shift the probes, scene objects, and live camera target by how far the scene
+ * origin moved, so they do not change place in Babylon world space. Saved
+ * camera poses are deliberately left alone: they are user-set snapshots and
+ * keep the exact values they were saved with.
  * @param experiment Experiment to rebase, mutated in place.
  * @param previousCenter Center of the outgoing atlas, in its own ASR mm.
  * @param center Center of the incoming atlas, in its own ASR mm.
@@ -127,9 +133,6 @@ function rebaseOntoAtlasOrigin(
     experiment.cameraPose.target,
     offset
   );
-  for (const pose of experiment.cameraPoses) {
-    pose.target = shiftTriple(pose.target, offset);
-  }
 }
 
 /**

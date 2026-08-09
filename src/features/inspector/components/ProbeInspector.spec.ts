@@ -503,14 +503,15 @@ describe("ProbeInspector", () => {
   });
 
   describe("home / copy / lock buttons", () => {
-    it("resets the tip position on home click", async () => {
-      const { wrapper, probe } = mountInspector(
+    it("resets the tip position to the reference coordinate on home click", async () => {
+      const { wrapper, probe, store } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
       );
+      store.experiment.referenceCoordinate = [7, 8, 9];
 
       await buttonByLabel(wrapper, t.home).trigger("click");
 
-      expect(probe.tipPosition).toEqual([0, 0, 0]);
+      expect(probe.tipPosition).toEqual([7, 8, 9]);
     });
 
     it("duplicates the probe on copy click", async () => {

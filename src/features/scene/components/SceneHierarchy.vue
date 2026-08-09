@@ -82,7 +82,10 @@ const SCENE_OBJECT_VISIBILITY_ICONS: Record<SceneObjectVisibility, string> = {
  */
 function addProbeAndSelect(probeInterfaceProbe: ProbeInterfaceProbe) {
   internProbeInterfaceProbe(currentExperiment.experiment, probeInterfaceProbe);
-  const probe = buildProbe(probeInterfaceProbe);
+  const probe = buildProbe(
+    probeInterfaceProbe,
+    currentExperiment.referenceCoordinate
+  );
   addProbe(currentExperiment.experiment, probe);
   currentExperiment.selectedInspectable = probe;
 }

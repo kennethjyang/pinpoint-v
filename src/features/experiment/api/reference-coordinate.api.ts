@@ -14,7 +14,8 @@ const DEFAULT_REFERENCE_COORDINATE_OVERRIDES: Record<
 
 /**
  * Compute the initial reference coordinate for an atlas, using a known
- * override if one exists, otherwise falling back to the atlas center.
+ * override if one exists, otherwise the atlas centre in AP and ML at the top
+ * of the volume.
  * @param atlas Atlas to build reference coordinate info from.
  */
 export function buildInitialReferenceCoordinate(
@@ -23,5 +24,6 @@ export function buildInitialReferenceCoordinate(
   const override = DEFAULT_REFERENCE_COORDINATE_OVERRIDES[atlas.name];
   if (override) return [...override];
 
-  return getAtlasCenter(atlas);
+  const [ap, , ml] = getAtlasCenter(atlas);
+  return [ap, 0, ml];
 }

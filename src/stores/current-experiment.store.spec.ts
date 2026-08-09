@@ -259,7 +259,7 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
@@ -279,7 +279,7 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(firstStore.experiment, spec);
-      addProbe(firstStore.experiment, buildProbe(spec));
+      addProbe(firstStore.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       // A fresh store over the same storage simulates a page reload.
@@ -299,7 +299,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
 
       let visibilityChanges = 0;
       // `store.probes[0]` is the reactive proxy Pinia hands back, unlike the
@@ -356,7 +356,7 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       store.experiment.name = "Renamed";
@@ -370,7 +370,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       store.selectedInspectable = store.probes[0]!;
@@ -421,7 +421,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       store.selectedInspectable = store.probes[0]!;
@@ -518,7 +518,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       store.draggedProbeId = store.probes[0]!.id;
@@ -538,7 +538,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
 
       store.draggedProbeId = store.probes[0]!.id;
@@ -567,7 +567,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, [0, 0, 0]));
       await nextTick();
       const defaultName = store.name;
 

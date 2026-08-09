@@ -35,10 +35,14 @@ const NEXT_PROBE_VISIBILITY: Record<ProbeVisibility, ProbeVisibility> = {
 
 /**
  * Build a probe referencing the given probe interface definition, with a
- * random name and color, a zeroed position, and a pitch pointing inferiorly.
+ * random name and color, the given tip position, and a pitch pointing inferiorly.
  * @param probeInterfaceProbe Probe interface definition for the probe.
+ * @param tipPosition Starting tip position, in atlas ASR mm.
  */
-export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
+export function buildProbe(
+  probeInterfaceProbe: ProbeInterfaceProbe,
+  tipPosition: [number, number, number]
+): Probe {
   const uuid = crypto.randomUUID();
   const uniqueName = uuid.slice(0, 8);
   return {
@@ -49,7 +53,7 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     visibility: "visible",
     lock: false,
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
-    tipPosition: [0, 0, 0],
+    tipPosition: [...tipPosition],
     rotation: [0, 0, Math.PI / 2],
     sliceExtentMillimeters: null,
     sliceCenterHeightMillimeters: 0,
@@ -92,11 +96,15 @@ export function rotateProbeVisibility(probe: Probe) {
 }
 
 /**
- * Reset a probe's tip position to the atlas origin.
+ * Reset a probe's tip position to the experiment's reference coordinate.
  * @param probe Probe to reset the tip position of.
+ * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
-export function homeProbe(probe: Probe) {
-  probe.tipPosition = [0, 0, 0];
+export function homeProbe(
+  probe: Probe,
+  referenceCoordinate: [number, number, number]
+) {
+  probe.tipPosition = [...referenceCoordinate];
 }
 
 /**

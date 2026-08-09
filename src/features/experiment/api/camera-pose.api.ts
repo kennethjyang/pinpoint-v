@@ -16,33 +16,29 @@ const INITIAL_BETA = Math.PI / 8;
 const RADIUS_AP_MULTIPLIER = 1.5;
 
 /**
+ * Camera radius that frames an atlas's full AP extent, in mm.
+ * @param atlas Atlas to frame.
+ */
+export function getAtlasFramingRadiusMillimeters(atlas: Atlas): number {
+  return (
+    Math.max(getAtlasDimensionsMillimeters(atlas)[0], 0) * RADIUS_AP_MULTIPLIER
+  );
+}
+
+/**
  * Build an experiment's live camera pose: the default orbit, framed on the atlas.
  * @param atlas Atlas to frame the pose on.
  */
 export function buildCameraPose(atlas: Atlas): CameraPose {
-  const pose: CameraPose = {
+  return {
     inspectableKind: "camera",
     id: crypto.randomUUID(),
     name: "",
     alpha: INITIAL_ALPHA,
     beta: INITIAL_BETA,
-    radius: 0,
-    target: [0, 0, 0]
+    radius: getAtlasFramingRadiusMillimeters(atlas),
+    target: getAtlasCenter(atlas)
   };
-  frameCameraPoseOnAtlas(pose, atlas);
-  return pose;
-}
-
-/**
- * Frame a camera pose on an atlas: radius from the atlas's AP extent and target
- * on the atlas centre, leaving the orbit angles as the user left them.
- * @param pose Camera pose to frame.
- * @param atlas Atlas to frame the pose on.
- */
-function frameCameraPoseOnAtlas(pose: CameraPose, atlas: Atlas): void {
-  pose.radius =
-    Math.max(getAtlasDimensionsMillimeters(atlas)[0], 0) * RADIUS_AP_MULTIPLIER;
-  pose.target = getAtlasCenter(atlas);
 }
 
 /**

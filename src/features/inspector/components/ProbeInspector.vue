@@ -361,7 +361,9 @@ onUnmounted(cancelMoveToSurface);
                 :aria-label="t('probeInspector.home')"
                 :disable="probe.lock"
                 icon="home"
-                @click="homeProbe(probe)"
+                @click="
+                  homeProbe(probe, currentExperimentStore.referenceCoordinate)
+                "
               >
                 <q-tooltip>{{ t("probeInspector.home") }}</q-tooltip>
               </q-btn>

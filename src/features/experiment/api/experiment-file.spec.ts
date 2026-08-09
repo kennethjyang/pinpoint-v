@@ -32,7 +32,7 @@ function makeFullExperiment(): Experiment {
     annotations: { manufacturer: "imec", model_name: "np1" }
   });
   internProbeInterfaceProbe(experiment, spec);
-  addProbe(experiment, buildProbe(spec));
+  addProbe(experiment, buildProbe(spec, [0, 0, 0]));
   experiment.visibleStructures = [{ id: 5, isTransparent: false }];
   return experiment;
 }
@@ -321,7 +321,10 @@ describe("zipExperiment / unzipExperiment", () => {
       experiment.probeInterfaceProbes[
         Object.keys(experiment.probeInterfaceProbes)[0]!
       ]!;
-    const duplicate = { ...buildProbe(spec), id: experiment.probes[0]!.id };
+    const duplicate = {
+      ...buildProbe(spec, [0, 0, 0]),
+      id: experiment.probes[0]!.id
+    };
     experiment.probes.push(duplicate);
 
     expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
@@ -413,7 +416,7 @@ describe("zipExperiment / unzipExperiment", () => {
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     internProbeInterfaceProbe(experiment, spec);
-    addProbe(experiment, buildProbe(spec));
+    addProbe(experiment, buildProbe(spec, [0, 0, 0]));
 
     // buildProbeContour (src/features/scene/api/probe.api.ts) already
     // degrades to `null` for missing contour geometry, so this is left
