@@ -17,8 +17,9 @@ export interface Experiment {
 
   /**
    * Reference coordinate (in ASR, AP/DV/ML, mm) marking the experiment's
-   * landmark of interest within the atlas. Tracked separately from the
-   * scene's origin, which is anchored to the atlas center instead.
+   * landmark of interest within the atlas. A landmark only: geometry
+   * (probe tips, scene objects, camera targets) is stored in atlas ASR mm,
+   * independent of this value.
    */
   referenceCoordinate: [number, number, number];
 

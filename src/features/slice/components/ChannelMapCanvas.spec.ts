@@ -148,8 +148,8 @@ describe("ChannelMapCanvas", () => {
   }
 
   it("hands the sampler a geometry covering every shank's full extent at the measured size", () => {
-    const { store, probe, contour } = mountCanvas();
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const { probe, contour } = mountCanvas();
+    const frame = getProbeFrame(probe);
 
     expect(capturedGeometry).toEqual({
       rightMillimeters: frame.rightMillimeters,
@@ -209,8 +209,8 @@ describe("ChannelMapCanvas", () => {
   });
 
   it("crops the sampled geometry and overlay to the probe's channel map window", () => {
-    const { wrapper, store, probe } = mountCanvas({ min: 2, max: 4 });
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const { wrapper, probe } = mountCanvas({ min: 2, max: 4 });
+    const frame = getProbeFrame(probe);
 
     expect(capturedGeometry!.halfHeightMillimeters).toBe(1);
     expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
@@ -265,7 +265,6 @@ describe("ChannelMapCanvas", () => {
 
     const pinia = createPinia();
     setActivePinia(pinia);
-    const store = useCurrentExperimentStore(pinia);
 
     const probeInterfaceProbe = makeProbeInterfaceProbe({
       si_units: "mm",
@@ -307,7 +306,7 @@ describe("ChannelMapCanvas", () => {
       6, 6
     ]);
 
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const frame = getProbeFrame(probe);
     expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
       toAtlasMillimeters(frame, -0.95, 5)
     );

@@ -4,7 +4,6 @@ import type { ProbeSurfaceChoice } from "../models/probe-surface-choice.model";
 import type { ProbeVisibility } from "../models/visibility.model";
 import type { ProbeInterfaceProbe } from "../models/probe-interface.model";
 import type { Experiment } from "@/features/experiment";
-import { atlasToReferenceRelative } from "@/features/experiment";
 import {
   KNOWN_MANUFACTURERS,
   KNOWN_PROBES
@@ -104,17 +103,12 @@ export function homeProbe(probe: Probe) {
  * Move a probe's tip to a point in atlas ASR millimeters.
  * @param probe Probe to move.
  * @param atlasMillimeters Target tip position, in atlas ASR mm.
- * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
 export function setProbeTipMillimeters(
   probe: Probe,
-  atlasMillimeters: [number, number, number],
-  referenceCoordinate: [number, number, number]
+  atlasMillimeters: [number, number, number]
 ): void {
-  probe.tipPosition = atlasToReferenceRelative(
-    referenceCoordinate,
-    atlasMillimeters
-  );
+  probe.tipPosition = [...atlasMillimeters];
 }
 
 /**

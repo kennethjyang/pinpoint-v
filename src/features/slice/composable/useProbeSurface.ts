@@ -10,7 +10,6 @@ import { useAnnotationSampler } from "./useAnnotationSampler";
 export function useProbeSurface(): {
   findTargets: (
     probe: Probe,
-    referenceCoordinate: [number, number, number],
     signal?: AbortSignal
   ) => Promise<ProbeSurfaceTargets | null>;
 } {
@@ -20,19 +19,17 @@ export function useProbeSurface(): {
    * Resolve a probe's brain-surface tip targets, or null when the annotation
    * volume can't be opened.
    * @param probe Probe to find surface targets for.
-   * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
    * @param signal Aborts the in-flight sampling.
    */
   async function findTargets(
     probe: Probe,
-    referenceCoordinate: [number, number, number],
     signal?: AbortSignal
   ): Promise<ProbeSurfaceTargets | null> {
     const level = await getFinestLevel();
     if (!level) return null;
 
     return findProbeSurfaceTargets(
-      getProbeFrame(probe, referenceCoordinate),
+      getProbeFrame(probe),
       probe.rotation[2],
       level,
       geometry => sampleOnce(geometry, 0, signal)

@@ -4,7 +4,6 @@ import {
   getAtlasDimensionsMillimeters
 } from "@/features/atlas";
 import type { CameraPose } from "../models/camera-pose.model";
-import { atlasToReferenceRelative } from "./reference-coordinate.api";
 import { isFiniteNumber, isFiniteTriple, isRecord } from "@/utils/type-guards";
 
 /** Initial orbit azimuth of a camera pose, in radians. */
@@ -19,12 +18,8 @@ const RADIUS_AP_MULTIPLIER = 1.5;
 /**
  * Build an experiment's live camera pose: the default orbit, framed on the atlas.
  * @param atlas Atlas to frame the pose on.
- * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
-export function buildCameraPose(
-  atlas: Atlas,
-  referenceCoordinate: [number, number, number]
-): CameraPose {
+export function buildCameraPose(atlas: Atlas): CameraPose {
   const pose: CameraPose = {
     inspectableKind: "camera",
     id: crypto.randomUUID(),
@@ -34,7 +29,7 @@ export function buildCameraPose(
     radius: 0,
     target: [0, 0, 0]
   };
-  frameCameraPoseOnAtlas(pose, atlas, referenceCoordinate);
+  frameCameraPoseOnAtlas(pose, atlas);
   return pose;
 }
 
@@ -43,19 +38,11 @@ export function buildCameraPose(
  * on the atlas centre, leaving the orbit angles as the user left them.
  * @param pose Camera pose to frame.
  * @param atlas Atlas to frame the pose on.
- * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
-export function frameCameraPoseOnAtlas(
-  pose: CameraPose,
-  atlas: Atlas,
-  referenceCoordinate: [number, number, number]
-): void {
+function frameCameraPoseOnAtlas(pose: CameraPose, atlas: Atlas): void {
   pose.radius =
     Math.max(getAtlasDimensionsMillimeters(atlas)[0], 0) * RADIUS_AP_MULTIPLIER;
-  pose.target = atlasToReferenceRelative(
-    referenceCoordinate,
-    getAtlasCenter(atlas)
-  );
+  pose.target = getAtlasCenter(atlas);
 }
 
 /**
@@ -76,7 +63,7 @@ export function copyCameraPose(pose: CameraPose, name: string): CameraPose {
  * Write an orbit and target onto a camera pose in place, keeping its id and name.
  * @param pose Camera pose to update.
  * @param orbit Alpha/beta in radians and radius in mm.
- * @param target Point the camera orbits, relative to the reference coordinate, in ASR mm.
+ * @param target Point the camera orbits, in atlas ASR mm.
  */
 export function setCameraPose(
   pose: CameraPose,

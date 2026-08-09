@@ -1170,7 +1170,6 @@ describe("SceneCanvas", () => {
         probeId: probe.id,
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
-        tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
       };
@@ -1197,7 +1196,6 @@ describe("SceneCanvas", () => {
         probeId: probe.id,
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
-        tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
       };
@@ -1220,27 +1218,17 @@ describe("SceneCanvas", () => {
       const { runtime } = await mountCanvas();
       const store = useCurrentExperimentStore();
       const probe = await addTestProbe(store);
-      const referenceCoordinate = store.referenceCoordinate;
+      // Away from the camera's Vector3.Zero() look-at target, so the tubes
+      // and probe mesh aren't clustered exactly where the camera points.
+      probe.tipPosition = [5.7, 0.44, 5.4];
+      await flushPromises();
 
       store.probeSurfaceChoice = {
         probeId: probe.id,
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
-        tipMillimeters: [
-          referenceCoordinate[0] + probe.tipPosition[0],
-          referenceCoordinate[1] + probe.tipPosition[1],
-          referenceCoordinate[2] + probe.tipPosition[2]
-        ],
-        axisTargetMillimeters: [
-          referenceCoordinate[0] + 1,
-          referenceCoordinate[1],
-          referenceCoordinate[2]
-        ],
-        dorsoventralTargetMillimeters: [
-          referenceCoordinate[0],
-          referenceCoordinate[1] + 2,
-          referenceCoordinate[2]
-        ]
+        axisTargetMillimeters: [6.7, 0.44, 5.4],
+        dorsoventralTargetMillimeters: [5.7, 2.44, 5.4]
       };
       await flushPromises();
 
@@ -1270,13 +1258,13 @@ describe("SceneCanvas", () => {
       // midpoint through the atlas root's world matrix, not the raw ASR
       // millimeters or `mesh.absolutePosition` (just the mesh's origin).
       const midMillimeters: [number, number, number] = [
-        (store.probeSurfaceChoice!.tipMillimeters[0] +
+        (store.probeSurfaceChoice!.tipPosition[0] +
           store.probeSurfaceChoice!.dorsoventralTargetMillimeters[0]) /
           2,
-        (store.probeSurfaceChoice!.tipMillimeters[1] +
+        (store.probeSurfaceChoice!.tipPosition[1] +
           store.probeSurfaceChoice!.dorsoventralTargetMillimeters[1]) /
           2,
-        (store.probeSurfaceChoice!.tipMillimeters[2] +
+        (store.probeSurfaceChoice!.tipPosition[2] +
           store.probeSurfaceChoice!.dorsoventralTargetMillimeters[2]) /
           2
       ];
@@ -1303,7 +1291,7 @@ describe("SceneCanvas", () => {
       );
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([0, 2, 0]);
+      expect(probe.tipPosition).toEqual([5.7, 2.44, 5.4]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
   });

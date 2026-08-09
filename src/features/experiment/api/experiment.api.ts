@@ -1,12 +1,8 @@
 import { toRaw } from "vue";
 import type { Atlas } from "@/features/atlas";
-import { isSameAtlas } from "@/features/atlas";
+import { getAtlasCenter, isSameAtlas } from "@/features/atlas";
 import type { CameraPose } from "../models/camera-pose.model";
-import { buildCameraPose, frameCameraPoseOnAtlas } from "./camera-pose.api";
-import {
-  atlasToReferenceRelative,
-  referenceRelativeToAtlas
-} from "./reference-coordinate.api";
+import { buildCameraPose } from "./camera-pose.api";
 import type { VisibleStructure } from "../models/visible-structure.model";
 import type { Experiment } from "../models/experiment.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
@@ -54,7 +50,7 @@ export function buildExperiment(
     probeInterfaceProbes: {},
     probes: [],
     sceneObjects: [],
-    cameraPose: buildCameraPose(atlas, referenceCoordinate),
+    cameraPose: buildCameraPose(atlas),
     cameraPoses: []
   };
 }
@@ -89,49 +85,67 @@ export function setExperimentProperties(
   const { name, atlas, referenceCoordinate, defaultStructureIdentifiers } =
     properties;
   const isNewAtlas = !isSameAtlas(atlas, experiment.atlas);
+  const previousCenter = getAtlasCenter(experiment.atlas);
 
   if (isNewAtlas) {
     resetStructureVisibility(experiment, defaultStructureIdentifiers);
   }
 
   experiment.name = name.trim();
+  experiment.referenceCoordinate = [...referenceCoordinate];
   experiment.atlas = { ...atlas };
 
   if (isNewAtlas) {
-    // Probe tips and the camera target are offsets from the reference
-    // coordinate, and a new atlas brings its own landmark, so those offsets
-    // carry over untouched. Only the camera's framing is absolute to the
-    // volume, so it is rebuilt.
-    experiment.referenceCoordinate = [...referenceCoordinate];
-    frameCameraPoseOnAtlas(experiment.cameraPose, atlas, referenceCoordinate);
-    return;
+    rebaseOntoAtlasOrigin(experiment, previousCenter, getAtlasCenter(atlas));
   }
-
-  moveReferenceCoordinate(experiment, referenceCoordinate);
 }
 
 /**
- * Move an experiment's reference coordinate within one atlas, re-deriving every
- * probe tip and the camera target so they stay at the same atlas coordinate.
- * @param experiment Experiment to move the reference coordinate of.
- * @param referenceCoordinate New reference coordinate, in atlas ASR mm.
+ * Shift every atlas-origin-relative coordinate by how far the scene origin
+ * moved, so nothing changes place in Babylon world space.
+ * @param experiment Experiment to rebase, mutated in place.
+ * @param previousCenter Center of the outgoing atlas, in its own ASR mm.
+ * @param center Center of the incoming atlas, in its own ASR mm.
  */
-function moveReferenceCoordinate(
+function rebaseOntoAtlasOrigin(
   experiment: Experiment,
-  referenceCoordinate: [number, number, number]
+  previousCenter: [number, number, number],
+  center: [number, number, number]
 ) {
-  const previous = experiment.referenceCoordinate;
+  const offset: [number, number, number] = [
+    center[0] - previousCenter[0],
+    center[1] - previousCenter[1],
+    center[2] - previousCenter[2]
+  ];
   for (const probe of experiment.probes) {
-    probe.tipPosition = atlasToReferenceRelative(
-      referenceCoordinate,
-      referenceRelativeToAtlas(previous, probe.tipPosition)
-    );
+    probe.tipPosition = shiftTriple(probe.tipPosition, offset);
   }
-  experiment.cameraPose.target = atlasToReferenceRelative(
-    referenceCoordinate,
-    referenceRelativeToAtlas(previous, experiment.cameraPose.target)
+  for (const sceneObject of experiment.sceneObjects) {
+    sceneObject.position = shiftTriple(sceneObject.position, offset);
+  }
+  experiment.cameraPose.target = shiftTriple(
+    experiment.cameraPose.target,
+    offset
   );
-  experiment.referenceCoordinate = [...referenceCoordinate];
+  for (const pose of experiment.cameraPoses) {
+    pose.target = shiftTriple(pose.target, offset);
+  }
+}
+
+/**
+ * Add a per-axis offset to a coordinate triple.
+ * @param coordinate Coordinate to shift.
+ * @param offset Offset to add, per axis.
+ */
+function shiftTriple(
+  coordinate: [number, number, number],
+  offset: [number, number, number]
+): [number, number, number] {
+  return [
+    coordinate[0] + offset[0],
+    coordinate[1] + offset[1],
+    coordinate[2] + offset[2]
+  ];
 }
 
 /**

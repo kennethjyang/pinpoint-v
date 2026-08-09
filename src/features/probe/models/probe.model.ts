@@ -44,7 +44,7 @@ export interface Probe {
    * Internal position representation of the probe tip.
    * - AP, DV, ML order.
    * - ASR orientation.
-   * - Relative to the experiment's reference coordinate.
+   * - Relative to the atlas origin.
    * - In mm.
    *
    * UI may convert this information for different displays.

@@ -1,4 +1,4 @@
-import { atlasToReferenceRelative, setCameraPose } from "@/features/experiment";
+import { setCameraPose } from "@/features/experiment";
 import { setProbeTipMillimeters } from "@/features/probe";
 import type { Inspectable } from "../models/inspectable.model";
 
@@ -28,12 +28,10 @@ export function isSameInspectable(a: Inspectable, b: Inspectable): boolean {
  * The world and coordinate systems have no position, so they are left alone too.
  * @param inspectable Inspectable to move, mutated in place.
  * @param atlasMillimeters Destination, in atlas ASR mm.
- * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
 export function moveInspectableToMillimeters(
   inspectable: Inspectable,
-  atlasMillimeters: [number, number, number],
-  referenceCoordinate: [number, number, number]
+  atlasMillimeters: [number, number, number]
 ): void {
   // The world and a coordinate system have no position to move.
   if (
@@ -47,18 +45,15 @@ export function moveInspectableToMillimeters(
     setCameraPose(
       inspectable,
       [inspectable.alpha, inspectable.beta, inspectable.radius],
-      atlasToReferenceRelative(referenceCoordinate, atlasMillimeters)
-    );
-    return;
-  }
-
-  if (inspectable.inspectableKind === "sceneObject") {
-    inspectable.position = atlasToReferenceRelative(
-      referenceCoordinate,
       atlasMillimeters
     );
     return;
   }
 
-  setProbeTipMillimeters(inspectable, atlasMillimeters, referenceCoordinate);
+  if (inspectable.inspectableKind === "sceneObject") {
+    inspectable.position = [...atlasMillimeters];
+    return;
+  }
+
+  setProbeTipMillimeters(inspectable, atlasMillimeters);
 }

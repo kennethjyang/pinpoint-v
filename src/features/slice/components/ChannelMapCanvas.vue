@@ -91,7 +91,7 @@ const layout = computed(() =>
 /** Sampling surface covering every shank's band, or null while unmeasured. */
 const plane = computed(() => {
   if (!layout.value) return null;
-  const frame = getProbeFrame(probe, currentExperiment.referenceCoordinate);
+  const frame = getProbeFrame(probe);
   return getShankSliceGeometry(
     frame,
     layout.value,

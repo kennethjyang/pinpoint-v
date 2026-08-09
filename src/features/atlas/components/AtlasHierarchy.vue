@@ -190,11 +190,7 @@ async function moveToRegionCenter(item: HierarchyItem): Promise<void> {
   const selected = currentExperiment.selectedInspectable;
   if (!selected || !canMoveToRegion.value) return;
 
-  moveInspectableToMillimeters(
-    selected,
-    center,
-    currentExperiment.referenceCoordinate
-  );
+  moveInspectableToMillimeters(selected, center);
 }
 
 /**

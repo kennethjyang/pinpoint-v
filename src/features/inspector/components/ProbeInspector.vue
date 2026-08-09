@@ -274,12 +274,7 @@ async function moveToSurface(): Promise<void> {
   surfaceAbortController = controller;
   isFindingSurface.value = true;
   try {
-    const referenceCoordinate = currentExperimentStore.referenceCoordinate;
-    const targets = await findTargets(
-      probe,
-      referenceCoordinate,
-      controller.signal
-    );
+    const targets = await findTargets(probe, controller.signal);
     // An abort that lands after the rays resolved must still not move the probe. No
     // toast either: the user asked for this to stop, so it is not a failure.
     if (controller.signal.aborted) return;
@@ -294,7 +289,7 @@ async function moveToSurface(): Promise<void> {
     const { insideMillimeters, axisMillimeters, dorsoventralMillimeters } =
       targets;
     if (insideMillimeters) {
-      setProbeTipMillimeters(probe, insideMillimeters, referenceCoordinate);
+      setProbeTipMillimeters(probe, insideMillimeters);
       return;
     }
     if (!axisMillimeters && !dorsoventralMillimeters) {
@@ -307,8 +302,7 @@ async function moveToSurface(): Promise<void> {
     if (!axisMillimeters || !dorsoventralMillimeters) {
       setProbeTipMillimeters(
         probe,
-        axisMillimeters ?? dorsoventralMillimeters!,
-        referenceCoordinate
+        axisMillimeters ?? dorsoventralMillimeters!
       );
       return;
     }
@@ -317,11 +311,6 @@ async function moveToSurface(): Promise<void> {
       probeId: probe.id,
       tipPosition: [...probe.tipPosition],
       rotation: [...probe.rotation],
-      tipMillimeters: [
-        referenceCoordinate[0] + probe.tipPosition[0],
-        referenceCoordinate[1] + probe.tipPosition[1],
-        referenceCoordinate[2] + probe.tipPosition[2]
-      ],
       axisTargetMillimeters: axisMillimeters,
       dorsoventralTargetMillimeters: dorsoventralMillimeters
     };

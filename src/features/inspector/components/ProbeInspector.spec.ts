@@ -575,11 +575,7 @@ describe("ProbeInspector", () => {
       await buttonByLabel(wrapper, t.surface).trigger("click");
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([
-        1 - store.referenceCoordinate[0],
-        2 - store.referenceCoordinate[1],
-        3 - store.referenceCoordinate[2]
-      ]);
+      expect(probe.tipPosition).toEqual([1, 2, 3]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
 
@@ -617,11 +613,7 @@ describe("ProbeInspector", () => {
       await buttonByLabel(wrapper, t.surface).trigger("click");
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([
-        1 - store.referenceCoordinate[0],
-        2 - store.referenceCoordinate[1],
-        3 - store.referenceCoordinate[2]
-      ]);
+      expect(probe.tipPosition).toEqual([1, 2, 3]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
 
@@ -696,18 +688,12 @@ describe("ProbeInspector", () => {
     it("shows cancel with a progress bar while sampling, aborting without moving the tip on cancel click", async () => {
       let resolveTargets!: (value: ProbeSurfaceTargets | null) => void;
       let capturedSignal: AbortSignal | undefined;
-      const findTargets = vi.fn(
-        (
-          _probe: unknown,
-          _referenceCoordinate: unknown,
-          signal?: AbortSignal
-        ) => {
-          capturedSignal = signal;
-          return new Promise<ProbeSurfaceTargets | null>(resolve => {
-            resolveTargets = resolve;
-          });
-        }
-      );
+      const findTargets = vi.fn((_probe: unknown, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        return new Promise<ProbeSurfaceTargets | null>(resolve => {
+          resolveTargets = resolve;
+        });
+      });
       vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
@@ -744,7 +730,6 @@ describe("ProbeInspector", () => {
         probeId: probe.id,
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
-        tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
       };
@@ -763,7 +748,6 @@ describe("ProbeInspector", () => {
         probeId: probe.id,
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
-        tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
       };

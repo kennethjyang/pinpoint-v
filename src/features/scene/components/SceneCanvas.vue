@@ -80,7 +80,6 @@ import {
 import { getSceneModel } from "../api/scene-model.api";
 import { setGizmoControls } from "../api/gizmo.api";
 import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
-import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 import {
   buildProbeSurfacePaths,
   disposeProbeSurfacePaths,
@@ -113,7 +112,6 @@ const runtime = useBabylonRuntimeService();
 useCameraPoseSync(
   runtime.camera,
   () => currentExperiment.atlas,
-  () => currentExperiment.referenceCoordinate,
   () => currentExperiment.experiment.cameraPose,
   () => {
     currentExperiment.isCameraMoving = true;
@@ -456,15 +454,6 @@ watch(runtime.scene, scene => {
   onWatcherCleanup(() => observer.remove());
 });
 
-watchEffect(() => {
-  const scene = runtime.scene.value;
-  if (!scene) return;
-  setReferenceCoordinateNodePosition(
-    scene,
-    currentExperiment.referenceCoordinate
-  );
-});
-
 // Sync probes from state, reattaching selection to any rebuilt entity.
 watchEffect(() => {
   const scene = runtime.scene.value;
@@ -778,8 +767,7 @@ watch(runtime.scene, scene => {
       probe,
       kind === "axis"
         ? choice.axisTargetMillimeters
-        : choice.dorsoventralTargetMillimeters,
-      currentExperiment.referenceCoordinate
+        : choice.dorsoventralTargetMillimeters
     );
   });
   onWatcherCleanup(() => observer.remove());
