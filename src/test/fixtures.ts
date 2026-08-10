@@ -5,6 +5,11 @@ import type {
   TerminologyRow
 } from "@/features/atlas";
 import type { CoordinateSystem } from "@/features/coordinate-system";
+import {
+  buildCoordinateSystem,
+  buildCoordinateSystemNode,
+  buildCoordinateSystemValue
+} from "@/features/coordinate-system";
 import type { ProbeGeometry, SceneModel, SceneObject } from "@/features/scene";
 import type { CameraPose } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
@@ -138,23 +143,20 @@ export function makeCoordinateSystem(
   overrides: Partial<CoordinateSystem> = {}
 ): CoordinateSystem {
   return {
-    inspectableKind: "coordinateSystem",
-    id: crypto.randomUUID(),
-    name: "Fixture Coordinate System",
-    chain: [
-      {
-        position: [
-          { name: "ML", value: 0, fixed: false, bounds: null },
-          { name: "DV", value: 0, fixed: false, bounds: null },
-          { name: "AP", value: 0, fixed: false, bounds: null }
+    ...buildCoordinateSystem("Fixture Coordinate System", [
+      buildCoordinateSystemNode(
+        [
+          buildCoordinateSystemValue("ML"),
+          buildCoordinateSystemValue("DV"),
+          buildCoordinateSystemValue("AP")
         ],
-        rotation: [
-          { name: "Pitch", value: 0, fixed: false, bounds: null },
-          { name: "Yaw", value: 0, fixed: false, bounds: null },
-          { name: "Roll", value: 0, fixed: false, bounds: null }
+        [
+          buildCoordinateSystemValue("Pitch"),
+          buildCoordinateSystemValue("Yaw"),
+          buildCoordinateSystemValue("Roll")
         ]
-      }
-    ],
+      )
+    ]),
     ...overrides
   };
 }

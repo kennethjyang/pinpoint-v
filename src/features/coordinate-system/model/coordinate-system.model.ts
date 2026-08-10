@@ -1,4 +1,4 @@
-interface CoordinateSystemValue {
+export interface CoordinateSystemValue {
   name: string;
   value: number;
   fixed: boolean;
@@ -6,17 +6,24 @@ interface CoordinateSystemValue {
   // Is ignored if fixed = true. Null means unbounded.
   bounds: [number, number] | null;
 }
-interface CoordinateSystemNode {
+export interface CoordinateSystemNode {
   position: [
     CoordinateSystemValue,
     CoordinateSystemValue,
     CoordinateSystemValue
   ];
+
+  // Mapping from XYZ index to a coordinate system value index.
+  positionDisplayOrder: [number, number, number];
+
   rotation: [
     CoordinateSystemValue,
     CoordinateSystemValue,
     CoordinateSystemValue
   ];
+
+  // Mapping from XYZ index to a coordinate system value index.
+  rotationDisplayOrder: [number, number, number];
 }
 
 export interface CoordinateSystem {
