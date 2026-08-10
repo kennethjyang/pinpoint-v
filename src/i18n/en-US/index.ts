@@ -176,7 +176,10 @@ export default {
     confirmDelete: 'Are you sure you wish to delete "{name}"?',
     delete: "Delete",
     cancel: "Cancel",
-    close: "Close"
+    close: "Close",
+    dragToReorder: "Drag to reorder",
+    defaultPinned:
+      "The default coordinate system always stays first and cannot be deleted."
   },
   modelFile: {
     invalidModelFile: "Unable to import that 3D model.",
@@ -204,9 +207,12 @@ export default {
   probeInspector: {
     name: "Name",
     probeType: "Probe Type",
-    roll: "Roll",
-    yaw: "Yaw",
-    pitch: "Pitch",
+    coordinateSystem: "Coordinate System",
+    transform: "Transform {index}",
+    transformValue: "Transform {index} {name}",
+    position: "Position",
+    rotation: "Rotation",
+    outOfBounds: "Must be between {minimum} and {maximum} {unit}.",
     home: "Reset tip position",
     surface: "Move to surface",
     cancelSurface: "Cancel move to surface",

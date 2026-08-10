@@ -38,6 +38,80 @@ describe("useCoordinateSystemLibraryStore", () => {
     });
   });
 
+  describe("reorder", () => {
+    it("moves a system to a later index, leaving the default first", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(1, 2);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "NewScale MIS",
+        "Surface Coordinate & Depth"
+      ]);
+    });
+
+    it("moves a system to an earlier index, leaving the default first", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(2, 1);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "NewScale MIS",
+        "Surface Coordinate & Depth"
+      ]);
+    });
+
+    it("is a no-op for equal indices", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(1, 1);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "Surface Coordinate & Depth",
+        "NewScale MIS"
+      ]);
+    });
+
+    it("is a no-op for an out-of-range index", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(1, 5);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "Surface Coordinate & Depth",
+        "NewScale MIS"
+      ]);
+    });
+
+    it("cannot move the default out of index 0", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(0, 2);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "Surface Coordinate & Depth",
+        "NewScale MIS"
+      ]);
+    });
+
+    it("cannot displace the default at index 0", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      store.reorder(2, 0);
+
+      expect(store.library.map(({ name }) => name)).toEqual([
+        "Default",
+        "Surface Coordinate & Depth",
+        "NewScale MIS"
+      ]);
+    });
+  });
+
   describe("seeded library", () => {
     it("recreates the three seeds by name, in order", () => {
       const store = useCoordinateSystemLibraryStore();

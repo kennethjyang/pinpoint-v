@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref } from "vue";
+import { computed, onUnmounted, ref, toRaw, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -20,22 +20,16 @@ import {
   useModelFileImport
 } from "@/features/scene";
 import { SliceCanvas, useProbeSurface } from "@/features/slice";
+import type { CoordinateSystemNode } from "@/features/coordinate-system";
 import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
+import ProbeTransformChain from "./ProbeTransformChain.vue";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { setProbeInterface } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { usePreferencesStore } from "@/stores/preferences.store";
-import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
-import { useUnitLabels } from "@/composable/useUnitLabels";
+import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useValidationRules } from "@/composable/useValidationRules";
 import { useNotify } from "@/composable/useNotify";
 import CommittedInput from "@/components/CommittedInput.vue";
-import {
-  millimetersToPositionUnit,
-  positionUnitToMillimeters,
-  radiansToRotationUnit,
-  rotationUnitToRadians
-} from "@/utils/math";
 
 // A library probe's identifier paired with its display label. `emit-value`
 // keeps the model the identifier, which `findProbeInterfaceProbeByIdentifier`
@@ -53,16 +47,21 @@ interface ShankAlignmentOption {
   attrs: { "aria-label": string };
 }
 
+// A library coordinate system's id paired with its name. `emit-value` keeps the
+// model the id.
+interface CoordinateSystemOption {
+  label: string;
+  value: string;
+}
+
 const { probe } = defineProps<{
   probe: Probe;
 }>();
 
 const probeLibraryStore = useProbeLibraryStore();
 const currentExperimentStore = useCurrentExperimentStore();
-const preferences = usePreferencesStore();
-const unitLabels = useUnitLabels();
-const { requiredName: nameRules, optionalNumber: numberRules } =
-  useValidationRules();
+const coordinateSystemLibraryStore = useCoordinateSystemLibraryStore();
+const { requiredName: nameRules } = useValidationRules();
 
 const { t } = useI18n();
 const { notifyWarning } = useNotify();
@@ -70,6 +69,17 @@ const { findTargets } = useProbeSurface();
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
+
+/** Id of the library coordinate system whose chain the transform inputs edit. */
+const coordinateSystemId = ref(
+  coordinateSystemLibraryStore.library[0]?.id ?? ""
+);
+
+/**
+ * Working copy of the selected coordinate system's chain. Detached from the library so
+ * editing a value here never rewrites the shared definition.
+ */
+const chain = ref<CoordinateSystemNode[]>([]);
 
 /**
  * Aborts the in-flight surface sampling. Deliberately a plain `let`, not a ref:
@@ -102,6 +112,13 @@ const probeTypeOptions = computed<ProbeTypeOption[]>(() =>
   probeLibraryStore.library.map(probeInterfaceProbe => ({
     label: getProbeInterfaceDisplayName(probeInterfaceProbe),
     value: getProbeInterfaceIdentifier(probeInterfaceProbe)
+  }))
+);
+
+const coordinateSystemOptions = computed<CoordinateSystemOption[]>(() =>
+  coordinateSystemLibraryStore.library.map(({ id, name }) => ({
+    label: name,
+    value: id
   }))
 );
 
@@ -157,64 +174,10 @@ const shankAlignmentOptions = computed<ShankAlignmentOption[]>(() => {
   return options;
 });
 
-const positionSuffix = computed(() =>
-  unitLabels.position(preferences.positionUnit)
-);
-
-const rotationSuffix = computed(() =>
-  unitLabels.rotation(preferences.rotationUnit)
-);
 const name = computed({
   get: () => probe.name,
   set: (value: string) => (probe.name = value.trim())
 });
-
-const ap = useNumericTupleModel(
-  () => probe.tipPosition,
-  0,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const dv = useNumericTupleModel(
-  () => probe.tipPosition,
-  1,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const ml = useNumericTupleModel(
-  () => probe.tipPosition,
-  2,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-
-const roll = useNumericTupleModel(
-  () => probe.rotation,
-  0,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const yaw = useNumericTupleModel(
-  () => probe.rotation,
-  1,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const pitch = useNumericTupleModel(
-  () => probe.rotation,
-  2,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
 
 const lockIcon = computed(() =>
   probe.lock ? "lock" : "sym_o_lock_open_right"
@@ -251,6 +214,16 @@ const surfaceLabel = computed(() =>
     ? t("probeInspector.cancelSurface")
     : t("probeInspector.surface")
 );
+
+/** Re-clone the selected library coordinate system's chain into the working copy. */
+function seedChain(): void {
+  const coordinateSystem = coordinateSystemLibraryStore.library.find(
+    ({ id }) => id === coordinateSystemId.value
+  );
+  chain.value = coordinateSystem
+    ? structuredClone(toRaw(coordinateSystem)).chain
+    : [];
+}
 
 /**
  * Abort an in-flight surface move, dropping any path choice awaiting a pick - which
@@ -328,6 +301,9 @@ function onSurfaceClick(): void {
   }
   void moveToSurface();
 }
+
+// A different probe or a different coordinate system starts from the library's values.
+watch([() => probe.id, coordinateSystemId], seedChain, { immediate: true });
 
 onUnmounted(cancelMoveToSurface);
 </script>
@@ -431,71 +407,16 @@ onUnmounted(cancelMoveToSurface);
             />
           </div>
 
-          <div class="row q-gutter-x-sm">
-            <CommittedInput
-              v-model="ap"
-              :disable="probe.lock"
-              :label="t('axis.ap')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="dv"
-              :disable="probe.lock"
-              :label="t('axis.dv')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="ml"
-              :disable="probe.lock"
-              :label="t('axis.ml')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-          </div>
+          <q-select
+            v-model="coordinateSystemId"
+            emit-value
+            :label="t('probeInspector.coordinateSystem')"
+            map-options
+            :options="coordinateSystemOptions"
+            outlined
+          />
 
-          <div class="row q-gutter-x-sm">
-            <CommittedInput
-              v-model="roll"
-              :disable="probe.lock"
-              :label="t('probeInspector.roll')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="yaw"
-              :disable="probe.lock"
-              :label="t('probeInspector.yaw')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="pitch"
-              :disable="probe.lock"
-              :label="t('probeInspector.pitch')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-          </div>
+          <ProbeTransformChain :chain="chain" :disable="probe.lock" />
 
           <div>
             <q-color

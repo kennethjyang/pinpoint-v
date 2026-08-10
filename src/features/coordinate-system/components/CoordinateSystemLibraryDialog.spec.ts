@@ -60,12 +60,14 @@ describe("CoordinateSystemLibraryDialog", () => {
     const notify = vi.fn();
     wrapper.vm.$q.notify = notify;
 
-    const firstItem = wrapper.findAllComponents({ name: "QItem" })[0]!;
-    await firstItem.findComponent({ name: "QBtn" }).trigger("click");
+    const targetItem = wrapper.findAllComponents({ name: "QItem" })[1]!;
+    await targetItem.findComponent({ name: "QBtn" }).trigger("click");
 
     expect(store.library).toHaveLength(3);
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining("Default") })
+      expect.objectContaining({
+        message: expect.stringContaining(store.library[1]!.name)
+      })
     );
   });
 
@@ -74,14 +76,16 @@ describe("CoordinateSystemLibraryDialog", () => {
     const store = useCoordinateSystemLibraryStore();
     const notify = vi.fn();
     wrapper.vm.$q.notify = notify;
+    const target = store.library[1]!.name;
 
-    const firstItem = wrapper.findAllComponents({ name: "QItem" })[0]!;
-    await firstItem.findComponent({ name: "QBtn" }).trigger("click");
+    const targetItem = wrapper.findAllComponents({ name: "QItem" })[1]!;
+    await targetItem.findComponent({ name: "QBtn" }).trigger("click");
     const options = notify.mock.calls[0]![0];
     options.actions[1].handler();
 
     expect(store.library).toHaveLength(2);
-    expect(store.library.map(({ name }) => name)).not.toContain("Default");
+    expect(store.library.map(({ name }) => name)).not.toContain(target);
+    expect(store.library.map(({ name }) => name)).toContain("Default");
   });
 
   it("selects the coordinate system and closes the dialog on row click", async () => {
@@ -94,5 +98,56 @@ describe("CoordinateSystemLibraryDialog", () => {
 
     expect(currentExperimentStore.selectedInspectable).toBe(store.library[0]);
     expect(wrapper.emitted("ok")).toBeTruthy();
+  });
+
+  it("offers no delete button for the default coordinate system", async () => {
+    const wrapper = await mountDialog();
+
+    const items = wrapper.findAllComponents({ name: "QItem" });
+
+    expect(items[0]!.findAllComponents({ name: "QBtn" })).toHaveLength(0);
+    expect(items[1]!.findAllComponents({ name: "QBtn" })).toHaveLength(1);
+  });
+
+  it("offers no drag handle for the default coordinate system", async () => {
+    const wrapper = await mountDialog();
+
+    const items = wrapper.findAllComponents({ name: "QItem" });
+
+    expect(items[0]!.find(".coordinate-system-row__handle").exists()).toBe(
+      false
+    );
+    expect(items[1]!.find(".coordinate-system-row__handle").exists()).toBe(
+      true
+    );
+  });
+
+  it("moves the dragged row to the dropped-on row's index", async () => {
+    const wrapper = await mountDialog();
+    const store = useCoordinateSystemLibraryStore();
+
+    const items = wrapper.findAllComponents({ name: "QItem" });
+    await items[1]!.find(".coordinate-system-row__handle").trigger("dragstart");
+    await items[2]!.trigger("dragover");
+    await items[2]!.trigger("drop");
+
+    expect(store.library.map(({ name }) => name)).toEqual([
+      "Default",
+      "NewScale MIS",
+      "Surface Coordinate & Depth"
+    ]);
+  });
+
+  it("does not let a drag displace the default coordinate system", async () => {
+    const wrapper = await mountDialog();
+    const store = useCoordinateSystemLibraryStore();
+    const before = store.library.map(({ name }) => name);
+
+    const items = wrapper.findAllComponents({ name: "QItem" });
+    await items[2]!.find(".coordinate-system-row__handle").trigger("dragstart");
+    await items[0]!.trigger("dragover");
+    await items[0]!.trigger("drop");
+
+    expect(store.library.map(({ name }) => name)).toEqual(before);
   });
 });

@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import type { CoordinateSystem } from "../model/coordinate-system.model";
 import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { useDragReorder } from "@/composable/useDragReorder";
 
 defineEmits([...useDialogPluginComponent.emits]);
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent();
@@ -12,6 +13,25 @@ const $q = useQuasar();
 const { t } = useI18n();
 const coordinateSystemLibraryStore = useCoordinateSystemLibraryStore();
 const currentExperimentStore = useCurrentExperimentStore();
+
+const {
+  draggedIndex,
+  dropTargetIndex,
+  startDrag,
+  dragOverRow,
+  dropRow,
+  endDrag
+} = useDragReorder(coordinateSystemLibraryStore.reorder);
+
+/**
+ * Accept a drag over a row, except over the pinned default at index 0.
+ * @param index Index of the row being hovered.
+ * @param event Drag event to accept.
+ */
+function onDragOverRow(index: number, event: DragEvent): void {
+  if (index === 0) return;
+  dragOverRow(index, event);
+}
 
 /**
  * Select a coordinate system for the inspector and close the library.
@@ -58,14 +78,44 @@ function confirmRemove(coordinateSystem: CoordinateSystem) {
       <q-card-section>
         <q-list class="dynamic-dialog-list" separator>
           <q-item
-            v-for="coordinateSystem in coordinateSystemLibraryStore.library"
+            v-for="(
+              coordinateSystem, index
+            ) in coordinateSystemLibraryStore.library"
             :key="coordinateSystem.id"
             v-ripple
+            :class="{
+              'coordinate-system-row--dragging': draggedIndex === index,
+              'coordinate-system-row--drop-target':
+                dropTargetIndex === index && draggedIndex !== index
+            }"
             clickable
             @click="openInInspector(coordinateSystem)"
+            @dragover="onDragOverRow(index, $event)"
+            @drop="dropRow(index)"
           >
-            <q-item-section>{{ coordinateSystem.name }}</q-item-section>
             <q-item-section side>
+              <!-- Index 0 is the built-in default: pinned first, so it gets a lock in place of
+                   the drag handle rather than an empty section, which would collapse
+                   (`.q-item__section--side` is `min-width: 0`) and misalign this row's name. -->
+              <div
+                v-if="index > 0"
+                class="coordinate-system-row__handle"
+                draggable="true"
+                :title="t('coordinateSystemLibrary.dragToReorder')"
+                @dragend="endDrag"
+                @dragstart.stop="startDrag(index, $event)"
+              >
+                <q-icon name="drag_indicator" size="sm" />
+              </div>
+              <q-icon
+                v-else
+                name="lock"
+                size="sm"
+                :title="t('coordinateSystemLibrary.defaultPinned')"
+              />
+            </q-item-section>
+            <q-item-section>{{ coordinateSystem.name }}</q-item-section>
+            <q-item-section v-if="index > 0" side>
               <q-btn
                 :aria-label="
                   t('coordinateSystemLibrary.deleteCoordinateSystem', {
@@ -91,3 +141,16 @@ function confirmRemove(coordinateSystem: CoordinateSystem) {
     </q-card>
   </q-dialog>
 </template>
+
+<style lang="sass" scoped>
+.coordinate-system-row__handle
+  cursor: grab
+  display: flex
+
+.coordinate-system-row--dragging
+  opacity: 0.5
+
+.coordinate-system-row--drop-target
+  outline: 2px solid var(--q-primary)
+  outline-offset: -2px
+</style>

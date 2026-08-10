@@ -125,8 +125,28 @@ export const useCoordinateSystemLibraryStore = defineStore(
       library.value.splice(index, 1);
     }
 
+    /**
+     * Move a coordinate system within the library. Index 0 is the default system and is
+     * pinned: it can be neither moved nor displaced.
+     * @param fromIndex Index of the coordinate system to move.
+     * @param toIndex Index to move it to.
+     */
+    function reorder(fromIndex: number, toIndex: number) {
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 1 ||
+        toIndex < 1 ||
+        fromIndex >= library.value.length ||
+        toIndex >= library.value.length
+      ) {
+        return;
+      }
+      const [coordinateSystem] = library.value.splice(fromIndex, 1);
+      library.value.splice(toIndex, 0, coordinateSystem!);
+    }
+
     const state = { library };
-    const actions = { remove };
+    const actions = { remove, reorder };
     return { ...state, ...actions };
   },
   { persist: true }

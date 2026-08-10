@@ -3,8 +3,8 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ValidationRule } from "quasar";
 import CommittedInput from "@/components/CommittedInput.vue";
+import { useCoordinateSystemValueModel } from "../composable/useCoordinateSystemValueModel";
 import { useNumericModel } from "@/composable/useNumericModel";
-import { useUnitLabels } from "@/composable/useUnitLabels";
 import { useValidationRules } from "@/composable/useValidationRules";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import {
@@ -13,12 +13,6 @@ import {
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
 } from "@/features/coordinate-system";
-import {
-  millimetersToPositionUnit,
-  positionUnitToMillimeters,
-  radiansToRotationUnit,
-  rotationUnitToRadians
-} from "@/utils/math";
 
 // One axis-mapping choice. `attrs` puts a stable aria-label on the rendered
 // button (Quasar spreads it onto each `q-btn`).
@@ -39,46 +33,17 @@ const { coordinateSystemValue, component } = defineProps<{
 const axisIndex = defineModel<number>("axisIndex", { required: true });
 
 const preferences = usePreferencesStore();
-const unitLabels = useUnitLabels();
 const { optionalNumber: numberRules } = useValidationRules();
 const { t } = useI18n();
-
-/**
- * Convert a stored value into its display unit for this value's component.
- * @param storedValue Value in the stored unit (millimeters or radians).
- */
-function toDisplay(storedValue: number): number {
-  return component === "position"
-    ? millimetersToPositionUnit(storedValue, preferences.positionUnit)
-    : radiansToRotationUnit(storedValue, preferences.rotationUnit);
-}
-
-/**
- * Convert a displayed value back into its stored unit for this value's component.
- * @param displayValue Value in the displayed unit.
- */
-function fromDisplay(displayValue: number): number {
-  return component === "position"
-    ? positionUnitToMillimeters(displayValue, preferences.positionUnit)
-    : rotationUnitToRadians(displayValue, preferences.rotationUnit);
-}
-
-const suffix = computed(() =>
-  component === "position"
-    ? unitLabels.position(preferences.positionUnit)
-    : unitLabels.rotation(preferences.rotationUnit)
+const { value, suffix, toDisplay, fromDisplay } = useCoordinateSystemValueModel(
+  () => coordinateSystemValue,
+  component
 );
+
 const name = computed({
   get: () => coordinateSystemValue.name,
   set: (value: string) => (coordinateSystemValue.name = value.trim())
 });
-const value = useNumericModel(
-  () => coordinateSystemValue.value,
-  next => (coordinateSystemValue.value = next),
-  toDisplay,
-  fromDisplay,
-  () => preferences.decimalPrecision
-);
 const minimumBound = useNumericModel(
   () => coordinateSystemValue.bounds?.[0] ?? 0,
   next => {

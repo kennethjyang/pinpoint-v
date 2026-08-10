@@ -9,11 +9,18 @@ import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
+import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import {
   makeProbe,
   makeProbeInterfaceProbe,
   makeSceneModel
 } from "@/test/fixtures";
+import {
+  buildCoordinateSystem,
+  buildCoordinateSystemNode,
+  buildCoordinateSystemValue,
+  buildFixedCoordinateSystemValue
+} from "@/features/coordinate-system";
 import { getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
 import {
@@ -137,6 +144,18 @@ function buttonByLabel(wrapper: VueWrapper, label: string) {
     .find(button => button.attributes("aria-label") === label)!;
 }
 
+function selectByLabel(wrapper: VueWrapper, label: string) {
+  return wrapper
+    .findAllComponents({ name: "QSelect" })
+    .find(select => select.props("label") === label)!;
+}
+
+function fieldByAriaLabel(wrapper: VueWrapper, ariaLabel: string) {
+  return wrapper
+    .findAllComponents({ name: "QInput" })
+    .find(field => field.find("input").attributes("aria-label") === ariaLabel)!;
+}
+
 /**
  * Focus, replace a field's text, and blur it -- the sequence a real user
  * produces, which `use-field`'s handlers require in this order.
@@ -179,7 +198,7 @@ describe("ProbeInspector", () => {
       props: { probe: store.experiment.probes[0]! },
       global: { provide: babylonRuntimeProvide }
     });
-    return { wrapper, store, probe: store.experiment.probes[0]! };
+    return { wrapper, store, probe: store.experiment.probes[0]!, pinia };
   }
 
   it("groups the inspector into slice, properties, and body model sections", () => {
@@ -268,88 +287,81 @@ describe("ProbeInspector", () => {
     expect(name.find("[role='alert']").exists()).toBe(false);
   });
 
-  it("commits AP/DV/ML into tipPosition as real numbers", async () => {
-    const { wrapper, probe } = mountInspector();
-
-    await editAndBlur(fieldByLabel(wrapper, axis.ap), "-2.5");
-    await editAndBlur(fieldByLabel(wrapper, axis.dv), "1");
-    await editAndBlur(fieldByLabel(wrapper, axis.ml), "0");
-
-    expect(probe.tipPosition).toEqual([-2.5, 1, 0]);
-    expect(probe.tipPosition.every(value => typeof value === "number")).toBe(
-      true
-    );
-  });
-
-  it("commits Roll/Yaw/Pitch in degrees, converting to radians in orientation", async () => {
-    const { wrapper, probe } = mountInspector();
-
-    await editAndBlur(fieldByLabel(wrapper, t.roll), "90");
-    await editAndBlur(fieldByLabel(wrapper, t.yaw), "180");
-    await editAndBlur(fieldByLabel(wrapper, t.pitch), "-45");
-
-    expect(probe.rotation[0]).toBeCloseTo(Math.PI / 2);
-    expect(probe.rotation[1]).toBeCloseTo(Math.PI);
-    expect(probe.rotation[2]).toBeCloseTo(-Math.PI / 4);
-  });
-
   it("rejects a non-numeric value in a numeric field", async () => {
-    const { wrapper, probe } = mountInspector();
+    const { wrapper, pinia } = mountInspector();
+    const ml =
+      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
+        .name;
 
-    const ap = fieldByLabel(wrapper, axis.ap);
-    await editAndBlur(ap, "abc");
+    const field = fieldByLabel(wrapper, ml);
+    await editAndBlur(field, "abc");
 
-    expect(probe.tipPosition[0]).toBe(0);
-    expect(ap.find("[role='alert']").text()).toBe(validation.mustBeNumber);
+    expect(field.find("[role='alert']").text()).toBe(validation.mustBeNumber);
+
+    // "abc" must never reach the stored value: forcing a precision change
+    // re-syncs the field from the canonical value, which only shows a
+    // freshly formatted zero if the invalid entry was never committed.
+    usePreferencesStore().decimalPrecision = 1;
+    await wrapper.vm.$nextTick();
+    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe("0.0");
   });
 
   it("rounds the display to the preferences store's decimal precision", async () => {
-    const { wrapper } = mountInspector(
-      makeProbe({ tipPosition: [1.2345, 0, 0] })
-    );
+    const { wrapper, pinia } = mountInspector();
+    const ml =
+      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
+        .name;
+
+    await editAndBlur(fieldByLabel(wrapper, ml), "1.2345");
     usePreferencesStore().decimalPrecision = 1;
     await wrapper.vm.$nextTick();
 
-    expect(fieldByLabel(wrapper, axis.ap).props("modelValue")).toBe("1.2");
+    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe("1.2");
   });
 
   it("displays positions and rotations in the preferences store's units", async () => {
-    const { wrapper } = mountInspector(
-      makeProbe({ tipPosition: [1, 0, 0], rotation: [0, 0, Math.PI / 2] })
-    );
+    const { wrapper, pinia } = mountInspector();
+    const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+    const ml = node.position[0]!.name;
+    const pitchName = node.rotation[0]!.name;
+
+    await editAndBlur(fieldByLabel(wrapper, ml), "1");
     const preferences = usePreferencesStore();
     preferences.positionUnit = "micrometer";
     preferences.rotationUnit = "radian";
     await wrapper.vm.$nextTick();
 
-    const ap = fieldByLabel(wrapper, axis.ap);
-    expect(ap.props("modelValue")).toBe("1000.000");
-    expect(ap.props("suffix")).toBe("µm");
-    const pitch = fieldByLabel(wrapper, t.pitch);
-    expect(pitch.props("modelValue")).toBe("1.571");
-    expect(pitch.props("suffix")).toBe("rad");
+    const mlField = fieldByLabel(wrapper, ml);
+    expect(mlField.props("modelValue")).toBe("1000.000");
+    expect(mlField.props("suffix")).toBe("µm");
+    expect(fieldByLabel(wrapper, pitchName).props("suffix")).toBe("rad");
   });
 
   it("commits zero when a numeric field is left blank", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeProbe({ tipPosition: [5, 0, 0] })
-    );
+    const { wrapper, pinia } = mountInspector();
+    const ml =
+      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
+        .name;
+    const field = fieldByLabel(wrapper, ml);
 
-    const ap = fieldByLabel(wrapper, axis.ap);
-    await editAndBlur(ap, "");
+    await editAndBlur(field, "5");
+    await editAndBlur(field, "");
 
-    expect(probe.tipPosition[0]).toBe(0);
-    expect(ap.find("[role='alert']").exists()).toBe(false);
+    expect(field.props("modelValue")).toBe("0.000");
+    expect(field.find("[role='alert']").exists()).toBe(false);
   });
 
   it("accepts zero in a numeric field", async () => {
-    const { wrapper, probe } = mountInspector(
-      makeProbe({ tipPosition: [5, 0, 0] })
-    );
+    const { wrapper, pinia } = mountInspector();
+    const ml =
+      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
+        .name;
+    const field = fieldByLabel(wrapper, ml);
 
-    await editAndBlur(fieldByLabel(wrapper, axis.ap), "0");
+    await editAndBlur(field, "5");
+    await editAndBlur(field, "0");
 
-    expect(probe.tipPosition[0]).toBe(0);
+    expect(field.props("modelValue")).toBe("0.000");
   });
 
   it("re-seeds every field when the probe prop changes", async () => {
@@ -357,20 +369,24 @@ describe("ProbeInspector", () => {
     setActivePinia(pinia);
     useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
-    const a = makeProbe({ name: "A", tipPosition: [1, 2, 3] });
-    const b = makeProbe({ name: "B", tipPosition: [4, 5, 6] });
+    const a = makeProbe({ name: "A" });
+    const b = makeProbe({ name: "B" });
     store.experiment.probes = [a, b];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
       props: { probe: a },
       global: { provide: babylonRuntimeProvide }
     });
+    const ml =
+      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
+        .name;
 
+    await editAndBlur(fieldByLabel(wrapper, ml), "1");
     // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
     await wrapper.setProps({ probe: b } as Record<string, unknown>);
 
     expect(fieldByLabel(wrapper, t.name).props("modelValue")).toBe("B");
-    expect(fieldByLabel(wrapper, axis.ap).props("modelValue")).toBe("4.000");
+    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe("0.000");
   });
 
   it("keeps the renamed probe selected and in sync with the store", async () => {
@@ -382,6 +398,139 @@ describe("ProbeInspector", () => {
 
     expect(store.isInspectableSelected(probe)).toBe(true);
     expect(store.selectedInspectable?.name).toBe("B");
+  });
+
+  describe("coordinate system transform chain", () => {
+    it("renders one transform group per node of the selected coordinate system", async () => {
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+
+      expect(
+        wrapper.findAll(".text-overline").map(node => node.text())
+      ).toEqual([t.transform.replace("{index}", "1")]);
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper.findAll(".text-overline").map(node => node.text())
+      ).toEqual([
+        t.transform.replace("{index}", "1"),
+        t.transform.replace("{index}", "2")
+      ]);
+    });
+
+    it("hides a node's rotation row when every rotation value is fixed", async () => {
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+      const depthName = surfaceAndDepth.chain[1]!.position[1]!.name;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(
+        fieldByAriaLabel(
+          wrapper,
+          t.transformValue.replace("{index}", "2").replace("{name}", depthName)
+        ).exists()
+      ).toBe(true);
+      expect(
+        wrapper
+          .findComponent({ name: "ProbeTransformChain" })
+          .findAllComponents({ name: "QInput" })
+      ).toHaveLength(9);
+    });
+
+    it("shows a fixed value as a disabled input labelled by its axis", async () => {
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(fieldByLabel(wrapper, axis.x).props("disable")).toBe(true);
+      expect(fieldByLabel(wrapper, axis.z).props("disable")).toBe(true);
+      expect(fieldByLabel(wrapper, "Depth").props("disable")).toBe(false);
+    });
+
+    it("writes an out-of-bounds value and shows the bounds error", async () => {
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+      const pitchName = surfaceAndDepth.chain[0]!.rotation[0]!.name;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+      const field = fieldByLabel(wrapper, pitchName);
+      await editAndBlur(field, "200");
+
+      expect(field.props("modelValue")).toBe("200.000");
+      expect(field.find("[role='alert']").text()).toBe(
+        t.outOfBounds
+          .replace("{minimum}", "0.000")
+          .replace("{maximum}", "90.000")
+          .replace("{unit}", "°")
+      );
+    });
+
+    it("omits a node whose every value is fixed", async () => {
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const allFixedNode = buildCoordinateSystemNode(
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ],
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ]
+      );
+      const adjustableNode = buildCoordinateSystemNode(
+        [
+          buildCoordinateSystemValue("X"),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ],
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ]
+      );
+      const custom = buildCoordinateSystem("Custom", [
+        allFixedNode,
+        adjustableNode
+      ]);
+      store.library.push(custom);
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        custom.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(
+        wrapper.findAll(".text-overline").map(node => node.text())
+      ).toEqual([t.transform.replace("{index}", "2")]);
+    });
   });
 
   describe("probe type select", () => {
@@ -404,7 +553,7 @@ describe("ProbeInspector", () => {
         global: { provide: babylonRuntimeProvide }
       });
 
-      const select = wrapper.findComponent({ name: "QSelect" });
+      const select = selectByLabel(wrapper, t.probeType);
       expect(select.props("options")).toEqual([
         {
           label: getProbeInterfaceDisplayName(spec),
@@ -429,7 +578,7 @@ describe("ProbeInspector", () => {
         global: { provide: babylonRuntimeProvide }
       });
 
-      expect(wrapper.findComponent({ name: "QSelect" }).text()).toContain(
+      expect(selectByLabel(wrapper, t.probeType).text()).toContain(
         "imec NP1000"
       );
     });
@@ -458,9 +607,10 @@ describe("ProbeInspector", () => {
         global: { provide: babylonRuntimeProvide }
       });
 
-      wrapper
-        .findComponent({ name: "QSelect" })
-        .vm.$emit("update:modelValue", getProbeInterfaceIdentifier(newSpec));
+      selectByLabel(wrapper, t.probeType).vm.$emit(
+        "update:modelValue",
+        getProbeInterfaceIdentifier(newSpec)
+      );
       await wrapper.vm.$nextTick();
 
       expect(probe.probeInterfaceIdentifier).toBe(
@@ -488,9 +638,10 @@ describe("ProbeInspector", () => {
         global: { provide: babylonRuntimeProvide }
       });
 
-      wrapper
-        .findComponent({ name: "QSelect" })
-        .vm.$emit("update:modelValue", "unknown manufacturer unknown-model");
+      selectByLabel(wrapper, t.probeType).vm.$emit(
+        "update:modelValue",
+        "unknown manufacturer unknown-model"
+      );
       await wrapper.vm.$nextTick();
 
       expect(probe.probeInterfaceIdentifier).toBe(
@@ -538,9 +689,13 @@ describe("ProbeInspector", () => {
     });
 
     it("disables the pose fields and the home/pin buttons while locked, leaving name and copy editable", () => {
-      const { wrapper } = mountInspector(makeProbe({ lock: true }));
+      const { wrapper, pinia } = mountInspector(makeProbe({ lock: true }));
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const valueNames = [...node.position, ...node.rotation].map(
+        ({ name }) => name
+      );
 
-      for (const label of [axis.ap, axis.dv, axis.ml, t.roll, t.yaw, t.pitch]) {
+      for (const label of valueNames) {
         expect(fieldByLabel(wrapper, label).props("disable")).toBe(true);
       }
       expect(fieldByLabel(wrapper, t.name).props("disable")).toBeFalsy();
