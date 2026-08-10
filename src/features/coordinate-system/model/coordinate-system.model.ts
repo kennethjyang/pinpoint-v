@@ -29,9 +29,15 @@ export interface CoordinateSystemNode {
   onSurface: boolean;
 }
 
+/** Which triple of a coordinate system node a value belongs to. */
+export type CoordinateSystemNodeComponent = "position" | "rotation";
+
 export interface CoordinateSystem {
   inspectableKind: "coordinateSystem";
   id: string;
   name: string;
+
+  // If the whole chain is offset by the experiment's reference coordinate.
+  offsetByReferenceCoordinate: boolean;
   chain: CoordinateSystemNode[];
 }

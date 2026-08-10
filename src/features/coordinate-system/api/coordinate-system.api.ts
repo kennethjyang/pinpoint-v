@@ -1,6 +1,7 @@
 import type {
   CoordinateSystem,
   CoordinateSystemNode,
+  CoordinateSystemNodeComponent,
   CoordinateSystemValue
 } from "../model/coordinate-system.model";
 
@@ -66,15 +67,18 @@ export function buildCoordinateSystemNode(
  * Build a coordinate system with a fresh id.
  * @param name Display name of the coordinate system.
  * @param chain Transform chain, applied in order.
+ * @param offsetByReferenceCoordinate Whether the chain is offset by the experiment reference coordinate.
  */
 export function buildCoordinateSystem(
   name: string,
-  chain: CoordinateSystemNode[]
+  chain: CoordinateSystemNode[],
+  offsetByReferenceCoordinate = false
 ): CoordinateSystem {
   return {
     inspectableKind: "coordinateSystem",
     id: crypto.randomUUID(),
     name,
+    offsetByReferenceCoordinate,
     chain
   };
 }
@@ -100,4 +104,124 @@ export function addCoordinateSystemTransform(
       ]
     )
   );
+}
+
+/**
+ * Axis index (0 = X, 1 = Y, 2 = Z) a node's value is mapped to, or -1 when absent.
+ * @param node Coordinate system node holding the value.
+ * @param component Whether the value is a position or a rotation value.
+ * @param valueIndex Index of the value within its display-ordered triple.
+ */
+export function getCoordinateSystemValueAxis(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  valueIndex: number
+): number {
+  const { order } = getComponentPair(node, component);
+  return order.indexOf(valueIndex);
+}
+
+/**
+ * Resolve a node's values array and display order for the given component.
+ * @param node Coordinate system node holding the component.
+ * @param component Whether to resolve the position or rotation pair.
+ */
+function getComponentPair(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent
+): {
+  values: [CoordinateSystemValue, CoordinateSystemValue, CoordinateSystemValue];
+  order: [number, number, number];
+} {
+  return component === "position"
+    ? { values: node.position, order: node.positionDisplayOrder }
+    : { values: node.rotation, order: node.rotationDisplayOrder };
+}
+
+/**
+ * Map a node's value onto an axis, swapping with the value that held it so the
+ * three axes stay distinct.
+ * @param node Coordinate system node holding the value.
+ * @param component Whether the value is a position or a rotation value.
+ * @param valueIndex Index of the value within its display-ordered triple.
+ * @param axisIndex Axis index (0 = X, 1 = Y, 2 = Z) to map the value onto.
+ */
+export function setCoordinateSystemValueAxis(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  valueIndex: number,
+  axisIndex: number
+): void {
+  const { order } = getComponentPair(node, component);
+  const currentAxis = order.indexOf(valueIndex);
+  if (
+    currentAxis === -1 ||
+    currentAxis === axisIndex ||
+    axisIndex < 0 ||
+    axisIndex >= order.length
+  ) {
+    return;
+  }
+  order[currentAxis] = order[axisIndex]!;
+  order[axisIndex] = valueIndex;
+}
+
+/**
+ * Move a node's value within its display order, keeping every axis mapped to
+ * the same value.
+ * @param node Coordinate system node holding the value.
+ * @param component Whether the value is a position or a rotation value.
+ * @param fromIndex Index of the value to move.
+ * @param toIndex Index to move it to.
+ */
+export function reorderCoordinateSystemValue(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  fromIndex: number,
+  toIndex: number
+): void {
+  const { values, order } = getComponentPair(node, component);
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= values.length ||
+    toIndex >= values.length
+  ) {
+    return;
+  }
+
+  const newToOld = [0, 1, 2];
+  newToOld.splice(toIndex, 0, ...newToOld.splice(fromIndex, 1));
+  const oldToNew = [0, 0, 0];
+  newToOld.forEach((oldIndex, newIndex) => (oldToNew[oldIndex] = newIndex));
+  values.splice(toIndex, 0, ...values.splice(fromIndex, 1));
+  for (let axis = 0; axis < order.length; axis++) {
+    order[axis] = oldToNew[order[axis]!]!;
+  }
+}
+
+/**
+ * Fix or unfix a coordinate system value; a fixed value is always unbounded.
+ * @param coordinateSystemValue Coordinate system value to update.
+ * @param fixed Whether the value should be fixed.
+ */
+export function setCoordinateSystemValueFixed(
+  coordinateSystemValue: CoordinateSystemValue,
+  fixed: boolean
+): void {
+  coordinateSystemValue.fixed = fixed;
+  if (fixed) coordinateSystemValue.bounds = null;
+}
+
+/**
+ * Bound or unbound a coordinate system value, seeding a new bound at zero.
+ * @param coordinateSystemValue Coordinate system value to update.
+ * @param bounded Whether the value should be bounded.
+ */
+export function setCoordinateSystemValueBounded(
+  coordinateSystemValue: CoordinateSystemValue,
+  bounded: boolean
+): void {
+  coordinateSystemValue.bounds = bounded ? [0, 0] : null;
 }

@@ -4,7 +4,12 @@ import {
   buildCoordinateSystem,
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
-  buildFixedCoordinateSystemValue
+  buildFixedCoordinateSystemValue,
+  getCoordinateSystemValueAxis,
+  reorderCoordinateSystemValue,
+  setCoordinateSystemValueAxis,
+  setCoordinateSystemValueBounded,
+  setCoordinateSystemValueFixed
 } from "./coordinate-system.api";
 import { makeCoordinateSystem } from "@/test/fixtures";
 
@@ -126,11 +131,180 @@ describe("buildCoordinateSystem", () => {
     expect(coordinateSystem.inspectableKind).toBe("coordinateSystem");
     expect(coordinateSystem.name).toBe("CCF");
     expect(coordinateSystem.chain).toEqual([]);
+    expect(coordinateSystem.offsetByReferenceCoordinate).toBe(false);
+  });
+
+  it("carries an explicit offsetByReferenceCoordinate", () => {
+    const coordinateSystem = buildCoordinateSystem("CCF", [], true);
+
+    expect(coordinateSystem.offsetByReferenceCoordinate).toBe(true);
   });
 
   it("assigns a fresh id on every call", () => {
     expect(buildCoordinateSystem("CCF", []).id).not.toBe(
       buildCoordinateSystem("CCF", []).id
     );
+  });
+});
+
+describe("getCoordinateSystemValueAxis", () => {
+  function makeNode() {
+    return buildCoordinateSystemNode(
+      [
+        buildCoordinateSystemValue("ML"),
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ],
+      [
+        buildCoordinateSystemValue("Pitch"),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ]
+    );
+  }
+
+  it("returns the axis a value index resolves to under the default order", () => {
+    const node = makeNode();
+
+    expect(getCoordinateSystemValueAxis(node, "position", 1)).toBe(1);
+  });
+
+  it("returns the axis a value index resolves to under a permuted order", () => {
+    const node = makeNode();
+    node.positionDisplayOrder = [2, 0, 1];
+
+    expect(getCoordinateSystemValueAxis(node, "position", 2)).toBe(0);
+  });
+});
+
+describe("setCoordinateSystemValueAxis", () => {
+  function makeNode() {
+    return buildCoordinateSystemNode(
+      [
+        buildCoordinateSystemValue("ML"),
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ],
+      [
+        buildCoordinateSystemValue("Pitch"),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ]
+    );
+  }
+
+  it("swaps the value onto the target axis with whichever value held it", () => {
+    const node = makeNode();
+
+    setCoordinateSystemValueAxis(node, "position", 1, 0);
+
+    expect(node.positionDisplayOrder).toEqual([1, 0, 2]);
+    expect(new Set(node.positionDisplayOrder).size).toBe(3);
+  });
+
+  it("is a no-op when the value already owns the target axis", () => {
+    const node = makeNode();
+
+    setCoordinateSystemValueAxis(node, "position", 0, 0);
+
+    expect(node.positionDisplayOrder).toEqual([0, 1, 2]);
+  });
+
+  it("leaves the other component's display order untouched", () => {
+    const node = makeNode();
+
+    setCoordinateSystemValueAxis(node, "position", 1, 0);
+
+    expect(node.rotationDisplayOrder).toEqual([0, 1, 2]);
+  });
+});
+
+describe("reorderCoordinateSystemValue", () => {
+  function makeNode() {
+    return buildCoordinateSystemNode(
+      [
+        buildCoordinateSystemValue("ML"),
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ],
+      [
+        buildCoordinateSystemValue("Pitch"),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ]
+    );
+  }
+
+  it("moves a value while keeping every axis mapped to the same value", () => {
+    const node = makeNode();
+    const nameByAxisBefore = [0, 1, 2].map(
+      axis => node.position[node.positionDisplayOrder[axis]!]!.name
+    );
+
+    reorderCoordinateSystemValue(node, "position", 0, 2);
+
+    expect(node.position.map(value => value.name)).toEqual(["DV", "AP", "ML"]);
+    expect(node.positionDisplayOrder).toEqual([2, 0, 1]);
+    const nameByAxisAfter = [0, 1, 2].map(
+      axis => node.position[node.positionDisplayOrder[axis]!]!.name
+    );
+    expect(nameByAxisAfter).toEqual(nameByAxisBefore);
+  });
+
+  it("is a no-op when fromIndex equals toIndex", () => {
+    const node = makeNode();
+
+    reorderCoordinateSystemValue(node, "position", 1, 1);
+
+    expect(node.position.map(value => value.name)).toEqual(["ML", "DV", "AP"]);
+    expect(node.positionDisplayOrder).toEqual([0, 1, 2]);
+  });
+
+  it("is a no-op for an out-of-range index", () => {
+    const node = makeNode();
+
+    reorderCoordinateSystemValue(node, "position", 0, 3);
+    reorderCoordinateSystemValue(node, "position", -1, 1);
+
+    expect(node.position.map(value => value.name)).toEqual(["ML", "DV", "AP"]);
+    expect(node.positionDisplayOrder).toEqual([0, 1, 2]);
+  });
+});
+
+describe("setCoordinateSystemValueFixed", () => {
+  it("fixes a bounded value and clears its bounds", () => {
+    const value = buildCoordinateSystemValue("Depth", [-7.5, 7.5], 3);
+
+    setCoordinateSystemValueFixed(value, true);
+
+    expect(value.fixed).toBe(true);
+    expect(value.bounds).toBeNull();
+  });
+
+  it("unfixes a value and leaves its bounds null", () => {
+    const value = buildFixedCoordinateSystemValue("Radius", 20);
+
+    setCoordinateSystemValueFixed(value, false);
+
+    expect(value.fixed).toBe(false);
+    expect(value.bounds).toBeNull();
+  });
+});
+
+describe("setCoordinateSystemValueBounded", () => {
+  it("bounds an unbounded value at zero", () => {
+    const value = buildCoordinateSystemValue("ML");
+
+    setCoordinateSystemValueBounded(value, true);
+
+    expect(value.bounds).toEqual([0, 0]);
+  });
+
+  it("unbounds a bounded value", () => {
+    const value = buildCoordinateSystemValue("Depth", [-7.5, 7.5], 3);
+
+    setCoordinateSystemValueBounded(value, false);
+
+    expect(value.bounds).toBeNull();
   });
 });

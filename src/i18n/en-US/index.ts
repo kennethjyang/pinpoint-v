@@ -275,7 +275,21 @@ export default {
   },
   coordinateSystemInspector: {
     name: "Name",
-    addTransform: "Add Transform"
+    addTransform: "Add Transform",
+    offsetByReferenceCoordinate: "Offset by reference coordinate",
+    transform: "Transform {index}",
+    surfaceCoordinate: "Surface coordinate",
+    position: "Position",
+    rotation: "Rotation",
+    valueName: "Value name",
+    value: "Value",
+    axis: "Axis for {name}",
+    mapToAxis: "Map to {axis}",
+    fixed: "Fixed",
+    bounded: "Bounded",
+    minimum: "Minimum",
+    maximum: "Maximum",
+    dragToReorder: "Drag to reorder"
   },
   slice: {
     zoom: "Zoom",

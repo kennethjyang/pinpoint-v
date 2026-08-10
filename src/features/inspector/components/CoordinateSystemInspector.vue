@@ -7,6 +7,7 @@ import {
 } from "@/features/coordinate-system";
 import { useValidationRules } from "@/composable/useValidationRules";
 import CommittedInput from "@/components/CommittedInput.vue";
+import CoordinateSystemNodeInspector from "./CoordinateSystemNodeInspector.vue";
 
 const { coordinateSystem } = defineProps<{
   coordinateSystem: CoordinateSystem;
@@ -30,6 +31,10 @@ const name = computed({
       outlined
       :rules="nameRules"
     />
+    <q-toggle
+      v-model="coordinateSystem.offsetByReferenceCoordinate"
+      :label="t('coordinateSystemInspector.offsetByReferenceCoordinate')"
+    />
     <q-btn
       class="full-width"
       color="primary"
@@ -37,7 +42,14 @@ const name = computed({
       :label="t('coordinateSystemInspector.addTransform')"
       @click="addCoordinateSystemTransform(coordinateSystem)"
     />
-    <q-list class="col scroll" separator></q-list>
+    <q-list class="col scroll" separator>
+      <CoordinateSystemNodeInspector
+        v-for="(node, index) of coordinateSystem.chain"
+        :key="index"
+        :index="index"
+        :node="node"
+      />
+    </q-list>
   </div>
 </template>
 
