@@ -80,6 +80,43 @@ describe("CoordinateSystemInspector", () => {
     ).toEqual(["ML", "DV", "AP"]);
   });
 
+  it("renders each node's name as its expansion item label", () => {
+    const { wrapper, coordinateSystem } = mountInspector(
+      makeCoordinateSystem({
+        chain: [
+          ...makeCoordinateSystem().chain,
+          ...makeCoordinateSystem().chain
+        ]
+      })
+    );
+
+    const labels = wrapper
+      .findAllComponents({ name: "QExpansionItem" })
+      .map(item => item.props("label"));
+    expect(labels).toEqual(coordinateSystem.chain.map(node => node.name));
+  });
+
+  it("editing the transform name field renames the node and trims", async () => {
+    const { wrapper, coordinateSystem } = mountInspector();
+
+    await editAndBlur(fieldByLabel(wrapper, t.nodeName), "  Depth  ");
+
+    expect(coordinateSystem.chain[0]!.name).toBe("Depth");
+  });
+
+  it("names a newly added transform by its position in the chain", async () => {
+    const { wrapper, coordinateSystem } = mountInspector();
+
+    const addButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(button => button.text().includes(t.addTransform))!;
+    await addButton.trigger("click");
+
+    expect(coordinateSystem.chain[1]!.name).toBe(
+      t.newTransformName.replace("{index}", "2")
+    );
+  });
+
   it("renders one CoordinateSystemNodeInspector per chain node", () => {
     const { wrapper } = mountInspector(
       makeCoordinateSystem({

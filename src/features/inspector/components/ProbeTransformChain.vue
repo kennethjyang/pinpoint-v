@@ -4,10 +4,12 @@ import { useI18n } from "vue-i18n";
 import type { CoordinateSystemNode } from "@/features/coordinate-system";
 import ProbeTransformValueRow from "./ProbeTransformValueRow.vue";
 
-const { chain, disable } = defineProps<{
+const { chain, disable, offSurfaceNodeIndexes } = defineProps<{
   chain: CoordinateSystemNode[];
   disable: boolean;
+  offSurfaceNodeIndexes: number[];
 }>();
+const emit = defineEmits<{ commit: [] }>();
 
 const { t } = useI18n();
 
@@ -27,22 +29,28 @@ const visibleNodes = computed(() =>
     <q-item v-for="{ node, index } of visibleNodes" :key="index">
       <q-item-section>
         <div class="column no-wrap q-gutter-y-sm">
-          <div class="text-overline">{{
-            t("probeInspector.transform", { index: index + 1 })
-          }}</div>
+          <div class="text-overline">{{ node.name }}</div>
+          <div
+            v-if="offSurfaceNodeIndexes.includes(index)"
+            class="text-caption text-warning"
+          >
+            {{ t("probeInspector.offSurface") }}
+          </div>
           <ProbeTransformValueRow
             component="position"
             :disable="disable"
             :label="t('probeInspector.position')"
             :node="node"
-            :node-index="index"
+            :node-name="node.name"
+            @commit="emit('commit')"
           />
           <ProbeTransformValueRow
             component="rotation"
             :disable="disable"
             :label="t('probeInspector.rotation')"
             :node="node"
-            :node-index="index"
+            :node-name="node.name"
+            @commit="emit('commit')"
           />
         </div>
       </q-item-section>

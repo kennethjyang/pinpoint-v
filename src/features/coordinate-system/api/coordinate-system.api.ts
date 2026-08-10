@@ -33,6 +33,7 @@ export function buildFixedCoordinateSystemValue(
 
 /**
  * Build a coordinate system chain node from its position and rotation values.
+ * @param name Display name of the transform.
  * @param position Position values.
  * @param rotation Rotation values.
  * @param positionDisplayOrder Mapping from XYZ index to position value index.
@@ -40,6 +41,7 @@ export function buildFixedCoordinateSystemValue(
  * @param onSurface Whether this node must reside on the surface of the brain.
  */
 export function buildCoordinateSystemNode(
+  name: string,
   position: [
     CoordinateSystemValue,
     CoordinateSystemValue,
@@ -55,6 +57,7 @@ export function buildCoordinateSystemNode(
   onSurface = false
 ): CoordinateSystemNode {
   return {
+    name,
     position,
     positionDisplayOrder,
     rotation,
@@ -86,12 +89,15 @@ export function buildCoordinateSystem(
 /**
  * Append an all-zero, unbounded, unfixed transform to a coordinate system's chain.
  * @param coordinateSystem Coordinate system to append to, mutated in place.
+ * @param name Display name of the transform.
  */
 export function addCoordinateSystemTransform(
-  coordinateSystem: CoordinateSystem
+  coordinateSystem: CoordinateSystem,
+  name: string
 ): void {
   coordinateSystem.chain.push(
     buildCoordinateSystemNode(
+      name,
       [
         buildCoordinateSystemValue("ML"),
         buildCoordinateSystemValue("DV"),
@@ -119,6 +125,38 @@ export function getCoordinateSystemValueAxis(
 ): number {
   const { order } = getComponentPair(node, component);
   return order.indexOf(valueIndex);
+}
+
+/**
+ * Read a node's value on the given axis.
+ * @param node Coordinate system node holding the value.
+ * @param component Whether to read a position or a rotation value.
+ * @param axisIndex Axis index (0 = X, 1 = Y, 2 = Z) to read.
+ */
+export function getCoordinateSystemAxisValue(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  axisIndex: number
+): number {
+  const { values, order } = getComponentPair(node, component);
+  return values[order[axisIndex]!]!.value;
+}
+
+/**
+ * Write a node's value on the given axis.
+ * @param node Coordinate system node holding the value, mutated in place.
+ * @param component Whether to write a position or a rotation value.
+ * @param axisIndex Axis index (0 = X, 1 = Y, 2 = Z) to write.
+ * @param value Value to assign.
+ */
+export function setCoordinateSystemAxisValue(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  axisIndex: number,
+  value: number
+): void {
+  const { values, order } = getComponentPair(node, component);
+  values[order[axisIndex]!]!.value = value;
 }
 
 /**

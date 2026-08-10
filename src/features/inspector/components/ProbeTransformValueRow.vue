@@ -11,13 +11,14 @@ import ProbeTransformValueInput from "./ProbeTransformValueInput.vue";
 
 const AXIS_MESSAGE_KEYS = ["axis.x", "axis.y", "axis.z"] as const;
 
-const { node, nodeIndex, component, label, disable } = defineProps<{
+const { node, nodeName, component, label, disable } = defineProps<{
   node: CoordinateSystemNode;
-  nodeIndex: number;
+  nodeName: string;
   component: CoordinateSystemNodeComponent;
   label: string;
   disable: boolean;
 }>();
+const emit = defineEmits<{ commit: [] }>();
 
 const { t } = useI18n();
 
@@ -60,7 +61,7 @@ function valueLabel(
         :key="valueIndex"
         :ariaLabel="
           t('probeInspector.transformValue', {
-            index: nodeIndex + 1,
+            transform: nodeName,
             name: valueLabel(coordinateSystemValue, valueIndex)
           })
         "
@@ -68,6 +69,7 @@ function valueLabel(
         :coordinate-system-value="coordinateSystemValue"
         :disable="disable"
         :label="valueLabel(coordinateSystemValue, valueIndex)"
+        @commit="emit('commit')"
       />
     </div>
   </div>

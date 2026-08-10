@@ -14,6 +14,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
     const library = ref<CoordinateSystem[]>([
       buildCoordinateSystem("Default", [
         buildCoordinateSystemNode(
+          "Tip",
           [
             buildCoordinateSystemValue("ML"),
             buildCoordinateSystemValue("DV"),
@@ -28,6 +29,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
       ]),
       buildCoordinateSystem("Surface Coordinate & Depth", [
         buildCoordinateSystemNode(
+          "Surface Coordinate",
           [
             buildCoordinateSystemValue("ML"),
             buildCoordinateSystemValue("DV"),
@@ -43,6 +45,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
           true
         ),
         buildCoordinateSystemNode(
+          "Depth",
           [
             buildFixedCoordinateSystemValue(),
             buildCoordinateSystemValue("Depth"),
@@ -57,6 +60,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
       ]),
       buildCoordinateSystem("NewScale MIS", [
         buildCoordinateSystemNode(
+          "Arc",
           [
             buildFixedCoordinateSystemValue(),
             buildFixedCoordinateSystemValue(),
@@ -69,6 +73,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
           ]
         ),
         buildCoordinateSystemNode(
+          "Module",
           [
             buildFixedCoordinateSystemValue(),
             buildFixedCoordinateSystemValue(),
@@ -84,6 +89,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
           ]
         ),
         buildCoordinateSystemNode(
+          "Stage",
           [
             buildCoordinateSystemValue("X"),
             buildCoordinateSystemValue("Y"),
@@ -99,6 +105,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
           true
         ),
         buildCoordinateSystemNode(
+          "Depth",
           [
             buildFixedCoordinateSystemValue(),
             buildCoordinateSystemValue("Depth"),

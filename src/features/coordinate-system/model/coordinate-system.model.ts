@@ -7,6 +7,9 @@ export interface CoordinateSystemValue {
   bounds: [number, number] | null;
 }
 export interface CoordinateSystemNode {
+  /** User-facing label for this transform, e.g. `Depth`. */
+  name: string;
+
   position: [
     CoordinateSystemValue,
     CoordinateSystemValue,

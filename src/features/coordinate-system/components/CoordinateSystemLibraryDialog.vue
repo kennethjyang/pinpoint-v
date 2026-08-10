@@ -43,6 +43,17 @@ function openInInspector(coordinateSystem: CoordinateSystem) {
 }
 
 /**
+ * Open a row in the inspector, except the pinned default at index 0, which is
+ * locked to its definition.
+ * @param index Index of the clicked row.
+ * @param coordinateSystem Coordinate system the row renders.
+ */
+function onRowClick(index: number, coordinateSystem: CoordinateSystem): void {
+  if (index === 0) return;
+  openInInspector(coordinateSystem);
+}
+
+/**
  * Ask the user to confirm, then remove the coordinate system from the library.
  * @param coordinateSystem Coordinate system to remove.
  */
@@ -82,14 +93,14 @@ function confirmRemove(coordinateSystem: CoordinateSystem) {
               coordinateSystem, index
             ) in coordinateSystemLibraryStore.library"
             :key="coordinateSystem.id"
-            v-ripple
+            :clickable="index > 0"
+            v-ripple="index > 0"
             :class="{
               'coordinate-system-row--dragging': draggedIndex === index,
               'coordinate-system-row--drop-target':
                 dropTargetIndex === index && draggedIndex !== index
             }"
-            clickable
-            @click="openInInspector(coordinateSystem)"
+            @click="onRowClick(index, coordinateSystem)"
             @dragover="onDragOverRow(index, $event)"
             @drop="dropRow(index)"
           >

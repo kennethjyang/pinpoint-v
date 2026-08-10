@@ -147,6 +147,7 @@ export function makeCoordinateSystem(
   return {
     ...buildCoordinateSystem("Fixture Coordinate System", [
       buildCoordinateSystemNode(
+        "Tip",
         [
           buildCoordinateSystemValue("ML"),
           buildCoordinateSystemValue("DV"),

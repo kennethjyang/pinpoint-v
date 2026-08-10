@@ -5,14 +5,18 @@ export type {
   CoordinateSystemNodeComponent,
   CoordinateSystemValue
 } from "./model/coordinate-system.model";
+export type { CoordinateSystemSolution } from "./api/forward-kinematics.api";
+export { solveCoordinateSystemChain } from "./api/forward-kinematics.api";
 export {
   addCoordinateSystemTransform,
   buildCoordinateSystem,
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
   buildFixedCoordinateSystemValue,
+  getCoordinateSystemAxisValue,
   getCoordinateSystemValueAxis,
   reorderCoordinateSystemValue,
+  setCoordinateSystemAxisValue,
   setCoordinateSystemValueAxis,
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed

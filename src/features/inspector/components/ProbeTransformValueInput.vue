@@ -18,6 +18,7 @@ const { coordinateSystemValue, component, label, ariaLabel, disable } =
     ariaLabel: string;
     disable: boolean;
   }>();
+const emit = defineEmits<{ commit: [] }>();
 
 const preferences = usePreferencesStore();
 const { optionalNumber: numberRules } = useValidationRules();
@@ -53,11 +54,22 @@ const boundsMessage = computed(() => {
 function formatBound(storedValue: number): string {
   return toDisplay(storedValue).toFixed(preferences.decimalPrecision);
 }
+
+/**
+ * Write a committed field value through to the coordinate system value, then
+ * report the edit so the chain can be re-solved.
+ * @param next Committed value, in the display unit.
+ */
+function onCommit(next: string): void {
+  value.value = next;
+  emit("commit");
+}
 </script>
 
 <template>
   <CommittedInput
-    v-model="value"
+    :model-value="value"
+    @update:model-value="onCommit"
     :aria-label="ariaLabel"
     class="col"
     :disable="disable"

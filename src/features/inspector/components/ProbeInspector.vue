@@ -20,7 +20,12 @@ import {
   useModelFileImport
 } from "@/features/scene";
 import { SliceCanvas, useProbeSurface } from "@/features/slice";
-import type { CoordinateSystemNode } from "@/features/coordinate-system";
+import {
+  type CoordinateSystemNode,
+  type CoordinateSystemSolution,
+  setCoordinateSystemAxisValue,
+  solveCoordinateSystemChain
+} from "@/features/coordinate-system";
 import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import ProbeTransformChain from "./ProbeTransformChain.vue";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
@@ -65,7 +70,7 @@ const { requiredName: nameRules } = useValidationRules();
 
 const { t } = useI18n();
 const { notifyWarning } = useNotify();
-const { findTargets } = useProbeSurface();
+const { findTargets, isOnSurface } = useProbeSurface();
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
@@ -81,11 +86,20 @@ const coordinateSystemId = ref(
  */
 const chain = ref<CoordinateSystemNode[]>([]);
 
+/** Indexes into `chain` of `onSurface` nodes the atlas rejects as off-surface. */
+const offSurfaceNodeIndexes = ref<number[]>([]);
+
 /**
  * Aborts the in-flight surface sampling. Deliberately a plain `let`, not a ref:
  * nothing renders it and replacing it must not retrigger effects.
  */
 let surfaceAbortController: AbortController | null = null;
+
+/**
+ * Guards a surface check against a superseded commit. Deliberately a plain
+ * `let`, not a ref: nothing renders it.
+ */
+let surfaceCheckId = 0;
 
 /**
  * Link to the probe identifier that also repoints its interned interface
@@ -120,6 +134,21 @@ const coordinateSystemOptions = computed<CoordinateSystemOption[]>(() =>
     label: name,
     value: id
   }))
+);
+
+/** Library coordinate system the transform inputs edit, or null when it is gone. */
+const selectedCoordinateSystem = computed(
+  () =>
+    coordinateSystemLibraryStore.library.find(
+      ({ id }) => id === coordinateSystemId.value
+    ) ?? null
+);
+
+/** Root translation the chain hangs off, in atlas ASR mm, or null for the atlas origin. */
+const referenceOffset = computed(() =>
+  selectedCoordinateSystem.value?.offsetByReferenceCoordinate
+    ? currentExperimentStore.referenceCoordinate
+    : null
 );
 
 /** This probe's interned interface definition, or null when the experiment has none. */
@@ -217,12 +246,30 @@ const surfaceLabel = computed(() =>
 
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
-  const coordinateSystem = coordinateSystemLibraryStore.library.find(
-    ({ id }) => id === coordinateSystemId.value
-  );
-  chain.value = coordinateSystem
-    ? structuredClone(toRaw(coordinateSystem)).chain
+  chain.value = selectedCoordinateSystem.value
+    ? structuredClone(toRaw(selectedCoordinateSystem.value)).chain
     : [];
+  offSurfaceNodeIndexes.value = [];
+
+  // A single all-adjustable node is exactly invertible from the probe's pose, so
+  // the default coordinate system reads and writes live state. Any other chain
+  // shape is not invertible, so it keeps the library's values.
+  const [node] = chain.value;
+  if (
+    chain.value.length === 1 &&
+    node &&
+    ![...node.position, ...node.rotation].some(({ fixed }) => fixed)
+  ) {
+    const offset = referenceOffset.value ?? [0, 0, 0];
+    const [ap, dv, ml] = probe.tipPosition;
+    setCoordinateSystemAxisValue(node, "position", 0, ml - offset[2]);
+    setCoordinateSystemAxisValue(node, "position", 1, dv - offset[1]);
+    setCoordinateSystemAxisValue(node, "position", 2, ap - offset[0]);
+    const [roll, yaw, pitch] = probe.rotation;
+    setCoordinateSystemAxisValue(node, "rotation", 0, pitch);
+    setCoordinateSystemAxisValue(node, "rotation", 1, yaw);
+    setCoordinateSystemAxisValue(node, "rotation", 2, roll);
+  }
 }
 
 /**
@@ -300,6 +347,41 @@ function onSurfaceClick(): void {
     return;
   }
   void moveToSurface();
+}
+
+/** Re-solve the working chain onto the probe and recheck its surface nodes. */
+function applySolve(): void {
+  const solution = solveCoordinateSystemChain(
+    chain.value,
+    referenceOffset.value
+  );
+  setProbeTipMillimeters(probe, solution.tipPosition);
+  probe.rotation = [...solution.rotation];
+  void checkSurfaceNodes(solution);
+}
+
+/**
+ * Replace the off-surface warnings with the on-surface nodes the atlas rejects.
+ * @param solution Solved chain the node positions come from.
+ */
+async function checkSurfaceNodes(
+  solution: CoordinateSystemSolution
+): Promise<void> {
+  const checkId = ++surfaceCheckId;
+  const indexes = chain.value.flatMap((node, index) =>
+    node.onSurface ? [index] : []
+  );
+  if (indexes.length === 0) {
+    offSurfaceNodeIndexes.value = [];
+    return;
+  }
+  const results = await Promise.all(
+    indexes.map(index => isOnSurface(solution.nodePositions[index]!))
+  );
+  if (checkId !== surfaceCheckId) return;
+  offSurfaceNodeIndexes.value = indexes.filter(
+    (_, position) => results[position] === false
+  );
 }
 
 // A different probe or a different coordinate system starts from the library's values.
@@ -416,7 +498,12 @@ onUnmounted(cancelMoveToSurface);
             outlined
           />
 
-          <ProbeTransformChain :chain="chain" :disable="probe.lock" />
+          <ProbeTransformChain
+            :chain="chain"
+            :disable="probe.lock"
+            :off-surface-node-indexes="offSurfaceNodeIndexes"
+            @commit="applySolve"
+          />
 
           <div>
             <q-color

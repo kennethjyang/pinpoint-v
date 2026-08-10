@@ -5,8 +5,10 @@ import {
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
   buildFixedCoordinateSystemValue,
+  getCoordinateSystemAxisValue,
   getCoordinateSystemValueAxis,
   reorderCoordinateSystemValue,
+  setCoordinateSystemAxisValue,
   setCoordinateSystemValueAxis,
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
@@ -17,7 +19,7 @@ describe("addCoordinateSystemTransform", () => {
   it("appends an all-zero, unfixed, unbounded node to the chain", () => {
     const coordinateSystem = makeCoordinateSystem();
 
-    addCoordinateSystemTransform(coordinateSystem);
+    addCoordinateSystemTransform(coordinateSystem, "Tip");
 
     expect(coordinateSystem.chain).toHaveLength(2);
     const node = coordinateSystem.chain[1]!;
@@ -34,10 +36,18 @@ describe("addCoordinateSystemTransform", () => {
     }
   });
 
+  it("puts the passed name on the appended node", () => {
+    const coordinateSystem = makeCoordinateSystem();
+
+    addCoordinateSystemTransform(coordinateSystem, "Depth");
+
+    expect(coordinateSystem.chain[1]!.name).toBe("Depth");
+  });
+
   it("appends a node to an empty chain", () => {
     const coordinateSystem = makeCoordinateSystem({ chain: [] });
 
-    addCoordinateSystemTransform(coordinateSystem);
+    addCoordinateSystemTransform(coordinateSystem, "Tip");
 
     expect(coordinateSystem.chain).toHaveLength(1);
   });
@@ -89,14 +99,14 @@ describe("buildCoordinateSystemNode", () => {
       buildCoordinateSystemValue("ML"),
       buildCoordinateSystemValue("DV"),
       buildCoordinateSystemValue("AP")
-    ] satisfies Parameters<typeof buildCoordinateSystemNode>[0];
+    ] satisfies Parameters<typeof buildCoordinateSystemNode>[1];
     const rotation = [
       buildCoordinateSystemValue("Pitch"),
       buildCoordinateSystemValue("Yaw"),
       buildCoordinateSystemValue("Roll")
-    ] satisfies Parameters<typeof buildCoordinateSystemNode>[1];
+    ] satisfies Parameters<typeof buildCoordinateSystemNode>[2];
 
-    const node = buildCoordinateSystemNode(position, rotation);
+    const node = buildCoordinateSystemNode("Tip", position, rotation);
 
     expect(node.position).toBe(position);
     expect(node.rotation).toBe(rotation);
@@ -106,6 +116,7 @@ describe("buildCoordinateSystemNode", () => {
 
   it("preserves an explicit display order", () => {
     const node = buildCoordinateSystemNode(
+      "Tip",
       [
         buildCoordinateSystemValue("ML"),
         buildCoordinateSystemValue("DV"),
@@ -150,6 +161,7 @@ describe("buildCoordinateSystem", () => {
 describe("getCoordinateSystemValueAxis", () => {
   function makeNode() {
     return buildCoordinateSystemNode(
+      "Tip",
       [
         buildCoordinateSystemValue("ML"),
         buildCoordinateSystemValue("DV"),
@@ -180,6 +192,7 @@ describe("getCoordinateSystemValueAxis", () => {
 describe("setCoordinateSystemValueAxis", () => {
   function makeNode() {
     return buildCoordinateSystemNode(
+      "Tip",
       [
         buildCoordinateSystemValue("ML"),
         buildCoordinateSystemValue("DV"),
@@ -222,6 +235,7 @@ describe("setCoordinateSystemValueAxis", () => {
 describe("reorderCoordinateSystemValue", () => {
   function makeNode() {
     return buildCoordinateSystemNode(
+      "Tip",
       [
         buildCoordinateSystemValue("ML"),
         buildCoordinateSystemValue("DV"),
@@ -306,5 +320,73 @@ describe("setCoordinateSystemValueBounded", () => {
     setCoordinateSystemValueBounded(value, false);
 
     expect(value.bounds).toBeNull();
+  });
+});
+
+describe("getCoordinateSystemAxisValue", () => {
+  function makeNode() {
+    return buildCoordinateSystemNode(
+      "Tip",
+      [
+        buildCoordinateSystemValue("ML", null, 1),
+        buildCoordinateSystemValue("DV", null, 2),
+        buildCoordinateSystemValue("AP", null, 3)
+      ],
+      [
+        buildCoordinateSystemValue("Pitch", null, 0.1),
+        buildCoordinateSystemValue("Yaw", null, 0.2),
+        buildCoordinateSystemValue("Roll", null, 0.3)
+      ],
+      [2, 0, 1]
+    );
+  }
+
+  it("reads the value mapped onto the given axis under a non-identity order", () => {
+    const node = makeNode();
+
+    // positionDisplayOrder [2, 0, 1]: axis 0 <- value 2 (AP=3), axis 1 <- value 0 (ML=1),
+    // axis 2 <- value 1 (DV=2).
+    expect(getCoordinateSystemAxisValue(node, "position", 0)).toBe(3);
+    expect(getCoordinateSystemAxisValue(node, "position", 1)).toBe(1);
+    expect(getCoordinateSystemAxisValue(node, "position", 2)).toBe(2);
+  });
+
+  it("reads the value mapped onto the given axis under the default rotation order", () => {
+    const node = makeNode();
+
+    expect(getCoordinateSystemAxisValue(node, "rotation", 0)).toBeCloseTo(0.1);
+    expect(getCoordinateSystemAxisValue(node, "rotation", 1)).toBeCloseTo(0.2);
+    expect(getCoordinateSystemAxisValue(node, "rotation", 2)).toBeCloseTo(0.3);
+  });
+});
+
+describe("setCoordinateSystemAxisValue", () => {
+  function makeNode() {
+    return buildCoordinateSystemNode(
+      "Tip",
+      [
+        buildCoordinateSystemValue("ML", null, 1),
+        buildCoordinateSystemValue("DV", null, 2),
+        buildCoordinateSystemValue("AP", null, 3)
+      ],
+      [
+        buildCoordinateSystemValue("Pitch"),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ],
+      [2, 0, 1]
+    );
+  }
+
+  it("writes the value mapped onto the given axis under a non-identity order", () => {
+    const node = makeNode();
+
+    setCoordinateSystemAxisValue(node, "position", 0, 100);
+
+    // Axis 0 maps to value index 2 (AP) under order [2, 0, 1].
+    expect(node.position[2]!.value).toBe(100);
+    expect(node.position[0]!.value).toBe(1);
+    expect(node.position[1]!.value).toBe(2);
+    expect(getCoordinateSystemAxisValue(node, "position", 0)).toBe(100);
   });
 });

@@ -40,13 +40,19 @@ const name = computed({
       color="primary"
       icon="add"
       :label="t('coordinateSystemInspector.addTransform')"
-      @click="addCoordinateSystemTransform(coordinateSystem)"
+      @click="
+        addCoordinateSystemTransform(
+          coordinateSystem,
+          t('coordinateSystemInspector.newTransformName', {
+            index: coordinateSystem.chain.length + 1
+          })
+        )
+      "
     />
     <q-list class="col scroll" separator>
       <CoordinateSystemNodeInspector
         v-for="(node, index) of coordinateSystem.chain"
         :key="index"
-        :index="index"
         :node="node"
       />
     </q-list>

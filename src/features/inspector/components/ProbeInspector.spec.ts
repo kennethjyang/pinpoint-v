@@ -178,7 +178,10 @@ async function editAndEnter(field: VueWrapper, value: string) {
 describe("ProbeInspector", () => {
   beforeEach(() => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
-    vi.mocked(useProbeSurface).mockReturnValue({ findTargets: vi.fn() });
+    vi.mocked(useProbeSurface).mockReturnValue({
+      findTargets: vi.fn(),
+      isOnSurface: vi.fn()
+    });
     openModelFileDialogSpy.mockReset();
     capturedOnModelFileChange = null;
     vi.mocked(canLoadModelFile).mockReset();
@@ -408,7 +411,7 @@ describe("ProbeInspector", () => {
 
       expect(
         wrapper.findAll(".text-overline").map(node => node.text())
-      ).toEqual([t.transform.replace("{index}", "1")]);
+      ).toEqual([store.library[0]!.chain[0]!.name]);
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
@@ -418,17 +421,15 @@ describe("ProbeInspector", () => {
 
       expect(
         wrapper.findAll(".text-overline").map(node => node.text())
-      ).toEqual([
-        t.transform.replace("{index}", "1"),
-        t.transform.replace("{index}", "2")
-      ]);
+      ).toEqual(surfaceAndDepth.chain.map(node => node.name));
     });
 
     it("hides a node's rotation row when every rotation value is fixed", async () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
-      const depthName = surfaceAndDepth.chain[1]!.position[1]!.name;
+      const depthNodeName = surfaceAndDepth.chain[1]!.name;
+      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
@@ -439,7 +440,9 @@ describe("ProbeInspector", () => {
       expect(
         fieldByAriaLabel(
           wrapper,
-          t.transformValue.replace("{index}", "2").replace("{name}", depthName)
+          t.transformValue
+            .replace("{transform}", depthNodeName)
+            .replace("{name}", depthValueName)
         ).exists()
       ).toBe(true);
       expect(
@@ -453,6 +456,7 @@ describe("ProbeInspector", () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
+      const depthNodeName = surfaceAndDepth.chain[1]!.name;
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
@@ -464,10 +468,14 @@ describe("ProbeInspector", () => {
         .findAllComponents({ name: "QInput" })
         .map(field => field.find("input").attributes("aria-label"));
       expect(ariaLabels).not.toContain(
-        t.transformValue.replace("{index}", "2").replace("{name}", axis.x)
+        t.transformValue
+          .replace("{transform}", depthNodeName)
+          .replace("{name}", axis.x)
       );
       expect(ariaLabels).not.toContain(
-        t.transformValue.replace("{index}", "2").replace("{name}", axis.z)
+        t.transformValue
+          .replace("{transform}", depthNodeName)
+          .replace("{name}", axis.z)
       );
       expect(fieldByLabel(wrapper, "Depth").props("disable")).toBeFalsy();
     });
@@ -499,6 +507,7 @@ describe("ProbeInspector", () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const allFixedNode = buildCoordinateSystemNode(
+        "Fixed",
         [
           buildFixedCoordinateSystemValue(),
           buildFixedCoordinateSystemValue(),
@@ -511,6 +520,7 @@ describe("ProbeInspector", () => {
         ]
       );
       const adjustableNode = buildCoordinateSystemNode(
+        "Adjustable",
         [
           buildCoordinateSystemValue("X"),
           buildFixedCoordinateSystemValue(),
@@ -536,7 +546,110 @@ describe("ProbeInspector", () => {
 
       expect(
         wrapper.findAll(".text-overline").map(node => node.text())
-      ).toEqual([t.transform.replace("{index}", "2")]);
+      ).toEqual(["Adjustable"]);
+    });
+
+    it("shows the probe's current tip and rotation on the default coordinate system", () => {
+      const { wrapper, pinia } = mountInspector(
+        makeProbe({
+          tipPosition: [7, 8, 9],
+          rotation: [Math.PI / 2, Math.PI, Math.PI / 4]
+        })
+      );
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+
+      expect(
+        fieldByLabel(wrapper, node.position[0]!.name).props("modelValue")
+      ).toBe("9.000");
+      expect(
+        fieldByLabel(wrapper, node.position[1]!.name).props("modelValue")
+      ).toBe("8.000");
+      expect(
+        fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
+      ).toBe("7.000");
+      expect(
+        fieldByLabel(wrapper, node.rotation[0]!.name).props("modelValue")
+      ).toBe("45.000");
+      expect(
+        fieldByLabel(wrapper, node.rotation[1]!.name).props("modelValue")
+      ).toBe("180.000");
+      expect(
+        fieldByLabel(wrapper, node.rotation[2]!.name).props("modelValue")
+      ).toBe("90.000");
+    });
+
+    it("commits the ML field to the probe's tip, leaving AP and DV alone", async () => {
+      const { wrapper, probe, pinia } = mountInspector(
+        makeProbe({ tipPosition: [7, 8, 9] })
+      );
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+
+      await editAndBlur(fieldByLabel(wrapper, node.position[0]!.name), "20");
+
+      expect(probe.tipPosition).toEqual([7, 8, 20]);
+    });
+
+    it("does not move the probe when switching to a multi-node coordinate system", async () => {
+      const { wrapper, probe, pinia } = mountInspector(
+        makeProbe({ tipPosition: [7, 8, 9], rotation: [0.1, 0.2, 0.3] })
+      );
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(probe.tipPosition).toEqual([7, 8, 9]);
+      expect(probe.rotation).toEqual([0.1, 0.2, 0.3]);
+    });
+
+    it("shows the off-surface warning once when isOnSurface resolves false after a commit", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isOnSurface: vi.fn().mockResolvedValue(false)
+      });
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+    });
+
+    it("shows no off-surface warning when isOnSurface resolves null after a commit", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isOnSurface: vi.fn().mockResolvedValue(null)
+      });
+      const { wrapper, pinia } = mountInspector();
+      const store = useCoordinateSystemLibraryStore(pinia);
+      const surfaceAndDepth = store.library[1]!;
+      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
+      await flushPromises();
+
+      expect(wrapper.findAll(".text-warning")).toHaveLength(0);
     });
   });
 
@@ -732,7 +845,10 @@ describe("ProbeInspector", () => {
         axisMillimeters: null,
         dorsoventralMillimeters: null
       } satisfies ProbeSurfaceTargets);
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, store, probe } = mountInspector();
 
       await buttonByLabel(wrapper, t.surface).trigger("click");
@@ -748,7 +864,10 @@ describe("ProbeInspector", () => {
         axisMillimeters: [1, 2, 3],
         dorsoventralMillimeters: [4, 5, 6]
       } satisfies ProbeSurfaceTargets);
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, store, probe } = mountInspector(
         makeProbe({ tipPosition: [7, 8, 9] })
       );
@@ -770,7 +889,10 @@ describe("ProbeInspector", () => {
         axisMillimeters: [1, 2, 3],
         dorsoventralMillimeters: null
       } satisfies ProbeSurfaceTargets);
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, store, probe } = mountInspector();
 
       await buttonByLabel(wrapper, t.surface).trigger("click");
@@ -786,7 +908,10 @@ describe("ProbeInspector", () => {
         axisMillimeters: null,
         dorsoventralMillimeters: null
       } satisfies ProbeSurfaceTargets);
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
       );
@@ -806,7 +931,10 @@ describe("ProbeInspector", () => {
 
     it("shows a surface-unavailable warning when findTargets resolves null", async () => {
       const findTargets = vi.fn().mockResolvedValue(null);
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
       );
@@ -832,7 +960,10 @@ describe("ProbeInspector", () => {
             resolveTargets = resolve;
           })
       );
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper } = mountInspector();
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
@@ -857,7 +988,10 @@ describe("ProbeInspector", () => {
           resolveTargets = resolve;
         });
       });
-      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn()
+      });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
       );

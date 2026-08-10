@@ -179,7 +179,7 @@ export default {
     close: "Close",
     dragToReorder: "Drag to reorder",
     defaultPinned:
-      "The default coordinate system always stays first and cannot be deleted."
+      "The default coordinate system always stays first and cannot be edited or deleted."
   },
   modelFile: {
     invalidModelFile: "Unable to import that 3D model.",
@@ -208,8 +208,8 @@ export default {
     name: "Name",
     probeType: "Probe Type",
     coordinateSystem: "Coordinate System",
-    transform: "Transform {index}",
-    transformValue: "Transform {index} {name}",
+    transformValue: "{transform} {name}",
+    offSurface: "Not on the brain surface.",
     position: "Position",
     rotation: "Rotation",
     outOfBounds: "Must be between {minimum} and {maximum} {unit}.",
@@ -286,7 +286,8 @@ export default {
     name: "Name",
     addTransform: "Add Transform",
     offsetByReferenceCoordinate: "Offset by reference coordinate",
-    transform: "Transform {index}",
+    nodeName: "Transform name",
+    newTransformName: "Transform {index}",
     surfaceCoordinate: "Surface coordinate",
     position: "Position",
     rotation: "Rotation",

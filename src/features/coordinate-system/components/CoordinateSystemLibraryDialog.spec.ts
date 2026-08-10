@@ -93,11 +93,22 @@ describe("CoordinateSystemLibraryDialog", () => {
     const store = useCoordinateSystemLibraryStore();
     const currentExperimentStore = useCurrentExperimentStore();
 
+    const targetItem = wrapper.findAllComponents({ name: "QItem" })[1]!;
+    await targetItem.trigger("click");
+
+    expect(currentExperimentStore.selectedInspectable).toBe(store.library[1]);
+    expect(wrapper.emitted("ok")).toBeTruthy();
+  });
+
+  it("does nothing when the pinned default row is clicked", async () => {
+    const wrapper = await mountDialog();
+    const currentExperimentStore = useCurrentExperimentStore();
+
     const firstItem = wrapper.findAllComponents({ name: "QItem" })[0]!;
     await firstItem.trigger("click");
 
-    expect(currentExperimentStore.selectedInspectable).toBe(store.library[0]);
-    expect(wrapper.emitted("ok")).toBeTruthy();
+    expect(currentExperimentStore.selectedInspectable).toBeNull();
+    expect(wrapper.emitted("ok")).toBeFalsy();
   });
 
   it("offers no delete button for the default coordinate system", async () => {
