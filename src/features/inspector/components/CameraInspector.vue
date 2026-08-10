@@ -214,7 +214,6 @@ function applyPose(savedPose: CameraPose): void {
       color="primary"
       icon="restart_alt"
       :label="t('cameraInspector.resetCamera')"
-      outline
       @click="resetCamera"
     />
     <q-separator />
