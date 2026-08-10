@@ -255,7 +255,8 @@ export default {
     noPoses: "No saved camera poses yet."
   },
   worldInspector: {
-    backgroundColor: "Background Color",
+    backgroundColorLightMode: "Background Color (Light)",
+    backgroundColorDarkMode: "Background Color (Dark)",
     lightPower: "Light Power",
     specularIntensity: "Specular Intensity",
     specularPower: "Glossiness",
