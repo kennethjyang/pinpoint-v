@@ -53,8 +53,9 @@ export interface Probe {
 
   /**
    * Internal orientation representation of the probe.
-   * - Roll, yaw, pitch order (aligned to AP, DV, ML order
-   * where zero is electrodes facing superior and tip facing anterior).
+   * - Roll, yaw, pitch order (aligned to AP, DV, ML order;
+   * at zero rotation the tip points along -AP and the head-stage cut-out,
+   * i.e. the contact face, is on the -DV side of the shanks).
    * - Pivot on tip.
    * - In radians.
    */
@@ -62,8 +63,8 @@ export interface Probe {
 
   /**
    * Edge length of the inspector's slice view, in mm. Null until the user
-   * picks a zoom, so the slice view can default it proportionally to the
-   * current atlas instead of a fixed value.
+   * picks a zoom, so the slice view can default it from the current
+   * atlas's average size.
    */
   sliceExtentMillimeters: number | null;
 

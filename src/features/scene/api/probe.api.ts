@@ -143,7 +143,7 @@ export function buildProbe(
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
     shankAlignmentIndex: probe.shankAlignmentIndex,
     geometry,
-    bodyModelId: probe.bodyModel?.id ?? null
+    bodyModelId: probe.bodyModel?.modelId ?? null
   };
 
   const node = new TransformNode(
@@ -266,7 +266,7 @@ export function syncProbes(
       probe.probeInterfaceIdentifier !== metadata.probeInterfaceIdentifier ||
       probe.shankAlignmentIndex !== metadata.shankAlignmentIndex ||
       !isSameProbeGeometry(metadata.geometry, geometry) ||
-      (probe.bodyModel?.id ?? null) !== metadata.bodyModelId
+      (probe.bodyModel?.modelId ?? null) !== metadata.bodyModelId
     ) {
       disposeProbe(scene, id, gizmoManager);
       if (probe) rebuiltProbeIds.push(id);
@@ -587,6 +587,9 @@ function buildHeadStageMesh(
     },
     scene
   );
+  // This position resolves to probe-local -Y once parented under the
+  // pitched base mesh - that is the contact face, so the sign here is
+  // load-bearing.
   cutterMesh.position = new Vector3(
     0,
     geometry.headStageCutDepthMillimeters - geometry.headStageLengthMillimeters,
