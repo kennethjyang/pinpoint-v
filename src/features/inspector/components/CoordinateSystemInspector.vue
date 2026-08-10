@@ -3,7 +3,8 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   addCoordinateSystemTransform,
-  type CoordinateSystem
+  type CoordinateSystem,
+  setCoordinateSystemSurfaceNode
 } from "@/features/coordinate-system";
 import { useValidationRules } from "@/composable/useValidationRules";
 import CommittedInput from "@/components/CommittedInput.vue";
@@ -54,6 +55,9 @@ const name = computed({
         v-for="(node, index) of coordinateSystem.chain"
         :key="index"
         :node="node"
+        @update:on-surface="
+          setCoordinateSystemSurfaceNode(coordinateSystem, index, $event)
+        "
       />
     </q-list>
   </div>

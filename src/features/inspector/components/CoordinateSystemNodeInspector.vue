@@ -10,12 +10,19 @@ const { node } = defineProps<{
   node: CoordinateSystemNode;
 }>();
 
+const emit = defineEmits<{ "update:onSurface": [onSurface: boolean] }>();
+
 const { requiredName: nodeNameRules } = useValidationRules();
 const { t } = useI18n();
 
 const name = computed({
   get: () => node.name,
   set: (value: string) => (node.name = value.trim())
+});
+
+const isOnSurface = computed({
+  get: () => node.onSurface,
+  set: (value: boolean) => emit("update:onSurface", value)
 });
 </script>
 
@@ -36,7 +43,7 @@ const name = computed({
           :rules="nodeNameRules"
         />
         <q-toggle
-          v-model="node.onSurface"
+          v-model="isOnSurface"
           :label="t('coordinateSystemInspector.surfaceCoordinate')"
         />
         <CoordinateSystemValueList

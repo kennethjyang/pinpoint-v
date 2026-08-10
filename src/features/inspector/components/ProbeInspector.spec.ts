@@ -578,6 +578,68 @@ describe("ProbeInspector", () => {
       ).toBe("90.000");
     });
 
+    it("mirrors an external probe pose change into the default node's fields", async () => {
+      const { wrapper, probe, pinia } = mountInspector(
+        makeProbe({ tipPosition: [0, 0, 0] })
+      );
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+
+      probe.tipPosition = [1, 2, 3];
+      await wrapper.vm.$nextTick();
+
+      expect(
+        fieldByLabel(wrapper, node.position[0]!.name).props("modelValue")
+      ).toBe("3.000");
+      expect(
+        fieldByLabel(wrapper, node.position[1]!.name).props("modelValue")
+      ).toBe("2.000");
+      expect(
+        fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
+      ).toBe("1.000");
+    });
+
+    it("tracks a gizmo drag frame by frame, only committing history on release", async () => {
+      const { wrapper, store, probe, pinia } = mountInspector(
+        makeProbe({ tipPosition: [0, 0, 0] })
+      );
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const preDragTip = [...probe.tipPosition];
+      // Mounting seeds the probe into the store, which commits its own history
+      // point; reset that baseline so only the drag's history is under test.
+      store.resetHistory();
+
+      store.draggedProbeId = probe.id;
+      probe.tipPosition = [1, 0, 0];
+      await wrapper.vm.$nextTick();
+      probe.tipPosition = [2, 0, 0];
+      await wrapper.vm.$nextTick();
+
+      expect(store.canUndo).toBe(false);
+      expect(
+        fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
+      ).toBe("2.000");
+
+      store.endProbeDrag();
+      expect(store.canUndo).toBe(true);
+      store.undo();
+      expect(store.probes[0]!.tipPosition).toEqual(preDragTip);
+    });
+
+    it("does not renormalize rotation on commit, matching the old six-input system", async () => {
+      const { wrapper, probe, pinia } = mountInspector(
+        makeProbe({
+          tipPosition: [7, 8, 9],
+          rotation: [0, (3 * Math.PI) / 2, 0]
+        })
+      );
+      const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+
+      await editAndBlur(fieldByLabel(wrapper, node.position[0]!.name), "20");
+
+      expect(probe.tipPosition).toEqual([7, 8, 20]);
+      expect(probe.rotation).toEqual([0, (3 * Math.PI) / 2, 0]);
+    });
+
     it("commits the ML field to the probe's tip, leaving AP and DV alone", async () => {
       const { wrapper, probe, pinia } = mountInspector(
         makeProbe({ tipPosition: [7, 8, 9] })

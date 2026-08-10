@@ -113,6 +113,28 @@ export function addCoordinateSystemTransform(
 }
 
 /**
+ * Mark one node of a coordinate system's chain as its surface node, clearing every
+ * other node so at most one is ever on the surface.
+ * @param coordinateSystem Coordinate system holding the chain, mutated in place.
+ * @param nodeIndex Index of the node to set or clear.
+ * @param onSurface Whether that node is on the brain surface.
+ */
+export function setCoordinateSystemSurfaceNode(
+  coordinateSystem: CoordinateSystem,
+  nodeIndex: number,
+  onSurface: boolean
+): void {
+  if (!onSurface) {
+    const node = coordinateSystem.chain[nodeIndex];
+    if (node) node.onSurface = false;
+    return;
+  }
+  coordinateSystem.chain.forEach((node, index) => {
+    node.onSurface = index === nodeIndex;
+  });
+}
+
+/**
  * Axis index (0 = X, 1 = Y, 2 = Z) a node's value is mapped to, or -1 when absent.
  * @param node Coordinate system node holding the value.
  * @param component Whether the value is a position or a rotation value.

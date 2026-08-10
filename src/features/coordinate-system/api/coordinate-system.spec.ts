@@ -9,6 +9,7 @@ import {
   getCoordinateSystemValueAxis,
   reorderCoordinateSystemValue,
   setCoordinateSystemAxisValue,
+  setCoordinateSystemSurfaceNode,
   setCoordinateSystemValueAxis,
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
@@ -50,6 +51,66 @@ describe("addCoordinateSystemTransform", () => {
     addCoordinateSystemTransform(coordinateSystem, "Tip");
 
     expect(coordinateSystem.chain).toHaveLength(1);
+  });
+});
+
+describe("setCoordinateSystemSurfaceNode", () => {
+  function makeTwoNodeChain() {
+    return makeCoordinateSystem({
+      chain: [
+        buildCoordinateSystemNode(
+          "Tip",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
+        ),
+        buildCoordinateSystemNode(
+          "Second",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ]
+        )
+      ]
+    });
+  }
+
+  it("enabling a node clears every other node's surface flag", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    setCoordinateSystemSurfaceNode(coordinateSystem, 1, true);
+
+    expect(coordinateSystem.chain.map(node => node.onSurface)).toEqual([
+      false,
+      true
+    ]);
+  });
+
+  it("disabling a node clears only that node", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    setCoordinateSystemSurfaceNode(coordinateSystem, 1, false);
+
+    expect(coordinateSystem.chain.map(node => node.onSurface)).toEqual([
+      true,
+      false
+    ]);
   });
 });
 

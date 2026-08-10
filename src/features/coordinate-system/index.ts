@@ -17,6 +17,7 @@ export {
   getCoordinateSystemValueAxis,
   reorderCoordinateSystemValue,
   setCoordinateSystemAxisValue,
+  setCoordinateSystemSurfaceNode,
   setCoordinateSystemValueAxis,
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed

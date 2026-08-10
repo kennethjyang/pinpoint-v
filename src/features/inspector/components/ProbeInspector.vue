@@ -23,6 +23,7 @@ import { SliceCanvas, useProbeSurface } from "@/features/slice";
 import {
   type CoordinateSystemNode,
   type CoordinateSystemSolution,
+  getCoordinateSystemAxisValue,
   setCoordinateSystemAxisValue,
   solveCoordinateSystemChain
 } from "@/features/coordinate-system";
@@ -151,6 +152,18 @@ const referenceOffset = computed(() =>
     : null
 );
 
+/**
+ * The chain's single all-adjustable node, or null when the chain is not exactly
+ * invertible from the probe's pose.
+ */
+const directNode = computed(() => {
+  const [node] = chain.value;
+  if (chain.value.length !== 1 || !node) return null;
+  return [...node.position, ...node.rotation].some(({ fixed }) => fixed)
+    ? null
+    : node;
+});
+
 /** This probe's interned interface definition, or null when the experiment has none. */
 const probeInterfaceProbe = computed(
   () =>
@@ -244,6 +257,45 @@ const surfaceLabel = computed(() =>
     : t("probeInspector.surface")
 );
 
+/**
+ * Write the probe's live pose into the direct chain's single node.
+ * @param node Direct chain node to write, mutated in place.
+ */
+function writeProbePoseIntoNode(node: CoordinateSystemNode): void {
+  const offset = referenceOffset.value ?? [0, 0, 0];
+  const [ap, dv, ml] = probe.tipPosition;
+  setCoordinateSystemAxisValue(node, "position", 0, ml - offset[2]);
+  setCoordinateSystemAxisValue(node, "position", 1, dv - offset[1]);
+  setCoordinateSystemAxisValue(node, "position", 2, ap - offset[0]);
+  const [roll, yaw, pitch] = probe.rotation;
+  setCoordinateSystemAxisValue(node, "rotation", 0, pitch);
+  setCoordinateSystemAxisValue(node, "rotation", 1, yaw);
+  setCoordinateSystemAxisValue(node, "rotation", 2, roll);
+}
+
+/**
+ * Solve a direct chain's single node into a probe pose without the matrix chain, so
+ * a value reaches the probe exactly as typed.
+ * @param node Direct chain node to solve.
+ */
+function solveDirectNode(node: CoordinateSystemNode): CoordinateSystemSolution {
+  const offset = referenceOffset.value ?? [0, 0, 0];
+  const tipPosition: [number, number, number] = [
+    getCoordinateSystemAxisValue(node, "position", 2) + offset[0],
+    getCoordinateSystemAxisValue(node, "position", 1) + offset[1],
+    getCoordinateSystemAxisValue(node, "position", 0) + offset[2]
+  ];
+  return {
+    tipPosition,
+    rotation: [
+      getCoordinateSystemAxisValue(node, "rotation", 2),
+      getCoordinateSystemAxisValue(node, "rotation", 1),
+      getCoordinateSystemAxisValue(node, "rotation", 0)
+    ],
+    nodePositions: [tipPosition]
+  };
+}
+
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
   chain.value = selectedCoordinateSystem.value
@@ -254,22 +306,8 @@ function seedChain(): void {
   // A single all-adjustable node is exactly invertible from the probe's pose, so
   // the default coordinate system reads and writes live state. Any other chain
   // shape is not invertible, so it keeps the library's values.
-  const [node] = chain.value;
-  if (
-    chain.value.length === 1 &&
-    node &&
-    ![...node.position, ...node.rotation].some(({ fixed }) => fixed)
-  ) {
-    const offset = referenceOffset.value ?? [0, 0, 0];
-    const [ap, dv, ml] = probe.tipPosition;
-    setCoordinateSystemAxisValue(node, "position", 0, ml - offset[2]);
-    setCoordinateSystemAxisValue(node, "position", 1, dv - offset[1]);
-    setCoordinateSystemAxisValue(node, "position", 2, ap - offset[0]);
-    const [roll, yaw, pitch] = probe.rotation;
-    setCoordinateSystemAxisValue(node, "rotation", 0, pitch);
-    setCoordinateSystemAxisValue(node, "rotation", 1, yaw);
-    setCoordinateSystemAxisValue(node, "rotation", 2, roll);
-  }
+  const node = directNode.value;
+  if (node) writeProbePoseIntoNode(node);
 }
 
 /**
@@ -351,10 +389,10 @@ function onSurfaceClick(): void {
 
 /** Re-solve the working chain onto the probe and recheck its surface nodes. */
 function applySolve(): void {
-  const solution = solveCoordinateSystemChain(
-    chain.value,
-    referenceOffset.value
-  );
+  const node = directNode.value;
+  const solution = node
+    ? solveDirectNode(node)
+    : solveCoordinateSystemChain(chain.value, referenceOffset.value);
   setProbeTipMillimeters(probe, solution.tipPosition);
   probe.rotation = [...solution.rotation];
   void checkSurfaceNodes(solution);
@@ -386,6 +424,19 @@ async function checkSurfaceNodes(
 
 // A different probe or a different coordinate system starts from the library's values.
 watch([() => probe.id, coordinateSystemId], seedChain, { immediate: true });
+
+// The scene writes the probe's pose straight into state on every gizmo drag frame,
+// so mirror it back into a direct chain to keep the inputs live. Nothing is written
+// to the probe here, so the drag still lands as the single history point
+// `endProbeDrag` commits on release.
+watch(
+  [() => probe.tipPosition, () => probe.rotation, referenceOffset],
+  () => {
+    const node = directNode.value;
+    if (node) writeProbePoseIntoNode(node);
+  },
+  { deep: true }
+);
 
 onUnmounted(cancelMoveToSurface);
 </script>

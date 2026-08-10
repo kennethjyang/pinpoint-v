@@ -148,6 +148,30 @@ describe("CoordinateSystemInspector", () => {
     expect(coordinateSystem.chain[0]!.onSurface).toBe(true);
   });
 
+  it("enabling a second node's surface toggle clears the first node's", async () => {
+    const { wrapper, coordinateSystem } = mountInspector(
+      makeCoordinateSystem({
+        chain: [
+          { ...makeCoordinateSystem().chain[0]!, onSurface: true },
+          makeCoordinateSystem().chain[0]!
+        ]
+      })
+    );
+
+    const secondNode = wrapper.findAllComponents(
+      CoordinateSystemNodeInspector
+    )[1]!;
+    const secondToggle = secondNode
+      .findAllComponents({ name: "QToggle" })
+      .find(toggle => toggle.props("label") === t.surfaceCoordinate)!;
+    await secondToggle.setValue(true);
+
+    expect(coordinateSystem.chain.map(node => node.onSurface)).toEqual([
+      false,
+      true
+    ]);
+  });
+
   it("editing the first value-name field renames the value", async () => {
     const { wrapper, coordinateSystem } = mountInspector();
 
