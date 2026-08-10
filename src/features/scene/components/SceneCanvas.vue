@@ -25,6 +25,7 @@ import {
 } from "../api/axis-guide.api";
 import {
   applyCameraProjection,
+  scaleCameraClipPlanesToAtlas,
   trackAxisViewProjection
 } from "../api/camera.api";
 import type { SurfaceMaterialSettings } from "../api/material.api";
@@ -431,6 +432,17 @@ watchEffect(() => {
 
   scaleSsaoToAtlas(
     pipeline,
+    getAtlasLongestDimensionMillimeters(currentExperiment.atlas)
+  );
+});
+
+// Clip planes are in millimetres, so they track the atlas's size.
+watchEffect(() => {
+  const camera = runtime.camera.value;
+  if (!camera) return;
+
+  scaleCameraClipPlanesToAtlas(
+    camera,
     getAtlasLongestDimensionMillimeters(currentExperiment.atlas)
   );
 });

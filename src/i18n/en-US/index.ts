@@ -1,8 +1,9 @@
 export default {
   atlasPicker: {
     title: "Atlas",
-    brainglobeHosted: "BrainGlobe Hosted",
-    customHTTPHost: "Custom HTTP Host",
+    brainglobeHosted: "BrainGlobe",
+    allenInstituteHosted: "Allen Institute",
+    customHTTPHost: "Custom",
     sourceUrl: "Source URL",
     search: "Search",
     atlasCount: "no atlases | one atlas | {count} atlases",
@@ -242,6 +243,7 @@ export default {
     yaw: "Yaw",
     pitch: "Pitch",
     scaleSuffix: "×",
+    copy: "Duplicate 3D object",
     lock: "Lock 3D object",
     unlock: "Unlock 3D object",
     collisionDetection: "Collision detection"

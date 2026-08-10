@@ -23,7 +23,7 @@ export function makeSceneModel(
   overrides: Partial<SceneModel> = {}
 ): SceneModel {
   return {
-    id: crypto.randomUUID(),
+    modelId: crypto.randomUUID(),
     position: [0, 0, 0],
     rotation: [0, 0, 0],
     scale: [1, 1, 1],
@@ -40,6 +40,7 @@ export function makeSceneObject(
 ): SceneObject {
   return {
     ...makeSceneModel(),
+    id: crypto.randomUUID(),
     inspectableKind: "sceneObject",
     name: "Object abc123",
     color: "#ffffff",
@@ -71,6 +72,7 @@ export function makeManifest(overrides: Partial<Manifest> = {}): Manifest {
   return {
     terminologyLocation: "/terminologies/allen_mouse-terminology/3_0",
     annotationSetLocation: "/annotation-sets/allen_mouse-annotation/3_0",
+    species: "Mus musculus",
     atlasLink: "http://www.brain-map.org",
     resolutions: [[0.025, 0.025, 0.025]],
     shape: [[528, 320, 456]],
