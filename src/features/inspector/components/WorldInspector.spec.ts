@@ -59,11 +59,15 @@ describe("WorldInspector", () => {
     expect(preferences.worldBackgroundColorLightMode).toBe("#33334d");
   });
 
-  it("appends Babylon's default clear color to the standard palette for both pickers", () => {
+  it("appends Babylon's default clear color and pure white to the standard palette for both pickers", () => {
     const wrapper = mountWithQuasar(WorldInspector);
 
     for (const picker of wrapper.findAllComponents({ name: "QColor" })) {
-      expect(picker.props("palette")).toEqual([...STANDARD_COLORS, "#33334d"]);
+      expect(picker.props("palette")).toEqual([
+        ...STANDARD_COLORS,
+        "#33334d",
+        "#ffffff"
+      ]);
     }
   });
 

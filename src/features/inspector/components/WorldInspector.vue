@@ -8,10 +8,11 @@ import {
   usePreferencesStore
 } from "@/stores/preferences.store";
 
-/** Standard palette plus Babylon's default clear color, so it stays pickable after switching away from it. */
+/** Standard palette plus Babylon's default clear color and pure white, so both stay pickable after switching away from them. */
 const BACKGROUND_COLOR_PALETTE = [
   ...STANDARD_COLORS,
-  DEFAULT_WORLD_BACKGROUND_COLOR
+  DEFAULT_WORLD_BACKGROUND_COLOR,
+  "#ffffff"
 ];
 
 const $q = useQuasar();
