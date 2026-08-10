@@ -435,7 +435,7 @@ describe("SceneCanvas", () => {
     await flushPromises();
 
     expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ color: "warning" })
+      expect.objectContaining({ type: "warning" })
     );
     expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
       false
@@ -734,7 +734,7 @@ describe("SceneCanvas", () => {
     await flushPromises();
 
     expect(notifySpy).toHaveBeenCalledWith(
-      expect.objectContaining({ color: "warning" })
+      expect.objectContaining({ type: "warning" })
     );
     expect(
       runtime.scene.value!.getTransformNodeByName("axisGuideRoot_node")
@@ -1024,6 +1024,40 @@ describe("SceneCanvas", () => {
       gizmoManager.gizmos.positionGizmo!.xGizmo
         .updateGizmoRotationToMatchAttachedMesh
     ).toBe(false);
+  });
+
+  it("switches the axis guide labels between global and local coordinate spaces with the gizmo toolbar", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    await setAxisGuidesVisible(true);
+
+    const guides = (await vi.mocked(createAxisGuides).mock.results[0]!
+      .value) as { renderers: Record<"ap" | "dv" | "ml", FakeTextRenderer> };
+    const labelTexts = () =>
+      Object.values(guides.renderers)
+        .flatMap(renderer =>
+          renderer.paragraphs.map(paragraph => paragraph.text)
+        )
+        .sort();
+
+    expect(labelTexts()).toEqual(
+      ["+AP", "-AP", "+DV", "-DV", "+ML", "-ML"].sort()
+    );
+
+    store.selectedInspectable = makeProbe();
+    await flushPromises();
+
+    expect(labelTexts()).toEqual(["+X", "-X", "+Y", "-Y", "+Z", "-Z"].sort());
+
+    const coordinateSpaceToggle = wrapper
+      .findAllComponents({ name: "QBtnToggle" })
+      .find(toggle => toggle.props("modelValue") === "local")!;
+    await coordinateSpaceToggle.vm.$emit("update:modelValue", "global");
+    await flushPromises();
+
+    expect(labelTexts()).toEqual(
+      ["+AP", "-AP", "+DV", "-DV", "+ML", "-ML"].sort()
+    );
   });
 
   it("hides the gizmo toolbar while nothing is selected", async () => {
