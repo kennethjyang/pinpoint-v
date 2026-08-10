@@ -3,7 +3,10 @@ import {
   buildCoordinateSystemNode,
   buildCoordinateSystemValue
 } from "./coordinate-system.api";
-import { solveCoordinateSystemChain } from "./forward-kinematics.api";
+import {
+  isCoordinateSystemSolutionAtPose,
+  solveCoordinateSystemChain
+} from "./forward-kinematics.api";
 import type { CoordinateSystemNode } from "../model/coordinate-system.model";
 
 /** Build a node with the given axis-ordered position/rotation values under an identity order. */
@@ -142,5 +145,78 @@ describe("solveCoordinateSystemChain", () => {
     expect(solution.rotation[1]).toBeCloseTo(0);
     expect(solution.rotation[2]).toBeCloseTo(0);
     expect(solution.nodePositions).toEqual([]);
+  });
+});
+
+describe("isCoordinateSystemSolutionAtPose", () => {
+  it("is true for an exact match", () => {
+    const node = makeIdentityNode([1, 2, 3], [0.1, 0.2, 0.3]);
+    const solution = solveCoordinateSystemChain([node], null);
+
+    expect(
+      isCoordinateSystemSolutionAtPose(
+        solution,
+        solution.tipPosition,
+        solution.rotation,
+        1e-4
+      )
+    ).toBe(true);
+  });
+
+  it("is true for a rotation expressed in an equivalent Euler branch", () => {
+    const node = makeIdentityNode([1, 2, 3], [0.1, 0.2, 0.3]);
+    const solution = solveCoordinateSystemChain([node], null);
+    const equivalentRotation: [number, number, number] = [
+      solution.rotation[0] + 2 * Math.PI,
+      solution.rotation[1],
+      solution.rotation[2]
+    ];
+
+    expect(
+      isCoordinateSystemSolutionAtPose(
+        solution,
+        solution.tipPosition,
+        equivalentRotation,
+        1e-4
+      )
+    ).toBe(true);
+  });
+
+  it("is false for a position off by more than the tolerance", () => {
+    const node = makeIdentityNode([1, 2, 3], [0.1, 0.2, 0.3]);
+    const solution = solveCoordinateSystemChain([node], null);
+    const offPosition: [number, number, number] = [
+      solution.tipPosition[0] + 1,
+      solution.tipPosition[1],
+      solution.tipPosition[2]
+    ];
+
+    expect(
+      isCoordinateSystemSolutionAtPose(
+        solution,
+        offPosition,
+        solution.rotation,
+        1e-4
+      )
+    ).toBe(false);
+  });
+
+  it("is false for a rotation off by more than the tolerance", () => {
+    const node = makeIdentityNode([1, 2, 3], [0.1, 0.2, 0.3]);
+    const solution = solveCoordinateSystemChain([node], null);
+    const offRotation: [number, number, number] = [
+      solution.rotation[0] + 1,
+      solution.rotation[1],
+      solution.rotation[2]
+    ];
+
+    expect(
+      isCoordinateSystemSolutionAtPose(
+        solution,
+        solution.tipPosition,
+        offRotation,
+        1e-4
+      )
+    ).toBe(false);
   });
 });

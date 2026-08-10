@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { shallowRef } from "vue";
+import { shallowRef, toRaw } from "vue";
 import { flushPromises } from "@vue/test-utils";
 import type { VueWrapper } from "@vue/test-utils";
-import { createPinia, setActivePinia } from "pinia";
+import { createPinia, type Pinia, setActivePinia } from "pinia";
 import type { AbstractEngine } from "@babylonjs/core";
 import ProbeInspector from "./ProbeInspector.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
@@ -19,7 +19,10 @@ import {
   buildCoordinateSystem,
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
-  buildFixedCoordinateSystemValue
+  buildFixedCoordinateSystemValue,
+  type CoordinateSystemSolution,
+  isCoordinateSystemSolutionAtPose,
+  solveCoordinateSystemChain
 } from "@/features/coordinate-system";
 import { getTerminologyRows } from "@/features/atlas";
 import {
@@ -183,6 +186,7 @@ describe("ProbeInspector", () => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
     vi.mocked(useProbeSurface).mockReturnValue({
       findTargets: vi.fn(),
+      isInsideBrain: vi.fn(),
       isOnSurface: vi.fn()
     });
     openModelFileDialogSpy.mockReset();
@@ -684,6 +688,7 @@ describe("ProbeInspector", () => {
     it("shows the off-surface warning once when isOnSurface resolves false after a commit", async () => {
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets: vi.fn(),
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn().mockResolvedValue(false)
       });
       const { wrapper, pinia } = mountInspector();
@@ -709,6 +714,7 @@ describe("ProbeInspector", () => {
     it("shows no off-surface warning when isOnSurface resolves null after a commit", async () => {
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets: vi.fn(),
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn().mockResolvedValue(null)
       });
       const { wrapper, pinia } = mountInspector();
@@ -725,6 +731,151 @@ describe("ProbeInspector", () => {
       await flushPromises();
 
       expect(wrapper.findAll(".text-warning")).toHaveLength(0);
+    });
+  });
+
+  describe("inverse kinematics", () => {
+    /**
+     * Solve a chain matching the multi-node library system's structure, seeded from what the
+     * inspector currently renders for it.
+     * @param wrapper Mounted inspector to read rendered fields from.
+     * @param pinia Active pinia instance, to resolve the library and reference offset.
+     */
+    function solveDisplayedChain(
+      wrapper: VueWrapper,
+      pinia: Pinia
+    ): CoordinateSystemSolution {
+      const chain = structuredClone(
+        toRaw(useCoordinateSystemLibraryStore(pinia).library[1]!)
+      ).chain;
+      for (const node of chain) {
+        for (const value of [...node.position, ...node.rotation]) {
+          if (value.fixed) continue;
+          value.value = Number(
+            fieldByLabel(wrapper, value.name).props("modelValue")
+          );
+        }
+      }
+      const referenceOffset =
+        useCurrentExperimentStore(pinia).referenceCoordinate;
+      return solveCoordinateSystemChain(chain, referenceOffset);
+    }
+
+    /**
+     * Select the multi-node "Surface Coordinate & Depth" library system, in radians and at
+     * high precision so its rendered values round-trip cleanly, and let its initial solve settle.
+     * @param pinia Active pinia instance, to resolve the library.
+     */
+    async function selectMultiNodeSystem(
+      wrapper: VueWrapper,
+      pinia: Pinia
+    ): Promise<void> {
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      usePreferencesStore().rotationUnit = "radian";
+      usePreferencesStore().decimalPrecision = 6;
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+    }
+
+    /**
+     * Wait past the live-preview throttle window, so the next drag-frame pose change fires
+     * its own solve instead of being dropped by the leading-edge-only throttle.
+     */
+    function waitOutPreviewThrottle(): Promise<void> {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setTimeout(resolve, 150);
+      return promise;
+    }
+
+    it("reproduces an external pose change in the chain's inputs and leaves the ghost null", async () => {
+      const { wrapper, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      probe.tipPosition = [5, 6, 7];
+      probe.rotation = [0.1, 0.2, 0.3];
+      await flushPromises();
+
+      const solution = solveDisplayedChain(wrapper, pinia);
+      expect(
+        isCoordinateSystemSolutionAtPose(
+          solution,
+          probe.tipPosition,
+          probe.rotation,
+          1e-3
+        )
+      ).toBe(true);
+      expect(useCurrentExperimentStore(pinia).probeGhost).toBeNull();
+    });
+
+    it("draws a ghost at the closest reachable pose while an unreachable drag is out of bounds, and clears it once the drag is back in reach", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.tipPosition = [1, 2, 3];
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+
+      expect(store.probeGhost).not.toBeNull();
+      expect(store.probeGhost?.probeId).toBe(probe.id);
+      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      await waitOutPreviewThrottle();
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(store.probeGhost).toBeNull();
+    });
+
+    it("snaps the probe onto the ghost's pose and clears the ghost when an unreachable drag is released", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      expect(store.probeGhost).not.toBeNull();
+
+      store.draggedProbeId = null;
+      await flushPromises();
+
+      expect(store.probeGhost).toBeNull();
+      const solution = solveDisplayedChain(wrapper, pinia);
+      expect(
+        isCoordinateSystemSolutionAtPose(
+          solution,
+          probe.tipPosition,
+          probe.rotation,
+          1e-3
+        )
+      ).toBe(true);
+    });
+
+    it("shows the failure toast once per excursion out of reach", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+      await waitOutPreviewThrottle();
+      probe.rotation = [0, 0, 2.1];
+      await flushPromises();
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+      await waitOutPreviewThrottle();
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+      await waitOutPreviewThrottle();
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      expect(notifySpy).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -922,6 +1073,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector();
@@ -941,6 +1093,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector(
@@ -966,6 +1119,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector();
@@ -985,6 +1139,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(
@@ -1007,6 +1162,7 @@ describe("ProbeInspector", () => {
       const findTargets = vi.fn().mockResolvedValue(null);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(
@@ -1035,6 +1191,7 @@ describe("ProbeInspector", () => {
       );
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper } = mountInspector();
@@ -1063,6 +1220,7 @@ describe("ProbeInspector", () => {
       });
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
+        isInsideBrain: vi.fn(),
         isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(

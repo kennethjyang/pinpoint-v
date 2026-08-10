@@ -16,6 +16,7 @@ import {
 } from "@/features/atlas";
 import {
   detachProbeInterfaceProbes,
+  type ProbeGhost,
   type ProbeSurfaceChoice
 } from "@/features/probe";
 import type { Inspectable } from "@/features/scene";
@@ -66,6 +67,9 @@ export const useCurrentExperimentStore = defineStore(
 
     /** Pending surface-move choice awaiting the user's pick, or null. */
     const probeSurfaceChoice = ref<ProbeSurfaceChoice | null>(null);
+
+    /** Translucent clone drawn at the closest reachable pose while a drag can't be solved, or null. */
+    const probeGhost = ref<ProbeGhost | null>(null);
 
     /** Are the atlas axis guides shown in the scene. */
     const areAxisGuidesVisible = ref(false);
@@ -285,6 +289,7 @@ export const useCurrentExperimentStore = defineStore(
       resetHistory();
       selectedInspectable.value = null;
       draggedProbeId.value = null;
+      probeGhost.value = null;
       draggedSceneObjectId.value = null;
       bodyModelGizmoProbeId.value = null;
       isCameraMoving.value = false;
@@ -298,6 +303,7 @@ export const useCurrentExperimentStore = defineStore(
       bodyModelGizmoProbeId,
       isCameraMoving,
       probeSurfaceChoice,
+      probeGhost,
       isTerminologyRowsEvaluating,
       areAxisGuidesVisible,
       isLoadingRegionCenter,

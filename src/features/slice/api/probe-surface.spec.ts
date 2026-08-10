@@ -5,6 +5,7 @@ import { planSamples } from "./sample-plan.api";
 import type { ProbeFrame } from "./probe-frame.api";
 import {
   findProbeSurfaceTargets,
+  isInAnnotation,
   isOnAnnotationSurface,
   type RaySampler
 } from "./probe-surface.api";
@@ -398,6 +399,64 @@ describe("isOnAnnotationSurface", () => {
     const sampleNeighborhood: RaySampler = async () => null;
 
     const result = await isOnAnnotationSurface(
+      level,
+      [
+        voxelCenter(level, 0, 2),
+        voxelCenter(level, 1, 3),
+        voxelCenter(level, 2, 2)
+      ],
+      sampleNeighborhood
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("isInAnnotation", () => {
+  it("is true for an annotated center voxel", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(level, () => true);
+    const point: [number, number, number] = [
+      voxelCenter(level, 0, 2),
+      voxelCenter(level, 1, 3),
+      voxelCenter(level, 2, 2)
+    ];
+
+    const result = await isInAnnotation(
+      level,
+      point,
+      makeSampleRay(level, grid)
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it("is false for a background voxel", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(
+      level,
+      (ap, dv, ml) => !(ap === 2 && dv === 3 && ml === 2)
+    );
+    const point: [number, number, number] = [
+      voxelCenter(level, 0, 2),
+      voxelCenter(level, 1, 3),
+      voxelCenter(level, 2, 2)
+    ];
+
+    const result = await isInAnnotation(
+      level,
+      point,
+      makeSampleRay(level, grid)
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it("is null when the sampler can't be read", async () => {
+    const level = makeLevel();
+    const sampleNeighborhood: RaySampler = async () => null;
+
+    const result = await isInAnnotation(
       level,
       [
         voxelCenter(level, 0, 2),

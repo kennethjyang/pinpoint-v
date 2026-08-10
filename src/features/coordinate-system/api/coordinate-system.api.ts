@@ -189,6 +189,21 @@ export function getCoordinateSystemValueAxis(
 }
 
 /**
+ * Value mapped to a node's axis, with its fixed flag and bounds.
+ * @param node Coordinate system node holding the value.
+ * @param component Whether to read a position or a rotation value.
+ * @param axisIndex Axis index (0 = X, 1 = Y, 2 = Z) to read.
+ */
+export function getCoordinateSystemAxisEntry(
+  node: CoordinateSystemNode,
+  component: CoordinateSystemNodeComponent,
+  axisIndex: number
+): CoordinateSystemValue {
+  const { values, order } = getComponentPair(node, component);
+  return values[order[axisIndex]!]!;
+}
+
+/**
  * Read a node's value on the given axis.
  * @param node Coordinate system node holding the value.
  * @param component Whether to read a position or a rotation value.
@@ -199,8 +214,7 @@ export function getCoordinateSystemAxisValue(
   component: CoordinateSystemNodeComponent,
   axisIndex: number
 ): number {
-  const { values, order } = getComponentPair(node, component);
-  return values[order[axisIndex]!]!.value;
+  return getCoordinateSystemAxisEntry(node, component, axisIndex).value;
 }
 
 /**
@@ -216,8 +230,7 @@ export function setCoordinateSystemAxisValue(
   axisIndex: number,
   value: number
 ): void {
-  const { values, order } = getComponentPair(node, component);
-  values[order[axisIndex]!]!.value = value;
+  getCoordinateSystemAxisEntry(node, component, axisIndex).value = value;
 }
 
 /**

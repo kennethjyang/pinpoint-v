@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { computed, onUnmounted, ref, toRaw, watch } from "vue";
+import { useThrottleFn } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -23,9 +24,14 @@ import { SliceCanvas, useProbeSurface } from "@/features/slice";
 import {
   type CoordinateSystemNode,
   type CoordinateSystemSolution,
+  type CoordinateSystemSolveStatus,
   getCoordinateSystemAxisValue,
+  isCoordinateSystemSolutionAtPose,
+  PREVIEW_SOLVE_STARTS,
   setCoordinateSystemAxisValue,
-  solveCoordinateSystemChain
+  SETTLED_SOLVE_STARTS,
+  solveCoordinateSystemChain,
+  solveCoordinateSystemChainInverse
 } from "@/features/coordinate-system";
 import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import ProbeTransformChain from "./ProbeTransformChain.vue";
@@ -60,6 +66,25 @@ interface CoordinateSystemOption {
   value: string;
 }
 
+/** Why an inverse-kinematics run fired, which sets its solve budget and what it writes. */
+type SolveReason = "preview" | "release" | "external";
+
+/** Milliseconds between live solves while the gizmo is dragging - 10 Hz. */
+const PREVIEW_SOLVE_INTERVAL_MILLISECONDS = 100;
+
+/** Pose difference, in mm and radians, below which the probe needs no correction. */
+const POSE_MATCH_TOLERANCE = 1e-4;
+
+const SOLVE_FAILURE_CAPTION_KEYS = {
+  stalled: "probeInspector.inverseKinematicsStalled",
+  diverged: "probeInspector.inverseKinematicsDiverged",
+  timeout: "probeInspector.inverseKinematicsTimeout",
+  noFreeValues: "probeInspector.inverseKinematicsNoFreeValues"
+} as const satisfies Record<
+  Exclude<CoordinateSystemSolveStatus, "converged">,
+  string
+>;
+
 const { probe } = defineProps<{
   probe: Probe;
 }>();
@@ -70,8 +95,8 @@ const coordinateSystemLibraryStore = useCoordinateSystemLibraryStore();
 const { requiredName: nameRules } = useValidationRules();
 
 const { t } = useI18n();
-const { notifyWarning } = useNotify();
-const { findTargets, isOnSurface } = useProbeSurface();
+const { notifyError, notifyWarning } = useNotify();
+const { findTargets, isInsideBrain, isOnSurface } = useProbeSurface();
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
@@ -101,6 +126,24 @@ let surfaceAbortController: AbortController | null = null;
  * `let`, not a ref: nothing renders it.
  */
 let surfaceCheckId = 0;
+
+/** Probe pose this inspector last wrote, so its own correction does not retrigger a solve. */
+let appliedPose: {
+  tipPosition: [number, number, number];
+  rotation: [number, number, number];
+} | null = null;
+
+/** Has the unreachable-pose toast fired, so it fires once per excursion out of reach. */
+let hasNotifiedNonConvergence = false;
+
+/** Was this probe being dragged, so the next non-drag run is the drag's release solve. */
+let wasDragging = false;
+
+/** Is a solve in flight, so live previews do not queue up behind each other. */
+let isSolving = false;
+
+/** Guards a solve against a superseded pose change. */
+let solveId = 0;
 
 /**
  * Link to the probe identifier that also repoints its interned interface
@@ -296,18 +339,115 @@ function solveDirectNode(node: CoordinateSystemNode): CoordinateSystemSolution {
   };
 }
 
+/**
+ * Mark the chain as reaching the probe: drop this probe's ghost and re-arm the failure toast.
+ */
+function clearUnreachable(): void {
+  hasNotifiedNonConvergence = false;
+  if (currentExperimentStore.probeGhost?.probeId === probe.id) {
+    currentExperimentStore.probeGhost = null;
+  }
+}
+
+/**
+ * Solve the working chain's non-fixed values onto the probe's pose, driving or clearing the
+ * unreachable-pose ghost and toast based on the result.
+ * @param reason Why this solve fired, which sets its restart budget and what it writes.
+ */
+async function runInverseKinematics(reason: SolveReason): Promise<void> {
+  if (reason === "preview" && isSolving) return;
+  const id = ++solveId;
+  isSolving = true;
+  try {
+    let surfacePosition: [number, number, number] | null = null;
+    if (chain.value.some(node => node.onSurface)) {
+      const inside = await isInsideBrain(probe.tipPosition);
+      if (inside) {
+        surfacePosition = (await findTargets(probe))?.insideMillimeters ?? null;
+      }
+    }
+    if (id !== solveId) return;
+
+    const status = solveCoordinateSystemChainInverse(
+      chain.value,
+      {
+        tipPosition: [...probe.tipPosition],
+        rotation: [...probe.rotation],
+        surfacePosition
+      },
+      referenceOffset.value,
+      reason === "preview" ? PREVIEW_SOLVE_STARTS : SETTLED_SOLVE_STARTS
+    );
+    const solution = solveCoordinateSystemChain(
+      chain.value,
+      referenceOffset.value
+    );
+
+    if (status !== "converged" && !hasNotifiedNonConvergence) {
+      hasNotifiedNonConvergence = true;
+      notifyError(
+        t("probeInspector.inverseKinematicsFailed"),
+        t(SOLVE_FAILURE_CAPTION_KEYS[status])
+      );
+    }
+
+    if (status === "converged") {
+      clearUnreachable();
+    } else if (reason === "release") {
+      if (
+        !isCoordinateSystemSolutionAtPose(
+          solution,
+          probe.tipPosition,
+          probe.rotation,
+          POSE_MATCH_TOLERANCE
+        )
+      ) {
+        appliedPose = {
+          tipPosition: [...solution.tipPosition],
+          rotation: [...solution.rotation]
+        };
+        setProbeTipMillimeters(probe, solution.tipPosition);
+        probe.rotation = [...solution.rotation];
+      }
+      clearUnreachable();
+    } else {
+      currentExperimentStore.probeGhost = {
+        probeId: probe.id,
+        tipPosition: [...solution.tipPosition],
+        rotation: [...solution.rotation]
+      };
+    }
+
+    void checkSurfaceNodes(solution);
+  } finally {
+    if (id === solveId) isSolving = false;
+  }
+}
+
+// The gizmo streams a pose every frame; solve at 10 Hz so the inputs follow the drag without
+// queueing a solve per frame. Leading edge and no trailing call, so the release run below is
+// always the final compute.
+const previewInverseKinematics = useThrottleFn(
+  () => runInverseKinematics("preview"),
+  PREVIEW_SOLVE_INTERVAL_MILLISECONDS
+);
+
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
   chain.value = selectedCoordinateSystem.value
     ? structuredClone(toRaw(selectedCoordinateSystem.value)).chain
     : [];
   offSurfaceNodeIndexes.value = [];
+  appliedPose = null;
+  clearUnreachable();
 
   // A single all-adjustable node is exactly invertible from the probe's pose, so
   // the default coordinate system reads and writes live state. Any other chain
-  // shape is not invertible, so it keeps the library's values.
+  // shape needs a solve to describe the probe's current pose instead of showing
+  // the library's stored values.
   const node = directNode.value;
   if (node) writeProbePoseIntoNode(node);
+  else void runInverseKinematics("external");
 }
 
 /**
@@ -393,8 +533,13 @@ function applySolve(): void {
   const solution = node
     ? solveDirectNode(node)
     : solveCoordinateSystemChain(chain.value, referenceOffset.value);
+  appliedPose = {
+    tipPosition: [...solution.tipPosition],
+    rotation: [...solution.rotation]
+  };
   setProbeTipMillimeters(probe, solution.tipPosition);
   probe.rotation = [...solution.rotation];
+  clearUnreachable();
   void checkSurfaceNodes(solution);
 }
 
@@ -425,20 +570,55 @@ async function checkSurfaceNodes(
 // A different probe or a different coordinate system starts from the library's values.
 watch([() => probe.id, coordinateSystemId], seedChain, { immediate: true });
 
-// The scene writes the probe's pose straight into state on every gizmo drag frame,
-// so mirror it back into a direct chain to keep the inputs live. Nothing is written
-// to the probe here, so the drag still lands as the single history point
-// `endProbeDrag` commits on release.
+// The scene writes the probe's pose straight into state on every gizmo drag frame. A direct
+// chain mirrors it live and needs no solve. Any other chain solves for it: at 10 Hz while
+// dragging, once more when `endProbeDrag` nulls `draggedProbeId` (the release run), and once
+// for an external change such as undo, Home, or Move to surface. Nothing is committed to
+// history until that release run.
 watch(
-  [() => probe.tipPosition, () => probe.rotation, referenceOffset],
+  [
+    () => probe.tipPosition,
+    () => probe.rotation,
+    referenceOffset,
+    () => currentExperimentStore.draggedProbeId
+  ],
   () => {
     const node = directNode.value;
-    if (node) writeProbePoseIntoNode(node);
+    if (node) {
+      writeProbePoseIntoNode(node);
+      clearUnreachable();
+      return;
+    }
+    if (
+      appliedPose &&
+      appliedPose.tipPosition.every(
+        (value, index) => value === probe.tipPosition[index]
+      ) &&
+      appliedPose.rotation.every(
+        (value, index) => value === probe.rotation[index]
+      )
+    ) {
+      return;
+    }
+    if (currentExperimentStore.draggedProbeId === probe.id) {
+      wasDragging = true;
+      void previewInverseKinematics();
+      return;
+    }
+    if (wasDragging) {
+      wasDragging = false;
+      void runInverseKinematics("release");
+      return;
+    }
+    void runInverseKinematics("external");
   },
   { deep: true }
 );
 
-onUnmounted(cancelMoveToSurface);
+onUnmounted(() => {
+  cancelMoveToSurface();
+  clearUnreachable();
+});
 </script>
 
 <template>

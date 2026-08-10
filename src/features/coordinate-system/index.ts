@@ -6,7 +6,19 @@ export type {
   CoordinateSystemValue
 } from "./model/coordinate-system.model";
 export type { CoordinateSystemSolution } from "./api/forward-kinematics.api";
-export { solveCoordinateSystemChain } from "./api/forward-kinematics.api";
+export {
+  isCoordinateSystemSolutionAtPose,
+  solveCoordinateSystemChain
+} from "./api/forward-kinematics.api";
+export type {
+  CoordinateSystemSolveStatus,
+  CoordinateSystemTarget
+} from "./api/inverse-kinematics.api";
+export {
+  PREVIEW_SOLVE_STARTS,
+  SETTLED_SOLVE_STARTS,
+  solveCoordinateSystemChainInverse
+} from "./api/inverse-kinematics.api";
 export {
   addCoordinateSystemTransform,
   buildCoordinateSystem,

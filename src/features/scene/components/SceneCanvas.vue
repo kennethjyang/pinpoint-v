@@ -54,6 +54,7 @@ import {
   setProbeRotationFromGizmoDrag,
   syncProbes
 } from "../api/probe.api";
+import { syncProbeGhost } from "../api/probe-ghost.api";
 import {
   createCollisionState,
   pruneCollisions,
@@ -567,6 +568,8 @@ watchEffect(() => {
       );
     }
   }
+
+  syncProbeGhost(scene, currentExperiment.probeGhost, rebuiltProbeIds);
 });
 
 /**

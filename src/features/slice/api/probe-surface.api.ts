@@ -247,6 +247,38 @@ export async function isOnAnnotationSurface(
   pointMillimeters: [number, number, number],
   sampleNeighborhood: RaySampler
 ): Promise<boolean | null> {
+  const values = await sampleNeighborhood(
+    getVoxelNeighborhoodGeometry(level, pointMillimeters)
+  );
+  if (!values) return null;
+
+  return (
+    values[13] !== 0 && FACE_NEIGHBOR_INDEXES.some(index => values[index] === 0)
+  );
+}
+
+/**
+ * Is a point inside an annotated voxel, i.e. inside the brain. Null when the volume can't be sampled.
+ * @param level Annotation level to test against, finest first.
+ * @param pointMillimeters Point to test, in atlas ASR mm.
+ * @param sampleNeighborhood Samples the 3x3x3 voxel block around the point.
+ */
+export async function isInAnnotation(
+  level: AnnotationLevel,
+  pointMillimeters: [number, number, number],
+  sampleNeighborhood: RaySampler
+): Promise<boolean | null> {
+  const values = await sampleNeighborhood(
+    getVoxelNeighborhoodGeometry(level, pointMillimeters)
+  );
+  return values ? values[13] !== 0 : null;
+}
+
+/** Build the sampling geometry for the 3x3x3 voxel neighborhood centered on a point's voxel. */
+function getVoxelNeighborhoodGeometry(
+  level: AnnotationLevel,
+  pointMillimeters: [number, number, number]
+): SampleGeometry {
   const scale = level.scaleMillimeters;
   const center: [number, number, number] = [0, 0, 0];
   for (let axis = 0; axis < 3; axis++) {
@@ -258,7 +290,7 @@ export async function isOnAnnotationSurface(
       level.translationMillimeters[axis]! + (voxel + 0.5) * scale[axis]!;
   }
 
-  const geometry: SampleGeometry = {
+  return {
     rightMillimeters: [0, 0, 1],
     upMillimeters: [0, 1, 0],
     halfHeightMillimeters: 1.5 * scale[1]!,
@@ -271,10 +303,4 @@ export async function isOnAnnotationSurface(
       columnCount: 3
     }))
   };
-  const values = await sampleNeighborhood(geometry);
-  if (!values) return null;
-
-  return (
-    values[13] !== 0 && FACE_NEIGHBOR_INDEXES.some(index => values[index] === 0)
-  );
 }

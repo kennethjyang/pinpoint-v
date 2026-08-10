@@ -54,3 +54,41 @@ export function solveCoordinateSystemChain(
     nodePositions
   };
 }
+
+/**
+ * Does a solved chain reproduce a probe pose within a tolerance, comparing orientation as a
+ * rotation matrix so equivalent Euler branches count as equal.
+ * @param solution Solved chain to compare.
+ * @param tipPosition Probe tip to compare against, in atlas ASR mm as [ap, dv, ml].
+ * @param rotation Probe rotation to compare against as [roll, yaw, pitch], in radians.
+ * @param tolerance Largest position (mm) or rotation-matrix element difference treated as equal.
+ */
+export function isCoordinateSystemSolutionAtPose(
+  solution: CoordinateSystemSolution,
+  tipPosition: [number, number, number],
+  rotation: [number, number, number],
+  tolerance: number
+): boolean {
+  const positionMatches = tipPosition.every(
+    (value, index) =>
+      Math.abs(value - solution.tipPosition[index]!) <= tolerance
+  );
+  if (!positionMatches) {
+    return false;
+  }
+
+  const targetRotationMatrix = Matrix.RotationYawPitchRoll(
+    rotation[1],
+    rotation[2],
+    rotation[0]
+  );
+  const solutionRotationMatrix = Matrix.RotationYawPitchRoll(
+    solution.rotation[1],
+    solution.rotation[2],
+    solution.rotation[0]
+  );
+  return targetRotationMatrix.m.every(
+    (value, index) =>
+      Math.abs(value - solutionRotationMatrix.m[index]!) <= tolerance
+  );
+}
