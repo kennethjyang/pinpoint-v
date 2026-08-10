@@ -14,7 +14,6 @@ import {
   setStructureVisibility
 } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
-import { usePreferencesStore } from "@/stores/preferences.store";
 import { getProbeFrame } from "../api/probe-frame.api";
 import {
   formatSliceExtentMillimeters,
@@ -35,7 +34,6 @@ const LOADING_BAR_DELAY_MILLISECONDS = 500;
 const { probe } = defineProps<{ probe: Probe }>();
 
 const currentExperiment = useCurrentExperimentStore();
-const preferences = usePreferencesStore();
 const { t } = useI18n();
 
 const square = useTemplateRef<HTMLDivElement>("square");
@@ -73,8 +71,7 @@ const { zoomRange, extentMillimeters, zoomExponent, centerHeightMillimeters } =
   useSliceViewport(
     toRef(() => probe),
     contour,
-    computed(() => currentExperiment.atlas),
-    toRef(preferences, "sliceDefaultZoomFraction")
+    computed(() => currentExperiment.atlas)
   );
 
 /** Full-resolution device-pixel edge length, quantized to bound replans. */

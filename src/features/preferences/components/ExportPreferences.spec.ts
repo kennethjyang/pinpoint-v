@@ -90,7 +90,6 @@ function buildUploadedPreferences(overrides: Record<string, unknown> = {}) {
     probeHeadStageCutDepthMillimeters: 17.5,
     probeRodDiameterMillimeters: 8,
     probeRodLengthMillimeters: 200,
-    sliceDefaultZoomFraction: 0.25,
     ...overrides
   };
 }

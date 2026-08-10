@@ -498,15 +498,7 @@ describe("getDefaultSliceExtentMillimeters", () => {
 
     // Average of [13.2, 8, 11.4] is 10.8666...; a third is 3.622mm;
     // log2(3.622) ~= 1.857, which rounds up to tick 2 (4mm).
-    expect(getDefaultSliceExtentMillimeters(atlas, 1 / 3, range)).toBe(4);
-  });
-
-  it("scales with the fraction preference", () => {
-    const atlas = makeAtlas();
-    const range = { minimum: -2, maximum: 4 };
-
-    // log2(10.8666...) ~= 3.44, which rounds to tick 3 (8mm).
-    expect(getDefaultSliceExtentMillimeters(atlas, 1, range)).toBe(8);
+    expect(getDefaultSliceExtentMillimeters(atlas, range)).toBe(4);
   });
 
   it("scales up for a wider, human-scale range", () => {
@@ -520,27 +512,35 @@ describe("getDefaultSliceExtentMillimeters", () => {
 
     // Average dimension 197mm; a third is 65.67mm; log2(65.67) ~= 6.04,
     // which rounds to tick 6 (64mm).
-    expect(getDefaultSliceExtentMillimeters(atlas, 1 / 3, range)).toBe(64);
+    expect(getDefaultSliceExtentMillimeters(atlas, range)).toBe(64);
   });
 
-  it("clamps a target far below the range down to its minimum", () => {
+  it("clamps a target above the range down to its maximum", () => {
     const atlas = makeAtlas({
       manifest: makeManifest({
         resolutions: [[0.5, 0.5, 0.5]],
         shape: [[394, 394, 394]]
       })
     });
-    const range = { minimum: -2, maximum: 4 };
+    const range = { minimum: 2, maximum: 4 };
 
-    // A tiny fraction targets a tick of -7, clamped up to the -2 minimum.
-    expect(getDefaultSliceExtentMillimeters(atlas, 0.001, range)).toBe(0.25);
+    // A third of 197mm rounds to tick 6, clamped down to the 4 maximum.
+    expect(getDefaultSliceExtentMillimeters(atlas, range)).toBe(16);
+  });
+
+  it("clamps a target below the range up to its minimum", () => {
+    const atlas = makeAtlas();
+    const range = { minimum: 4, maximum: 8 };
+
+    // A third of 10.8666...mm rounds to tick 2, clamped up to the 4 minimum.
+    expect(getDefaultSliceExtentMillimeters(atlas, range)).toBe(16);
   });
 
   it("falls back to the range midpoint when the atlas's dimensions are unknown", () => {
     const atlas = makeAtlas({ manifest: makeManifest({ resolutions: [] }) });
     const range = { minimum: -2, maximum: 4 };
 
-    expect(getDefaultSliceExtentMillimeters(atlas, 1 / 3, range)).toBe(2);
+    expect(getDefaultSliceExtentMillimeters(atlas, range)).toBe(2);
   });
 });
 

@@ -98,8 +98,7 @@ const NUMERIC_PREFERENCE_RANGES = {
   probeHeadStageLengthMillimeters: [0.01, 1000],
   probeHeadStageCutDepthMillimeters: [0, 1000],
   probeRodDiameterMillimeters: [0.01, 1000],
-  probeRodLengthMillimeters: [0.01, 10_000],
-  sliceDefaultZoomFraction: [0.125, 1]
+  probeRodLengthMillimeters: [0.01, 10_000]
 } as const satisfies Record<NumericPreferenceKey, readonly [number, number]>;
 
 /**
@@ -195,7 +194,6 @@ function pickPreferences(source: Preferences, version: string): Preferences {
     probeHeadStageLengthMillimeters: source.probeHeadStageLengthMillimeters,
     probeHeadStageCutDepthMillimeters: source.probeHeadStageCutDepthMillimeters,
     probeRodDiameterMillimeters: source.probeRodDiameterMillimeters,
-    probeRodLengthMillimeters: source.probeRodLengthMillimeters,
-    sliceDefaultZoomFraction: source.sliceDefaultZoomFraction
+    probeRodLengthMillimeters: source.probeRodLengthMillimeters
   };
 }

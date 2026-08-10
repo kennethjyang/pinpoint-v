@@ -48,8 +48,6 @@ export interface Preferences {
   probeRodDiameterMillimeters: number;
   /** Length of a probe's rod, in mm. */
   probeRodLengthMillimeters: number;
-  /** Fraction of the atlas's average dimension a probe's slice view zooms to before its zoom is set. */
-  sliceDefaultZoomFraction: number;
 }
 
 /** Babylon's default scene clear color, the starting background for both themes. */
@@ -79,7 +77,6 @@ export const usePreferencesStore = defineStore(
     const probeHeadStageCutDepthMillimeters = ref(17.5);
     const probeRodDiameterMillimeters = ref(8);
     const probeRodLengthMillimeters = ref(200);
-    const sliceDefaultZoomFraction = ref(0.25);
 
     // `satisfies` keeps the store's state and `Preferences` in lockstep: a new
     // preference must appear in both.
@@ -104,8 +101,7 @@ export const usePreferencesStore = defineStore(
       probeHeadStageLengthMillimeters,
       probeHeadStageCutDepthMillimeters,
       probeRodDiameterMillimeters,
-      probeRodLengthMillimeters,
-      sliceDefaultZoomFraction
+      probeRodLengthMillimeters
     } satisfies { [K in keyof Preferences]: Ref<Preferences[K]> };
     return { ...state };
   },

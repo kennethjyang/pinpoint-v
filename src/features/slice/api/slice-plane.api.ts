@@ -68,6 +68,9 @@ const SHANK_GAP_PIXELS = 1;
  */
 const MINIMUM_CHANNEL_MAP_WINDOW_MILLIMETERS = 0.05;
 
+/** Fraction of the atlas's average dimension a never-zoomed probe defaults to showing. */
+const DEFAULT_ZOOM_ATLAS_FRACTION = 1 / 3;
+
 /**
  * Derive the slice zoom range from an atlas's longest dimension.
  * @param atlas Atlas to derive the range from.
@@ -98,19 +101,17 @@ export function clampSliceExtent(
 
 /**
  * Default slice extent for a probe whose zoom has never been set, in mm - a
- * fraction of the atlas's average dimension, snapped to the nearest whole
- * zoom exponent (i.e. the nearest slider tick) and clamped into the range.
+ * third of the atlas's average dimension, snapped to the nearest whole zoom
+ * exponent (i.e. the nearest slider tick) and clamped into the range.
  * @param atlas Atlas to size the default against.
- * @param atlasFraction Fraction of the atlas's average dimension to show.
  * @param range Zoom range to snap into, as log2 mm exponents.
  */
 export function getDefaultSliceExtentMillimeters(
   atlas: Atlas,
-  atlasFraction: number,
   range: SliceZoomExponentRange
 ): number {
   const targetMillimeters =
-    getAtlasAverageDimensionMillimeters(atlas) * atlasFraction;
+    getAtlasAverageDimensionMillimeters(atlas) * DEFAULT_ZOOM_ATLAS_FRACTION;
   const exponent =
     targetMillimeters > 0
       ? Math.round(Math.log2(targetMillimeters))

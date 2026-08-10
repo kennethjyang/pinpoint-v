@@ -90,35 +90,4 @@ describe("ProbePreferences", () => {
 
     expect(preferences.probeRodLengthMillimeters).toBe(0.5);
   });
-
-  it("reads the Default Zoom slider from the stored fraction, in log2 space", async () => {
-    const wrapper = mountWithQuasar(ProbePreferences);
-    const preferences = usePreferencesStore();
-    preferences.sliceDefaultZoomFraction = 0.5;
-    await wrapper.vm.$nextTick();
-
-    const slider = wrapper.findComponent({ name: "QSlider" });
-
-    expect(slider.props("modelValue")).toBe(-1);
-  });
-
-  it("moving the Default Zoom slider writes the converted fraction to sliceDefaultZoomFraction", async () => {
-    const wrapper = mountWithQuasar(ProbePreferences);
-    const preferences = usePreferencesStore();
-
-    const slider = wrapper.findComponent({ name: "QSlider" });
-    await slider.vm.$emit("update:modelValue", -1);
-
-    expect(preferences.sliceDefaultZoomFraction).toBe(0.5);
-  });
-
-  it("Default Zoom slider spans 1/8 to 1 in log2 steps", () => {
-    const wrapper = mountWithQuasar(ProbePreferences);
-
-    const slider = wrapper.findComponent({ name: "QSlider" });
-
-    expect(slider.props("min")).toBe(-3);
-    expect(slider.props("max")).toBe(0);
-    expect(slider.props("step")).toBe(1);
-  });
 });
