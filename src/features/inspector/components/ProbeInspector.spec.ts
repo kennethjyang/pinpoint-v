@@ -22,7 +22,10 @@ import {
   buildFixedCoordinateSystemValue
 } from "@/features/coordinate-system";
 import { getTerminologyRows } from "@/features/atlas";
-import { internProbeInterfaceProbe } from "@/features/experiment";
+import {
+  ALLEN_MOUSE_REFERENCE_COORDINATE,
+  internProbeInterfaceProbe
+} from "@/features/experiment";
 import {
   getProbeContour,
   getProbeInterfaceDisplayName,
@@ -303,10 +306,13 @@ describe("ProbeInspector", () => {
 
     // "abc" must never reach the stored value: forcing a precision change
     // re-syncs the field from the canonical value, which only shows a
-    // freshly formatted zero if the invalid entry was never committed.
+    // freshly formatted zero-tip-relative-to-reference value if the invalid
+    // entry was never committed.
     usePreferencesStore().decimalPrecision = 1;
     await wrapper.vm.$nextTick();
-    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe("0.0");
+    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe(
+      (0 - ALLEN_MOUSE_REFERENCE_COORDINATE[2]).toFixed(1)
+    );
   });
 
   it("rounds the display to the preferences store's decimal precision", async () => {
@@ -389,7 +395,9 @@ describe("ProbeInspector", () => {
     await wrapper.setProps({ probe: b } as Record<string, unknown>);
 
     expect(fieldByLabel(wrapper, t.name).props("modelValue")).toBe("B");
-    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe("0.000");
+    expect(fieldByLabel(wrapper, ml).props("modelValue")).toBe(
+      (0 - ALLEN_MOUSE_REFERENCE_COORDINATE[2]).toFixed(3)
+    );
   });
 
   it("keeps the renamed probe selected and in sync with the store", async () => {
@@ -549,7 +557,7 @@ describe("ProbeInspector", () => {
       ).toEqual(["Adjustable"]);
     });
 
-    it("shows the probe's current tip and rotation on the default coordinate system", () => {
+    it("shows the probe's current tip and rotation, local to the reference coordinate", () => {
       const { wrapper, pinia } = mountInspector(
         makeProbe({
           tipPosition: [7, 8, 9],
@@ -557,16 +565,17 @@ describe("ProbeInspector", () => {
         })
       );
       const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const [apRef, dvRef, mlRef] = ALLEN_MOUSE_REFERENCE_COORDINATE;
 
       expect(
         fieldByLabel(wrapper, node.position[0]!.name).props("modelValue")
-      ).toBe("9.000");
+      ).toBe((9 - mlRef).toFixed(3));
       expect(
         fieldByLabel(wrapper, node.position[1]!.name).props("modelValue")
-      ).toBe("8.000");
+      ).toBe((8 - dvRef).toFixed(3));
       expect(
         fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
-      ).toBe("7.000");
+      ).toBe((7 - apRef).toFixed(3));
       expect(
         fieldByLabel(wrapper, node.rotation[0]!.name).props("modelValue")
       ).toBe("45.000");
@@ -578,24 +587,25 @@ describe("ProbeInspector", () => {
       ).toBe("90.000");
     });
 
-    it("mirrors an external probe pose change into the default node's fields", async () => {
+    it("mirrors an external probe pose change into the default node's fields, local to the reference coordinate", async () => {
       const { wrapper, probe, pinia } = mountInspector(
         makeProbe({ tipPosition: [0, 0, 0] })
       );
       const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const [apRef, dvRef, mlRef] = ALLEN_MOUSE_REFERENCE_COORDINATE;
 
       probe.tipPosition = [1, 2, 3];
       await wrapper.vm.$nextTick();
 
       expect(
         fieldByLabel(wrapper, node.position[0]!.name).props("modelValue")
-      ).toBe("3.000");
+      ).toBe((3 - mlRef).toFixed(3));
       expect(
         fieldByLabel(wrapper, node.position[1]!.name).props("modelValue")
-      ).toBe("2.000");
+      ).toBe((2 - dvRef).toFixed(3));
       expect(
         fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
-      ).toBe("1.000");
+      ).toBe((1 - apRef).toFixed(3));
     });
 
     it("tracks a gizmo drag frame by frame, only committing history on release", async () => {
@@ -603,6 +613,7 @@ describe("ProbeInspector", () => {
         makeProbe({ tipPosition: [0, 0, 0] })
       );
       const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const [apRef] = ALLEN_MOUSE_REFERENCE_COORDINATE;
       const preDragTip = [...probe.tipPosition];
       // Mounting seeds the probe into the store, which commits its own history
       // point; reset that baseline so only the drag's history is under test.
@@ -617,7 +628,7 @@ describe("ProbeInspector", () => {
       expect(store.canUndo).toBe(false);
       expect(
         fieldByLabel(wrapper, node.position[2]!.name).props("modelValue")
-      ).toBe("2.000");
+      ).toBe((2 - apRef).toFixed(3));
 
       store.endProbeDrag();
       expect(store.canUndo).toBe(true);
@@ -633,10 +644,11 @@ describe("ProbeInspector", () => {
         })
       );
       const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const [, , mlRef] = ALLEN_MOUSE_REFERENCE_COORDINATE;
 
       await editAndBlur(fieldByLabel(wrapper, node.position[0]!.name), "20");
 
-      expect(probe.tipPosition).toEqual([7, 8, 20]);
+      expect(probe.tipPosition).toEqual([7, 8, 20 + mlRef]);
       expect(probe.rotation).toEqual([0, (3 * Math.PI) / 2, 0]);
     });
 
@@ -645,10 +657,11 @@ describe("ProbeInspector", () => {
         makeProbe({ tipPosition: [7, 8, 9] })
       );
       const node = useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!;
+      const [, , mlRef] = ALLEN_MOUSE_REFERENCE_COORDINATE;
 
       await editAndBlur(fieldByLabel(wrapper, node.position[0]!.name), "20");
 
-      expect(probe.tipPosition).toEqual([7, 8, 20]);
+      expect(probe.tipPosition).toEqual([7, 8, 20 + mlRef]);
     });
 
     it("does not move the probe when switching to a multi-node coordinate system", async () => {

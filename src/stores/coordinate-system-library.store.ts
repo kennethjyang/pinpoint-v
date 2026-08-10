@@ -12,24 +12,28 @@ export const useCoordinateSystemLibraryStore = defineStore(
   "coordinate-system-library",
   () => {
     const library = ref<CoordinateSystem[]>([
-      buildCoordinateSystem("Default", [
-        buildCoordinateSystemNode(
-          "Tip",
-          [
-            buildCoordinateSystemValue("ML"),
-            buildCoordinateSystemValue("DV"),
-            buildCoordinateSystemValue("AP")
-          ],
-          [
-            buildCoordinateSystemValue("Pitch"),
-            buildCoordinateSystemValue("Yaw"),
-            buildCoordinateSystemValue("Roll")
-          ],
-          [0, 1, 2],
-          [0, 1, 2],
-          true
-        )
-      ]),
+      buildCoordinateSystem(
+        "Default",
+        [
+          buildCoordinateSystemNode(
+            "Tip",
+            [
+              buildCoordinateSystemValue("ML"),
+              buildCoordinateSystemValue("DV"),
+              buildCoordinateSystemValue("AP")
+            ],
+            [
+              buildCoordinateSystemValue("Pitch"),
+              buildCoordinateSystemValue("Yaw"),
+              buildCoordinateSystemValue("Roll")
+            ],
+            [0, 1, 2],
+            [0, 1, 2],
+            true
+          )
+        ],
+        true
+      ),
       buildCoordinateSystem("Surface Coordinate & Depth", [
         buildCoordinateSystemNode(
           "Surface Coordinate",
