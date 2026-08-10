@@ -1,11 +1,19 @@
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  findTransformChain,
+  getTransformChainLabel,
+  getTransformChains,
+  isTransformInputBound,
   STANDARD_COLORS,
   type SceneObject,
   toggleSceneObjectCollidable,
-  toggleSceneObjectLock
+  toggleSceneObjectLock,
+  TRANSFORM_INPUT_GROUPS,
+  type TransformInputComponent,
+  type TransformInputGroup,
+  type TransformStepKind
 } from "@/features/scene";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
@@ -18,6 +26,34 @@ import {
   radiansToRotationUnit,
   rotationUnitToRadians
 } from "@/utils/math";
+
+/** Unit kind of each transform input group's three values. */
+const TRANSFORM_INPUT_GROUP_KINDS: Readonly<
+  Record<TransformInputGroup, TransformStepKind>
+> = {
+  globalTranslation: "translation",
+  globalRotation: "rotation",
+  localRotation: "rotation",
+  localTranslation: "translation"
+};
+
+/** Every component slot of an input group, in the order its row lists them. */
+const TRANSFORM_INPUT_COMPONENTS: readonly TransformInputComponent[] = [
+  0, 1, 2
+];
+
+/** One transform input's writable display model, paired with the slot it edits. */
+interface TransformInputField {
+  component: TransformInputComponent;
+  model: WritableComputedRef<string>;
+}
+
+/** One row of transform inputs: an input group's three fields. */
+interface TransformInputRow {
+  group: TransformInputGroup;
+  kind: TransformStepKind;
+  fields: TransformInputField[];
+}
 
 const { sceneObject } = defineProps<{
   sceneObject: SceneObject;
@@ -45,51 +81,55 @@ const name = computed({
   set: (value: string) => (sceneObject.name = value.trim())
 });
 
-const ap = useNumericTupleModel(
-  () => sceneObject.position,
-  0,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const dv = useNumericTupleModel(
-  () => sceneObject.position,
-  1,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const ml = useNumericTupleModel(
-  () => sceneObject.position,
-  2,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
+/** Every transform chain the object can be posed through. */
+const chains = computed(() => getTransformChains(preferences.transformChains));
+
+/** Chain mapping this object's twelve transform inputs onto its pose. */
+const chain = computed(() =>
+  findTransformChain(chains.value, sceneObject.transformChainId)
 );
 
-const roll = useNumericTupleModel(
-  () => sceneObject.rotation,
-  0,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
+const chainOptions = computed(() =>
+  chains.value.map(candidate => ({
+    label: getTransformChainLabel(candidate, key => t(key)),
+    value: candidate.id
+  }))
 );
-const yaw = useNumericTupleModel(
-  () => sceneObject.rotation,
-  1,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const pitch = useNumericTupleModel(
-  () => sceneObject.rotation,
-  2,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
+
+/**
+ * Writable display models for the object's twelve transform inputs, one row per
+ * input group. Built up front: a composable cannot be created inside `v-for`.
+ */
+const transformInputRows: TransformInputRow[] = TRANSFORM_INPUT_GROUPS.map(
+  group => ({
+    group,
+    kind: TRANSFORM_INPUT_GROUP_KINDS[group],
+    fields: TRANSFORM_INPUT_COMPONENTS.map(component => ({
+      component,
+      model:
+        TRANSFORM_INPUT_GROUP_KINDS[group] === "rotation"
+          ? useNumericTupleModel(
+              () => sceneObject.transformInputs[group],
+              component,
+              radians =>
+                radiansToRotationUnit(radians, preferences.rotationUnit),
+              value => rotationUnitToRadians(value, preferences.rotationUnit),
+              () => preferences.decimalPrecision
+            )
+          : useNumericTupleModel(
+              () => sceneObject.transformInputs[group],
+              component,
+              millimeters =>
+                millimetersToPositionUnit(
+                  millimeters,
+                  preferences.positionUnit
+                ),
+              value =>
+                positionUnitToMillimeters(value, preferences.positionUnit),
+              () => preferences.decimalPrecision
+            )
+    }))
+  })
 );
 
 const scaleAp = useNumericTupleModel(
@@ -152,70 +192,40 @@ const lockLabel = computed(() =>
       :rules="nameRules"
     />
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="ap"
-        :disable="sceneObject.lock"
-        :label="t('axis.ap')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="dv"
-        :disable="sceneObject.lock"
-        :label="t('axis.dv')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="ml"
-        :disable="sceneObject.lock"
-        :label="t('axis.ml')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-    </div>
+    <q-select
+      v-model="sceneObject.transformChainId"
+      :disable="sceneObject.lock"
+      emit-value
+      :label="t('sceneObjectInspector.transformChain')"
+      map-options
+      :options="chainOptions"
+      outlined
+    />
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="roll"
-        :disable="sceneObject.lock"
-        :label="t('sceneObjectInspector.roll')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="yaw"
-        :disable="sceneObject.lock"
-        :label="t('sceneObjectInspector.yaw')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="pitch"
-        :disable="sceneObject.lock"
-        :label="t('sceneObjectInspector.pitch')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
+    <div v-for="row in transformInputRows" :key="row.group">
+      <div class="text-body2 q-pb-xs">{{
+        t(`transformChain.${row.group}`)
+      }}</div>
+      <div class="row q-gutter-x-sm">
+        <CommittedInput
+          v-for="field in row.fields"
+          :key="field.component"
+          v-model="field.model.value"
+          :disable="
+            sceneObject.lock ||
+            !isTransformInputBound(chain, {
+              group: row.group,
+              component: field.component
+            })
+          "
+          :label="preferences.transformInputNames[row.group][field.component]"
+          :rules="numberRules"
+          :suffix="row.kind === 'rotation' ? rotationSuffix : positionSuffix"
+          class="col"
+          hide-bottom-space
+          outlined
+        />
+      </div>
     </div>
 
     <div class="row q-gutter-x-sm">

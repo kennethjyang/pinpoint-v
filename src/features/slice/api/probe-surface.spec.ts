@@ -95,13 +95,12 @@ describe("findProbeSurfaceTargets", () => {
         voxelCenter(level, 0, 1),
         voxelCenter(level, 1, 4),
         voxelCenter(level, 2, 1)
-      ],
-      upMillimeters: [0, -1, 0]
+      ]
     });
 
     const result = await findProbeSurfaceTargets(
       frame,
-      1,
+      [0, -1, 0],
       level,
       makeSampleRay(level, grid)
     );
@@ -119,17 +118,71 @@ describe("findProbeSurfaceTargets", () => {
     );
   });
 
-  it("returns an axis-only result when outside the brain and only the axis path reaches it", async () => {
+  it("marches the depth direction rather than the frame's own up axis", async () => {
     const level = makeLevel();
-    const grid = makeGrid(level, () => true);
+    // Brain sits only along +AP from the tip, so a march up the frame's own
+    // +Z would find none - a hit proves the depth direction drove the ray.
+    const grid = makeGrid(
+      level,
+      (ap, dv, ml) => dv === 1 && ml === 1 && ap >= 2
+    );
     const frame = makeFrame({
-      originMillimeters: [-0.5, 0.25, 0.15],
-      upMillimeters: [-1, 0, 0]
+      originMillimeters: [
+        voxelCenter(level, 0, 1),
+        voxelCenter(level, 1, 1),
+        voxelCenter(level, 2, 1)
+      ],
+      upMillimeters: [0, -1, 0]
     });
 
     const result = await findProbeSurfaceTargets(
       frame,
-      1,
+      [1, 0, 0],
+      level,
+      makeSampleRay(level, grid)
+    );
+
+    expect(result.insideMillimeters).not.toBeNull();
+    expect(result.insideMillimeters![0]).toBeCloseTo(
+      voxelCenter(level, 0, 3),
+      9
+    );
+    expect(result.insideMillimeters![1]).toBe(frame.originMillimeters[1]);
+    expect(result.insideMillimeters![2]).toBe(frame.originMillimeters[2]);
+  });
+
+  it("marches only the DV ray when the chain has no depth axis", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(level, () => true);
+    const frame = makeFrame({
+      originMillimeters: [
+        voxelCenter(level, 0, 1),
+        -0.1,
+        voxelCenter(level, 2, 1)
+      ]
+    });
+    const sampleRay = vi.fn(makeSampleRay(level, grid));
+
+    const result = await findProbeSurfaceTargets(frame, null, level, sampleRay);
+
+    expect(result.insideMillimeters).toBeNull();
+    expect(result.axisMillimeters).toBeNull();
+    expect(result.dorsoventralMillimeters).not.toBeNull();
+    expect(result.dorsoventralMillimeters![1]).toBeCloseTo(
+      voxelCenter(level, 1, 0),
+      9
+    );
+    expect(sampleRay).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns an axis-only result when outside the brain and only the axis path reaches it", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(level, () => true);
+    const frame = makeFrame({ originMillimeters: [-0.5, 0.25, 0.15] });
+
+    const result = await findProbeSurfaceTargets(
+      frame,
+      [-1, 0, 0],
       level,
       makeSampleRay(level, grid)
     );
@@ -145,14 +198,11 @@ describe("findProbeSurfaceTargets", () => {
   it("returns a DV-only result when outside the brain and only straight-down DV reaches it", async () => {
     const level = makeLevel();
     const grid = makeGrid(level, () => true);
-    const frame = makeFrame({
-      originMillimeters: [0.15, -0.1, 0.15],
-      upMillimeters: [1, 0, 0]
-    });
+    const frame = makeFrame({ originMillimeters: [0.15, -0.1, 0.15] });
 
     const result = await findProbeSurfaceTargets(
       frame,
-      1,
+      [1, 0, 0],
       level,
       makeSampleRay(level, grid)
     );
@@ -171,14 +221,11 @@ describe("findProbeSurfaceTargets", () => {
   it("returns both axis and DV targets, with insideMillimeters null, when both paths reach the brain", async () => {
     const level = makeLevel();
     const grid = makeGrid(level, () => true);
-    const frame = makeFrame({
-      originMillimeters: [0.15, -0.1, 0.15],
-      upMillimeters: [-0.6, -0.8, 0]
-    });
+    const frame = makeFrame({ originMillimeters: [0.15, -0.1, 0.15] });
 
     const result = await findProbeSurfaceTargets(
       frame,
-      1,
+      [-0.6, -0.8, 0],
       level,
       makeSampleRay(level, grid)
     );
@@ -191,14 +238,11 @@ describe("findProbeSurfaceTargets", () => {
   it("returns all-null targets when every ray misses the volume bounds", async () => {
     const level = makeLevel();
     const grid = makeGrid(level, () => true);
-    const frame = makeFrame({
-      originMillimeters: [-100, 0.25, 0.15],
-      upMillimeters: [0, -1, 0]
-    });
+    const frame = makeFrame({ originMillimeters: [-100, 0.25, 0.15] });
 
     const result = await findProbeSurfaceTargets(
       frame,
-      1,
+      [0, -1, 0],
       level,
       makeSampleRay(level, grid)
     );
@@ -212,13 +256,15 @@ describe("findProbeSurfaceTargets", () => {
 
   it("returns all-null targets when the sampler resolves null", async () => {
     const level = makeLevel();
-    const frame = makeFrame({
-      originMillimeters: [0.15, 0.25, 0.15],
-      upMillimeters: [0, -1, 0]
-    });
+    const frame = makeFrame({ originMillimeters: [0.15, 0.25, 0.15] });
     const sampleRay: RaySampler = async () => null;
 
-    const result = await findProbeSurfaceTargets(frame, 1, level, sampleRay);
+    const result = await findProbeSurfaceTargets(
+      frame,
+      [1, 0, 0],
+      level,
+      sampleRay
+    );
 
     expect(result).toEqual({
       insideMillimeters: null,
@@ -227,9 +273,9 @@ describe("findProbeSurfaceTargets", () => {
     });
   });
 
-  describe("pitch collapse at exactly Math.PI / 2", () => {
+  describe("collapse onto the DV ray", () => {
     /**
-     * Tip inside the level's bounds, with background above it (so the +Z
+     * Tip inside the level's bounds, with background above it (so the depth
      * ray clips and reaches the sampler but finds no brain) and brain below
      * it, so the collapse branch is actually exercised rather than being
      * pre-empted by `insideMillimeters`.
@@ -245,18 +291,17 @@ describe("findProbeSurfaceTargets", () => {
           voxelCenter(level, 0, 1),
           voxelCenter(level, 1, 3),
           voxelCenter(level, 2, 1)
-        ],
-        upMillimeters: [0, -1, 0]
+        ]
       });
       return { level, frame, sampleRay: vi.fn(makeSampleRay(level, grid)) };
     }
 
-    it("collapses to a single DV target, sampling exactly twice", async () => {
+    it("collapses to a single DV target when the reversed depth axis is the DV direction, sampling exactly twice", async () => {
       const { level, frame, sampleRay } = makeCollapseFixture();
 
       const result = await findProbeSurfaceTargets(
         frame,
-        Math.PI / 2,
+        [0, -1, 0],
         level,
         sampleRay
       );
@@ -277,40 +322,60 @@ describe("findProbeSurfaceTargets", () => {
       expect(sampleRay).toHaveBeenCalledTimes(2);
     });
 
-    it("marches all three rays away from the exact collapse pitch", async () => {
+    it("collapses when the reversed depth axis is within the parallel epsilon of DV", async () => {
       const { level, frame, sampleRay } = makeCollapseFixture();
 
-      await findProbeSurfaceTargets(frame, 1, level, sampleRay);
+      // A unit direction about 1e-6 radians off straight down.
+      const result = await findProbeSurfaceTargets(
+        frame,
+        [1e-6, -Math.sqrt(1 - 1e-12), 0],
+        level,
+        sampleRay
+      );
+
+      expect(result.axisMillimeters).toBeNull();
+      expect(result.dorsoventralMillimeters).not.toBeNull();
+      expect(sampleRay).toHaveBeenCalledTimes(2);
+    });
+
+    it("marches all three rays when the depth axis tilts away from DV", async () => {
+      const { level, frame, sampleRay } = makeCollapseFixture();
+
+      await findProbeSurfaceTargets(frame, [-0.6, -0.8, 0], level, sampleRay);
 
       expect(sampleRay).toHaveBeenCalledTimes(3);
     });
 
-    it("does not collapse at Math.PI / 2 + 1e-9", async () => {
-      const { level, frame, sampleRay } = makeCollapseFixture();
+    it("does not collapse when the depth axis points down DV rather than up it", async () => {
+      const level = makeLevel();
+      // Brain only above the tip, so the reversed depth axis is the one ray
+      // that reaches it while the DV ray marches away from it.
+      const grid = makeGrid(
+        level,
+        (ap, dv, ml) => ap === 1 && ml === 1 && dv <= 1
+      );
+      const frame = makeFrame({
+        originMillimeters: [
+          voxelCenter(level, 0, 1),
+          voxelCenter(level, 1, 3),
+          voxelCenter(level, 2, 1)
+        ]
+      });
 
       const result = await findProbeSurfaceTargets(
         frame,
-        Math.PI / 2 + 1e-9,
+        [0, 1, 0],
         level,
-        sampleRay
+        makeSampleRay(level, grid)
       );
 
+      expect(result.insideMillimeters).toBeNull();
       expect(result.axisMillimeters).not.toBeNull();
-      expect(result.dorsoventralMillimeters).not.toBeNull();
-    });
-
-    it("does not collapse at -Math.PI / 2", async () => {
-      const { level, frame, sampleRay } = makeCollapseFixture();
-
-      const result = await findProbeSurfaceTargets(
-        frame,
-        -Math.PI / 2,
-        level,
-        sampleRay
+      expect(result.axisMillimeters![1]).toBeCloseTo(
+        voxelCenter(level, 1, 1),
+        9
       );
-
-      expect(result.axisMillimeters).not.toBeNull();
-      expect(result.dorsoventralMillimeters).not.toBeNull();
+      expect(result.dorsoventralMillimeters).toBeNull();
     });
   });
 });

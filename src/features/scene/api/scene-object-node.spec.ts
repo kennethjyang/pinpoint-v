@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { Color3, Vector3 } from "@babylonjs/core";
-import type { Mesh, StandardMaterial } from "@babylonjs/core";
+import { Color3, TransformNode, Vector3 } from "@babylonjs/core";
+import type {
+  DragStartEndEvent,
+  Mesh,
+  StandardMaterial
+} from "@babylonjs/core";
 import { registerBuiltInLoaders } from "@babylonjs/loaders/dynamic";
 import { addSceneObject, buildExperiment } from "@/features/experiment";
-import { makeAtlas, makeSceneObject } from "@/test/fixtures";
+import {
+  makeAtlas,
+  makeSceneObject,
+  makeTransformInputs
+} from "@/test/fixtures";
 import {
   makeTestModelFile,
+  makeTestSceneWithGizmo,
   makeTestSceneWithPhysics,
   tickScene
 } from "@/test/mount-helper";
@@ -15,14 +24,19 @@ import {
   buildSceneObjectNode,
   createSceneObjectSyncState,
   disposeSceneObjectNode,
+  endSceneObjectGizmoDrag,
   getSceneObjectMeshes,
   getSceneObjectTransformNode,
   syncSceneObjects
 } from "./scene-object-node.api";
+import { getTransformChains } from "./transform-chain.api";
 
 // `buildSceneObjectNode` imports the stored model file through `ImportMeshAsync`,
 // which needs the glTF plugin factory registered, mirroring the app boot.
 registerBuiltInLoaders();
+
+/** Chains every sync resolves poses against: the built-in default alone. */
+const CHAINS = getTransformChains([]);
 
 /**
  * Build an experiment holding one scene object, for sync tests.
@@ -134,8 +148,10 @@ describe("syncSceneObjects", () => {
   it("snaps a freshly built object to its ASR pose", async () => {
     const { scene, gizmoManager } = await makeTestSceneWithPhysics();
     const { experiment, sceneObject } = makeExperimentWithSceneObject({
-      position: [1, 2, 3],
-      rotation: [0.1, 0.2, 0.3]
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 2, 3],
+        globalRotation: [0, 0.2, 0.3]
+      })
     });
     const modelFile = await makeTestModelFile();
     const state = createSceneObjectSyncState();
@@ -144,15 +160,49 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       async () => modelFile
     );
 
+    const { globalTranslation, globalRotation } = sceneObject.transformInputs;
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
-    expect(node.position.equals(asrToVector3(sceneObject.position))).toBe(true);
-    expect(node.rotation.equals(asrToVector3(sceneObject.rotation))).toBe(true);
+    expect(node.position.equals(asrToVector3(globalTranslation))).toBe(true);
+    // Rotation resolves through a quaternion, so it lands on the ASR angles
+    // to float precision rather than bit-exactly.
+    expect(
+      node.rotation.subtract(asrToVector3(globalRotation)).length()
+    ).toBeCloseTo(0, 10);
     expect(node.scaling.equals(asrToVector3(sceneObject.scale))).toBe(true);
+  });
+
+  it("snaps a freshly built object to its chain-resolved pose, not its global translation alone", async () => {
+    const { scene, gizmoManager } = await makeTestSceneWithPhysics();
+    const { experiment, sceneObject } = makeExperimentWithSceneObject({
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 2, 3],
+        localTranslation: [4, 0, 0]
+      })
+    });
+    const modelFile = await makeTestModelFile();
+    const state = createSceneObjectSyncState();
+
+    await syncSceneObjects(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      state,
+      null,
+      async () => modelFile
+    );
+
+    // The default chain translates globally, then again along the object's own
+    // depth axis, which is AP while it is unrotated.
+    const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
+    expect(node.position.equals(asrToVector3([5, 2, 3]))).toBe(true);
+    expect(node.position.equals(asrToVector3([1, 2, 3]))).toBe(false);
   });
 
   it("interpolates an existing object's pose change over time", async () => {
@@ -166,28 +216,29 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
     );
-    sceneObject.position = [5, 0, 0];
+    sceneObject.transformInputs.globalTranslation = [5, 0, 0];
     await syncSceneObjects(
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
     );
 
+    const goal = asrToVector3(sceneObject.transformInputs.globalTranslation);
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
     // Interpolation has started but not finished after a single small tick.
     tickScene(scene, 50);
-    expect(node.position.equals(asrToVector3(sceneObject.position))).toBe(
-      false
-    );
+    expect(node.position.equals(goal)).toBe(false);
     tickScene(scene, 1000);
-    expect(node.position.equals(asrToVector3(sceneObject.position))).toBe(true);
+    expect(node.position.equals(goal)).toBe(true);
   });
 
   it("recolors the material when the object's color changes", async () => {
@@ -203,6 +254,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -212,6 +264,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -236,6 +289,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -245,6 +299,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -269,6 +324,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -282,6 +338,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -308,6 +365,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -321,6 +379,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -343,6 +402,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -356,6 +416,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -379,18 +440,20 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
     );
     const node = getSceneObjectTransformNode(scene, sceneObject.id)!;
     node.position = Vector3.Zero();
-    sceneObject.position = [9, 9, 9];
+    sceneObject.transformInputs.globalTranslation = [9, 9, 9];
 
     await syncSceneObjects(
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       sceneObject.id,
       loadModel
@@ -410,6 +473,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -419,6 +483,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -437,6 +502,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -448,6 +514,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -466,6 +533,7 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
@@ -477,11 +545,51 @@ describe("syncSceneObjects", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       state,
       null,
       loadModel
     );
     expect(state.failedIds.has(sceneObject.id)).toBe(false);
+  });
+});
+
+describe("endSceneObjectGizmoDrag", () => {
+  it("reports a scale drag-end on a scene object node", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const scaleGizmo = gizmoManager.gizmos.scaleGizmo!;
+    const onDragEnd = vi.fn();
+    endSceneObjectGizmoDrag(scaleGizmo, onDragEnd);
+
+    gizmoManager.attachToNode(new TransformNode("abc123_object_node", scene));
+    scaleGizmo.onDragEndObservable.notifyObservers({} as DragStartEndEvent);
+
+    expect(onDragEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it("never reports a drag-end on a node that is not a scene object", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const scaleGizmo = gizmoManager.gizmos.scaleGizmo!;
+    const onDragEnd = vi.fn();
+    endSceneObjectGizmoDrag(scaleGizmo, onDragEnd);
+
+    gizmoManager.attachToNode(new TransformNode("abc123_probe_node", scene));
+    scaleGizmo.onDragEndObservable.notifyObservers({} as DragStartEndEvent);
+
+    expect(onDragEnd).not.toHaveBeenCalled();
+  });
+
+  it("returns the observer, so the caller can stop listening", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const scaleGizmo = gizmoManager.gizmos.scaleGizmo!;
+    const onDragEnd = vi.fn();
+    const observer = endSceneObjectGizmoDrag(scaleGizmo, onDragEnd);
+
+    gizmoManager.attachToNode(new TransformNode("abc123_object_node", scene));
+    scaleGizmo.onDragEndObservable.remove(observer);
+    scaleGizmo.onDragEndObservable.notifyObservers({} as DragStartEndEvent);
+
+    expect(onDragEnd).not.toHaveBeenCalled();
   });
 });
 

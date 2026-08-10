@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref } from "vue";
+import { computed, onUnmounted, ref, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -10,13 +10,24 @@ import {
   getProbeShankBasePositionMillimeters,
   getProbeShanks,
   homeProbe,
+  insertProbeTipToMillimeters,
   type Probe,
   setProbeTipMillimeters,
   toggleProbeLock
 } from "@/features/probe";
 import {
   buildSceneModel,
+  findTransformChain,
+  getTransformChainLabel,
+  getTransformChainPose,
+  getTransformChains,
+  isTransformInputBound,
+  moveTransformChainOrigin,
   STANDARD_COLORS,
+  TRANSFORM_INPUT_GROUPS,
+  type TransformInputComponent,
+  type TransformInputGroup,
+  type TransformStepKind,
   useModelFileImport
 } from "@/features/scene";
 import { SliceCanvas, useProbeSurface } from "@/features/slice";
@@ -51,6 +62,34 @@ interface ShankAlignmentOption {
   label: string;
   value: number | null;
   attrs: { "aria-label": string };
+}
+
+/** Unit kind of each transform input group's three values. */
+const TRANSFORM_INPUT_GROUP_KINDS: Readonly<
+  Record<TransformInputGroup, TransformStepKind>
+> = {
+  globalTranslation: "translation",
+  globalRotation: "rotation",
+  localRotation: "rotation",
+  localTranslation: "translation"
+};
+
+/** Every component slot of an input group, in the order its row lists them. */
+const TRANSFORM_INPUT_COMPONENTS: readonly TransformInputComponent[] = [
+  0, 1, 2
+];
+
+/** One transform input's writable display model, paired with the slot it edits. */
+interface TransformInputField {
+  component: TransformInputComponent;
+  model: WritableComputedRef<string>;
+}
+
+/** One row of transform inputs: an input group's three fields. */
+interface TransformInputRow {
+  group: TransformInputGroup;
+  kind: TransformStepKind;
+  fields: TransformInputField[];
 }
 
 const { probe } = defineProps<{
@@ -124,15 +163,34 @@ const shanks = computed(() =>
     : []
 );
 
+/** Every transform chain the probe can be posed through. */
+const chains = computed(() => getTransformChains(preferences.transformChains));
+
+/** Chain mapping this probe's twelve transform inputs onto its pose. */
+const chain = computed(() =>
+  findTransformChain(chains.value, probe.transformChainId)
+);
+
+const chainOptions = computed(() =>
+  chains.value.map(candidate => ({
+    label: getTransformChainLabel(candidate, key => t(key)),
+    value: candidate.id
+  }))
+);
+
 // Declared with its derived inputs: an imported model starts at the shank base.
 const { isImporting: isImportingBodyModel, open: openBodyModelFile } =
   useModelFileImport(modelId => {
     const model = buildSceneModel(modelId);
     if (contour.value) {
-      model.position = getProbeShankBasePositionMillimeters(
-        contour.value,
-        shanks.value,
-        probe.shankAlignmentIndex
+      moveTransformChainOrigin(
+        model.transformInputs,
+        findTransformChain(chains.value, model.transformChainId),
+        getProbeShankBasePositionMillimeters(
+          contour.value,
+          shanks.value,
+          probe.shankAlignmentIndex
+        )
       );
     }
     probe.bodyModel = model;
@@ -169,51 +227,40 @@ const name = computed({
   set: (value: string) => (probe.name = value.trim())
 });
 
-const ap = useNumericTupleModel(
-  () => probe.tipPosition,
-  0,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const dv = useNumericTupleModel(
-  () => probe.tipPosition,
-  1,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const ml = useNumericTupleModel(
-  () => probe.tipPosition,
-  2,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-
-const roll = useNumericTupleModel(
-  () => probe.rotation,
-  0,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const yaw = useNumericTupleModel(
-  () => probe.rotation,
-  1,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const pitch = useNumericTupleModel(
-  () => probe.rotation,
-  2,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
+/**
+ * Writable display models for the probe's twelve transform inputs, one row per
+ * input group. Built up front: a composable cannot be created inside `v-for`.
+ */
+const transformInputRows: TransformInputRow[] = TRANSFORM_INPUT_GROUPS.map(
+  group => ({
+    group,
+    kind: TRANSFORM_INPUT_GROUP_KINDS[group],
+    fields: TRANSFORM_INPUT_COMPONENTS.map(component => ({
+      component,
+      model:
+        TRANSFORM_INPUT_GROUP_KINDS[group] === "rotation"
+          ? useNumericTupleModel(
+              () => probe.transformInputs[group],
+              component,
+              radians =>
+                radiansToRotationUnit(radians, preferences.rotationUnit),
+              value => rotationUnitToRadians(value, preferences.rotationUnit),
+              () => preferences.decimalPrecision
+            )
+          : useNumericTupleModel(
+              () => probe.transformInputs[group],
+              component,
+              millimeters =>
+                millimetersToPositionUnit(
+                  millimeters,
+                  preferences.positionUnit
+                ),
+              value =>
+                positionUnitToMillimeters(value, preferences.positionUnit),
+              () => preferences.decimalPrecision
+            )
+    }))
+  })
 );
 
 const lockIcon = computed(() =>
@@ -265,6 +312,14 @@ function cancelMoveToSurface(): void {
   }
 }
 
+/** Warn that the probe has no brain surface it can reach. */
+function notifyNoSurfaceFound(): void {
+  notifyWarning(
+    t("probeInspector.noSurfaceFound"),
+    t("probeInspector.noSurfaceFoundCaption")
+  );
+}
+
 /**
  * Move the probe's tip onto the brain surface, or request a path pick when both an
  * along-axis and a down-on-DV move are available.
@@ -277,6 +332,7 @@ async function moveToSurface(): Promise<void> {
     const referenceCoordinate = currentExperimentStore.referenceCoordinate;
     const targets = await findTargets(
       probe,
+      chain.value,
       referenceCoordinate,
       controller.signal
     );
@@ -293,38 +349,67 @@ async function moveToSurface(): Promise<void> {
 
     const { insideMillimeters, axisMillimeters, dorsoventralMillimeters } =
       targets;
+    // The inside and axis targets both sit on the probe's own axis, so they
+    // advance its chain's depth input; only the DV target is a world move.
     if (insideMillimeters) {
-      setProbeTipMillimeters(probe, insideMillimeters, referenceCoordinate);
+      if (
+        !insertProbeTipToMillimeters(
+          probe,
+          chain.value,
+          insideMillimeters,
+          referenceCoordinate
+        )
+      ) {
+        notifyNoSurfaceFound();
+      }
       return;
     }
-    if (!axisMillimeters && !dorsoventralMillimeters) {
-      notifyWarning(
-        t("probeInspector.noSurfaceFound"),
-        t("probeInspector.noSurfaceFoundCaption")
+    if (axisMillimeters && dorsoventralMillimeters) {
+      const { position } = getTransformChainPose(
+        chain.value,
+        probe.transformInputs
       );
+      currentExperimentStore.probeSurfaceChoice = {
+        probeId: probe.id,
+        transformInputs: {
+          globalTranslation: [...probe.transformInputs.globalTranslation],
+          globalRotation: [...probe.transformInputs.globalRotation],
+          localRotation: [...probe.transformInputs.localRotation],
+          localTranslation: [...probe.transformInputs.localTranslation]
+        },
+        tipMillimeters: [
+          referenceCoordinate[0] + position[0],
+          referenceCoordinate[1] + position[1],
+          referenceCoordinate[2] + position[2]
+        ],
+        axisTargetMillimeters: axisMillimeters,
+        dorsoventralTargetMillimeters: dorsoventralMillimeters
+      };
       return;
     }
-    if (!axisMillimeters || !dorsoventralMillimeters) {
+    if (axisMillimeters) {
+      if (
+        !insertProbeTipToMillimeters(
+          probe,
+          chain.value,
+          axisMillimeters,
+          referenceCoordinate
+        )
+      ) {
+        notifyNoSurfaceFound();
+      }
+      return;
+    }
+    if (dorsoventralMillimeters) {
       setProbeTipMillimeters(
         probe,
-        axisMillimeters ?? dorsoventralMillimeters!,
+        chain.value,
+        dorsoventralMillimeters,
         referenceCoordinate
       );
       return;
     }
-
-    currentExperimentStore.probeSurfaceChoice = {
-      probeId: probe.id,
-      tipPosition: [...probe.tipPosition],
-      rotation: [...probe.rotation],
-      tipMillimeters: [
-        referenceCoordinate[0] + probe.tipPosition[0],
-        referenceCoordinate[1] + probe.tipPosition[1],
-        referenceCoordinate[2] + probe.tipPosition[2]
-      ],
-      axisTargetMillimeters: axisMillimeters,
-      dorsoventralTargetMillimeters: dorsoventralMillimeters
-    };
+    notifyNoSurfaceFound();
   } finally {
     isFindingSurface.value = false;
     if (surfaceAbortController === controller) surfaceAbortController = null;
@@ -440,70 +525,44 @@ onUnmounted(cancelMoveToSurface);
             />
           </div>
 
-          <div class="row q-gutter-x-sm">
-            <CommittedInput
-              v-model="ap"
-              :disable="probe.lock"
-              :label="t('axis.ap')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="dv"
-              :disable="probe.lock"
-              :label="t('axis.dv')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="ml"
-              :disable="probe.lock"
-              :label="t('axis.ml')"
-              :rules="numberRules"
-              :suffix="positionSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-          </div>
+          <q-select
+            v-model="probe.transformChainId"
+            :disable="probe.lock"
+            emit-value
+            :label="t('probeInspector.transformChain')"
+            map-options
+            :options="chainOptions"
+            outlined
+          />
 
-          <div class="row q-gutter-x-sm">
-            <CommittedInput
-              v-model="roll"
-              :disable="probe.lock"
-              :label="t('probeInspector.roll')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="yaw"
-              :disable="probe.lock"
-              :label="t('probeInspector.yaw')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
-            <CommittedInput
-              v-model="pitch"
-              :disable="probe.lock"
-              :label="t('probeInspector.pitch')"
-              :rules="numberRules"
-              :suffix="rotationSuffix"
-              class="col"
-              hide-bottom-space
-              outlined
-            />
+          <div v-for="row in transformInputRows" :key="row.group">
+            <div class="text-body2 q-pb-xs">{{
+              t(`transformChain.${row.group}`)
+            }}</div>
+            <div class="row q-gutter-x-sm">
+              <CommittedInput
+                v-for="field in row.fields"
+                :key="field.component"
+                v-model="field.model.value"
+                :disable="
+                  probe.lock ||
+                  !isTransformInputBound(chain, {
+                    group: row.group,
+                    component: field.component
+                  })
+                "
+                :label="
+                  preferences.transformInputNames[row.group][field.component]
+                "
+                :rules="numberRules"
+                :suffix="
+                  row.kind === 'rotation' ? rotationSuffix : positionSuffix
+                "
+                class="col"
+                hide-bottom-space
+                outlined
+              />
+            </div>
           </div>
 
           <div>

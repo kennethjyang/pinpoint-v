@@ -666,10 +666,13 @@ describe("SliceCanvas", () => {
       // 2400 device px at pixelRatio 1 clamps to the 1024 maximum.
       expect(capturedGeometry!.value!.widthPixels).toBe(1024);
 
-      // Two quick pose changes count as continuous movement.
-      store.experiment.probes[0]!.tipPosition = [1, 0, 0];
+      // Two quick pose changes count as continuous movement - one through a
+      // global input, one through a local one, so both reach the motion key.
+      store.experiment.probes[0]!.transformInputs.globalTranslation = [1, 0, 0];
       await nextTick();
-      store.experiment.probes[0]!.tipPosition = [2, 0, 0];
+      store.experiment.probes[0]!.transformInputs.localTranslation = [
+        0.5, 0, 0
+      ];
       await nextTick();
 
       // floor(2400 * 0.25 / 32) * 32.

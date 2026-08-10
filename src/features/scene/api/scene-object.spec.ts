@@ -7,6 +7,7 @@ import {
   toggleSceneObjectVisibility
 } from "./scene-object.api";
 import { STANDARD_COLORS } from "../models/standard-colors.model";
+import { buildTransformInputs } from "./transform-chain.api";
 import { makeSceneObject } from "@/test/fixtures";
 
 describe("buildSceneObject", () => {
@@ -23,8 +24,8 @@ describe("buildSceneObject", () => {
     expect(sceneObject.id).toBe("id");
     expect(sceneObject.visibility).toBe("visible");
     expect(sceneObject.lock).toBe(false);
-    expect(sceneObject.position).toEqual([0, 0, 0]);
-    expect(sceneObject.rotation).toEqual([0, 0, 0]);
+    expect(sceneObject.transformChainId.length).toBeGreaterThan(0);
+    expect(sceneObject.transformInputs).toEqual(buildTransformInputs());
     expect(sceneObject.scale).toEqual([1, 1, 1]);
     expect(STANDARD_COLORS).toContain(sceneObject.color);
   });

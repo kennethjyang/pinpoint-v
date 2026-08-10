@@ -9,9 +9,9 @@ export type RaySampler = (
 
 /** Tip targets that put a probe on the brain surface, in atlas ASR mm. */
 export interface ProbeSurfaceTargets {
-  /** Target when the probe already crosses brain along local +Z, else null. */
+  /** Target when the probe already crosses brain along its depth axis, else null. */
   insideMillimeters: [number, number, number] | null;
-  /** Target moving forward along probe-local -Z, else null. */
+  /** Target moving forward along the probe's reversed depth axis, else null. */
   axisMillimeters: [number, number, number] | null;
   /** Target moving down on DV (global -Y), else null. */
   dorsoventralMillimeters: [number, number, number] | null;
@@ -32,37 +32,29 @@ const DORSOVENTRAL_DIRECTION: [number, number, number] = [0, 1, 0];
 /** Ray samples per voxel along a level's finest axis, so a sample can't skip a voxel. */
 const RAY_SAMPLES_PER_VOXEL = 2;
 
-/** Pitch at which probe-local -Z is the DV direction, collapsing the two paths into one. */
-const PITCH_ALONG_DORSOVENTRAL = Math.PI / 2;
+/**
+ * How far a unit direction's alignment with DV may fall short of 1 and still
+ * count as the DV direction. A chain resolves its depth axis through nested
+ * rotations, so a probe aimed straight down never lands on it exactly.
+ */
+const DORSOVENTRAL_PARALLEL_EPSILON = 1e-6;
 
 /**
  * Resolve where a probe's tip must move to sit on the brain surface.
  * @param frame Probe's shank-plane frame, in atlas ASR mm.
- * @param pitchRadians Probe's pitch, i.e. `probe.rotation[2]`.
+ * @param depthDirection Unit ASR direction of the chain's depth axis, or null when it has none.
  * @param level Annotation level to march through.
  * @param sampleRay Samples one ray geometry.
  */
 export async function findProbeSurfaceTargets(
   frame: ProbeFrame,
-  pitchRadians: number,
+  depthDirection: [number, number, number] | null,
   level: AnnotationLevel,
   sampleRay: RaySampler
 ): Promise<ProbeSurfaceTargets> {
   const origin = frame.originMillimeters;
-  const up = frame.upMillimeters;
 
-  const inside = await findRayTarget(level, origin, up, "furthest", sampleRay);
-  if (inside) {
-    return {
-      insideMillimeters: inside,
-      axisMillimeters: null,
-      dorsoventralMillimeters: null
-    };
-  }
-
-  // At this exact pitch probe-local -Z and the DV direction are the same
-  // line, so marching the axis too would just repeat the DV march.
-  if (pitchRadians === PITCH_ALONG_DORSOVENTRAL) {
+  if (!depthDirection) {
     return {
       insideMillimeters: null,
       axisMillimeters: null,
@@ -76,9 +68,49 @@ export async function findProbeSurfaceTargets(
     };
   }
 
-  const down: [number, number, number] = [-up[0], -up[1], -up[2]];
+  const inside = await findRayTarget(
+    level,
+    origin,
+    depthDirection,
+    "furthest",
+    sampleRay
+  );
+  if (inside) {
+    return {
+      insideMillimeters: inside,
+      axisMillimeters: null,
+      dorsoventralMillimeters: null
+    };
+  }
+
+  const reversedDepth: [number, number, number] = [
+    -depthDirection[0],
+    -depthDirection[1],
+    -depthDirection[2]
+  ];
+
+  // The reversed depth axis and the DV direction are the same ray here, so
+  // marching the axis too would just repeat the DV march.
+  const alongDorsoventral =
+    reversedDepth[0] * DORSOVENTRAL_DIRECTION[0] +
+    reversedDepth[1] * DORSOVENTRAL_DIRECTION[1] +
+    reversedDepth[2] * DORSOVENTRAL_DIRECTION[2];
+  if (alongDorsoventral > 1 - DORSOVENTRAL_PARALLEL_EPSILON) {
+    return {
+      insideMillimeters: null,
+      axisMillimeters: null,
+      dorsoventralMillimeters: await findRayTarget(
+        level,
+        origin,
+        DORSOVENTRAL_DIRECTION,
+        "nearest",
+        sampleRay
+      )
+    };
+  }
+
   const [axisMillimeters, dorsoventralMillimeters] = await Promise.all([
-    findRayTarget(level, origin, down, "nearest", sampleRay),
+    findRayTarget(level, origin, reversedDepth, "nearest", sampleRay),
     findRayTarget(level, origin, DORSOVENTRAL_DIRECTION, "nearest", sampleRay)
   ]);
 

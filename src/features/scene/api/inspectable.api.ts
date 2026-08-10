@@ -1,6 +1,11 @@
 import { atlasToReferenceRelative, setCameraPose } from "@/features/experiment";
 import { setProbeTipMillimeters } from "@/features/probe";
 import type { Inspectable } from "../models/inspectable.model";
+import type { TransformChain } from "../models/transform-chain.model";
+import {
+  findTransformChain,
+  moveTransformChainOrigin
+} from "./transform-chain.api";
 
 /**
  * Is `a` the same inspectable entity as `b`.
@@ -27,11 +32,13 @@ export function isSameInspectable(a: Inspectable, b: Inspectable): boolean {
  * object's origin, or the camera's orbit target with its orbit left alone.
  * The world has no position, so it is left alone too.
  * @param inspectable Inspectable to move, mutated in place.
+ * @param chains Transform chains the moved object's inputs drive.
  * @param atlasMillimeters Destination, in atlas ASR mm.
  * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
 export function moveInspectableToMillimeters(
   inspectable: Inspectable,
+  chains: readonly TransformChain[],
   atlasMillimeters: [number, number, number],
   referenceCoordinate: [number, number, number]
 ): void {
@@ -47,13 +54,20 @@ export function moveInspectableToMillimeters(
     return;
   }
 
+  const chain = findTransformChain(chains, inspectable.transformChainId);
   if (inspectable.inspectableKind === "sceneObject") {
-    inspectable.position = atlasToReferenceRelative(
-      referenceCoordinate,
-      atlasMillimeters
+    moveTransformChainOrigin(
+      inspectable.transformInputs,
+      chain,
+      atlasToReferenceRelative(referenceCoordinate, atlasMillimeters)
     );
     return;
   }
 
-  setProbeTipMillimeters(inspectable, atlasMillimeters, referenceCoordinate);
+  setProbeTipMillimeters(
+    inspectable,
+    chain,
+    atlasMillimeters,
+    referenceCoordinate
+  );
 }

@@ -1,7 +1,13 @@
 import { defineStore } from "pinia";
 import { type Ref, ref } from "vue";
 import type { Appearance } from "@/features/preferences";
-import type { CameraProjection } from "@/features/scene";
+import type {
+  CameraProjection,
+  TransformChain,
+  TransformInputNames
+} from "@/features/scene";
+import { DEFAULT_TRANSFORM_CHAIN_ID } from "@/features/scene";
+import { i18n } from "@/services/i18n.service";
 import type { PositionUnit, RotationUnit } from "@/utils/math";
 
 /** Every preference value the store holds. */
@@ -46,6 +52,12 @@ export interface Preferences {
   probeRodDiameterMillimeters: number;
   /** Length of a probe's rod, in mm. */
   probeRodLengthMillimeters: number;
+  /** User-facing name of each of an object's twelve transform inputs. */
+  transformInputNames: TransformInputNames;
+  /** User-defined transform chains, on top of the locked built-in ones. */
+  transformChains: TransformChain[];
+  /** Id of the transform chain new probes are created with. */
+  defaultProbeChainId: string;
 }
 
 export const usePreferencesStore = defineStore(
@@ -71,6 +83,11 @@ export const usePreferencesStore = defineStore(
     const probeHeadStageCutDepthMillimeters = ref(17.5);
     const probeRodDiameterMillimeters = ref(8);
     const probeRodLengthMillimeters = ref(200);
+    const transformInputNames = ref<TransformInputNames>(
+      buildDefaultTransformInputNames()
+    );
+    const transformChains = ref<TransformChain[]>([]);
+    const defaultProbeChainId = ref(DEFAULT_TRANSFORM_CHAIN_ID);
 
     // `satisfies` keeps the store's state and `Preferences` in lockstep: a new
     // preference must appear in both.
@@ -94,9 +111,42 @@ export const usePreferencesStore = defineStore(
       probeHeadStageLengthMillimeters,
       probeHeadStageCutDepthMillimeters,
       probeRodDiameterMillimeters,
-      probeRodLengthMillimeters
+      probeRodLengthMillimeters,
+      transformInputNames,
+      transformChains,
+      defaultProbeChainId
     } satisfies { [K in keyof Preferences]: Ref<Preferences[K]> };
     return { ...state };
   },
   { persist: true }
 );
+
+/**
+ * Build the shipped name of every transform input, translated for the current
+ * locale.
+ */
+function buildDefaultTransformInputNames(): TransformInputNames {
+  const translate = (key: string) => i18n.global.t(`transformChain.${key}`);
+  return {
+    globalTranslation: [
+      translate("globalAp"),
+      translate("globalDv"),
+      translate("globalMl")
+    ],
+    globalRotation: [
+      translate("globalRoll"),
+      translate("globalYaw"),
+      translate("globalPitch")
+    ],
+    localRotation: [
+      translate("localRoll"),
+      translate("localYaw"),
+      translate("localPitch")
+    ],
+    localTranslation: [
+      translate("localDepth"),
+      translate("localForward"),
+      translate("localRight")
+    ]
+  };
+}

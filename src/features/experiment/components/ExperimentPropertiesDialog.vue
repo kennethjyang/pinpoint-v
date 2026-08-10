@@ -8,6 +8,7 @@ import {
   getTerminologyRows,
   isSameAtlas
 } from "@/features/atlas";
+import { getTransformChains } from "@/features/scene";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
@@ -107,12 +108,16 @@ async function save() {
       );
   isSaving.value = false;
 
-  setExperimentProperties(currentExperimentStore.experiment, {
-    name: name.value,
-    atlas: pickedAtlas,
-    referenceCoordinate: referenceCoordinate.value,
-    defaultStructureIdentifiers
-  });
+  setExperimentProperties(
+    currentExperimentStore.experiment,
+    getTransformChains(preferences.transformChains),
+    {
+      name: name.value,
+      atlas: pickedAtlas,
+      referenceCoordinate: referenceCoordinate.value,
+      defaultStructureIdentifiers
+    }
+  );
 
   onDialogOK();
 }

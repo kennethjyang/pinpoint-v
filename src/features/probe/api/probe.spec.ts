@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isProxy, isReactive, reactive, toRaw } from "vue";
 import type { Probe } from "../models/probe.model";
+import type { ProbeSurfaceChoice } from "../models/probe-surface-choice.model";
 import {
   buildProbe,
   copyProbe,
@@ -12,38 +13,64 @@ import {
   getProbeInterfaceIdentifier,
   getProbeModelDisplayName,
   homeProbe,
+  insertProbeTipToMillimeters,
   isProbe,
   isProbeInterfaceProbe,
+  isProbeSurfaceChoiceCurrent,
   rotateProbeVisibility,
+  setProbeTipMillimeters,
   toggleProbeLock
 } from "./probe.api";
-import { addProbe, buildExperiment } from "@/features/experiment";
+import {
+  addProbe,
+  buildExperiment,
+  referenceRelativeToAtlas
+} from "@/features/experiment";
+import type { TransformChain } from "@/features/scene";
+import {
+  BUILT_IN_TRANSFORM_CHAINS,
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  getTransformChainPose,
+  TRANSFORM_INPUT_GROUPS
+} from "@/features/scene";
 import {
   makeAtlas,
   makeProbe,
   makeProbeInterfaceProbe,
-  makeSceneModel
+  makeSceneModel,
+  makeTransformInputs
 } from "@/test/fixtures";
+
+/** The built-in default chain every fixture probe references. */
+const DEFAULT_CHAIN = BUILT_IN_TRANSFORM_CHAINS[0]!;
+
+/** Every one of the twelve input slots, as group/component pairs. */
+const TRANSFORM_INPUT_SLOTS = TRANSFORM_INPUT_GROUPS.flatMap(group =>
+  ([0, 1, 2] as const).map(component => ({ group, component }))
+);
 
 describe("buildProbe", () => {
   it("references the given probe identifier", () => {
     const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
-    const probe = buildProbe(spec);
+    const probe = buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID);
     expect(probe.probeInterfaceIdentifier).toBe("imec np1");
   });
 
   it("builds a probe with sensible defaults, starting pitched inferiorly", () => {
-    const probe = buildProbe(makeProbeInterfaceProbe());
+    const probe = buildProbe(makeProbeInterfaceProbe(), "chain-abc");
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
     expect(probe.lock).toBe(false);
-    expect(probe.tipPosition).toEqual([0, 0, 0]);
+    expect(probe.transformChainId).toBe("chain-abc");
     // A pitch of 0 would lie flat, pointing anteriorly; PI/2 is the intended
     // starting default so a new probe points inferiorly.
-    expect(probe.rotation).toEqual([0, 0, Math.PI / 2]);
+    expect(probe.transformInputs.globalRotation[2]).toBe(Math.PI / 2);
+    expect(probe.transformInputs).toEqual(
+      makeTransformInputs({ globalRotation: [0, 0, Math.PI / 2] })
+    );
     expect(probe.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
     );
@@ -58,8 +85,8 @@ describe("buildProbe", () => {
   });
 
   it("gives each probe a unique id", () => {
-    const a = buildProbe(makeProbeInterfaceProbe());
-    const b = buildProbe(makeProbeInterfaceProbe());
+    const a = buildProbe(makeProbeInterfaceProbe(), DEFAULT_TRANSFORM_CHAIN_ID);
+    const b = buildProbe(makeProbeInterfaceProbe(), DEFAULT_TRANSFORM_CHAIN_ID);
     expect(a.id).not.toBe(b.id);
   });
 });
@@ -135,16 +162,151 @@ describe("rotateProbeVisibility", () => {
 });
 
 describe("homeProbe", () => {
-  it("resets the probe's tip position to the atlas origin, leaving rotation untouched", () => {
+  it("zeroes both translation groups, leaving the rotations untouched", () => {
     const probe = makeProbe({
-      tipPosition: [1, 2, 3],
-      rotation: [0.1, 0.2, 0.3]
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 2, 3],
+        globalRotation: [0.1, 0.2, 0.3],
+        localRotation: [0.4, 0.5, 0.6],
+        localTranslation: [4, 5, 6]
+      })
     });
 
     homeProbe(probe);
 
-    expect(probe.tipPosition).toEqual([0, 0, 0]);
-    expect(probe.rotation).toEqual([0.1, 0.2, 0.3]);
+    expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
+    expect(probe.transformInputs.localTranslation).toEqual([0, 0, 0]);
+    expect(probe.transformInputs.globalRotation).toEqual([0.1, 0.2, 0.3]);
+    expect(probe.transformInputs.localRotation).toEqual([0.4, 0.5, 0.6]);
+  });
+});
+
+describe("setProbeTipMillimeters", () => {
+  const referenceCoordinate: [number, number, number] = [1, 2, 3];
+
+  it("lands the resolved tip on the atlas point, whatever the local inputs hold", () => {
+    const probe = makeProbe({
+      transformInputs: makeTransformInputs({
+        globalRotation: [0, 0, Math.PI / 2],
+        localTranslation: [1.5, 0, 0]
+      })
+    });
+
+    setProbeTipMillimeters(
+      probe,
+      DEFAULT_CHAIN,
+      [4, 6, 8],
+      referenceCoordinate
+    );
+
+    const tip = referenceRelativeToAtlas(
+      referenceCoordinate,
+      getTransformChainPose(DEFAULT_CHAIN, probe.transformInputs).position
+    );
+    expect(tip[0]).toBeCloseTo(4);
+    expect(tip[1]).toBeCloseTo(6);
+    expect(tip[2]).toBeCloseTo(8);
+  });
+});
+
+describe("insertProbeTipToMillimeters", () => {
+  const referenceCoordinate: [number, number, number] = [1, 2, 3];
+
+  it("advances only the chain's depth input", () => {
+    const probe = makeProbe();
+
+    const moved = insertProbeTipToMillimeters(
+      probe,
+      DEFAULT_CHAIN,
+      [4, 2, 3],
+      referenceCoordinate
+    );
+
+    expect(moved).toBe(true);
+    // The default chain inserts along probe-local AP, which is unrotated here.
+    expect(probe.transformInputs.localTranslation[0]).toBeCloseTo(3);
+    expect(probe.transformInputs.localTranslation[1]).toBe(0);
+    expect(probe.transformInputs.localTranslation[2]).toBe(0);
+    expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
+  });
+
+  it("reaches only along the depth axis, ignoring off-axis distance", () => {
+    const probe = makeProbe();
+
+    insertProbeTipToMillimeters(
+      probe,
+      DEFAULT_CHAIN,
+      [4, 9, 3],
+      referenceCoordinate
+    );
+
+    const { position } = getTransformChainPose(
+      DEFAULT_CHAIN,
+      probe.transformInputs
+    );
+    expect(position[0]).toBeCloseTo(3);
+    expect(position[1]).toBeCloseTo(0);
+    expect(position[2]).toBeCloseTo(0);
+  });
+
+  it("returns false and leaves the inputs alone for a chain with no depth axis", () => {
+    const chain: TransformChain = {
+      ...DEFAULT_CHAIN,
+      id: "no-depth",
+      isBuiltIn: false,
+      depthAxis: null
+    };
+    const probe = makeProbe();
+
+    const moved = insertProbeTipToMillimeters(
+      probe,
+      chain,
+      [4, 2, 3],
+      referenceCoordinate
+    );
+
+    expect(moved).toBe(false);
+    expect(probe.transformInputs).toEqual(makeTransformInputs());
+  });
+});
+
+describe("isProbeSurfaceChoiceCurrent", () => {
+  /**
+   * Snapshot a probe's inputs into a pending surface choice.
+   * @param probe Probe to snapshot.
+   */
+  function makeSurfaceChoice(probe: Probe): ProbeSurfaceChoice {
+    return {
+      probeId: probe.id,
+      transformInputs: structuredClone(probe.transformInputs),
+      tipMillimeters: [0, 0, 0],
+      axisTargetMillimeters: [1, 0, 0],
+      dorsoventralTargetMillimeters: [0, 1, 0]
+    };
+  }
+
+  it("stays current while the probe's inputs are untouched", () => {
+    const probe = makeProbe({
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 2, 3],
+        localRotation: [0.1, 0.2, 0.3]
+      })
+    });
+
+    expect(isProbeSurfaceChoiceCurrent(makeSurfaceChoice(probe), probe)).toBe(
+      true
+    );
+  });
+
+  it("drops once any of the twelve inputs changes", () => {
+    for (const { group, component } of TRANSFORM_INPUT_SLOTS) {
+      const probe = makeProbe();
+      const choice = makeSurfaceChoice(probe);
+
+      probe.transformInputs[group][component] += 0.5;
+
+      expect(isProbeSurfaceChoiceCurrent(choice, probe)).toBe(false);
+    }
   });
 });
 
@@ -177,13 +339,15 @@ describe("copyProbe", () => {
 
   it("deep-copies mutable fields, independent of the source", () => {
     const experiment = buildExperiment("experiment", makeAtlas(), [0, 0, 0]);
-    const probe = makeProbe({ tipPosition: [1, 2, 3] });
+    const probe = makeProbe({
+      transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+    });
     addProbe(experiment, probe);
 
     const copy = copyProbe(experiment, probe)!;
-    copy.tipPosition[0] = 99;
+    copy.transformInputs.globalTranslation[0] = 99;
 
-    expect(probe.tipPosition[0]).toBe(1);
+    expect(probe.transformInputs.globalTranslation[0]).toBe(1);
   });
 
   it("returns null and leaves the experiment untouched when the probe isn't there", () => {
@@ -383,12 +547,33 @@ describe("isProbe", () => {
     expect(isProbe(probe)).toBe(false);
   });
 
-  it("rejects a probe with a short tipPosition", () => {
-    expect(isProbe({ ...makeProbe(), tipPosition: [0, 0] })).toBe(false);
+  it("rejects a probe with an empty transformChainId", () => {
+    expect(isProbe({ ...makeProbe(), transformChainId: "" })).toBe(false);
   });
 
-  it("rejects a probe with a non-finite rotation component", () => {
-    expect(isProbe({ ...makeProbe(), rotation: [0, 0, NaN] })).toBe(false);
+  it("rejects a probe with a short translation input", () => {
+    const transformInputs = makeTransformInputs({
+      globalTranslation: [0, 0] as unknown as [number, number, number]
+    });
+    expect(isProbe({ ...makeProbe(), transformInputs })).toBe(false);
+  });
+
+  it("rejects a probe with a non-finite rotation input", () => {
+    const transformInputs = makeTransformInputs({
+      globalRotation: [0, 0, NaN]
+    });
+    expect(isProbe({ ...makeProbe(), transformInputs })).toBe(false);
+  });
+
+  it("rejects the old tipPosition and rotation shape", () => {
+    const {
+      transformChainId: _chainId,
+      transformInputs: _inputs,
+      ...rest
+    } = makeProbe();
+    expect(
+      isProbe({ ...rest, tipPosition: [0, 0, 0], rotation: [0, 0, 0] })
+    ).toBe(false);
   });
 
   it("accepts a probe with a null sliceExtentMillimeters", () => {

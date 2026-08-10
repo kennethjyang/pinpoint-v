@@ -1,11 +1,6 @@
 import type {
   AbstractMesh,
-  DragEvent,
-  DragStartEndEvent,
   GizmoManager,
-  IGizmo,
-  IPositionGizmo,
-  IRotationGizmo,
   Nullable,
   Observer,
   PhysicsShape,
@@ -36,7 +31,7 @@ import {
 } from "@/features/probe";
 import { setMaterialDiffuseColor } from "./material.api";
 import { buildReferenceCoordinateNode } from "./reference-coordinate.api";
-import { asrToVector3, vector3ToAsr } from "./coordinate-transforms.api";
+import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildCollisionBody, disposeCollisionBody } from "./collision.api";
 import {
   buildSceneEntityName,
@@ -50,7 +45,11 @@ import {
 } from "./pose-interpolation.api";
 import type { ProbeMetadata } from "../models/probe-metadata.model";
 import type { ProbeGeometry } from "../models/probe-geometry.model";
-import type { TransformGizmos } from "../models/gizmo.model";
+import type { TransformChain } from "../models/transform-chain.model";
+import {
+  findTransformChain,
+  getTransformChainPose
+} from "./transform-chain.api";
 
 /** Suffix applied to a probe's id to name its parenting transform node. */
 const PROBE_NODE_SUFFIX = sceneEntityNameSuffix("probe", "node");
@@ -237,6 +236,7 @@ export function disposeProbe(
  * @param scene Scene to sync the probes of.
  * @param experiment Experiment to pull probe data to sync from.
  * @param gizmoManager Gizmo manager for controlling probes.
+ * @param chains Transform chains the probes' inputs drive.
  * @param draggedProbeId ID of the probe being dragged (if any). Ignore transform updates for this probe.
  * @param geometry Probe body geometry to build meshes with.
  */
@@ -244,6 +244,7 @@ export function syncProbes(
   scene: Scene,
   experiment: Experiment,
   gizmoManager: GizmoManager,
+  chains: readonly TransformChain[],
   draggedProbeId: string | null,
   geometry: ProbeGeometry
 ): string[] {
@@ -317,8 +318,12 @@ export function syncProbes(
 
     if (probe.id === draggedProbeId) continue;
 
-    const goalPosition = asrToVector3(probe.tipPosition);
-    const goalRotation = asrToVector3(probe.rotation);
+    const pose = getTransformChainPose(
+      findTransformChain(chains, probe.transformChainId),
+      probe.transformInputs
+    );
+    const goalPosition = asrToVector3(pose.position);
+    const goalRotation = asrToVector3(pose.rotation);
     // A freshly built probe snaps, so it doesn't fly in from the origin; an
     // existing one glides to any new pose. A pose that already matches needs
     // neither, e.g. the sync right after a gizmo drag ends.
@@ -405,88 +410,6 @@ export function selectProbeFromGizmoAttach(
     );
     onSelect(probe);
   });
-}
-
-/**
- * Update a probe's position from a gizmo drag.
- * @param positionGizmo Position gizmo to track dragging on.
- * @param probes Experiment probes to resolve the attached mesh against.
- * @param onDrag Callback invoked with probe ID the drag is happening to.
- */
-export function setProbePositionFromGizmoDrag(
-  positionGizmo: IPositionGizmo,
-  probes: Probe[],
-  onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return positionGizmo.onDragObservable.add(() => {
-    const attached = attachedProbeFromGizmo(positionGizmo, probes);
-    if (!attached) return;
-    stopNodePoseInterpolation(attached.node);
-    attached.probe.tipPosition = vector3ToAsr(attached.node.position);
-    onDrag(attached.probe.id);
-  });
-}
-
-/**
- * Update a probe's orientation from a gizmo drag.
- * @param rotationGizmo Rotation gizmo to track dragging on.
- * @param probes Experiment probes to resolve the attached mesh against.
- * @param onDrag Callback invoked with probe ID the drag is happening to.
- */
-export function setProbeRotationFromGizmoDrag(
-  rotationGizmo: IRotationGizmo,
-  probes: Probe[],
-  onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return rotationGizmo.onDragObservable.add(() => {
-    const attached = attachedProbeFromGizmo(rotationGizmo, probes);
-    if (!attached) return;
-
-    stopNodePoseInterpolation(attached.node);
-    attached.probe.rotation = vector3ToAsr(attached.node.rotation);
-    onDrag(attached.probe.id);
-  });
-}
-
-/**
- * Callback filter for when dragging finishes on a probe, from either the
- * position or the rotation gizmo.
- * @param gizmos Position and rotation gizmos to track dragging on.
- * @param onDragEnd Callback invoked to confirm probe drag ended.
- */
-export function endProbeGizmoDrag(
-  gizmos: TransformGizmos,
-  onDragEnd: () => void
-): Observer<DragStartEndEvent>[] {
-  const onEnd = (gizmo: IGizmo) => () => {
-    if (!gizmo.attachedNode?.name.endsWith(PROBE_NODE_SUFFIX)) return;
-    onDragEnd();
-  };
-
-  return [
-    gizmos.positionGizmo.onDragEndObservable.add(onEnd(gizmos.positionGizmo)),
-    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo))
-  ];
-}
-
-/**
- * Resolve the probe and transform node currently attached to the gizmo, or
- * null if nothing (or a non-probe entity) is attached.
- * @param gizmo Gizmo to read the attached node from.
- * @param probes Experiment probes to resolve the attached mesh against.
- */
-function attachedProbeFromGizmo(
-  gizmo: IGizmo,
-  probes: Probe[]
-): { probe: Probe; node: TransformNode } | null {
-  const node = gizmo.attachedNode;
-  if (!node?.name.endsWith(PROBE_NODE_SUFFIX)) return null;
-
-  const probeId = sceneEntityIdFromName(node.name, "probe");
-  const probe = probes.find(probe => probe.id === probeId);
-  if (!probe) return null;
-
-  return { probe, node: node as TransformNode };
 }
 
 /**

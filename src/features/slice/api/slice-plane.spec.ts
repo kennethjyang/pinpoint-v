@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ProbeShank } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
+import { BUILT_IN_TRANSFORM_CHAINS } from "@/features/scene";
 import {
   makeAtlas,
   makeManifest,
   makeProbe,
-  makeProbeInterfaceProbe
+  makeProbeInterfaceProbe,
+  makeTransformInputs
 } from "@/test/fixtures";
 import { getProbeFrame, toAtlasMillimeters } from "./probe-frame.api";
 import {
@@ -26,6 +28,8 @@ import {
   setProbeChannelMapWindow
 } from "./slice-plane.api";
 
+const DEFAULT_CHAIN = BUILT_IN_TRANSFORM_CHAINS[0]!;
+
 /** Two 0.1mm shanks 1.8mm apart, joined along a top edge at y = 10mm. */
 const TWO_SHANK_CONTOUR = [
   [-1, 10],
@@ -40,13 +44,13 @@ const TWO_SHANK_CONTOUR = [
 
 describe("getProbeSlicePlane", () => {
   it("centers on the given height up the contour from the tip", () => {
-    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const probe = makeProbe();
+    const frame = getProbeFrame(probe, DEFAULT_CHAIN, [0, 0, 0]);
 
     const tipPlane = getProbeSlicePlane(frame, 0, 1, 16);
     const raisedPlane = getProbeSlicePlane(frame, 5, 1, 16);
 
-    // Default rotation [0,0,0]: right = ML (asrToVector3 x), up = DV, so a
+    // Zeroed transform inputs: right = ML (asrToVector3 x), up = DV, so a
     // nonzero center height must shift the plane center along the frame's up
     // axis relative to the tip-centered plane.
     expect(tipPlane.bands[0]!.centerMillimeters).not.toEqual(
@@ -59,7 +63,7 @@ describe("getProbeSlicePlane", () => {
 
   it("sets the band's and plane's half-extents to half the given extent", () => {
     const probe = makeProbe();
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const frame = getProbeFrame(probe, DEFAULT_CHAIN, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 4, 32);
 
@@ -70,8 +74,12 @@ describe("getProbeSlicePlane", () => {
   });
 
   it("carries the frame's right and up axes through unchanged", () => {
-    const probe = makeProbe({ rotation: [0, 0, Math.PI / 2] });
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const probe = makeProbe({
+      transformInputs: makeTransformInputs({
+        globalRotation: [0, 0, Math.PI / 2]
+      })
+    });
+    const frame = getProbeFrame(probe, DEFAULT_CHAIN, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 1, 16);
 
@@ -81,7 +89,7 @@ describe("getProbeSlicePlane", () => {
 
   it("emits exactly one band spanning the full output width", () => {
     const probe = makeProbe();
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const frame = getProbeFrame(probe, DEFAULT_CHAIN, [0, 0, 0]);
 
     const plane = getProbeSlicePlane(frame, 0, 4, 32);
 
@@ -198,10 +206,7 @@ describe("getShankSliceGeometry", () => {
   });
   const twoShankContour = getProbeContour(twoShankDefinition)!;
   const shanks = getProbeShanks(twoShankDefinition, twoShankContour);
-  const frame = getProbeFrame(
-    makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] }),
-    [0, 0, 0]
-  );
+  const frame = getProbeFrame(makeProbe(), DEFAULT_CHAIN, [0, 0, 0]);
 
   it("builds one band per shank, centered on its own x and the shared height", () => {
     const layout = getShankLayout(

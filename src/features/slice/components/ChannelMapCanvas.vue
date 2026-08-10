@@ -10,7 +10,9 @@ import {
 import { useDevicePixelRatio, useElementSize } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import type { Probe, ProbeShank } from "@/features/probe";
+import { findTransformChain, getTransformChains } from "@/features/scene";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { usePreferencesStore } from "@/stores/preferences.store";
 import {
   getChannelMapLabels,
   getStructureLabelRuns
@@ -64,6 +66,7 @@ const emit = defineEmits<{
 }>();
 
 const currentExperiment = useCurrentExperimentStore();
+const preferences = usePreferencesStore();
 const { t } = useI18n();
 
 const root = useTemplateRef<HTMLDivElement>("root");
@@ -91,7 +94,15 @@ const layout = computed(() =>
 /** Sampling surface covering every shank's band, or null while unmeasured. */
 const plane = computed(() => {
   if (!layout.value) return null;
-  const frame = getProbeFrame(probe, currentExperiment.referenceCoordinate);
+  const chain = findTransformChain(
+    getTransformChains(preferences.transformChains),
+    probe.transformChainId
+  );
+  const frame = getProbeFrame(
+    probe,
+    chain,
+    currentExperiment.referenceCoordinate
+  );
   return getShankSliceGeometry(
     frame,
     layout.value,
@@ -281,8 +292,9 @@ onUnmounted(() => emit("hover", null));
         :key="label.key"
         class="channel-map-canvas__label"
         :style="label.style"
-        >{{ label.abbreviation }}</div
       >
+        {{ label.abbreviation }}
+      </div>
     </div>
   </div>
 </template>

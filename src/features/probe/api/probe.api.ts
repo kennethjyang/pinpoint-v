@@ -9,13 +9,17 @@ import {
   KNOWN_MANUFACTURERS,
   KNOWN_PROBES
 } from "../models/known-probes.model";
-import { isSceneModel, STANDARD_COLORS } from "@/features/scene";
+import type { TransformChain } from "@/features/scene";
 import {
-  isFiniteTriple,
-  isFiniteNumber,
-  isHexColor,
-  isRecord
-} from "@/utils/type-guards";
+  buildTransformInputs,
+  isSceneModel,
+  isTransformInputs,
+  moveTransformChainOrigin,
+  moveTransformChainOriginAlongDepth,
+  STANDARD_COLORS,
+  TRANSFORM_INPUT_GROUPS
+} from "@/features/scene";
+import { isFiniteNumber, isHexColor, isRecord } from "@/utils/type-guards";
 
 /** Every valid probe visibility, for validating untrusted probe data. */
 const PROBE_VISIBILITIES: readonly string[] = [
@@ -38,10 +42,16 @@ const NEXT_PROBE_VISIBILITY: Record<ProbeVisibility, ProbeVisibility> = {
  * Build a probe referencing the given probe interface definition, with a
  * random name and color, a zeroed position, and a pitch pointing inferiorly.
  * @param probeInterfaceProbe Probe interface definition for the probe.
+ * @param transformChainId Id of the transform chain the probe's inputs drive.
  */
-export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
+export function buildProbe(
+  probeInterfaceProbe: ProbeInterfaceProbe,
+  transformChainId: string
+): Probe {
   const uuid = crypto.randomUUID();
   const uniqueName = uuid.slice(0, 8);
+  const transformInputs = buildTransformInputs();
+  transformInputs.globalRotation[2] = Math.PI / 2;
   return {
     inspectableKind: "probe",
     id: uuid,
@@ -50,8 +60,8 @@ export function buildProbe(probeInterfaceProbe: ProbeInterfaceProbe): Probe {
     visibility: "visible",
     lock: false,
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe),
-    tipPosition: [0, 0, 0],
-    rotation: [0, 0, Math.PI / 2],
+    transformChainId,
+    transformInputs,
     sliceExtentMillimeters: null,
     sliceCenterHeightMillimeters: 0,
     channelMapWindow: null,
@@ -93,27 +103,54 @@ export function rotateProbeVisibility(probe: Probe) {
 }
 
 /**
- * Reset a probe's tip position to the atlas origin.
- * @param probe Probe to reset the tip position of.
+ * Reset a probe's translation inputs, returning its tip to the reference
+ * coordinate however its chain applies them.
+ * @param probe Probe to home.
  */
 export function homeProbe(probe: Probe) {
-  probe.tipPosition = [0, 0, 0];
+  probe.transformInputs.globalTranslation = [0, 0, 0];
+  probe.transformInputs.localTranslation = [0, 0, 0];
 }
 
 /**
- * Move a probe's tip to a point in atlas ASR millimeters.
+ * Move a probe's tip onto a point in atlas ASR millimeters, adjusting the
+ * translation its chain applies first.
  * @param probe Probe to move.
+ * @param chain Transform chain the probe's inputs drive.
  * @param atlasMillimeters Target tip position, in atlas ASR mm.
  * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
 export function setProbeTipMillimeters(
   probe: Probe,
+  chain: TransformChain,
   atlasMillimeters: [number, number, number],
   referenceCoordinate: [number, number, number]
 ): void {
-  probe.tipPosition = atlasToReferenceRelative(
-    referenceCoordinate,
-    atlasMillimeters
+  moveTransformChainOrigin(
+    probe.transformInputs,
+    chain,
+    atlasToReferenceRelative(referenceCoordinate, atlasMillimeters)
+  );
+}
+
+/**
+ * Move a probe's tip onto a point in atlas ASR millimeters along its chain's
+ * depth axis alone. False when the chain has no depth axis to advance.
+ * @param probe Probe to move.
+ * @param chain Transform chain the probe's inputs drive.
+ * @param atlasMillimeters Target tip position, in atlas ASR mm.
+ * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
+ */
+export function insertProbeTipToMillimeters(
+  probe: Probe,
+  chain: TransformChain,
+  atlasMillimeters: [number, number, number],
+  referenceCoordinate: [number, number, number]
+): boolean {
+  return moveTransformChainOriginAlongDepth(
+    probe.transformInputs,
+    chain,
+    atlasToReferenceRelative(referenceCoordinate, atlasMillimeters)
   );
 }
 
@@ -126,13 +163,10 @@ export function isProbeSurfaceChoiceCurrent(
   choice: ProbeSurfaceChoice,
   probe: Probe
 ): boolean {
-  return (
-    choice.tipPosition[0] === probe.tipPosition[0] &&
-    choice.tipPosition[1] === probe.tipPosition[1] &&
-    choice.tipPosition[2] === probe.tipPosition[2] &&
-    choice.rotation[0] === probe.rotation[0] &&
-    choice.rotation[1] === probe.rotation[1] &&
-    choice.rotation[2] === probe.rotation[2]
+  return TRANSFORM_INPUT_GROUPS.every(group =>
+    choice.transformInputs[group].every(
+      (value, component) => value === probe.transformInputs[group][component]
+    )
   );
 }
 
@@ -271,8 +305,9 @@ export function isProbe(value: unknown): value is Probe {
     PROBE_VISIBILITIES.includes(value.visibility) &&
     typeof value.lock === "boolean" &&
     typeof value.probeInterfaceIdentifier === "string" &&
-    isFiniteTriple(value.tipPosition) &&
-    isFiniteTriple(value.rotation) &&
+    typeof value.transformChainId === "string" &&
+    value.transformChainId.length > 0 &&
+    isTransformInputs(value.transformInputs) &&
     (value.sliceExtentMillimeters === null ||
       isFiniteNumber(value.sliceExtentMillimeters)) &&
     isFiniteNumber(value.sliceCenterHeightMillimeters) &&

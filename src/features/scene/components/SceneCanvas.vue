@@ -45,11 +45,9 @@ import { usePreferencesStore } from "@/stores/preferences.store";
 import { useI18n } from "vue-i18n";
 import type { Mesh, Scene, SSAO2RenderingPipeline } from "@babylonjs/core";
 import {
-  endProbeGizmoDrag,
   getProbeMeshes,
+  getProbeTransformNode,
   selectProbeFromGizmoAttach,
-  setProbePositionFromGizmoDrag,
-  setProbeRotationFromGizmoDrag,
   syncProbes
 } from "../api/probe.api";
 import {
@@ -62,24 +60,36 @@ import {
   createSceneObjectSyncState,
   endSceneObjectGizmoDrag,
   getSceneObjectMeshes,
+  getSceneObjectTransformNode,
   selectSceneObjectFromGizmoAttach,
-  setSceneObjectPositionFromGizmoDrag,
-  setSceneObjectRotationFromGizmoDrag,
   setSceneObjectScaleFromGizmoDrag,
   syncSceneObjects
 } from "../api/scene-object-node.api";
 import {
   createProbeBodyModelSyncState,
   endProbeBodyModelGizmoDrag,
+  getProbeBodyModelNode,
   getProbeGizmoNode,
-  setProbeBodyModelPositionFromGizmoDrag,
-  setProbeBodyModelRotationFromGizmoDrag,
   setProbeBodyModelScaleFromGizmoDrag,
   syncProbeBodyModels
 } from "../api/probe-body-model.api";
 import { getSceneModel } from "../api/scene-model.api";
 import { setGizmoControls } from "../api/gizmo.api";
 import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
+import type {
+  TransformChain,
+  TransformInputGroup
+} from "../models/transform-chain.model";
+import {
+  findTransformChain,
+  getTransformChains,
+  isTransformInputBound
+} from "../api/transform-chain.api";
+import type {
+  TransformChainGizmo,
+  TransformChainGizmoTarget
+} from "../api/transform-chain-gizmo.api";
+import { createTransformChainGizmo } from "../api/transform-chain-gizmo.api";
 import { setReferenceCoordinateNodePosition } from "../api/reference-coordinate.api";
 import {
   buildProbeSurfacePaths,
@@ -87,6 +97,7 @@ import {
   pickProbeSurfacePathOnTap
 } from "../api/probe-surface-path.api";
 import {
+  insertProbeTipToMillimeters,
   isProbeSurfaceChoiceCurrent,
   setProbeTipMillimeters
 } from "@/features/probe";
@@ -143,6 +154,9 @@ const probeBodyModelSyncState = createProbeBodyModelSyncState();
 
 const gizmoMode = ref<GizmoMode>("position");
 const gizmoCoordinateSpace = ref<GizmoCoordinateSpace>("local");
+
+/** Handles driving the selected object's transform inputs, one per scene. */
+const chainGizmo = shallowRef<TransformChainGizmo | null>(null);
 
 /**
  * Terminology rows for the current atlas, empty while they resolve.
@@ -215,17 +229,51 @@ const isScaleGizmoAvailable = computed(
     currentExperiment.bodyModelGizmoProbeId !== null
 );
 
+/** Every transform chain an object can be driven by: the built-ins plus the user's. */
+const chains = computed(() => getTransformChains(preferences.transformChains));
+
+/** Chain driving the object the gizmo acts on, or null when nothing is selected. */
+const selectedChain = computed<TransformChain | null>(() => {
+  const selected = currentExperiment.selectedInspectable;
+  if (
+    !selected ||
+    selected.inspectableKind === "camera" ||
+    selected.inspectableKind === "world"
+  ) {
+    return null;
+  }
+
+  const bodyModel =
+    selected.inspectableKind === "probe" &&
+    currentExperiment.bodyModelGizmoProbeId === selected.id
+      ? selected.bodyModel
+      : null;
+  return findTransformChain(
+    chains.value,
+    (bodyModel ?? selected).transformChainId
+  );
+});
+
+/** Input group the mode and coordinate space name, or null while scaling. */
+const activeInputGroup = computed<TransformInputGroup | null>(() =>
+  gizmoMode.value === "scale"
+    ? null
+    : inputGroupOf(gizmoMode.value === "rotation", gizmoCoordinateSpace.value)
+);
+
 /** Transform-mode toggle options, offering scale only for scene objects. */
 const gizmoModeOptions = computed(() => [
   {
     label: t("sceneCanvas.gizmoPosition"),
     value: "position",
-    icon: "sym_o_point_scan"
+    icon: "sym_o_point_scan",
+    disable: !isTransformKindDrivable(false)
   },
   {
     label: t("sceneCanvas.gizmoRotation"),
     value: "rotation",
-    icon: "flip_camera_android"
+    icon: "flip_camera_android",
+    disable: !isTransformKindDrivable(true)
   },
   ...(isScaleGizmoAvailable.value
     ? [
@@ -237,6 +285,123 @@ const gizmoModeOptions = computed(() => [
       ]
     : [])
 ]);
+
+/**
+ * Coordinate-space toggle options, with a space disabled while the selection's
+ * chain reads none of that space's inputs for the active mode.
+ */
+const gizmoCoordinateSpaceOptions = computed(() => {
+  const chain = selectedChain.value;
+  const isRotation = gizmoMode.value === "rotation";
+  return [
+    {
+      label: t("sceneCanvas.gizmoLocal"),
+      value: "local",
+      icon: "sym_o_nearby",
+      disable:
+        !!chain &&
+        gizmoMode.value !== "scale" &&
+        !isInputGroupBound(chain, inputGroupOf(isRotation, "local"))
+    },
+    {
+      label: t("sceneCanvas.gizmoGlobal"),
+      value: "global",
+      icon: "sym_o_globe",
+      disable:
+        !!chain &&
+        gizmoMode.value !== "scale" &&
+        !isInputGroupBound(chain, inputGroupOf(isRotation, "global"))
+    }
+  ];
+});
+
+/** Input group a transform kind and coordinate space name together. */
+function inputGroupOf(
+  isRotation: boolean,
+  coordinateSpace: GizmoCoordinateSpace
+): TransformInputGroup {
+  if (coordinateSpace === "local") {
+    return isRotation ? "localRotation" : "localTranslation";
+  }
+  return isRotation ? "globalRotation" : "globalTranslation";
+}
+
+/** Does the chain read any of a group's three inputs. */
+function isInputGroupBound(
+  chain: TransformChain,
+  group: TransformInputGroup
+): boolean {
+  return ([0, 1, 2] as const).some(component =>
+    isTransformInputBound(chain, { group, component })
+  );
+}
+
+/**
+ * Can the selection be translated or rotated at all, i.e. does its chain read
+ * either space's inputs for that kind.
+ */
+function isTransformKindDrivable(isRotation: boolean): boolean {
+  const chain = selectedChain.value;
+  if (!chain) return true;
+
+  return (
+    isInputGroupBound(chain, inputGroupOf(isRotation, "local")) ||
+    isInputGroupBound(chain, inputGroupOf(isRotation, "global"))
+  );
+}
+
+/**
+ * Object the chain gizmo drives: the selection, or its body model while that
+ * holds the gizmo. Null for the camera, the world, and a locked object.
+ */
+function resolveChainGizmoTarget(
+  scene: Scene,
+  group: TransformInputGroup
+): TransformChainGizmoTarget | null {
+  const selected = currentExperiment.selectedInspectable;
+  if (
+    !selected ||
+    selected.inspectableKind === "camera" ||
+    selected.inspectableKind === "world" ||
+    selected.lock
+  ) {
+    return null;
+  }
+
+  if (selected.inspectableKind === "sceneObject") {
+    const node = getSceneObjectTransformNode(scene, selected.id);
+    if (!node) return null;
+    return {
+      node,
+      chain: findTransformChain(chains.value, selected.transformChainId),
+      inputs: selected.transformInputs,
+      group
+    };
+  }
+
+  const probeNode = getProbeTransformNode(scene, selected.id);
+  if (!probeNode) return null;
+
+  const bodyModel = selected.bodyModel;
+  const bodyModelNode =
+    bodyModel && currentExperiment.bodyModelGizmoProbeId === selected.id
+      ? getProbeBodyModelNode(scene, selected.id)
+      : null;
+  if (bodyModel && bodyModelNode) {
+    return {
+      node: bodyModelNode,
+      chain: findTransformChain(chains.value, bodyModel.transformChainId),
+      inputs: bodyModel.transformInputs,
+      group
+    };
+  }
+  return {
+    node: probeNode,
+    chain: findTransformChain(chains.value, selected.transformChainId),
+    inputs: selected.transformInputs,
+    group
+  };
+}
 
 /** Meshes of a colliding entity, whichever kind it is. */
 function collisionEntityMeshes(scene: Scene, entityId: string): Mesh[] {
@@ -475,6 +640,7 @@ watchEffect(() => {
     scene,
     currentExperiment.experiment,
     gizmoManager,
+    chains.value,
     currentExperiment.draggedProbeId,
     probeGeometry.value
   );
@@ -534,6 +700,7 @@ async function syncSceneObjectsFromState() {
       scene,
       currentExperiment.experiment,
       gizmoManager,
+      chains.value,
       sceneObjectSyncState,
       currentExperiment.draggedSceneObjectId,
       getSceneModel
@@ -613,6 +780,7 @@ async function syncProbeBodyModelsFromState() {
       scene,
       currentExperiment.experiment,
       gizmoManager,
+      chains.value,
       probeBodyModelSyncState,
       currentExperiment.draggedProbeId,
       getSceneModel
@@ -773,11 +941,22 @@ watch(runtime.scene, scene => {
     // applying it.
     if (!probe || probe.lock) return;
 
+    const chain = findTransformChain(chains.value, probe.transformChainId);
+    // The axis path runs down the chain's depth axis; the DV path moves the
+    // whole object, so it goes through the chain's leading translation.
+    if (kind === "axis") {
+      insertProbeTipToMillimeters(
+        probe,
+        chain,
+        choice.axisTargetMillimeters,
+        currentExperiment.referenceCoordinate
+      );
+      return;
+    }
     setProbeTipMillimeters(
       probe,
-      kind === "axis"
-        ? choice.axisTargetMillimeters
-        : choice.dorsoventralTargetMillimeters,
+      chain,
+      choice.dorsoventralTargetMillimeters,
       currentExperiment.referenceCoordinate
     );
   });
@@ -791,8 +970,69 @@ watch(isScaleGizmoAvailable, available => {
   if (!available && gizmoMode.value === "scale") gizmoMode.value = "position";
 });
 
-// Configure the gizmos from the control bar and keep the probe and scene
-// object drag observers on them.
+// Build the chain gizmo for the current scene, reporting its drags the same way
+// the gizmo manager's own drags are reported.
+watch(
+  runtime.gizmoManager,
+  gizmoManager => {
+    if (!gizmoManager) return;
+
+    const gizmo = createTransformChainGizmo(gizmoManager.utilityLayer, {
+      onDrag: () => {
+        const selected = currentExperiment.selectedInspectable;
+        if (selected?.inspectableKind === "probe") {
+          currentExperiment.draggedProbeId = selected.id;
+          return;
+        }
+        if (selected?.inspectableKind === "sceneObject") {
+          currentExperiment.draggedSceneObjectId = selected.id;
+        }
+      },
+      // Both no-op unless that kind was the one being dragged, so a released
+      // handle records exactly one history point.
+      onDragEnd: () => {
+        currentExperiment.endProbeDrag();
+        currentExperiment.endSceneObjectDrag();
+      }
+    });
+    chainGizmo.value = gizmo;
+
+    onWatcherCleanup(() => {
+      gizmo.dispose();
+      chainGizmo.value = null;
+    });
+  },
+  { immediate: true }
+);
+
+// Aim the chain gizmo at the selection. Reading every input keeps the handles
+// glued to the object as it moves, including during their own drags.
+watchEffect(() => {
+  const gizmo = chainGizmo.value;
+  const scene = runtime.scene.value;
+  if (!gizmo || !scene) return;
+
+  const group = activeInputGroup.value;
+  gizmo.setTarget(group ? resolveChainGizmoTarget(scene, group) : null);
+});
+
+// Fall back to the other coordinate space when the active one drives nothing in
+// the selection's chain, so the toolbar never sits on a dead option.
+watchEffect(() => {
+  const group = activeInputGroup.value;
+  const chain = selectedChain.value;
+  if (!group || !chain || isInputGroupBound(chain, group)) return;
+
+  const isRotation = gizmoMode.value === "rotation";
+  const otherSpace =
+    gizmoCoordinateSpace.value === "local" ? "global" : "local";
+  if (isInputGroupBound(chain, inputGroupOf(isRotation, otherSpace))) {
+    gizmoCoordinateSpace.value = otherSpace;
+  }
+});
+
+// Keep the scale gizmo, the only one the gizmo manager still exposes, wired to
+// the scene objects and body models it can scale.
 watch(
   [
     runtime.gizmoManager,
@@ -804,93 +1044,41 @@ watch(
   ([gizmoManager, probes, sceneObjects, mode, coordinateSpace]) => {
     if (!gizmoManager) return;
 
-    const gizmos = setGizmoControls(gizmoManager, mode, coordinateSpace);
-    if (!gizmos) return;
+    const scaleGizmo = setGizmoControls(gizmoManager, mode, coordinateSpace);
+    if (!scaleGizmo) return;
 
-    const probePositionDraggingObserver = setProbePositionFromGizmoDrag(
-      gizmos.positionGizmo,
-      probes,
-      probeId => {
-        currentExperiment.draggedProbeId = probeId;
-      }
-    );
-    const probeRotationDraggingObserver = setProbeRotationFromGizmoDrag(
-      gizmos.rotationGizmo,
-      probes,
-      probeId => {
-        currentExperiment.draggedProbeId = probeId;
-      }
-    );
-    const probeDragEndObservers = endProbeGizmoDrag(gizmos, () => {
-      currentExperiment.endProbeDrag();
-    });
-
-    const sceneObjectPositionDraggingObserver =
-      setSceneObjectPositionFromGizmoDrag(
-        gizmos.positionGizmo,
-        sceneObjects,
-        sceneObjectId => {
-          currentExperiment.draggedSceneObjectId = sceneObjectId;
-        }
-      );
-    const sceneObjectRotationDraggingObserver =
-      setSceneObjectRotationFromGizmoDrag(
-        gizmos.rotationGizmo,
-        sceneObjects,
-        sceneObjectId => {
-          currentExperiment.draggedSceneObjectId = sceneObjectId;
-        }
-      );
     const sceneObjectScaleDraggingObserver = setSceneObjectScaleFromGizmoDrag(
-      gizmos.scaleGizmo,
+      scaleGizmo,
       sceneObjects,
       sceneObjectId => {
         currentExperiment.draggedSceneObjectId = sceneObjectId;
       }
     );
-    const sceneObjectDragEndObservers = endSceneObjectGizmoDrag(gizmos, () => {
-      currentExperiment.endSceneObjectDrag();
-    });
-
-    const bodyModelPositionDraggingObserver =
-      setProbeBodyModelPositionFromGizmoDrag(
-        gizmos.positionGizmo,
-        probes,
-        probeId => {
-          currentExperiment.draggedProbeId = probeId;
-        }
-      );
-    const bodyModelRotationDraggingObserver =
-      setProbeBodyModelRotationFromGizmoDrag(
-        gizmos.rotationGizmo,
-        probes,
-        probeId => {
-          currentExperiment.draggedProbeId = probeId;
-        }
-      );
+    const sceneObjectDragEndObserver = endSceneObjectGizmoDrag(
+      scaleGizmo,
+      () => {
+        currentExperiment.endSceneObjectDrag();
+      }
+    );
     const bodyModelScaleDraggingObserver = setProbeBodyModelScaleFromGizmoDrag(
-      gizmos.scaleGizmo,
+      scaleGizmo,
       probes,
       probeId => {
         currentExperiment.draggedProbeId = probeId;
       }
     );
-    const bodyModelDragEndObservers = endProbeBodyModelGizmoDrag(gizmos, () => {
-      currentExperiment.endProbeDrag();
-    });
+    const bodyModelDragEndObserver = endProbeBodyModelGizmoDrag(
+      scaleGizmo,
+      () => {
+        currentExperiment.endProbeDrag();
+      }
+    );
 
     onWatcherCleanup(() => {
-      probePositionDraggingObserver.remove();
-      probeRotationDraggingObserver.remove();
-      probeDragEndObservers.forEach(observer => observer.remove());
-      sceneObjectPositionDraggingObserver.remove();
-      sceneObjectRotationDraggingObserver.remove();
       sceneObjectScaleDraggingObserver.remove();
-      sceneObjectDragEndObservers.forEach(observer => observer.remove());
-      bodyModelPositionDraggingObserver.remove();
-      bodyModelRotationDraggingObserver.remove();
+      sceneObjectDragEndObserver.remove();
       bodyModelScaleDraggingObserver.remove();
-      bodyModelDragEndObservers.forEach(observer => observer.remove());
+      bodyModelDragEndObserver.remove();
     });
   }
 );
@@ -1010,18 +1198,7 @@ onUnmounted(() => {
         <q-btn-toggle
           v-model="gizmoCoordinateSpace"
           :aria-label="$t('sceneCanvas.gizmoCoordinateSpace')"
-          :options="[
-            {
-              label: $t('sceneCanvas.gizmoLocal'),
-              value: 'local',
-              icon: 'sym_o_nearby'
-            },
-            {
-              label: $t('sceneCanvas.gizmoGlobal'),
-              value: 'global',
-              icon: 'sym_o_globe'
-            }
-          ]"
+          :options="gizmoCoordinateSpaceOptions"
           toggle-color="primary"
         />
       </q-card-section>

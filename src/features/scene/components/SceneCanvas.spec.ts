@@ -20,6 +20,7 @@ import type {
 } from "@babylonjs/core";
 import {
   ArcRotateCamera,
+  GizmoCoordinatesMode,
   Matrix,
   Observable,
   PointerEventTypes,
@@ -71,10 +72,11 @@ import {
   makeProbeInterfaceProbe,
   makeSceneModel,
   makeSceneObject,
-  makeTerminologyRows
+  makeTerminologyRows,
+  makeTransformInputs
 } from "@/test/fixtures";
 import { getProbeTransformNode } from "../api/probe.api";
-import { asrToVector3, vector3ToAsr } from "../api/coordinate-transforms.api";
+import { asrToVector3 } from "../api/coordinate-transforms.api";
 import {
   buildProbeSurfacePaths,
   disposeProbeSurfacePaths
@@ -263,6 +265,17 @@ async function setAxisGuidesVisible(visible: boolean) {
 function axisGuidePickMeshCount(scene: Scene): number {
   return scene.meshes.filter(mesh => mesh.name.startsWith("axisGuidePick_"))
     .length;
+}
+
+/**
+ * The chain gizmo's handle anchors, one per handle it currently shows. Their
+ * local pose is the handle's own origin and axis in the object's frame.
+ * @param scene Scene the anchors are built in.
+ */
+function chainGizmoAnchors(scene: Scene): TransformNode[] {
+  return scene.transformNodes.filter(({ name }) =>
+    name.startsWith("transform_chain_gizmo_anchor")
+  );
 }
 
 describe("SceneCanvas", () => {
@@ -772,7 +785,7 @@ describe("SceneCanvas", () => {
   );
 
   it(
-    "drags and selects a probe in a new experiment after the old one is " +
+    "targets and selects a probe in a new experiment after the old one is " +
       "replaced, not the discarded one",
     async () => {
       const { runtime } = await mountCanvas();
@@ -821,40 +834,57 @@ describe("SceneCanvas", () => {
       const gizmoManager = runtime.gizmoManager.value!;
       const newNode = getProbeTransformNode(scene, newProbe.id)!;
 
-      gizmoManager.attachToNode(newNode);
-      newNode.position.set(1, 2, 3);
-      gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-        {} as never
+      // The pick path must resolve against the current experiment's probes.
+      gizmoManager.onAttachedToMeshObservable.notifyObservers(
+        newNode.getChildMeshes()[0]!
       );
+      await flushPromises();
 
-      expect(newProbe.tipPosition).not.toEqual([0, 0, 0]);
-      expect(store.draggedProbeId).toBe(newProbe.id);
+      expect(store.selectedInspectable).toMatchObject({ id: newProbe.id });
+      // Handles for the new probe, framed by its own parent.
+      const anchors = chainGizmoAnchors(scene);
+      expect(anchors).toHaveLength(1);
+      expect(anchors.every(anchor => anchor.parent === newNode.parent)).toBe(
+        true
+      );
     }
   );
 
-  it("propagates a rotation drag after switching to the rotation gizmo", async () => {
+  it("moves the handles onto the pivot the rotation is applied at, in either space", async () => {
     const { wrapper, runtime } = await mountCanvas();
     const store = useCurrentExperimentStore();
 
-    const contour = [
-      [-11, 9989],
-      [-11, -11],
-      [24, -220],
-      [59, -11],
-      [59, 9989]
-    ];
     const probeInterfaceProbe = makeProbeInterfaceProbe({
-      probe_planar_contour: contour
+      probe_planar_contour: [
+        [-11, 9989],
+        [-11, -11],
+        [24, -220],
+        [59, -11],
+        [59, 9989]
+      ]
     });
     internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
     const builtProbe = makeProbe({
-      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+      probeInterfaceIdentifier:
+        getProbeInterfaceIdentifier(probeInterfaceProbe),
+      // A probe driven 5mm up its own axis, so its origin and the frame its
+      // local rotation pivots on are different points.
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 2, 3],
+        localTranslation: [5, 0, 0]
+      })
     });
     addProbe(store.experiment, builtProbe);
     const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
-    await flushPromises();
     store.selectedInspectable = probe;
     await flushPromises();
+
+    const scene = runtime.scene.value!;
+    // Position in the default local space: the default chain drives the depth
+    // axis alone, so one arrow, on the probe's own origin.
+    expect(
+      chainGizmoAnchors(scene).map(({ position }) => position.asArray())
+    ).toEqual([[3, 2, 6]]);
 
     const modeToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -862,66 +892,39 @@ describe("SceneCanvas", () => {
     await modeToggle.vm.$emit("update:modelValue", "rotation");
     await flushPromises();
 
-    const scene = runtime.scene.value!;
-    const gizmoManager = runtime.gizmoManager.value!;
-    const node = getProbeTransformNode(scene, probe.id)!;
+    // Rotation: the default chain rolls the probe about its own depth axis
+    // before driving it in, so its ring pivots on the global translation the
+    // local translation moved the probe away from.
+    const spaceToggle = wrapper
+      .findAllComponents({ name: "QBtnToggle" })
+      .find(toggle => toggle.props("modelValue") === "local")!;
+    expect(spaceToggle.exists()).toBe(true);
+    expect(
+      chainGizmoAnchors(scene).map(({ position }) => position.asArray())
+    ).toEqual([[3, 2, 1]]);
 
-    gizmoManager.attachToNode(node);
-    node.rotation.set(0.1, 0.2, 0.3);
-    gizmoManager.gizmos.rotationGizmo!.onDragObservable.notifyObservers(
-      {} as never
-    );
+    await spaceToggle.vm.$emit("update:modelValue", "global");
+    await flushPromises();
 
-    expect(probe.rotation).toEqual(vector3ToAsr(node.rotation));
-    expect(store.draggedProbeId).toBe(probe.id);
-
-    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.notifyObservers(
-      {} as never
-    );
-
-    expect(store.draggedProbeId).toBeNull();
+    // The global space shows the two angles that aim the probe, pivoting on the
+    // same point.
+    expect(
+      chainGizmoAnchors(scene).map(({ position }) => position.asArray())
+    ).toEqual([
+      [3, 2, 1],
+      [3, 2, 1]
+    ]);
   });
 
-  it("collapses a full drag-then-release cycle into one undoable step", async () => {
+  it("shows no handles for a locked probe", async () => {
     const { runtime } = await mountCanvas();
     const store = useCurrentExperimentStore();
-
-    const contour = [
-      [-11, 9989],
-      [-11, -11],
-      [24, -220],
-      [59, -11],
-      [59, 9989]
-    ];
-    const probeInterfaceProbe = makeProbeInterfaceProbe({
-      probe_planar_contour: contour
-    });
-    internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
-    const builtProbe = makeProbe({
-      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
-    });
-    addProbe(store.experiment, builtProbe);
-    const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
+    const probe = makeProbe({ lock: true });
+    addProbe(store.experiment, probe);
+    store.selectedInspectable = store.experiment.probes[0]!;
     await flushPromises();
 
-    const scene = runtime.scene.value!;
-    const gizmoManager = runtime.gizmoManager.value!;
-    const node = getProbeTransformNode(scene, probe.id)!;
-    const positionGizmo = gizmoManager.gizmos.positionGizmo!;
-
-    gizmoManager.attachToNode(node);
-    node.position.set(1, 0, 0);
-    positionGizmo.onDragObservable.notifyObservers({} as never);
-    await flushPromises();
-    node.position.set(2, 0, 0);
-    positionGizmo.onDragObservable.notifyObservers({} as never);
-    await flushPromises();
-    positionGizmo.onDragEndObservable.notifyObservers({} as never);
-    await flushPromises();
-    store.undo();
-
-    const restoredProbe = store.probes.find(p => p.id === builtProbe.id)!;
-    expect(restoredProbe.tipPosition).toEqual([0, 0, 0]);
+    expect(chainGizmoAnchors(runtime.scene.value!)).toHaveLength(0);
   });
 
   it("streams the camera's pose live and collapses the movement into one undoable step", async () => {
@@ -947,11 +950,17 @@ describe("SceneCanvas", () => {
     expect(store.cameraPose.alpha).toBe(alphaBefore);
   });
 
-  it("keeps the position gizmo on the probe in global coordinates", async () => {
+  it("leaves the manager's translation and rotation gizmos off, tracking only the coordinate space", async () => {
     const { wrapper, runtime } = await mountCanvas();
     const store = useCurrentExperimentStore();
     store.selectedInspectable = makeProbe();
     await flushPromises();
+
+    const gizmoManager = runtime.gizmoManager.value!;
+
+    expect(gizmoManager.positionGizmoEnabled).toBe(false);
+    expect(gizmoManager.rotationGizmoEnabled).toBe(false);
+    expect(gizmoManager.coordinatesMode).toBe(GizmoCoordinatesMode.Local);
 
     const coordinateSpaceToggle = wrapper
       .findAllComponents({ name: "QBtnToggle" })
@@ -959,18 +968,45 @@ describe("SceneCanvas", () => {
     await coordinateSpaceToggle.vm.$emit("update:modelValue", "global");
     await flushPromises();
 
-    const gizmoManager = runtime.gizmoManager.value!;
+    expect(gizmoManager.coordinatesMode).toBe(GizmoCoordinatesMode.World);
+    expect(gizmoManager.positionGizmoEnabled).toBe(false);
+    expect(gizmoManager.rotationGizmoEnabled).toBe(false);
+  });
 
-    expect(
-      gizmoManager.gizmos.positionGizmo!.updateGizmoPositionToMatchAttachedMesh
-    ).toBe(true);
-    // `PositionGizmo`'s own `updateGizmoRotationToMatchAttachedMesh` getter
-    // does not reflect `coordinatesMode` (Babylon only keeps the per-axis
-    // `xGizmo` in sync), so assert on that instead.
-    expect(
-      gizmoManager.gizmos.positionGizmo!.xGizmo
-        .updateGizmoRotationToMatchAttachedMesh
-    ).toBe(false);
+  it("disables a coordinate space whose inputs the selection's chain never reads", async () => {
+    const { wrapper } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    const preferences = usePreferencesStore();
+    preferences.transformChains = [
+      {
+        id: "global-only",
+        name: "Global only",
+        isBuiltIn: false,
+        steps: [
+          {
+            kind: "translation",
+            arguments: [
+              { group: "globalTranslation", component: 0 },
+              { group: "globalTranslation", component: 1 },
+              { group: "globalTranslation", component: 2 }
+            ]
+          }
+        ],
+        depthAxis: null
+      }
+    ];
+    store.selectedInspectable = makeProbe({ transformChainId: "global-only" });
+    await flushPromises();
+
+    const spaceOptions = wrapper
+      .findAllComponents({ name: "QBtnToggle" })
+      .find(toggle => toggle.props("modelValue") === "global")!
+      .props("options") as { value: string; disable: boolean }[];
+
+    expect(spaceOptions).toMatchObject([
+      { value: "local", disable: true },
+      { value: "global", disable: false }
+    ]);
   });
 
   it("hides the gizmo toolbar while nothing is selected", async () => {
@@ -1035,19 +1071,18 @@ describe("SceneCanvas", () => {
     expect(modeToggle.props("modelValue")).toBe("position");
   });
 
-  it("drags the body model gizmo without moving the probe, and undoes the release as one step", async () => {
+  it("targets the body model's node while its gizmo is attached, and the probe's own node otherwise", async () => {
     const { runtime } = await mountCanvas();
     const store = useCurrentExperimentStore();
 
-    const contour = [
-      [-11, 9989],
-      [-11, -11],
-      [24, -220],
-      [59, -11],
-      [59, 9989]
-    ];
     const probeInterfaceProbe = makeProbeInterfaceProbe({
-      probe_planar_contour: contour
+      probe_planar_contour: [
+        [-11, 9989],
+        [-11, -11],
+        [24, -220],
+        [59, -11],
+        [59, 9989]
+      ]
     });
     internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
     const builtProbe = makeProbe({
@@ -1058,11 +1093,9 @@ describe("SceneCanvas", () => {
     addProbe(store.experiment, builtProbe);
     const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
     store.selectedInspectable = probe;
-    store.bodyModelGizmoProbeId = probe.id;
     await flushPromises();
 
     const scene = runtime.scene.value!;
-    const gizmoManager = runtime.gizmoManager.value!;
     const probeNode = getProbeTransformNode(scene, probe.id)!;
     const bodyModelNode = new TransformNode(
       `${probe.id}_probe_body-model_node`,
@@ -1070,27 +1103,20 @@ describe("SceneCanvas", () => {
     );
     bodyModelNode.parent = probeNode;
 
-    gizmoManager.attachToNode(bodyModelNode);
-    bodyModelNode.position.set(1, 2, 3);
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as never
-    );
+    // Without the body model gizmo the handles frame the probe itself.
+    expect(
+      chainGizmoAnchors(scene).every(
+        anchor => anchor.parent === probeNode.parent
+      )
+    ).toBe(true);
 
-    expect(probe.bodyModel!.position).toEqual([1, 2, 3]);
-    expect(probe.tipPosition).toEqual([0, 0, 0]);
-    expect(store.draggedProbeId).toBe(probe.id);
-
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.notifyObservers(
-      {} as never
-    );
+    store.bodyModelGizmoProbeId = probe.id;
     await flushPromises();
 
-    expect(store.draggedProbeId).toBeNull();
-
-    store.undo();
-
-    const restoredProbe = store.probes.find(p => p.id === builtProbe.id)!;
-    expect(restoredProbe.bodyModel!.position).toEqual([0, 0, 0]);
+    // With it, the model's own depth handle frames it inside the probe's node.
+    const anchors = chainGizmoAnchors(scene);
+    expect(anchors).toHaveLength(1);
+    expect(anchors.every(anchor => anchor.parent === probeNode)).toBe(true);
   });
 
   it("offers a scale option while the body model gizmo is attached, resetting the mode on detach", async () => {
@@ -1157,8 +1183,7 @@ describe("SceneCanvas", () => {
 
       store.probeSurfaceChoice = {
         probeId: probe.id,
-        tipPosition: [...probe.tipPosition],
-        rotation: [...probe.rotation],
+        transformInputs: makeTransformInputs(),
         tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
@@ -1184,8 +1209,7 @@ describe("SceneCanvas", () => {
 
       store.probeSurfaceChoice = {
         probeId: probe.id,
-        tipPosition: [...probe.tipPosition],
-        rotation: [...probe.rotation],
+        transformInputs: makeTransformInputs(),
         tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
@@ -1193,7 +1217,7 @@ describe("SceneCanvas", () => {
       await flushPromises();
       vi.mocked(disposeProbeSurfacePaths).mockClear();
 
-      probe.tipPosition = [1, 2, 3];
+      probe.transformInputs.globalTranslation = [1, 2, 3];
       await flushPromises();
 
       expect(store.probeSurfaceChoice).toBeNull();
@@ -1213,13 +1237,8 @@ describe("SceneCanvas", () => {
 
       store.probeSurfaceChoice = {
         probeId: probe.id,
-        tipPosition: [...probe.tipPosition],
-        rotation: [...probe.rotation],
-        tipMillimeters: [
-          referenceCoordinate[0] + probe.tipPosition[0],
-          referenceCoordinate[1] + probe.tipPosition[1],
-          referenceCoordinate[2] + probe.tipPosition[2]
-        ],
+        transformInputs: makeTransformInputs(),
+        tipMillimeters: [...referenceCoordinate],
         axisTargetMillimeters: [
           referenceCoordinate[0] + 1,
           referenceCoordinate[1],
@@ -1292,7 +1311,8 @@ describe("SceneCanvas", () => {
       );
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([0, 2, 0]);
+      expect(probe.transformInputs.globalTranslation).toEqual([0, 2, 0]);
+      expect(probe.transformInputs.localTranslation).toEqual([0, 0, 0]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
   });

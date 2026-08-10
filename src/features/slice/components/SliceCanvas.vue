@@ -10,10 +10,16 @@ import {
   getProbeShanks
 } from "@/features/probe";
 import {
+  findTransformChain,
+  getTransformChainPose,
+  getTransformChains
+} from "@/features/scene";
+import {
   getVisibleStructure,
   setStructureVisibility
 } from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { usePreferencesStore } from "@/stores/preferences.store";
 import { getProbeFrame } from "../api/probe-frame.api";
 import {
   formatSliceExtentMillimeters,
@@ -34,6 +40,7 @@ const LOADING_BAR_DELAY_MILLISECONDS = 500;
 const { probe } = defineProps<{ probe: Probe }>();
 
 const currentExperiment = useCurrentExperimentStore();
+const preferences = usePreferencesStore();
 const { t } = useI18n();
 
 const square = useTemplateRef<HTMLDivElement>("square");
@@ -79,6 +86,19 @@ const settledSizePixels = computed(() =>
   getQuantizedSizePixels(width.value, pixelRatio.value)
 );
 
+/** Every transform chain the probe could be posed by. */
+const chains = computed(() => getTransformChains(preferences.transformChains));
+
+/** Transform chain mapping the probe's inputs onto its pose. */
+const chain = computed(() =>
+  findTransformChain(chains.value, probe.transformChainId)
+);
+
+/** Probe's resolved pose, relative to the experiment reference coordinate. */
+const pose = computed(() =>
+  getTransformChainPose(chain.value, probe.transformInputs)
+);
+
 /**
  * Everything that would trigger a replan, excluding the resolution scale
  * itself - feeding the scale back in would make its own change look like
@@ -87,8 +107,8 @@ const settledSizePixels = computed(() =>
 const motionKey = computed(() =>
   [
     settledSizePixels.value,
-    ...probe.tipPosition,
-    ...probe.rotation,
+    ...pose.value.position,
+    ...pose.value.rotation,
     ...currentExperiment.referenceCoordinate,
     centerHeightMillimeters.value,
     extentMillimeters.value
@@ -104,7 +124,11 @@ const sizePixels = computed(() =>
 
 const plane = computed(() => {
   if (!contour.value || sizePixels.value === 0) return null;
-  const frame = getProbeFrame(probe, currentExperiment.referenceCoordinate);
+  const frame = getProbeFrame(
+    probe,
+    chain.value,
+    currentExperiment.referenceCoordinate
+  );
   return getProbeSlicePlane(
     frame,
     centerHeightMillimeters.value,
@@ -259,9 +283,9 @@ useSliceCanvasPainter(
         />
 
         <div v-if="!contour" class="fit flex flex-center absolute-top">
-          <p class="text-caption text-weight-light">{{
-            t("slice.noContour")
-          }}</p>
+          <p class="text-caption text-weight-light">
+            {{ t("slice.noContour") }}
+          </p>
         </div>
 
         <q-tooltip v-if="hoveredStructure" model-value no-parent-event>

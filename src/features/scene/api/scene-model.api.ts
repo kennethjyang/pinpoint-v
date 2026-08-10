@@ -7,6 +7,11 @@ import {
   type UseStore
 } from "idb-keyval";
 import type { SceneModel } from "../models/scene-model.model";
+import {
+  buildTransformInputs,
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  isTransformInputs
+} from "./transform-chain.api";
 import { isFiniteTriple, isRecord } from "@/utils/type-guards";
 
 /** IndexedDB database holding scene models. */
@@ -30,11 +35,17 @@ function sceneModelStore(): UseStore {
 }
 
 /**
- * Build a scene model placed at its own origin, unrotated and unscaled.
+ * Build a scene model placed at its own origin, unrotated and unscaled, driven
+ * by the built-in default transform chain.
  * @param id Model id, also the key of its file in IndexedDB.
  */
 export function buildSceneModel(id: string): SceneModel {
-  return { id, position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] };
+  return {
+    id,
+    transformChainId: DEFAULT_TRANSFORM_CHAIN_ID,
+    transformInputs: buildTransformInputs(),
+    scale: [1, 1, 1]
+  };
 }
 
 /**
@@ -47,8 +58,9 @@ export function isSceneModel(value: unknown): value is SceneModel {
   return (
     typeof value.id === "string" &&
     value.id.length > 0 &&
-    isFiniteTriple(value.position) &&
-    isFiniteTriple(value.rotation) &&
+    typeof value.transformChainId === "string" &&
+    value.transformChainId.length > 0 &&
+    isTransformInputs(value.transformInputs) &&
     isFiniteTriple(value.scale)
   );
 }

@@ -2,6 +2,7 @@ import parse from "semver/functions/parse";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import ExportPreferences from "./ExportPreferences.vue";
+import { DEFAULT_TRANSFORM_CHAIN_ID } from "@/features/scene";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import {
   createWrapperRegistry,
@@ -89,6 +90,14 @@ function buildUploadedPreferences(overrides: Record<string, unknown> = {}) {
     probeHeadStageCutDepthMillimeters: 17.5,
     probeRodDiameterMillimeters: 8,
     probeRodLengthMillimeters: 200,
+    transformInputNames: {
+      globalTranslation: ["AP", "DV", "ML"],
+      globalRotation: ["Roll", "Yaw", "Pitch"],
+      localRotation: ["Local Roll", "Local Yaw", "Local Pitch"],
+      localTranslation: ["Local AP", "Local DV", "Local ML"]
+    },
+    transformChains: [],
+    defaultProbeChainId: DEFAULT_TRANSFORM_CHAIN_ID,
     ...overrides
   };
 }

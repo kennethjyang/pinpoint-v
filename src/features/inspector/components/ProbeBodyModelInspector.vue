@@ -1,7 +1,17 @@
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
-import type { SceneModel } from "@/features/scene";
+import {
+  findTransformChain,
+  getTransformChainLabel,
+  getTransformChains,
+  isTransformInputBound,
+  type SceneModel,
+  TRANSFORM_INPUT_GROUPS,
+  type TransformInputComponent,
+  type TransformInputGroup,
+  type TransformStepKind
+} from "@/features/scene";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
@@ -14,6 +24,34 @@ import {
   radiansToRotationUnit,
   rotationUnitToRadians
 } from "@/utils/math";
+
+/** Unit kind of each transform input group's three values. */
+const TRANSFORM_INPUT_GROUP_KINDS: Readonly<
+  Record<TransformInputGroup, TransformStepKind>
+> = {
+  globalTranslation: "translation",
+  globalRotation: "rotation",
+  localRotation: "rotation",
+  localTranslation: "translation"
+};
+
+/** Every component slot of an input group, in the order its row lists them. */
+const TRANSFORM_INPUT_COMPONENTS: readonly TransformInputComponent[] = [
+  0, 1, 2
+];
+
+/** One transform input's writable display model, paired with the slot it edits. */
+interface TransformInputField {
+  component: TransformInputComponent;
+  model: WritableComputedRef<string>;
+}
+
+/** One row of transform inputs: an input group's three fields. */
+interface TransformInputRow {
+  group: TransformInputGroup;
+  kind: TransformStepKind;
+  fields: TransformInputField[];
+}
 
 const {
   probeId,
@@ -50,51 +88,56 @@ const gizmoButtonLabel = computed(() =>
     : t("probeInspector.attachBodyModelGizmo")
 );
 
-const positionX = useNumericTupleModel(
-  () => bodyModel.position,
-  0,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const positionY = useNumericTupleModel(
-  () => bodyModel.position,
-  1,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const positionZ = useNumericTupleModel(
-  () => bodyModel.position,
-  2,
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
+/** Every transform chain the body model can be posed through. */
+const chains = computed(() => getTransformChains(preferences.transformChains));
+
+/** Chain mapping this body model's twelve transform inputs onto its pose. */
+const chain = computed(() =>
+  findTransformChain(chains.value, bodyModel.transformChainId)
 );
 
-const rotationX = useNumericTupleModel(
-  () => bodyModel.rotation,
-  0,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
+const chainOptions = computed(() =>
+  chains.value.map(candidate => ({
+    label: getTransformChainLabel(candidate, key => t(key)),
+    value: candidate.id
+  }))
 );
-const rotationY = useNumericTupleModel(
-  () => bodyModel.rotation,
-  1,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const rotationZ = useNumericTupleModel(
-  () => bodyModel.rotation,
-  2,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
+
+/**
+ * Writable display models for the body model's twelve transform inputs, one row
+ * per input group. Built up front: a composable cannot be created inside
+ * `v-for`.
+ */
+const transformInputRows: TransformInputRow[] = TRANSFORM_INPUT_GROUPS.map(
+  group => ({
+    group,
+    kind: TRANSFORM_INPUT_GROUP_KINDS[group],
+    fields: TRANSFORM_INPUT_COMPONENTS.map(component => ({
+      component,
+      model:
+        TRANSFORM_INPUT_GROUP_KINDS[group] === "rotation"
+          ? useNumericTupleModel(
+              () => bodyModel.transformInputs[group],
+              component,
+              radians =>
+                radiansToRotationUnit(radians, preferences.rotationUnit),
+              value => rotationUnitToRadians(value, preferences.rotationUnit),
+              () => preferences.decimalPrecision
+            )
+          : useNumericTupleModel(
+              () => bodyModel.transformInputs[group],
+              component,
+              millimeters =>
+                millimetersToPositionUnit(
+                  millimeters,
+                  preferences.positionUnit
+                ),
+              value =>
+                positionUnitToMillimeters(value, preferences.positionUnit),
+              () => preferences.decimalPrecision
+            )
+    }))
+  })
 );
 
 const scaleX = useNumericTupleModel(
@@ -141,70 +184,41 @@ function toggleGizmo() {
         :label="gizmoButtonLabel"
         @click="toggleGizmo"
       />
-      <div class="row q-gutter-x-sm">
-        <CommittedInput
-          v-model="positionX"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelPosition', { axis: t('axis.x') })"
-          outlined
-          :rules="numberRules"
-          :suffix="positionSuffix"
-        />
-        <CommittedInput
-          v-model="positionY"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelPosition', { axis: t('axis.y') })"
-          outlined
-          :rules="numberRules"
-          :suffix="positionSuffix"
-        />
-        <CommittedInput
-          v-model="positionZ"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelPosition', { axis: t('axis.z') })"
-          outlined
-          :rules="numberRules"
-          :suffix="positionSuffix"
-        />
-      </div>
 
-      <div class="row q-gutter-x-sm">
-        <CommittedInput
-          v-model="rotationX"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelRotation', { axis: t('axis.x') })"
-          outlined
-          :rules="numberRules"
-          :suffix="rotationSuffix"
-        />
-        <CommittedInput
-          v-model="rotationY"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelRotation', { axis: t('axis.y') })"
-          outlined
-          :rules="numberRules"
-          :suffix="rotationSuffix"
-        />
-        <CommittedInput
-          v-model="rotationZ"
-          class="col"
-          :disable="disable"
-          hide-bottom-space
-          :label="t('probeInspector.bodyModelRotation', { axis: t('axis.z') })"
-          outlined
-          :rules="numberRules"
-          :suffix="rotationSuffix"
-        />
+      <q-select
+        v-model="bodyModel.transformChainId"
+        :disable="disable"
+        emit-value
+        :label="t('probeInspector.bodyModelTransformChain')"
+        map-options
+        :options="chainOptions"
+        outlined
+      />
+
+      <div v-for="row in transformInputRows" :key="row.group">
+        <div class="text-body2 q-pb-xs">{{
+          t(`transformChain.${row.group}`)
+        }}</div>
+        <div class="row q-gutter-x-sm">
+          <CommittedInput
+            v-for="field in row.fields"
+            :key="field.component"
+            v-model="field.model.value"
+            class="col"
+            :disable="
+              disable ||
+              !isTransformInputBound(chain, {
+                group: row.group,
+                component: field.component
+              })
+            "
+            hide-bottom-space
+            :label="preferences.transformInputNames[row.group][field.component]"
+            outlined
+            :rules="numberRules"
+            :suffix="row.kind === 'rotation' ? rotationSuffix : positionSuffix"
+          />
+        </div>
       </div>
 
       <div class="row q-gutter-x-sm">

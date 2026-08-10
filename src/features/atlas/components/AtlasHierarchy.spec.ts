@@ -15,9 +15,14 @@ import { setStructureVisibility } from "@/features/experiment";
 import { getDefaultStructureIdentifiers } from "../api/hierarchy.api";
 import { getTerminologyRows } from "../api/source.api";
 import {
+  BUILT_IN_TRANSFORM_CHAINS,
+  getTransformChainPose
+} from "@/features/scene";
+import {
   makeProbe,
   makeTerminologyRow,
-  makeTerminologyRows
+  makeTerminologyRows,
+  makeTransformInputs
 } from "@/test/fixtures";
 
 /**
@@ -398,14 +403,19 @@ describe("AtlasHierarchy", () => {
     const wrapper = await mountHierarchy(scene);
     const store = useCurrentExperimentStore();
     store.experiment.referenceCoordinate = [0, 0, 0];
-    const probe = makeProbe({ tipPosition: [0, 0, 0] });
+    const probe = makeProbe();
     store.experiment.probes.push(probe);
     store.selectedInspectable = probe;
 
     await findRow(wrapper, 8).trigger("click");
     await flushPromises();
 
-    expect(probe.tipPosition).toEqual([5, 3, 8]);
+    expect(
+      getTransformChainPose(
+        BUILT_IN_TRANSFORM_CHAINS[0]!,
+        probe.transformInputs
+      ).position
+    ).toEqual([5, 3, 8]);
   });
 
   it("leaves a locked probe's tip untouched and its row not clickable", async () => {
@@ -414,7 +424,7 @@ describe("AtlasHierarchy", () => {
     const wrapper = await mountHierarchy(scene);
     const store = useCurrentExperimentStore();
     store.experiment.referenceCoordinate = [0, 0, 0];
-    const probe = makeProbe({ tipPosition: [0, 0, 0], lock: true });
+    const probe = makeProbe({ lock: true });
     store.experiment.probes.push(probe);
     store.selectedInspectable = probe;
     await wrapper.vm.$nextTick();
@@ -426,7 +436,7 @@ describe("AtlasHierarchy", () => {
     await findRow(wrapper, 8).trigger("click");
     await flushPromises();
 
-    expect(probe.tipPosition).toEqual([0, 0, 0]);
+    expect(probe.transformInputs).toEqual(makeTransformInputs());
   });
 
   it("gives no row the clickable class when nothing is selected", async () => {

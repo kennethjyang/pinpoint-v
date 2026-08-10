@@ -1,4 +1,4 @@
-import type { SceneModel } from "@/features/scene";
+import type { SceneModel, TransformInputs } from "@/features/scene";
 import type { ProbeVisibility } from "../models/visibility.model";
 
 /**
@@ -41,24 +41,21 @@ export interface Probe {
   probeInterfaceIdentifier: string;
 
   /**
-   * Internal position representation of the probe tip.
-   * - AP, DV, ML order.
-   * - ASR orientation.
-   * - Relative to the experiment's reference coordinate.
-   * - In mm.
+   * Transform chain the probe's inputs are applied through, by id. Falls back
+   * to the built-in default chain when the id names no chain the user has.
+   */
+  transformChainId: string;
+
+  /**
+   * The twelve values the probe's transform chain maps onto its pose: local
+   * and global translations in mm, local and global rotations in radians.
+   * Translation triples are AP, DV, ML in ASR orientation; rotation triples
+   * are roll, yaw, pitch on the same axes. Both are relative to the
+   * experiment's reference coordinate.
    *
    * UI may convert this information for different displays.
    */
-  tipPosition: [number, number, number];
-
-  /**
-   * Internal orientation representation of the probe.
-   * - Roll, yaw, pitch order (aligned to AP, DV, ML order
-   * where zero is electrodes facing superior and tip facing anterior).
-   * - Pivot on tip.
-   * - In radians.
-   */
-  rotation: [number, number, number];
+  transformInputs: TransformInputs;
 
   /**
    * Edge length of the inspector's slice view, in mm. Null until the user

@@ -1,4 +1,6 @@
 import type { Probe } from "@/features/probe";
+import type { TransformChain } from "@/features/scene";
+import { getTransformChainDepthDirection } from "@/features/scene";
 import { getProbeFrame } from "../api/probe-frame.api";
 import {
   findProbeSurfaceTargets,
@@ -10,6 +12,7 @@ import { useAnnotationSampler } from "./useAnnotationSampler";
 export function useProbeSurface(): {
   findTargets: (
     probe: Probe,
+    chain: TransformChain,
     referenceCoordinate: [number, number, number],
     signal?: AbortSignal
   ) => Promise<ProbeSurfaceTargets | null>;
@@ -20,11 +23,13 @@ export function useProbeSurface(): {
    * Resolve a probe's brain-surface tip targets, or null when the annotation
    * volume can't be opened.
    * @param probe Probe to find surface targets for.
+   * @param chain Transform chain mapping the probe's inputs onto its pose.
    * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
    * @param signal Aborts the in-flight sampling.
    */
   async function findTargets(
     probe: Probe,
+    chain: TransformChain,
     referenceCoordinate: [number, number, number],
     signal?: AbortSignal
   ): Promise<ProbeSurfaceTargets | null> {
@@ -32,8 +37,8 @@ export function useProbeSurface(): {
     if (!level) return null;
 
     return findProbeSurfaceTargets(
-      getProbeFrame(probe, referenceCoordinate),
-      probe.rotation[2],
+      getProbeFrame(probe, chain, referenceCoordinate),
+      getTransformChainDepthDirection(chain, probe.transformInputs),
       level,
       geometry => sampleOnce(geometry, 0, signal)
     );

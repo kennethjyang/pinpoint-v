@@ -14,6 +14,7 @@ import type { TerminologyRow } from "@/features/atlas";
 import { getTerminologyRows } from "@/features/atlas";
 import type { ProbeChannelMapWindow } from "@/features/probe";
 import { getProbeContour, getProbeShanks } from "@/features/probe";
+import { BUILT_IN_TRANSFORM_CHAINS } from "@/features/scene";
 import { getChannelMapWidths } from "../api/channel-map-label.api";
 import { getProbeFrame, toAtlasMillimeters } from "../api/probe-frame.api";
 import type { SampleGeometry } from "../models/sample-geometry.model";
@@ -57,6 +58,8 @@ vi.mock("@vueuse/core", async importOriginal => {
     useElementSize: () => ({ width: ref(4), height: ref(600) })
   };
 });
+
+const DEFAULT_CHAIN = BUILT_IN_TRANSFORM_CHAINS[0]!;
 
 /** A 0.07mm x 10mm single-shank contour. */
 const SINGLE_SHANK_CONTOUR = [
@@ -125,11 +128,7 @@ describe("ChannelMapCanvas", () => {
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
     const shanks = getProbeShanks(probeInterfaceProbe, contour);
-    const probe = makeProbe({
-      tipPosition: [0, 0, 0],
-      rotation: [0, 0, 0],
-      channelMapWindow
-    });
+    const probe = makeProbe({ channelMapWindow });
 
     const imageFraction =
       zoomSelection === "small" ? 1 : getChannelMapWidths(shanks).imageFraction;
@@ -149,7 +148,11 @@ describe("ChannelMapCanvas", () => {
 
   it("hands the sampler a geometry covering every shank's full extent at the measured size", () => {
     const { store, probe, contour } = mountCanvas();
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const frame = getProbeFrame(
+      probe,
+      DEFAULT_CHAIN,
+      store.referenceCoordinate
+    );
 
     expect(capturedGeometry).toEqual({
       rightMillimeters: frame.rightMillimeters,
@@ -210,7 +213,11 @@ describe("ChannelMapCanvas", () => {
 
   it("crops the sampled geometry and overlay to the probe's channel map window", () => {
     const { wrapper, store, probe } = mountCanvas({ min: 2, max: 4 });
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const frame = getProbeFrame(
+      probe,
+      DEFAULT_CHAIN,
+      store.referenceCoordinate
+    );
 
     expect(capturedGeometry!.halfHeightMillimeters).toBe(1);
     expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
@@ -241,7 +248,7 @@ describe("ChannelMapCanvas", () => {
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
     const shanks = getProbeShanks(probeInterfaceProbe, contour);
-    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
+    const probe = makeProbe();
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
@@ -280,7 +287,7 @@ describe("ChannelMapCanvas", () => {
     });
     const contour = getProbeContour(probeInterfaceProbe)!;
     const shanks = getProbeShanks(probeInterfaceProbe, contour);
-    const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
+    const probe = makeProbe();
 
     const wrapper = mountWithQuasar(ChannelMapCanvas, {
       pinia,
@@ -307,7 +314,11 @@ describe("ChannelMapCanvas", () => {
       6, 6
     ]);
 
-    const frame = getProbeFrame(probe, store.referenceCoordinate);
+    const frame = getProbeFrame(
+      probe,
+      DEFAULT_CHAIN,
+      store.referenceCoordinate
+    );
     expect(capturedGeometry!.bands[0]!.centerMillimeters).toEqual(
       toAtlasMillimeters(frame, -0.95, 5)
     );

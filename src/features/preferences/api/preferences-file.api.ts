@@ -1,5 +1,11 @@
 import type { Appearance } from "./appearance.api";
-import type { CameraProjection } from "@/features/scene";
+import {
+  type CameraProjection,
+  isTransformChain,
+  isTransformInputNames,
+  type TransformArgument,
+  type TransformChain
+} from "@/features/scene";
 import type { Preferences } from "@/stores/preferences.store";
 import type { PositionUnit, RotationUnit } from "@/utils/math";
 import { isFiniteNumber, isRecord } from "@/utils/type-guards";
@@ -150,6 +156,22 @@ function isPreferences(value: unknown): value is Preferences {
   if (typeof appearance !== "string" || !APPEARANCES.includes(appearance)) {
     return false;
   }
+  if (!isTransformInputNames(value.transformInputNames)) return false;
+  // Built-in chains are code constants, so a file may only carry user chains.
+  if (
+    !Array.isArray(value.transformChains) ||
+    !value.transformChains.every(
+      chain => isTransformChain(chain) && !chain.isBuiltIn
+    )
+  ) {
+    return false;
+  }
+  if (
+    typeof value.defaultProbeChainId !== "string" ||
+    value.defaultProbeChainId.length === 0
+  ) {
+    return false;
+  }
 
   for (const [key, [minimum, maximum]] of Object.entries(
     NUMERIC_PREFERENCE_RANGES
@@ -190,6 +212,33 @@ function pickPreferences(source: Preferences, version: string): Preferences {
     probeHeadStageLengthMillimeters: source.probeHeadStageLengthMillimeters,
     probeHeadStageCutDepthMillimeters: source.probeHeadStageCutDepthMillimeters,
     probeRodDiameterMillimeters: source.probeRodDiameterMillimeters,
-    probeRodLengthMillimeters: source.probeRodLengthMillimeters
+    probeRodLengthMillimeters: source.probeRodLengthMillimeters,
+    transformInputNames: {
+      globalTranslation: [...source.transformInputNames.globalTranslation],
+      globalRotation: [...source.transformInputNames.globalRotation],
+      localRotation: [...source.transformInputNames.localRotation],
+      localTranslation: [...source.transformInputNames.localTranslation]
+    },
+    transformChains: source.transformChains.map(copyUserTransformChain),
+    defaultProbeChainId: source.defaultProbeChainId
+  };
+}
+
+/**
+ * Copy a user chain in full, keeping its id, so nothing stays shared.
+ * @param chain Chain to copy.
+ */
+function copyUserTransformChain(chain: TransformChain): TransformChain {
+  return {
+    id: chain.id,
+    name: chain.name,
+    isBuiltIn: chain.isBuiltIn,
+    steps: chain.steps.map(step => ({
+      kind: step.kind,
+      arguments: step.arguments.map(argument =>
+        typeof argument === "number" ? argument : { ...argument }
+      ) as [TransformArgument, TransformArgument, TransformArgument]
+    })),
+    depthAxis: chain.depthAxis ? { ...chain.depthAxis } : null
   };
 }

@@ -4,7 +4,16 @@ import {
   moveInspectableToMillimeters
 } from "./inspectable.api";
 import { WORLD_INSPECTABLE } from "../models/inspectable.model";
-import { makeCameraPose, makeProbe, makeSceneObject } from "@/test/fixtures";
+import {
+  getTransformChainPose,
+  getTransformChains
+} from "./transform-chain.api";
+import {
+  makeCameraPose,
+  makeProbe,
+  makeSceneObject,
+  makeTransformInputs
+} from "@/test/fixtures";
 
 describe("isSameInspectable", () => {
   it("returns true for two probes with the same id, even with different names", () => {
@@ -55,26 +64,40 @@ describe("isSameInspectable", () => {
 describe("moveInspectableToMillimeters", () => {
   const atlasMillimeters: [number, number, number] = [10, 20, 30];
   const referenceCoordinate: [number, number, number] = [1, 2, 3];
+  const chains = getTransformChains([]);
+  const chain = chains[0]!;
 
   it("moves a probe's tip to the destination, relative to the reference coordinate", () => {
     const probe = makeProbe();
 
-    moveInspectableToMillimeters(probe, atlasMillimeters, referenceCoordinate);
-
-    expect(probe.tipPosition).toEqual([9, 18, 27]);
-  });
-
-  it("moves a scene object's position, leaving other fields untouched", () => {
-    const sceneObject = makeSceneObject({ rotation: [1, 2, 3] });
-
     moveInspectableToMillimeters(
-      sceneObject,
+      probe,
+      chains,
       atlasMillimeters,
       referenceCoordinate
     );
 
-    expect(sceneObject.position).toEqual([9, 18, 27]);
-    expect(sceneObject.rotation).toEqual([1, 2, 3]);
+    expect(
+      getTransformChainPose(chain, probe.transformInputs).position
+    ).toEqual([9, 18, 27]);
+  });
+
+  it("moves a scene object's origin, leaving its rotation inputs untouched", () => {
+    const sceneObject = makeSceneObject({
+      transformInputs: makeTransformInputs({ globalRotation: [1, 2, 3] })
+    });
+
+    moveInspectableToMillimeters(
+      sceneObject,
+      chains,
+      atlasMillimeters,
+      referenceCoordinate
+    );
+
+    expect(
+      getTransformChainPose(chain, sceneObject.transformInputs).position
+    ).toEqual([9, 18, 27]);
+    expect(sceneObject.transformInputs.globalRotation).toEqual([1, 2, 3]);
   });
 
   it("moves a camera's target, leaving its orbit untouched", () => {
@@ -82,6 +105,7 @@ describe("moveInspectableToMillimeters", () => {
 
     moveInspectableToMillimeters(
       cameraPose,
+      chains,
       atlasMillimeters,
       referenceCoordinate
     );
@@ -95,6 +119,7 @@ describe("moveInspectableToMillimeters", () => {
   it("leaves the world unchanged", () => {
     moveInspectableToMillimeters(
       WORLD_INSPECTABLE,
+      chains,
       atlasMillimeters,
       referenceCoordinate
     );

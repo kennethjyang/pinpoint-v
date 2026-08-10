@@ -22,7 +22,14 @@ import {
 import { copyCameraPose } from "./camera-pose.api";
 import { referenceRelativeToAtlas } from "./reference-coordinate.api";
 import type { Experiment } from "../models/experiment.model";
+import type { Probe } from "@/features/probe";
 import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
+import {
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  findTransformChain,
+  getTransformChainPose,
+  getTransformChains
+} from "@/features/scene";
 import {
   getAtlasCenter,
   getAtlasDimensionsMillimeters
@@ -32,8 +39,45 @@ import {
   makeCameraPose,
   makeManifest,
   makeProbe,
-  makeProbeInterfaceProbe
+  makeProbeInterfaceProbe,
+  makeTransformInputs
 } from "@/test/fixtures";
+
+/** Chains available to the specs: the built-ins, with no user chains. */
+const CHAINS = getTransformChains([]);
+
+/**
+ * Resolve a probe's tip in atlas ASR mm, through its chain and the
+ * experiment's reference coordinate.
+ * @param experiment Experiment holding the probe.
+ * @param probe Probe to resolve the tip of.
+ */
+function resolveProbeTip(
+  experiment: Experiment,
+  probe: Probe
+): [number, number, number] {
+  return referenceRelativeToAtlas(
+    experiment.referenceCoordinate,
+    getTransformChainPose(
+      findTransformChain(CHAINS, probe.transformChainId),
+      probe.transformInputs
+    ).position
+  );
+}
+
+/**
+ * Assert an ASR triple matches an expected triple within float tolerance.
+ * @param actual Triple to check.
+ * @param expected Triple to match.
+ */
+function expectCloseTriple(
+  actual: [number, number, number],
+  expected: [number, number, number]
+) {
+  for (const axis of [0, 1, 2] as const) {
+    expect(actual[axis]).toBeCloseTo(expected[axis]);
+  }
+}
 
 describe("buildExperiment", () => {
   it("returns a new experiment with the given name, atlas, and reference coordinate", () => {
@@ -450,7 +494,7 @@ describe("getInternedProbeInterfaceProbe", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
     const spec = makeProbeInterfaceProbe({ si_units: "mm" });
     internProbeInterfaceProbe(experiment, spec);
-    const probe = buildProbe(spec);
+    const probe = buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID);
 
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toEqual(spec);
   });
@@ -663,7 +707,7 @@ describe("setExperimentProperties", () => {
     const experiment = buildExperiment("Old", makeAtlas(), [0, 0, 0]);
     const atlas = makeAtlas({ name: "allen_human" });
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "  New Name  ",
       atlas,
       referenceCoordinate: [1, 2, 3],
@@ -679,7 +723,7 @@ describe("setExperimentProperties", () => {
     const experiment = buildExperiment("Old", makeAtlas(), [0, 0, 0]);
     const referenceCoordinate: [number, number, number] = [1, 2, 3];
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New",
       atlas: makeAtlas(),
       referenceCoordinate,
@@ -698,7 +742,7 @@ describe("setExperimentProperties", () => {
       { id: 3, isTransparent: false }
     ];
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New",
       atlas: makeAtlas({ name: "allen_human" }),
       referenceCoordinate: [0, 0, 0],
@@ -719,7 +763,7 @@ describe("setExperimentProperties", () => {
       { id: 3, isTransparent: false }
     ];
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New",
       atlas: makeAtlas({ source: "https://other.test" }),
       referenceCoordinate: [0, 0, 0],
@@ -740,7 +784,7 @@ describe("setExperimentProperties", () => {
       { id: 3, isTransparent: false }
     ];
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New",
       atlas: makeAtlas(),
       referenceCoordinate: [0, 0, 0],
@@ -757,38 +801,59 @@ describe("setExperimentProperties", () => {
   it("shifts every probe tip and the camera target to compensate a reference coordinate move on the same atlas", () => {
     const atlas = makeAtlas();
     const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
-    const probe = buildProbe(makeProbeInterfaceProbe());
-    probe.tipPosition = [2, 0, 0];
-    addProbe(experiment, probe);
-    const previousTip = referenceRelativeToAtlas(
-      experiment.referenceCoordinate,
-      probe.tipPosition
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      DEFAULT_TRANSFORM_CHAIN_ID
     );
+    probe.transformInputs.globalTranslation = [2, 0, 0];
+    addProbe(experiment, probe);
+    const previousTip = resolveProbeTip(experiment, probe);
     const previousTarget = referenceRelativeToAtlas(
       experiment.referenceCoordinate,
       experiment.cameraPose.target
     );
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: experiment.name,
       atlas,
       referenceCoordinate: [1, 0, 0],
       defaultStructureIdentifiers: []
     });
 
-    expect(probe.tipPosition).toEqual([1, 0, 0]);
-    expect(
-      referenceRelativeToAtlas(
-        experiment.referenceCoordinate,
-        probe.tipPosition
-      )
-    ).toEqual(previousTip);
+    expectCloseTriple(probe.transformInputs.globalTranslation, [1, 0, 0]);
+    expectCloseTriple(resolveProbeTip(experiment, probe), previousTip);
     expect(
       referenceRelativeToAtlas(
         experiment.referenceCoordinate,
         experiment.cameraPose.target
       )
     ).toEqual(previousTarget);
+  });
+
+  it("keeps a probe carrying a local translation at the same atlas tip when the reference coordinate moves", () => {
+    const atlas = makeAtlas();
+    const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
+    const probe = makeProbe({
+      transformInputs: makeTransformInputs({
+        globalTranslation: [2, 1, 0],
+        globalRotation: [0, 0, Math.PI / 2],
+        localTranslation: [1.5, 0, 0]
+      })
+    });
+    addProbe(experiment, probe);
+    const previousTip = resolveProbeTip(experiment, probe);
+
+    setExperimentProperties(experiment, CHAINS, {
+      name: experiment.name,
+      atlas,
+      referenceCoordinate: [0.5, -1, 2],
+      defaultStructureIdentifiers: []
+    });
+
+    expectCloseTriple(resolveProbeTip(experiment, probe), previousTip);
+    // Only the global translation absorbs the shift; the insertion depth the
+    // local translation holds is left alone.
+    expectCloseTriple(probe.transformInputs.localTranslation, [1.5, 0, 0]);
   });
 
   it("re-frames the camera pose's radius and target when the atlas changes, leaving alpha/beta and cameraPoses untouched", () => {
@@ -802,7 +867,7 @@ describe("setExperimentProperties", () => {
       manifest: makeManifest({ shape: [[1000, 320, 456]] })
     });
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New",
       atlas: newAtlas,
       referenceCoordinate: [0, 0, 0],
@@ -818,22 +883,30 @@ describe("setExperimentProperties", () => {
     expect(experiment.cameraPoses).toEqual([savedPose]);
   });
 
-  it("leaves every probe's tipPosition byte-identical when the atlas changes with a re-seeded reference coordinate", () => {
+  it("leaves every probe's transform inputs byte-identical when the atlas changes with a re-seeded reference coordinate", () => {
     const atlas = makeAtlas();
     const experiment = buildExperiment("Exp", atlas, [5.7, 0.44, 5.4]);
-    const probe = buildProbe(makeProbeInterfaceProbe());
-    probe.tipPosition = [2, 0, 0];
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      DEFAULT_TRANSFORM_CHAIN_ID
+    );
+    probe.transformInputs.globalTranslation = [2, 0, 0];
     addProbe(experiment, probe);
     const newAtlas = makeAtlas({ name: "allen_human" });
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: experiment.name,
       atlas: newAtlas,
       referenceCoordinate: [116.5, 94.5, 98.5],
       defaultStructureIdentifiers: []
     });
 
-    expect(probe.tipPosition).toEqual([2, 0, 0]);
+    expect(probe.transformInputs).toEqual(
+      makeTransformInputs({
+        globalTranslation: [2, 0, 0],
+        globalRotation: [0, 0, Math.PI / 2]
+      })
+    );
     expect(experiment.referenceCoordinate).toEqual([116.5, 94.5, 98.5]);
   });
 
@@ -846,7 +919,7 @@ describe("setExperimentProperties", () => {
       experiment.cameraPose.target
     );
 
-    setExperimentProperties(experiment, {
+    setExperimentProperties(experiment, CHAINS, {
       name: "New Name",
       atlas,
       referenceCoordinate: experiment.referenceCoordinate,

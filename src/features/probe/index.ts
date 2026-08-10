@@ -12,6 +12,7 @@ export {
   rotateProbeVisibility,
   homeProbe,
   setProbeTipMillimeters,
+  insertProbeTipToMillimeters,
   isProbeSurfaceChoiceCurrent,
   copyProbe,
   toggleProbeLock,

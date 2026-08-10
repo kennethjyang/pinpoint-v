@@ -10,7 +10,12 @@ import {
 import type { VisibleStructure } from "../models/visible-structure.model";
 import type { Experiment } from "../models/experiment.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
-import type { SceneObject } from "@/features/scene";
+import type { SceneObject, TransformChain } from "@/features/scene";
+import {
+  findTransformChain,
+  getTransformChainPose,
+  moveTransformChainOrigin
+} from "@/features/scene";
 import {
   detachProbeInterfaceProbe,
   detachProbeInterfaceProbes,
@@ -74,11 +79,13 @@ export function cloneExperiment(experiment: Experiment): Experiment {
  * Commit edited properties onto an experiment in place, re-seeding the shown
  * structures when the atlas changed since their identifiers are atlas-specific.
  * @param experiment Experiment to update.
+ * @param chains Transform chains the probes' inputs drive, for re-deriving tips.
  * @param properties Name, atlas, reference coordinate, and default structure
  * identifiers to commit.
  */
 export function setExperimentProperties(
   experiment: Experiment,
+  chains: readonly TransformChain[],
   properties: {
     name: string;
     atlas: Atlas;
@@ -107,24 +114,34 @@ export function setExperimentProperties(
     return;
   }
 
-  moveReferenceCoordinate(experiment, referenceCoordinate);
+  moveReferenceCoordinate(experiment, chains, referenceCoordinate);
 }
 
 /**
  * Move an experiment's reference coordinate within one atlas, re-deriving every
  * probe tip and the camera target so they stay at the same atlas coordinate.
  * @param experiment Experiment to move the reference coordinate of.
+ * @param chains Transform chains the probes' inputs drive.
  * @param referenceCoordinate New reference coordinate, in atlas ASR mm.
  */
 function moveReferenceCoordinate(
   experiment: Experiment,
+  chains: readonly TransformChain[],
   referenceCoordinate: [number, number, number]
 ) {
   const previous = experiment.referenceCoordinate;
   for (const probe of experiment.probes) {
-    probe.tipPosition = atlasToReferenceRelative(
-      referenceCoordinate,
-      referenceRelativeToAtlas(previous, probe.tipPosition)
+    const chain = findTransformChain(chains, probe.transformChainId);
+    moveTransformChainOrigin(
+      probe.transformInputs,
+      chain,
+      atlasToReferenceRelative(
+        referenceCoordinate,
+        referenceRelativeToAtlas(
+          previous,
+          getTransformChainPose(chain, probe.transformInputs).position
+        )
+      )
     );
   }
   experiment.cameraPose.target = atlasToReferenceRelative(

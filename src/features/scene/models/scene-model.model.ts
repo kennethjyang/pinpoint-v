@@ -1,3 +1,5 @@
+import type { TransformInputs } from "./transform-chain.model";
+
 /**
  * An arbitrary 3D model's placement. Its `id` doubles as the key of the model's
  * file bytes in IndexedDB.
@@ -7,21 +9,19 @@ export interface SceneModel {
   id: string;
 
   /**
-   * Internal position representation of the model's origin.
-   * - Scene objects: AP, DV, ML order, ASR orientation, relative to the
-   *   experiment reference coordinate, in mm.
-   * - Probe body models: Babylon local X, Y, Z, relative to the probe's
-   *   transform node, in mm.
+   * Transform chain the model's inputs are applied through, by id. Falls back
+   * to the built-in default chain when the id names no chain the user has.
    */
-  position: [number, number, number];
+  transformChainId: string;
 
   /**
-   * Internal orientation representation of the model.
-   * - Scene objects: roll, yaw, pitch order (aligned to AP, DV, ML order), in radians.
-   * - Probe body models: Babylon local X, Y, Z rotation, relative to the
-   *   probe's transform node, in radians.
+   * The twelve values the model's transform chain maps onto its pose:
+   * translations in mm, rotations in radians. Triples are ASR ordered - AP,
+   * DV, ML for translations, roll, yaw, pitch for rotations - relative to the
+   * experiment reference coordinate for a scene object, and to the probe's
+   * transform node for a probe body model.
    */
-  rotation: [number, number, number];
+  transformInputs: TransformInputs;
 
   /**
    * Internal scale representation of the model.

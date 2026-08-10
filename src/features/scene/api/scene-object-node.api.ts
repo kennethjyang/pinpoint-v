@@ -4,8 +4,6 @@ import type {
   DragStartEndEvent,
   GizmoManager,
   IGizmo,
-  IPositionGizmo,
-  IRotationGizmo,
   IScaleGizmo,
   Nullable,
   Observer,
@@ -41,7 +39,11 @@ import {
   stopNodePoseInterpolation
 } from "./pose-interpolation.api";
 import type { SceneObject } from "../models/scene-object.model";
-import type { TransformGizmos } from "../models/gizmo.model";
+import type { TransformChain } from "../models/transform-chain.model";
+import {
+  findTransformChain,
+  getTransformChainPose
+} from "./transform-chain.api";
 
 /** Suffix applied to a scene object's id to name its parenting transform node. */
 const SCENE_OBJECT_NODE_SUFFIX = sceneEntityNameSuffix("object", "node");
@@ -295,6 +297,7 @@ function isSameScale(
  * @param scene Scene holding the scene object entities.
  * @param experiment Experiment whose scene objects to sync.
  * @param gizmoManager Gizmo manager to add fresh objects' meshes to.
+ * @param chains Transform chains the objects' inputs drive.
  * @param state Load bookkeeping, mutated in place.
  * @param draggedSceneObjectId Scene object id currently under a gizmo drag, skipped for pose updates.
  * @param loadModel Loader for a scene object's stored model file.
@@ -303,6 +306,7 @@ export async function syncSceneObjects(
   scene: Scene,
   experiment: Experiment,
   gizmoManager: GizmoManager,
+  chains: readonly TransformChain[],
   state: SceneObjectSyncState,
   draggedSceneObjectId: string | null,
   loadModel: (sceneObjectId: string) => Promise<File | null>
@@ -443,8 +447,12 @@ export async function syncSceneObjects(
       }
     }
 
-    const goalPosition = asrToVector3(sceneObject.position);
-    const goalRotation = asrToVector3(sceneObject.rotation);
+    const pose = getTransformChainPose(
+      findTransformChain(chains, sceneObject.transformChainId),
+      sceneObject.transformInputs
+    );
+    const goalPosition = asrToVector3(pose.position);
+    const goalRotation = asrToVector3(pose.rotation);
     const goalScaling = asrToVector3(sceneObject.scale);
     if (isFresh) {
       node.position = goalPosition;
@@ -555,46 +563,6 @@ function attachedSceneObjectFromGizmo(
 }
 
 /**
- * Update a scene object's position from a gizmo drag.
- * @param positionGizmo Position gizmo to track dragging on.
- * @param sceneObjects Experiment scene objects to resolve the attached mesh against.
- * @param onDrag Callback invoked with the scene object id the drag is happening to.
- */
-export function setSceneObjectPositionFromGizmoDrag(
-  positionGizmo: IPositionGizmo,
-  sceneObjects: SceneObject[],
-  onDrag: (sceneObjectId: string) => void
-): Observer<DragEvent> {
-  return positionGizmo.onDragObservable.add(() => {
-    const attached = attachedSceneObjectFromGizmo(positionGizmo, sceneObjects);
-    if (!attached) return;
-    stopNodePoseInterpolation(attached.node);
-    attached.sceneObject.position = vector3ToAsr(attached.node.position);
-    onDrag(attached.sceneObject.id);
-  });
-}
-
-/**
- * Update a scene object's orientation from a gizmo drag.
- * @param rotationGizmo Rotation gizmo to track dragging on.
- * @param sceneObjects Experiment scene objects to resolve the attached mesh against.
- * @param onDrag Callback invoked with the scene object id the drag is happening to.
- */
-export function setSceneObjectRotationFromGizmoDrag(
-  rotationGizmo: IRotationGizmo,
-  sceneObjects: SceneObject[],
-  onDrag: (sceneObjectId: string) => void
-): Observer<DragEvent> {
-  return rotationGizmo.onDragObservable.add(() => {
-    const attached = attachedSceneObjectFromGizmo(rotationGizmo, sceneObjects);
-    if (!attached) return;
-    stopNodePoseInterpolation(attached.node);
-    attached.sceneObject.rotation = vector3ToAsr(attached.node.rotation);
-    onDrag(attached.sceneObject.id);
-  });
-}
-
-/**
  * Update a scene object's scale from a gizmo drag.
  * @param scaleGizmo Scale gizmo to track dragging on.
  * @param sceneObjects Experiment scene objects to resolve the attached mesh against.
@@ -615,24 +583,19 @@ export function setSceneObjectScaleFromGizmoDrag(
 }
 
 /**
- * Callback filter for when dragging finishes on a scene object, from the
- * position, rotation, or scale gizmo.
- * @param gizmos Position, rotation, and scale gizmos to track dragging on.
+ * Callback filter for when a scale drag finishes on a scene object. The
+ * transform chain gizmo reports its own drags, so only the scale gizmo is left
+ * on the gizmo manager.
+ * @param scaleGizmo Scale gizmo to track dragging on.
  * @param onDragEnd Callback invoked to confirm the scene object drag ended.
  */
 export function endSceneObjectGizmoDrag(
-  gizmos: TransformGizmos,
+  scaleGizmo: IScaleGizmo,
   onDragEnd: () => void
-): Observer<DragStartEndEvent>[] {
-  const onEnd = (gizmo: IGizmo) => () => {
-    if (!gizmo.attachedNode) return;
-    if (!isSceneEntityName(gizmo.attachedNode.name, "object")) return;
+): Observer<DragStartEndEvent> {
+  return scaleGizmo.onDragEndObservable.add(() => {
+    const node = scaleGizmo.attachedNode;
+    if (!node || !isSceneEntityName(node.name, "object")) return;
     onDragEnd();
-  };
-
-  return [
-    gizmos.positionGizmo.onDragEndObservable.add(onEnd(gizmos.positionGizmo)),
-    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo)),
-    gizmos.scaleGizmo.onDragEndObservable.add(onEnd(gizmos.scaleGizmo))
-  ];
+  });
 }

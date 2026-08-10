@@ -5,7 +5,45 @@ import {
   parsePreferencesFile,
   serializePreferences
 } from "./preferences-file.api";
+import {
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  type TransformChain
+} from "@/features/scene";
 import type { Preferences } from "@/stores/preferences.store";
+
+/**
+ * Build a user transform chain fixture, so each test only needs to override
+ * the field(s) it cares about.
+ */
+function makeUserChain(
+  overrides: Partial<TransformChain> = {}
+): TransformChain {
+  return {
+    id: "user-chain",
+    name: "Manipulator",
+    isBuiltIn: false,
+    steps: [
+      {
+        kind: "translation",
+        arguments: [
+          { group: "globalTranslation", component: 0 },
+          1.5,
+          { group: "globalTranslation", component: 2 }
+        ]
+      },
+      {
+        kind: "rotation",
+        arguments: [
+          0,
+          { group: "globalRotation", component: 1 },
+          { group: "globalRotation", component: 2 }
+        ]
+      }
+    ],
+    depthAxis: { group: "localTranslation", component: 0 },
+    ...overrides
+  };
+}
 
 /**
  * Build a fully populated `Preferences` fixture, so each test only needs to
@@ -33,6 +71,14 @@ function makePreferences(overrides: Partial<Preferences> = {}): Preferences {
     probeHeadStageCutDepthMillimeters: 17.5,
     probeRodDiameterMillimeters: 8,
     probeRodLengthMillimeters: 200,
+    transformInputNames: {
+      globalTranslation: ["AP", "DV", "ML"],
+      globalRotation: ["Roll", "Yaw", "Pitch"],
+      localRotation: ["Local Roll", "Local Yaw", "Local Pitch"],
+      localTranslation: ["Local AP", "Local DV", "Local ML"]
+    },
+    transformChains: [makeUserChain()],
+    defaultProbeChainId: DEFAULT_TRANSFORM_CHAIN_ID,
     ...overrides
   };
 }
@@ -52,13 +98,49 @@ describe("serializePreferences", () => {
     );
   });
 
-  it("writes only the twenty preference keys", () => {
+  it("writes only the twenty-three preference keys", () => {
     const fixture = { ...makePreferences(), junk: 1 } as Preferences;
 
     const keys = Object.keys(JSON.parse(serializePreferences(fixture)));
 
-    expect(keys).toHaveLength(20);
+    expect(keys).toHaveLength(23);
     expect(keys).not.toContain("junk");
+  });
+
+  it("round-trips a user chain and every input name through applyPreferences", () => {
+    const source = makePreferences({
+      transformChains: [makeUserChain({ id: "mine", name: "Arm" })],
+      defaultProbeChainId: "mine",
+      transformInputNames: {
+        globalTranslation: ["Stage X", "Stage Y", "Stage Z"],
+        globalRotation: ["Roll", "Yaw", "Pitch"],
+        localRotation: ["Local Roll", "Local Yaw", "Local Pitch"],
+        localTranslation: ["Depth", "Local DV", "Local ML"]
+      }
+    });
+    const store = makePreferences();
+
+    const parsed = parsePreferencesFile(serializePreferences(source))!;
+    applyPreferences(store, parsed, "9.9.9");
+
+    expect(store.transformChains).toEqual(source.transformChains);
+    expect(store.transformInputNames).toEqual(source.transformInputNames);
+    expect(store.defaultProbeChainId).toBe("mine");
+  });
+
+  it("shares no chain or name references with the applied source", () => {
+    const source = makePreferences();
+    const store = makePreferences({ transformChains: [] });
+
+    applyPreferences(store, source, "9.9.9");
+    source.transformChains[0]!.steps[0]!.arguments[0] = 42;
+    source.transformInputNames.globalTranslation[0] = "Renamed";
+
+    expect(store.transformChains[0]!.steps[0]!.arguments[0]).toEqual({
+      group: "globalTranslation",
+      component: 0
+    });
+    expect(store.transformInputNames.globalTranslation[0]).toBe("AP");
   });
 });
 
@@ -173,6 +255,83 @@ describe("parsePreferencesFile", () => {
     expect(parsePreferencesFile(JSON.stringify(fixture))?.version).toBe(
       "not-semver"
     );
+  });
+
+  it("accepts a well-formed user chain", () => {
+    const fixture = makePreferences();
+
+    expect(
+      parsePreferencesFile(JSON.stringify(fixture))?.transformChains
+    ).toEqual(fixture.transformChains);
+  });
+
+  it("returns null for a malformed chain", () => {
+    const fixture = makePreferences({
+      transformChains: [{ id: "broken" } as TransformChain]
+    });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a chain step argument that names no input", () => {
+    const fixture = makePreferences({
+      transformChains: [
+        makeUserChain({
+          steps: [{ kind: "translation", arguments: [0, 0] as never }]
+        })
+      ]
+    });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a chain claiming to be built in", () => {
+    const fixture = makePreferences({
+      transformChains: [makeUserChain({ isBuiltIn: true })]
+    });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null when transformChains is not an array", () => {
+    const fixture = {
+      ...makePreferences(),
+      transformChains: { id: "user-chain" }
+    };
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a blank input name", () => {
+    const fixture = makePreferences();
+    fixture.transformInputNames.globalTranslation[1] = "";
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null when an input group's names are missing", () => {
+    const fixture = makePreferences();
+    // @ts-expect-error A file missing a group is exactly what this rejects.
+    delete fixture.transformInputNames.localRotation;
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for an empty defaultProbeChainId", () => {
+    const fixture = makePreferences({ defaultProbeChainId: "" });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("accepts a defaultProbeChainId naming no chain the file carries", () => {
+    const fixture = makePreferences({
+      transformChains: [],
+      defaultProbeChainId: "missing-chain"
+    });
+
+    expect(
+      parsePreferencesFile(JSON.stringify(fixture))?.defaultProbeChainId
+    ).toBe("missing-chain");
   });
 });
 

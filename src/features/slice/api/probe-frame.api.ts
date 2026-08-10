@@ -1,6 +1,7 @@
 import { Matrix, Vector3 } from "@babylonjs/core";
 import type { Probe } from "@/features/probe";
-import { vector3ToAsr } from "@/features/scene";
+import type { TransformChain } from "@/features/scene";
+import { getTransformChainPose, vector3ToAsr } from "@/features/scene";
 
 /** A probe's shank plane in atlas ASR millimeters. */
 export interface ProbeFrame {
@@ -21,20 +22,26 @@ const PROBE_LOCAL_UP = new Vector3(0, 0, 1);
 /**
  * Resolve a probe's shank-plane frame in atlas ASR millimeters.
  * @param probe Probe to resolve.
+ * @param chain Transform chain mapping the probe's inputs onto its pose.
  * @param referenceCoordinate Experiment reference coordinate, in atlas ASR mm.
  */
 export function getProbeFrame(
   probe: Probe,
+  chain: TransformChain,
   referenceCoordinate: [number, number, number]
 ): ProbeFrame {
-  const [roll, yaw, pitch] = probe.rotation;
+  const { position, rotation } = getTransformChainPose(
+    chain,
+    probe.transformInputs
+  );
+  const [roll, yaw, pitch] = rotation;
   const basis = Matrix.RotationYawPitchRoll(yaw, pitch, roll);
 
   return {
     originMillimeters: [
-      referenceCoordinate[0] + probe.tipPosition[0],
-      referenceCoordinate[1] + probe.tipPosition[1],
-      referenceCoordinate[2] + probe.tipPosition[2]
+      referenceCoordinate[0] + position[0],
+      referenceCoordinate[1] + position[1],
+      referenceCoordinate[2] + position[2]
     ],
     rightMillimeters: vector3ToAsr(
       Vector3.TransformNormal(PROBE_LOCAL_RIGHT, basis)

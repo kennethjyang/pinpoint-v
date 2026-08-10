@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StandardMaterial } from "@babylonjs/core";
 import { Color3, Vector3 } from "@babylonjs/core";
 import type { ProbeSurfaceChoice } from "@/features/probe";
+import { makeTransformInputs } from "@/test/fixtures";
 import { makeTestScene } from "@/test/mount-helper";
 import {
   buildProbeSurfacePaths,
@@ -16,8 +17,7 @@ function makeChoice(
 ): ProbeSurfaceChoice {
   return {
     probeId: "probe-1",
-    tipPosition: [0, 0, 0],
-    rotation: [0, 0, 0],
+    transformInputs: makeTransformInputs(),
     tipMillimeters: [5, 3, 5],
     axisTargetMillimeters: [5.1, 3.2, 5],
     dorsoventralTargetMillimeters: [5, 3.5, 5],

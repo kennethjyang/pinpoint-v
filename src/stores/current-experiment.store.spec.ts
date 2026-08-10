@@ -16,7 +16,10 @@ import {
   internProbeInterfaceProbe
 } from "@/features/experiment";
 import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
-import { WORLD_INSPECTABLE } from "@/features/scene";
+import {
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  WORLD_INSPECTABLE
+} from "@/features/scene";
 import {
   makeAtlas,
   makeProbe,
@@ -258,7 +261,7 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       const persisted = JSON.parse(localStorage.getItem("current-experiment")!);
@@ -278,7 +281,10 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(firstStore.experiment, spec);
-      addProbe(firstStore.experiment, buildProbe(spec));
+      addProbe(
+        firstStore.experiment,
+        buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID)
+      );
       await nextTick();
 
       // A fresh store over the same storage simulates a page reload.
@@ -298,7 +304,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
 
       let visibilityChanges = 0;
       // `store.probes[0]` is the reactive proxy Pinia hands back, unlike the
@@ -355,7 +361,7 @@ describe("useCurrentExperimentStore", () => {
       const spec = makeProbeInterfaceProbe();
       const identifier = getProbeInterfaceIdentifier(spec);
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       store.experiment.name = "Renamed";
@@ -369,7 +375,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       store.selectedInspectable = store.probes[0]!;
@@ -408,7 +414,7 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       store.selectedInspectable = store.probes[0]!;
@@ -505,40 +511,46 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       store.draggedProbeId = store.probes[0]!.id;
-      store.probes[0]!.tipPosition = [1, 0, 0];
+      store.probes[0]!.transformInputs.globalTranslation = [1, 0, 0];
       await nextTick();
-      store.probes[0]!.tipPosition = [2, 0, 0];
+      store.probes[0]!.transformInputs.globalTranslation = [2, 0, 0];
       await nextTick();
       store.endProbeDrag();
 
-      expect(store.probes[0]!.tipPosition).toEqual([2, 0, 0]);
+      expect(store.probes[0]!.transformInputs.globalTranslation).toEqual([
+        2, 0, 0
+      ]);
 
       store.undo();
-      expect(store.probes[0]!.tipPosition).toEqual([0, 0, 0]);
+      expect(store.probes[0]!.transformInputs.globalTranslation).toEqual([
+        0, 0, 0
+      ]);
     });
 
     it("redoes a drag as one step", async () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
 
       store.draggedProbeId = store.probes[0]!.id;
-      store.probes[0]!.tipPosition = [1, 0, 0];
+      store.probes[0]!.transformInputs.globalTranslation = [1, 0, 0];
       await nextTick();
-      store.probes[0]!.tipPosition = [2, 0, 0];
+      store.probes[0]!.transformInputs.globalTranslation = [2, 0, 0];
       await nextTick();
       store.endProbeDrag();
       store.undo();
 
       store.redo();
 
-      expect(store.probes[0]!.tipPosition).toEqual([2, 0, 0]);
+      expect(store.probes[0]!.transformInputs.globalTranslation).toEqual([
+        2, 0, 0
+      ]);
     });
 
     it("records nothing when no drag was in progress", () => {
@@ -554,12 +566,12 @@ describe("useCurrentExperimentStore", () => {
       const store = useCurrentExperimentStore();
       const spec = makeProbeInterfaceProbe();
       internProbeInterfaceProbe(store.experiment, spec);
-      addProbe(store.experiment, buildProbe(spec));
+      addProbe(store.experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
       await nextTick();
       const defaultName = store.name;
 
       store.draggedProbeId = store.probes[0]!.id;
-      store.probes[0]!.tipPosition = [1, 0, 0];
+      store.probes[0]!.transformInputs.globalTranslation = [1, 0, 0];
       await nextTick();
       store.endProbeDrag();
 

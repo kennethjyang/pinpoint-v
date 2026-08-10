@@ -1,10 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import type {
-  DragEvent,
-  DragStartEndEvent,
-  Scene,
-  StandardMaterial
-} from "@babylonjs/core";
+import type { Scene, StandardMaterial } from "@babylonjs/core";
 import { Color3, TransformNode } from "@babylonjs/core";
 import type { Experiment } from "@/features/experiment";
 import {
@@ -19,7 +14,8 @@ import {
   makeProbe,
   makeProbeGeometry,
   makeProbeInterfaceProbe,
-  makeSceneModel
+  makeSceneModel,
+  makeTransformInputs
 } from "@/test/fixtures";
 import {
   initializeTestCSG2,
@@ -32,20 +28,24 @@ import {
   attachProbeSelection,
   buildProbe,
   disposeProbe,
-  endProbeGizmoDrag,
   getProbeTransformNode,
   selectProbeFromGizmoAttach,
-  setProbePositionFromGizmoDrag,
-  setProbeRotationFromGizmoDrag,
   syncProbes
 } from "./probe.api";
 import { asrToVector3, vector3ToAsr } from "./coordinate-transforms.api";
+import {
+  getTransformChainPose,
+  getTransformChains
+} from "./transform-chain.api";
 
 // The head stage is CSG2-subtracted; initialize it once for every test in
 // this file, mirroring what `babylon-runtime.service.ts` does at startup.
 beforeAll(async () => {
   await initializeTestCSG2();
 });
+
+/** Chains a probe's transform inputs resolve against: the built-in default. */
+const CHAINS = getTransformChains([]);
 
 /** Single-shank contour (imec NP1000), in micrometers. */
 const NP1000_CONTOUR = [
@@ -710,7 +710,14 @@ describe("syncProbes", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
 
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(
       scene.getMaterialByName(`${probe.id}_probe_material`)!.isFrozen
@@ -723,10 +730,24 @@ describe("syncProbes", () => {
     const { experiment, probe } = makeExperimentWithProbe({
       color: "#ff0000"
     });
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     probe.color = "#00ff00";
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const material = scene.getMaterialByName(
       `${probe.id}_probe_material`
@@ -742,13 +763,27 @@ describe("syncProbes", () => {
     const { experiment, probe } = makeExperimentWithProbe({
       color: "#ff0000"
     });
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const material = scene.getMaterialByName(`${probe.id}_probe_material`)!;
     const markDirtySpy = vi.spyOn(material, "markDirty");
 
     probe.color = "#00ff00";
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(markDirtySpy).toHaveBeenCalledWith(true);
   });
@@ -756,12 +791,26 @@ describe("syncProbes", () => {
   it("leaves a frozen probe material untouched when nothing changed", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const material = scene.getMaterialByName(`${probe.id}_probe_material`)!;
     const markDirtySpy = vi.spyOn(material, "markDirty");
 
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(markDirtySpy).not.toHaveBeenCalled();
   });
@@ -769,7 +818,14 @@ describe("syncProbes", () => {
   it("keeps the shared rod material frozen without re-freezing it when another probe is added", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const rodMaterial = scene.getMaterialByName("probe_rod_material")!;
     const markDirtySpy = vi.spyOn(rodMaterial, "markDirty");
@@ -778,7 +834,14 @@ describe("syncProbes", () => {
       probeInterfaceIdentifier: experiment.probes[0]!.probeInterfaceIdentifier
     });
     addProbe(experiment, other);
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(rodMaterial.isFrozen).toBe(true);
     expect(markDirtySpy).not.toHaveBeenCalled();
@@ -787,7 +850,14 @@ describe("syncProbes", () => {
   it("returns the ids of probes it disposed and rebuilt due to a type change", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const oldNode = getProbeTransformNode(scene, probe.id)!;
 
     const newProbeInterfaceProbe = makeProbeInterfaceProbe({
@@ -803,6 +873,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -819,7 +890,14 @@ describe("syncProbes", () => {
       {},
       { probe_planar_contour: NP2020_CONTOUR }
     );
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const oldNode = getProbeTransformNode(scene, probe.id)!;
 
     probe.shankAlignmentIndex = 0;
@@ -828,6 +906,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -841,7 +920,14 @@ describe("syncProbes", () => {
   it("returns the ids of probes it disposed and rebuilt due to a body model being attached, then removed", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const builtNode = getProbeTransformNode(scene, probe.id)!;
 
     probe.bodyModel = makeSceneModel();
@@ -849,6 +935,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -862,6 +949,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -874,7 +962,14 @@ describe("syncProbes", () => {
   it("disposes and rebuilds a probe node whose metadata is null", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const oldNode = getProbeTransformNode(scene, probe.id)!;
     oldNode.metadata = null;
 
@@ -882,6 +977,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -895,12 +991,20 @@ describe("syncProbes", () => {
   it("does not report a probe as rebuilt when nothing changed", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const rebuilt = syncProbes(
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -911,10 +1015,17 @@ describe("syncProbes", () => {
   it("returns the ids of probes it disposed and rebuilt due to a geometry change", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const oldNode = getProbeTransformNode(scene, probe.id)!;
 
-    const rebuilt = syncProbes(scene, experiment, gizmoManager, null, {
+    const rebuilt = syncProbes(scene, experiment, gizmoManager, CHAINS, null, {
       ...makeProbeGeometry(),
       rodLengthMillimeters: 50
     });
@@ -928,12 +1039,20 @@ describe("syncProbes", () => {
   it("does not rebuild for an equal-but-distinct geometry object", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     const rebuilt = syncProbes(
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -945,7 +1064,14 @@ describe("syncProbes", () => {
     const { scene, gizmoManager, selectionOutlineLayer } =
       makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const oldNode = getProbeTransformNode(scene, probe.id)!;
     const oldShankMesh = scene.getMeshByName(probeMeshNames(probe.id).shank)!;
     attachProbeSelection(
@@ -968,6 +1094,7 @@ describe("syncProbes", () => {
       scene,
       experiment,
       gizmoManager,
+      CHAINS,
       null,
       makeProbeGeometry()
     );
@@ -998,58 +1125,139 @@ describe("syncProbes", () => {
 
   it("writes a plain, rotation-independent position (regression: gizmo drag no longer snaps after a rotation)", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    probe.rotation = [0, 0, Math.PI / 2];
-    probe.tipPosition = [5, 0, 0];
+    const { experiment, probe } = makeExperimentWithProbe({
+      transformInputs: makeTransformInputs({
+        globalTranslation: [5, 0, 0],
+        globalRotation: [0, 0, Math.PI / 2]
+      })
+    });
 
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
     const firstPass = node.position.clone();
 
     // The old `setPositionWithLocalVector` write drifted on a second pass at
     // a non-zero rotation (e.g. (0,-5,0) -> (0,0,-5)); a plain assignment is
     // idempotent regardless of rotation.
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(node.position.asArray()).toEqual(firstPass.asArray());
     expect(node.position.asArray()).toEqual(
-      asrToVector3(probe.tipPosition).asArray()
+      asrToVector3(probe.transformInputs.globalTranslation).asArray()
     );
   });
 
   it.each([[[0, 0, 0]], [[0, 0, Math.PI / 2]], [[0.3, 0.4, 0.5]]] as [
     [number, number, number]
   ][])(
-    "round-trips a tip position through sync and a drag readback at rotation %j",
-    rotation => {
+    "round-trips a global translation through sync and a position readback at rotation %j",
+    globalRotation => {
       const { scene, gizmoManager } = makeTestSceneWithGizmo();
-      const { experiment, probe } = makeExperimentWithProbe();
-      probe.rotation = rotation;
-      probe.tipPosition = [1, 2, 3];
+      const { experiment, probe } = makeExperimentWithProbe({
+        transformInputs: makeTransformInputs({
+          globalTranslation: [1, 2, 3],
+          globalRotation
+        })
+      });
 
-      syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+      syncProbes(
+        scene,
+        experiment,
+        gizmoManager,
+        CHAINS,
+        null,
+        makeProbeGeometry()
+      );
       const node = getProbeTransformNode(scene, probe.id)!;
 
-      // Exactly what setProbePositionFromGizmoDrag's readback does.
-      probe.tipPosition = vector3ToAsr(node.position);
-      syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+      // Reading the node's position straight back into the input the chain's
+      // first translation step drives has to be a no-op at any rotation.
+      probe.transformInputs.globalTranslation = vector3ToAsr(node.position);
+      syncProbes(
+        scene,
+        experiment,
+        gizmoManager,
+        CHAINS,
+        null,
+        makeProbeGeometry()
+      );
 
-      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      expect(probe.transformInputs.globalTranslation).toEqual([1, 2, 3]);
       expect(node.position.asArray()).toEqual(
-        asrToVector3(probe.tipPosition).asArray()
+        asrToVector3(probe.transformInputs.globalTranslation).asArray()
       );
     }
   );
 
+  it("syncs a probe to its chain-resolved pose, not its global translation alone", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      transformInputs: makeTransformInputs({
+        globalTranslation: [1, 0, 0],
+        globalRotation: [0, 0, -Math.PI / 2],
+        localTranslation: [2, 0, 0]
+      })
+    });
+
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
+    const node = getProbeTransformNode(scene, probe.id)!;
+
+    // A pitch of -90 degrees turns the probe-local +AP step onto atlas DV, so
+    // the node lands 2mm dorsal of the global translation, not anterior of it.
+    expect(
+      node.position.equalsWithEpsilon(asrToVector3([1, 2, 0]), 1e-10)
+    ).toBe(true);
+    expect(node.position.equalsWithEpsilon(asrToVector3([1, 0, 0]), 1e-6)).toBe(
+      false
+    );
+    expect(
+      node.rotation.equalsWithEpsilon(asrToVector3([0, 0, -Math.PI / 2]), 1e-10)
+    ).toBe(true);
+  });
+
   it("animates any position change, however small", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    probe.tipPosition = [0, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
 
-    probe.tipPosition = [0.1, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    probe.transformInputs.globalTranslation = [0.1, 0, 0];
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(node.position.asArray()).not.toEqual(
       asrToVector3([0.1, 0, 0]).asArray()
@@ -1066,12 +1274,25 @@ describe("syncProbes", () => {
   it("animates a rotation-only change", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    probe.rotation = [0, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
 
-    probe.rotation = [0, 0, Math.PI / 2];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    probe.transformInputs.globalRotation = [0, 0, Math.PI / 2];
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(node.rotation.asArray()).not.toEqual(
       asrToVector3([0, 0, Math.PI / 2]).asArray()
@@ -1088,13 +1309,26 @@ describe("syncProbes", () => {
   it("neither animates nor snaps the probe being dragged", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    probe.tipPosition = [0, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
 
-    probe.tipPosition = [5, 0, 0];
-    probe.rotation = [0, 0, Math.PI / 2];
-    syncProbes(scene, experiment, gizmoManager, probe.id, makeProbeGeometry());
+    probe.transformInputs.globalTranslation = [5, 0, 0];
+    probe.transformInputs.globalRotation = [0, 0, Math.PI / 2];
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      probe.id,
+      makeProbeGeometry()
+    );
     tickScene(scene, 100);
     tickScene(scene, 100);
 
@@ -1104,28 +1338,96 @@ describe("syncProbes", () => {
 
   it("snaps a freshly built probe rather than flying it from the origin", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    probe.tipPosition = [5, 0, 0];
+    const { experiment, probe } = makeExperimentWithProbe({
+      transformInputs: makeTransformInputs({ globalTranslation: [5, 0, 0] })
+    });
 
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
 
     expect(node.position.asArray()).toEqual(asrToVector3([5, 0, 0]).asArray());
   });
 
+  it("leaves a probe already sitting at its chain-resolved pose untouched (regression: no snap when a gizmo drag ends)", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe();
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
+    const node = getProbeTransformNode(scene, probe.id)!;
+
+    // What a finished rotate-then-translate gizmo drag leaves behind: the
+    // inputs and the node it moved agree already.
+    probe.transformInputs.globalRotation = [0, 0, Math.PI / 2];
+    probe.transformInputs.globalTranslation = [5, 0, 0];
+    const pose = getTransformChainPose(CHAINS[0]!, probe.transformInputs);
+    expect(pose.position).toEqual([5, 0, 0]);
+    node.position = asrToVector3(pose.position);
+    node.rotation = asrToVector3(pose.rotation);
+    const beforeSync = {
+      position: node.position.clone(),
+      rotation: node.rotation.clone()
+    };
+
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
+    tickScene(scene, 100);
+
+    expect(node.position.asArray()).toEqual(beforeSync.position.asArray());
+    expect(node.rotation.asArray()).toEqual(beforeSync.rotation.asArray());
+  });
+
   it("does not let an unrelated sync cut a glide short", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
-    probe.tipPosition = [0, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     const node = getProbeTransformNode(scene, probe.id)!;
 
-    probe.tipPosition = [5, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    probe.transformInputs.globalTranslation = [5, 0, 0];
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
     tickScene(scene, 100);
 
     probe.color = "#123456";
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
+    syncProbes(
+      scene,
+      experiment,
+      gizmoManager,
+      CHAINS,
+      null,
+      makeProbeGeometry()
+    );
 
     expect(node.position.asArray()).not.toEqual(
       asrToVector3([5, 0, 0]).asArray()
@@ -1135,32 +1437,6 @@ describe("syncProbes", () => {
     tickScene(scene, 100);
 
     expect(node.position.asArray()).toEqual(asrToVector3([5, 0, 0]).asArray());
-  });
-
-  it("stops the glide on a gizmo drag", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    probe.tipPosition = [0, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
-    const node = getProbeTransformNode(scene, probe.id)!;
-
-    probe.tipPosition = [5, 0, 0];
-    syncProbes(scene, experiment, gizmoManager, null, makeProbeGeometry());
-    tickScene(scene, 100);
-    const midway = node.position.clone();
-
-    setProbePositionFromGizmoDrag(
-      gizmoManager.gizmos.positionGizmo!,
-      experiment.probes,
-      () => {}
-    );
-    gizmoManager.attachToNode(node);
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-    tickScene(scene, 100);
-
-    expect(node.position.asArray()).toEqual(midway.asArray());
   });
 });
 
@@ -1376,296 +1652,5 @@ describe("selectProbeFromGizmoAttach", () => {
 
     expect(onSelect).not.toHaveBeenCalled();
     expect(gizmoManager.attachedNode).toBe(unrelatedNode);
-  });
-});
-
-describe("setProbePositionFromGizmoDrag", () => {
-  it("writes the attached probe's tip position and notifies onDrag", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-    node.position.set(1, 2, 3);
-    const onDrag = vi.fn();
-
-    setProbePositionFromGizmoDrag(
-      gizmoManager.gizmos.positionGizmo!,
-      experiment.probes,
-      onDrag
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-
-    expect(probe.tipPosition).toEqual(vector3ToAsr(node.position));
-    expect(onDrag).toHaveBeenCalledWith(probe.id);
-  });
-
-  it("does nothing when the attached node is not a probe", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment } = makeExperimentWithProbe();
-    const unrelatedNode = new TransformNode("unrelated", scene);
-    gizmoManager.attachToNode(unrelatedNode);
-    const onDrag = vi.fn();
-
-    setProbePositionFromGizmoDrag(
-      gizmoManager.gizmos.positionGizmo!,
-      experiment.probes,
-      onDrag
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-
-    expect(onDrag).not.toHaveBeenCalled();
-  });
-
-  it("leaves the probe's tip position unchanged when the gizmo is attached to its body-model node (regression: `_probe_` substring match)", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const bodyModelNode = new TransformNode(
-      `${probe.id}_probe_body-model_node`,
-      scene
-    );
-    gizmoManager.attachToNode(bodyModelNode);
-    bodyModelNode.position.set(1, 2, 3);
-    const onDrag = vi.fn();
-
-    setProbePositionFromGizmoDrag(
-      gizmoManager.gizmos.positionGizmo!,
-      experiment.probes,
-      onDrag
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-
-    expect(probe.tipPosition).toEqual([0, 0, 0]);
-    expect(onDrag).not.toHaveBeenCalled();
-  });
-});
-
-describe("setProbeRotationFromGizmoDrag", () => {
-  it("writes the attached probe's rotation and notifies onDrag", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-    node.rotation.set(0.1, 0.2, 0.3);
-    const onDrag = vi.fn();
-
-    setProbeRotationFromGizmoDrag(
-      gizmoManager.gizmos.rotationGizmo!,
-      experiment.probes,
-      onDrag
-    );
-    gizmoManager.gizmos.rotationGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-
-    expect(probe.rotation).toEqual(vector3ToAsr(node.rotation));
-    expect(onDrag).toHaveBeenCalledWith(probe.id);
-  });
-});
-
-describe("endProbeGizmoDrag", () => {
-  /**
-   * Regression: a rotation-only drag must clear `draggedProbeId` too, or
-   * `syncProbes` permanently skips that probe's transform (the bug behind
-   * the gizmo drag ending in an unexpected snap).
-   */
-  it("fires the callback when a rotation gizmo drag ends, not just a position one", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-    const onDragEnd = vi.fn();
-
-    endProbeGizmoDrag(
-      {
-        positionGizmo: gizmoManager.gizmos.positionGizmo!,
-        rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
-        scaleGizmo: gizmoManager.gizmos.scaleGizmo!
-      },
-      onDragEnd
-    );
-    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-
-    expect(onDragEnd).toHaveBeenCalledTimes(1);
-  });
-
-  it("fires the callback when a position gizmo drag ends", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-    const onDragEnd = vi.fn();
-
-    endProbeGizmoDrag(
-      {
-        positionGizmo: gizmoManager.gizmos.positionGizmo!,
-        rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
-        scaleGizmo: gizmoManager.gizmos.scaleGizmo!
-      },
-      onDragEnd
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-
-    expect(onDragEnd).toHaveBeenCalledTimes(1);
-  });
-
-  it("removing every returned observer stops both gizmos from notifying", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-    const onDragEnd = vi.fn();
-
-    const observers = endProbeGizmoDrag(
-      {
-        positionGizmo: gizmoManager.gizmos.positionGizmo!,
-        rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
-        scaleGizmo: gizmoManager.gizmos.scaleGizmo!
-      },
-      onDragEnd
-    );
-    observers.forEach(observer => observer.remove());
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-
-    expect(onDragEnd).not.toHaveBeenCalled();
-  });
-
-  it("reproduces the user's sequence: rotate, then drag position, without a snap on release", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { experiment, probe } = makeExperimentWithProbe();
-    const node = buildProbe(
-      scene,
-      probe,
-      experiment,
-      gizmoManager,
-      makeProbeGeometry()
-    )!;
-    gizmoManager.attachToNode(node);
-
-    let draggedProbeId: string | null = null;
-    setProbeRotationFromGizmoDrag(
-      gizmoManager.gizmos.rotationGizmo!,
-      experiment.probes,
-      id => {
-        draggedProbeId = id;
-      }
-    );
-    setProbePositionFromGizmoDrag(
-      gizmoManager.gizmos.positionGizmo!,
-      experiment.probes,
-      id => {
-        draggedProbeId = id;
-      }
-    );
-    endProbeGizmoDrag(
-      {
-        positionGizmo: gizmoManager.gizmos.positionGizmo!,
-        rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
-        scaleGizmo: gizmoManager.gizmos.scaleGizmo!
-      },
-      () => {
-        draggedProbeId = null;
-      }
-    );
-
-    // Rotate, then release. Without watching the rotation gizmo's drag-end,
-    // draggedProbeId would stay stuck on this probe forever.
-    node.rotation.set(0, 0, Math.PI / 2);
-    gizmoManager.gizmos.rotationGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-    gizmoManager.gizmos.rotationGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-    expect(draggedProbeId).toBeNull();
-
-    // Now drag position, release, and sync: the transform must not snap.
-    node.position.set(5, 0, 0);
-    gizmoManager.gizmos.positionGizmo!.onDragObservable.notifyObservers(
-      {} as DragEvent
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-    expect(draggedProbeId).toBeNull();
-
-    const beforeSync = node.position.clone();
-    syncProbes(
-      scene,
-      experiment,
-      gizmoManager,
-      draggedProbeId,
-      makeProbeGeometry()
-    );
-    expect(node.position.asArray()).toEqual(beforeSync.asArray());
-  });
-
-  it("does not fire when the gizmo is attached to a probe's body-model node (regression: `_probe_` substring match)", () => {
-    const { scene, gizmoManager } = makeTestSceneWithGizmo();
-    const { probe } = makeExperimentWithProbe();
-    const bodyModelNode = new TransformNode(
-      `${probe.id}_probe_body-model_node`,
-      scene
-    );
-    gizmoManager.attachToNode(bodyModelNode);
-    const onDragEnd = vi.fn();
-
-    endProbeGizmoDrag(
-      {
-        positionGizmo: gizmoManager.gizmos.positionGizmo!,
-        rotationGizmo: gizmoManager.gizmos.rotationGizmo!,
-        scaleGizmo: gizmoManager.gizmos.scaleGizmo!
-      },
-      onDragEnd
-    );
-    gizmoManager.gizmos.positionGizmo!.onDragEndObservable.notifyObservers(
-      {} as DragStartEndEvent
-    );
-
-    expect(onDragEnd).not.toHaveBeenCalled();
   });
 });

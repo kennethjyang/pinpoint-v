@@ -19,11 +19,13 @@ import {
 } from "@/features/experiment";
 import {
   getStructureHemisphereCenters,
+  getTransformChains,
   type Hemisphere,
   type HemisphereCenters,
   moveInspectableToMillimeters,
   useBabylonRuntimeService
 } from "@/features/scene";
+import { usePreferencesStore } from "@/stores/preferences.store";
 
 /** Width of one indent guide cell, matching `.guide`'s `flex: 0 0 1rem`. */
 const GUIDE_WIDTH = 16;
@@ -40,6 +42,7 @@ const currentExperiment = useCurrentExperimentStore();
 const { t } = useI18n();
 const { notifyWarning } = useNotify();
 const runtime = useBabylonRuntimeService();
+const preferences = usePreferencesStore();
 
 const filter = ref<string | null>(null);
 const root = useTemplateRef<HTMLDivElement>("root");
@@ -59,6 +62,8 @@ const lastRegionMove = ref<{
 const items = computed(() =>
   flattenHierarchy(currentExperiment.terminologyRows)
 );
+
+const chains = computed(() => getTransformChains(preferences.transformChains));
 
 // Filtering ahead of Fuse narrows both the hierarchy-ordered list and the
 // search results, and keeps hierarchy order while not searching. A transparent
@@ -186,6 +191,7 @@ async function moveToRegionCenter(item: HierarchyItem): Promise<void> {
 
   moveInspectableToMillimeters(
     selected,
+    chains.value,
     center,
     currentExperiment.referenceCoordinate
   );

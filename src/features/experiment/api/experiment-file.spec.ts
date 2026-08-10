@@ -13,12 +13,14 @@ import {
 } from "./experiment.api";
 import { copyCameraPose } from "./camera-pose.api";
 import { buildProbe, detachProbeInterfaceProbe } from "@/features/probe";
+import { DEFAULT_TRANSFORM_CHAIN_ID } from "@/features/scene";
 import {
   makeAtlas,
   makeCameraPose,
   makeProbeInterfaceProbe,
   makeSceneModel,
-  makeSceneObject
+  makeSceneObject,
+  makeTransformInputs
 } from "@/test/fixtures";
 import type { Experiment } from "../models/experiment.model";
 
@@ -32,7 +34,7 @@ function makeFullExperiment(): Experiment {
     annotations: { manufacturer: "imec", model_name: "np1" }
   });
   internProbeInterfaceProbe(experiment, spec);
-  addProbe(experiment, buildProbe(spec));
+  addProbe(experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
   experiment.visibleStructures = [{ id: 5, isTransparent: false }];
   return experiment;
 }
@@ -299,12 +301,29 @@ describe("zipExperiment / unzipExperiment", () => {
     expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
-  it("returns null when a probe has a short tipPosition", () => {
+  it("returns null when a probe has a short translation input", () => {
     const experiment = makeFullExperiment();
     experiment.probes[0] = {
       ...experiment.probes[0]!,
-      tipPosition: [0, 0] as unknown as [number, number, number]
+      transformInputs: makeTransformInputs({
+        globalTranslation: [0, 0] as unknown as [number, number, number]
+      })
     };
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
+  });
+
+  it("returns null when a probe carries the old tipPosition and rotation shape", () => {
+    const experiment = makeFullExperiment();
+    const {
+      transformChainId: _chainId,
+      transformInputs: _inputs,
+      ...probe
+    } = experiment.probes[0]!;
+    experiment.probes[0] = {
+      ...probe,
+      tipPosition: [0, 0, 0],
+      rotation: [0, 0, 0]
+    } as unknown as Experiment["probes"][number];
     expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 
@@ -321,7 +340,10 @@ describe("zipExperiment / unzipExperiment", () => {
       experiment.probeInterfaceProbes[
         Object.keys(experiment.probeInterfaceProbes)[0]!
       ]!;
-    const duplicate = { ...buildProbe(spec), id: experiment.probes[0]!.id };
+    const duplicate = {
+      ...buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID),
+      id: experiment.probes[0]!.id
+    };
     experiment.probes.push(duplicate);
 
     expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
@@ -413,7 +435,7 @@ describe("zipExperiment / unzipExperiment", () => {
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
     internProbeInterfaceProbe(experiment, spec);
-    addProbe(experiment, buildProbe(spec));
+    addProbe(experiment, buildProbe(spec, DEFAULT_TRANSFORM_CHAIN_ID));
 
     // buildProbeContour (src/features/scene/api/probe.api.ts) already
     // degrades to `null` for missing contour geometry, so this is left

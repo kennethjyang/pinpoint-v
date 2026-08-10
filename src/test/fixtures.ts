@@ -4,7 +4,20 @@ import type {
   Manifest,
   TerminologyRow
 } from "@/features/atlas";
-import type { ProbeGeometry, SceneModel, SceneObject } from "@/features/scene";
+import type {
+  ProbeGeometry,
+  SceneModel,
+  SceneObject,
+  TransformChain,
+  TransformInputGroup,
+  TransformInputs,
+  TransformStep,
+  TransformStepKind
+} from "@/features/scene";
+import {
+  buildTransformInputs,
+  DEFAULT_TRANSFORM_CHAIN_ID
+} from "@/features/scene";
 import type { CameraPose } from "@/features/experiment";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
 import { getProbeInterfaceIdentifier } from "@/features/probe";
@@ -18,8 +31,8 @@ export function makeSceneModel(
 ): SceneModel {
   return {
     id: crypto.randomUUID(),
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
+    transformChainId: DEFAULT_TRANSFORM_CHAIN_ID,
+    transformInputs: buildTransformInputs(),
     scale: [1, 1, 1],
     ...overrides
   };
@@ -119,14 +132,67 @@ export function makeProbe(overrides: Partial<Probe> = {}): Probe {
     probeInterfaceIdentifier: getProbeInterfaceIdentifier(
       makeProbeInterfaceProbe()
     ),
-    tipPosition: [0, 0, 0],
-    rotation: [0, 0, 0],
+    transformChainId: DEFAULT_TRANSFORM_CHAIN_ID,
+    transformInputs: buildTransformInputs(),
     sliceExtentMillimeters: 2,
     sliceCenterHeightMillimeters: 0,
     channelMapWindow: null,
     shankAlignmentIndex: null,
     bodyModel: null,
     ...overrides
+  };
+}
+
+/**
+ * Build a fixture set of transform inputs.
+ * @param overrides Input groups to override on the zeroed defaults.
+ */
+export function makeTransformInputs(
+  overrides: Partial<TransformInputs> = {}
+): TransformInputs {
+  return { ...buildTransformInputs(), ...overrides };
+}
+
+/**
+ * Build a fixture chain driving all twelve inputs, one step per group - unlike
+ * the built-in default, which fixes every local rotation and all but the depth
+ * axis of its local translation.
+ * @param overrides Fields to override on the fixture chain.
+ */
+export function makeTransformChain(
+  overrides: Partial<TransformChain> = {}
+): TransformChain {
+  return {
+    id: crypto.randomUUID(),
+    name: "Every input",
+    isBuiltIn: false,
+    steps: [
+      makeTransformStep("translation", "globalTranslation"),
+      makeTransformStep("rotation", "globalRotation"),
+      makeTransformStep("rotation", "localRotation"),
+      makeTransformStep("translation", "localTranslation")
+    ],
+    depthAxis: { group: "localTranslation", component: 0 },
+    ...overrides
+  };
+}
+
+/**
+ * Build a fixture chain step whose three arguments read one input group in order.
+ * @param kind Whether the step translates or rotates.
+ * @param group Input group the step reads.
+ */
+export function makeTransformStep(
+  kind: TransformStepKind,
+  group: TransformInputGroup
+): TransformStep {
+  return {
+    kind,
+    arguments: [
+      { group, component: 0 },
+      { group, component: 1 },
+      { group, component: 2 }
+    ]
   };
 }
 

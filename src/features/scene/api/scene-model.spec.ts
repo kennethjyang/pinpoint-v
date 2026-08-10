@@ -6,6 +6,8 @@ import {
   pruneSceneModels,
   putSceneModel
 } from "./scene-model.api";
+import { buildTransformInputs } from "./transform-chain.api";
+import { makeTransformInputs } from "@/test/fixtures";
 
 // In-memory replacement for the real IndexedDB-backed store, keyed the same
 // way `idb-keyval`'s default store is: a single flat map of key -> value.
@@ -35,8 +37,8 @@ describe("buildSceneModel", () => {
     const sceneModel = buildSceneModel("id");
 
     expect(sceneModel.id).toBe("id");
-    expect(sceneModel.position).toEqual([0, 0, 0]);
-    expect(sceneModel.rotation).toEqual([0, 0, 0]);
+    expect(sceneModel.transformChainId.length).toBeGreaterThan(0);
+    expect(sceneModel.transformInputs).toEqual(buildTransformInputs());
     expect(sceneModel.scale).toEqual([1, 1, 1]);
   });
 });
@@ -55,8 +57,18 @@ describe("isSceneModel", () => {
     expect(isSceneModel({ ...buildSceneModel("id"), id: "" })).toBe(false);
   });
 
-  it("rejects a non-triple position", () => {
-    const sceneModel = { ...buildSceneModel("id"), position: [0, 0] };
+  it("rejects an empty transform chain id", () => {
+    const sceneModel = { ...buildSceneModel("id"), transformChainId: "" };
+    expect(isSceneModel(sceneModel)).toBe(false);
+  });
+
+  it("rejects a non-triple translation input", () => {
+    const sceneModel = {
+      ...buildSceneModel("id"),
+      transformInputs: makeTransformInputs({
+        globalTranslation: [0, 0] as unknown as [number, number, number]
+      })
+    };
     expect(isSceneModel(sceneModel)).toBe(false);
   });
 
@@ -65,12 +77,25 @@ describe("isSceneModel", () => {
     expect(isSceneModel(sceneModel)).toBe(false);
   });
 
-  it("rejects a NaN in rotation", () => {
+  it("rejects a NaN in a rotation input", () => {
     const sceneModel = {
       ...buildSceneModel("id"),
-      rotation: [0, Number.NaN, 0]
+      transformInputs: makeTransformInputs({
+        globalRotation: [0, Number.NaN, 0]
+      })
     };
     expect(isSceneModel(sceneModel)).toBe(false);
+  });
+
+  it("rejects the old position and rotation shape", () => {
+    const {
+      transformChainId: _chainId,
+      transformInputs: _inputs,
+      ...rest
+    } = buildSceneModel("id");
+    expect(
+      isSceneModel({ ...rest, position: [0, 0, 0], rotation: [0, 0, 0] })
+    ).toBe(false);
   });
 });
 

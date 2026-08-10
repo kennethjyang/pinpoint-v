@@ -1,25 +1,22 @@
-import type { GizmoManager } from "@babylonjs/core";
+import type { GizmoManager, IScaleGizmo } from "@babylonjs/core";
 import { GizmoCoordinatesMode } from "@babylonjs/core";
-import type {
-  GizmoCoordinateSpace,
-  GizmoMode,
-  TransformGizmos
-} from "../models/gizmo.model";
+import type { GizmoCoordinateSpace, GizmoMode } from "../models/gizmo.model";
 
 /**
- * Enable exactly one of a gizmo manager's transform gizmos in the given
- * coordinate space, returning all three of them, or null if none is enabled.
+ * Configure the gizmo manager for a transform mode: translation and rotation
+ * are driven by the transform chain gizmo, so the manager only ever exposes its
+ * scale gizmo. Returns that gizmo, or null when it isn't built.
  * @param gizmoManager Gizmo manager to configure.
- * @param mode Transform gizmo to enable; the others are left built but detached.
- * @param coordinateSpace Axis frame all three transform gizmos drag in.
+ * @param mode Transform gizmo the toolbar has active.
+ * @param coordinateSpace Axis frame the scale gizmo drags in.
  */
 export function setGizmoControls(
   gizmoManager: GizmoManager,
   mode: GizmoMode,
   coordinateSpace: GizmoCoordinateSpace
-): TransformGizmos | null {
-  gizmoManager.positionGizmoEnabled = mode === "position";
-  gizmoManager.rotationGizmoEnabled = mode === "rotation";
+): IScaleGizmo | null {
+  gizmoManager.positionGizmoEnabled = false;
+  gizmoManager.rotationGizmoEnabled = false;
   gizmoManager.scaleGizmoEnabled = mode === "scale";
 
   // Also forces gizmo position tracking, so it follows the mesh in either space.
@@ -28,7 +25,5 @@ export function setGizmoControls(
       ? GizmoCoordinatesMode.Local
       : GizmoCoordinatesMode.World;
 
-  const { positionGizmo, rotationGizmo, scaleGizmo } = gizmoManager.gizmos;
-  if (!positionGizmo || !rotationGizmo || !scaleGizmo) return null;
-  return { positionGizmo, rotationGizmo, scaleGizmo };
+  return gizmoManager.gizmos.scaleGizmo ?? null;
 }

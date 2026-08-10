@@ -12,6 +12,7 @@ import {
 } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { usePreferencesStore } from "@/stores/preferences.store";
 import { useDragReorder } from "@/composable/useDragReorder";
 import {
   addProbe,
@@ -33,6 +34,7 @@ import type { SceneObjectVisibility } from "../models/scene-object-visibility.mo
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
 const currentExperiment = useCurrentExperimentStore();
+const preferences = usePreferencesStore();
 
 const {
   draggedIndex,
@@ -82,7 +84,10 @@ const SCENE_OBJECT_VISIBILITY_ICONS: Record<SceneObjectVisibility, string> = {
  */
 function addProbeAndSelect(probeInterfaceProbe: ProbeInterfaceProbe) {
   internProbeInterfaceProbe(currentExperiment.experiment, probeInterfaceProbe);
-  const probe = buildProbe(probeInterfaceProbe);
+  const probe = buildProbe(
+    probeInterfaceProbe,
+    preferences.defaultProbeChainId
+  );
   addProbe(currentExperiment.experiment, probe);
   currentExperiment.selectedInspectable = probe;
 }

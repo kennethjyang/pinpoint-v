@@ -5,6 +5,7 @@ import type { VueWrapper } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import type { AbstractEngine } from "@babylonjs/core";
 import ProbeInspector from "./ProbeInspector.vue";
+import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
@@ -12,7 +13,9 @@ import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import {
   makeProbe,
   makeProbeInterfaceProbe,
-  makeSceneModel
+  makeSceneModel,
+  makeTransformChain,
+  makeTransformInputs
 } from "@/test/fixtures";
 import { getTerminologyRows } from "@/features/atlas";
 import { internProbeInterfaceProbe } from "@/features/experiment";
@@ -22,13 +25,52 @@ import {
   getProbeInterfaceIdentifier
 } from "@/features/probe";
 import { useProbeSurface, type ProbeSurfaceTargets } from "@/features/slice";
-import { canLoadModelFile, putSceneModel } from "@/features/scene";
+import {
+  canLoadModelFile,
+  DEFAULT_TRANSFORM_CHAIN_ID,
+  putSceneModel,
+  TRANSFORM_INPUT_GROUPS,
+  type TransformChain,
+  type TransformInputComponent
+} from "@/features/scene";
 import { BabylonRuntimeServiceKey } from "@/services/babylon-runtime.service";
 import enUS from "@/i18n/en-US";
 
 const t = enUS.probeInspector;
 const axis = enUS.axis;
 const validation = enUS.validation;
+const transformChain = enUS.transformChain;
+
+/** Every component slot of an input group, for iterating the twelve inputs. */
+const COMPONENTS: readonly TransformInputComponent[] = [0, 1, 2];
+
+/**
+ * A user chain whose single translation step reads only the global translation
+ * group, leaving the other nine inputs unused and offering no depth axis.
+ */
+const TRANSLATION_ONLY_CHAIN: TransformChain = {
+  id: "translation-only",
+  name: "Translation only",
+  isBuiltIn: false,
+  steps: [
+    {
+      kind: "translation",
+      arguments: [
+        { group: "globalTranslation", component: 0 },
+        { group: "globalTranslation", component: 1 },
+        { group: "globalTranslation", component: 2 }
+      ]
+    }
+  ],
+  depthAxis: null
+};
+
+/**
+ * A user chain driving all twelve inputs, one step per group -- unlike the
+ * built-in default, which fixes every local rotation and every local
+ * translation but its depth axis.
+ */
+const ALL_INPUTS_CHAIN = makeTransformChain();
 
 /** Injected Babylon runtime, so `useModelFileImport` can read `engine.value`. */
 const babylonRuntimeProvide = {
@@ -131,6 +173,17 @@ function fieldByLabel(wrapper: VueWrapper, label: string) {
     .find(field => field.props("label") === label)!;
 }
 
+/**
+ * Finds one of the body model's transform input fields by its preference name,
+ * which the probe's own rows repeat.
+ */
+function bodyModelFieldByLabel(wrapper: VueWrapper, label: string) {
+  return wrapper
+    .findComponent(ProbeBodyModelInspector)
+    .findAllComponents({ name: "QInput" })
+    .find(field => field.props("label") === label)!;
+}
+
 function buttonByLabel(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAll("button")
@@ -166,9 +219,10 @@ describe("ProbeInspector", () => {
     vi.mocked(putSceneModel).mockReset();
   });
 
-  function mountInspector(probe = makeProbe()) {
+  function mountInspector(probe = makeProbe(), chains: TransformChain[] = []) {
     const pinia = createPinia();
     setActivePinia(pinia);
+    usePreferencesStore(pinia).transformChains = chains;
     const probeLibrary = useProbeLibraryStore(pinia);
     probeLibrary.add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
@@ -268,88 +322,212 @@ describe("ProbeInspector", () => {
     expect(name.find("[role='alert']").exists()).toBe(false);
   });
 
-  it("commits AP/DV/ML into tipPosition as real numbers", async () => {
-    const { wrapper, probe } = mountInspector();
-
-    await editAndBlur(fieldByLabel(wrapper, axis.ap), "-2.5");
-    await editAndBlur(fieldByLabel(wrapper, axis.dv), "1");
-    await editAndBlur(fieldByLabel(wrapper, axis.ml), "0");
-
-    expect(probe.tipPosition).toEqual([-2.5, 1, 0]);
-    expect(probe.tipPosition.every(value => typeof value === "number")).toBe(
-      true
+  it("commits every one of the twelve transform inputs, under its preference name", async () => {
+    const { wrapper, probe } = mountInspector(
+      makeProbe({ transformChainId: ALL_INPUTS_CHAIN.id }),
+      [ALL_INPUTS_CHAIN]
     );
+    const names = usePreferencesStore().transformInputNames;
+
+    for (const [row, group] of TRANSFORM_INPUT_GROUPS.entries()) {
+      for (const component of COMPONENTS) {
+        const typed = row * 3 + component + 1;
+        const field = fieldByLabel(wrapper, names[group][component]);
+        expect(field, `${group}[${component}] field`).toBeDefined();
+
+        await editAndBlur(field, String(typed));
+
+        // Rotation groups display degrees, translation groups millimeters.
+        const expected = group.endsWith("Rotation")
+          ? (typed * Math.PI) / 180
+          : typed;
+        expect(
+          probe.transformInputs[group][component],
+          `${group}[${component}] value`
+        ).toBeCloseTo(expected, 6);
+      }
+    }
   });
 
-  it("commits Roll/Yaw/Pitch in degrees, converting to radians in orientation", async () => {
+  it("captions each input row with its group", () => {
+    const { wrapper } = mountInspector();
+
+    for (const group of TRANSFORM_INPUT_GROUPS) {
+      expect(wrapper.text()).toContain(transformChain[group]);
+    }
+  });
+
+  it("labels an input from the user's renamed preference", async () => {
+    const { wrapper } = mountInspector();
+
+    usePreferencesStore().transformInputNames.localTranslation[0] = "Depth";
+    await wrapper.vm.$nextTick();
+
+    expect(fieldByLabel(wrapper, "Depth").exists()).toBe(true);
+  });
+
+  it("disables the five inputs the built-in default chain fixes at zero, leaving the other seven editable", () => {
+    const { wrapper } = mountInspector();
+    const names = usePreferencesStore().transformInputNames;
+
+    for (const label of [
+      names.globalRotation[0],
+      names.localRotation[1],
+      names.localRotation[2],
+      names.localTranslation[1],
+      names.localTranslation[2]
+    ]) {
+      expect(
+        fieldByLabel(wrapper, label).props("disable"),
+        `${label} disabled`
+      ).toBe(true);
+    }
+    for (const label of [
+      ...names.globalTranslation,
+      names.globalRotation[1],
+      names.globalRotation[2],
+      names.localRotation[0],
+      names.localTranslation[0]
+    ]) {
+      expect(
+        fieldByLabel(wrapper, label).props("disable"),
+        `${label} editable`
+      ).toBe(false);
+    }
+  });
+
+  it("disables the inputs its chain never reads, leaving the bound ones editable", async () => {
+    const { wrapper } = mountInspector(
+      makeProbe({ transformChainId: TRANSLATION_ONLY_CHAIN.id })
+    );
+    const preferences = usePreferencesStore();
+    preferences.transformChains = [TRANSLATION_ONLY_CHAIN];
+    await wrapper.vm.$nextTick();
+
+    const names = preferences.transformInputNames;
+    for (const component of COMPONENTS) {
+      expect(
+        fieldByLabel(wrapper, names.globalTranslation[component]).props(
+          "disable"
+        )
+      ).toBe(false);
+    }
+    for (const group of [
+      "globalRotation",
+      "localRotation",
+      "localTranslation"
+    ] as const) {
+      for (const component of COMPONENTS) {
+        expect(
+          fieldByLabel(wrapper, names[group][component]).props("disable"),
+          `${group}[${component}] disabled`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("switches the probe's chain from the chain selector", async () => {
     const { wrapper, probe } = mountInspector();
+    usePreferencesStore().transformChains = [TRANSLATION_ONLY_CHAIN];
+    await wrapper.vm.$nextTick();
 
-    await editAndBlur(fieldByLabel(wrapper, t.roll), "90");
-    await editAndBlur(fieldByLabel(wrapper, t.yaw), "180");
-    await editAndBlur(fieldByLabel(wrapper, t.pitch), "-45");
+    const select = wrapper
+      .findAllComponents({ name: "QSelect" })
+      .find(candidate => candidate.props("label") === t.transformChain)!;
+    expect(select.props("options")).toEqual([
+      {
+        label: transformChain.defaultChainName,
+        value: DEFAULT_TRANSFORM_CHAIN_ID
+      },
+      { label: TRANSLATION_ONLY_CHAIN.name, value: TRANSLATION_ONLY_CHAIN.id }
+    ]);
 
-    expect(probe.rotation[0]).toBeCloseTo(Math.PI / 2);
-    expect(probe.rotation[1]).toBeCloseTo(Math.PI);
-    expect(probe.rotation[2]).toBeCloseTo(-Math.PI / 4);
+    select.vm.$emit("update:modelValue", TRANSLATION_ONLY_CHAIN.id);
+    await wrapper.vm.$nextTick();
+
+    expect(probe.transformChainId).toBe(TRANSLATION_ONLY_CHAIN.id);
   });
 
   it("rejects a non-numeric value in a numeric field", async () => {
     const { wrapper, probe } = mountInspector();
+    const names = usePreferencesStore().transformInputNames;
 
-    const ap = fieldByLabel(wrapper, axis.ap);
+    const ap = fieldByLabel(wrapper, names.globalTranslation[0]);
     await editAndBlur(ap, "abc");
 
-    expect(probe.tipPosition[0]).toBe(0);
+    expect(probe.transformInputs.globalTranslation[0]).toBe(0);
     expect(ap.find("[role='alert']").text()).toBe(validation.mustBeNumber);
   });
 
   it("rounds the display to the preferences store's decimal precision", async () => {
     const { wrapper } = mountInspector(
-      makeProbe({ tipPosition: [1.2345, 0, 0] })
+      makeProbe({
+        transformInputs: makeTransformInputs({
+          globalTranslation: [1.2345, 0, 0]
+        })
+      })
     );
-    usePreferencesStore().decimalPrecision = 1;
+    const preferences = usePreferencesStore();
+    preferences.decimalPrecision = 1;
     await wrapper.vm.$nextTick();
 
-    expect(fieldByLabel(wrapper, axis.ap).props("modelValue")).toBe("1.2");
+    expect(
+      fieldByLabel(
+        wrapper,
+        preferences.transformInputNames.globalTranslation[0]
+      ).props("modelValue")
+    ).toBe("1.2");
   });
 
-  it("displays positions and rotations in the preferences store's units", async () => {
+  it("displays translations and rotations in the preferences store's units", async () => {
     const { wrapper } = mountInspector(
-      makeProbe({ tipPosition: [1, 0, 0], rotation: [0, 0, Math.PI / 2] })
+      makeProbe({
+        transformInputs: makeTransformInputs({
+          globalTranslation: [1, 0, 0],
+          globalRotation: [0, 0, Math.PI / 2]
+        })
+      })
     );
     const preferences = usePreferencesStore();
     preferences.positionUnit = "micrometer";
     preferences.rotationUnit = "radian";
     await wrapper.vm.$nextTick();
 
-    const ap = fieldByLabel(wrapper, axis.ap);
+    const names = preferences.transformInputNames;
+    const ap = fieldByLabel(wrapper, names.globalTranslation[0]);
     expect(ap.props("modelValue")).toBe("1000.000");
     expect(ap.props("suffix")).toBe("µm");
-    const pitch = fieldByLabel(wrapper, t.pitch);
+    const pitch = fieldByLabel(wrapper, names.globalRotation[2]);
     expect(pitch.props("modelValue")).toBe("1.571");
     expect(pitch.props("suffix")).toBe("rad");
   });
 
   it("commits zero when a numeric field is left blank", async () => {
     const { wrapper, probe } = mountInspector(
-      makeProbe({ tipPosition: [5, 0, 0] })
+      makeProbe({
+        transformInputs: makeTransformInputs({ globalTranslation: [5, 0, 0] })
+      })
     );
+    const names = usePreferencesStore().transformInputNames;
 
-    const ap = fieldByLabel(wrapper, axis.ap);
+    const ap = fieldByLabel(wrapper, names.globalTranslation[0]);
     await editAndBlur(ap, "");
 
-    expect(probe.tipPosition[0]).toBe(0);
+    expect(probe.transformInputs.globalTranslation[0]).toBe(0);
     expect(ap.find("[role='alert']").exists()).toBe(false);
   });
 
   it("accepts zero in a numeric field", async () => {
     const { wrapper, probe } = mountInspector(
-      makeProbe({ tipPosition: [5, 0, 0] })
+      makeProbe({
+        transformInputs: makeTransformInputs({ globalTranslation: [5, 0, 0] })
+      })
     );
+    const names = usePreferencesStore().transformInputNames;
 
-    await editAndBlur(fieldByLabel(wrapper, axis.ap), "0");
+    await editAndBlur(fieldByLabel(wrapper, names.globalTranslation[0]), "0");
 
-    expect(probe.tipPosition[0]).toBe(0);
+    expect(probe.transformInputs.globalTranslation[0]).toBe(0);
   });
 
   it("re-seeds every field when the probe prop changes", async () => {
@@ -357,8 +535,14 @@ describe("ProbeInspector", () => {
     setActivePinia(pinia);
     useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
-    const a = makeProbe({ name: "A", tipPosition: [1, 2, 3] });
-    const b = makeProbe({ name: "B", tipPosition: [4, 5, 6] });
+    const a = makeProbe({
+      name: "A",
+      transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+    });
+    const b = makeProbe({
+      name: "B",
+      transformInputs: makeTransformInputs({ globalTranslation: [4, 5, 6] })
+    });
     store.experiment.probes = [a, b];
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
@@ -370,7 +554,12 @@ describe("ProbeInspector", () => {
     await wrapper.setProps({ probe: b } as Record<string, unknown>);
 
     expect(fieldByLabel(wrapper, t.name).props("modelValue")).toBe("B");
-    expect(fieldByLabel(wrapper, axis.ap).props("modelValue")).toBe("4.000");
+    expect(
+      fieldByLabel(
+        wrapper,
+        usePreferencesStore(pinia).transformInputNames.globalTranslation[0]
+      ).props("modelValue")
+    ).toBe("4.000");
   });
 
   it("keeps the renamed probe selected and in sync with the store", async () => {
@@ -503,14 +692,20 @@ describe("ProbeInspector", () => {
   });
 
   describe("home / copy / lock buttons", () => {
-    it("resets the tip position on home click", async () => {
+    it("resets both translation groups on home click", async () => {
       const { wrapper, probe } = mountInspector(
-        makeProbe({ tipPosition: [1, 2, 3] })
+        makeProbe({
+          transformInputs: makeTransformInputs({
+            globalTranslation: [1, 2, 3],
+            localTranslation: [4, 5, 6]
+          })
+        })
       );
 
       await buttonByLabel(wrapper, t.home).trigger("click");
 
-      expect(probe.tipPosition).toEqual([0, 0, 0]);
+      expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
+      expect(probe.transformInputs.localTranslation).toEqual([0, 0, 0]);
     });
 
     it("duplicates the probe on copy click", async () => {
@@ -536,12 +731,28 @@ describe("ProbeInspector", () => {
       expect(probe.lock).toBe(false);
     });
 
-    it("disables the pose fields and the home/pin buttons while locked, leaving name and copy editable", () => {
-      const { wrapper } = mountInspector(makeProbe({ lock: true }));
+    it("disables the transform inputs, the chain selector, and the home/pin buttons while locked, leaving name and copy editable", () => {
+      // A chain driving all twelve inputs, so the lock alone disables them.
+      const { wrapper } = mountInspector(
+        makeProbe({ lock: true, transformChainId: ALL_INPUTS_CHAIN.id }),
+        [ALL_INPUTS_CHAIN]
+      );
+      const names = usePreferencesStore().transformInputNames;
 
-      for (const label of [axis.ap, axis.dv, axis.ml, t.roll, t.yaw, t.pitch]) {
-        expect(fieldByLabel(wrapper, label).props("disable")).toBe(true);
+      for (const group of TRANSFORM_INPUT_GROUPS) {
+        for (const component of COMPONENTS) {
+          expect(
+            fieldByLabel(wrapper, names[group][component]).props("disable"),
+            `${group}[${component}] disabled`
+          ).toBe(true);
+        }
       }
+      expect(
+        wrapper
+          .findAllComponents({ name: "QSelect" })
+          .find(candidate => candidate.props("label") === t.transformChain)!
+          .props("disable")
+      ).toBe(true);
       expect(fieldByLabel(wrapper, t.name).props("disable")).toBeFalsy();
       expect(
         buttonByLabel(wrapper, t.home).attributes("disabled")
@@ -553,17 +764,20 @@ describe("ProbeInspector", () => {
 
     it("does not move a locked probe when its disabled home button is clicked", async () => {
       const { wrapper, probe } = mountInspector(
-        makeProbe({ lock: true, tipPosition: [1, 2, 3] })
+        makeProbe({
+          lock: true,
+          transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+        })
       );
 
       await buttonByLabel(wrapper, t.home).trigger("click");
 
-      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      expect(probe.transformInputs.globalTranslation).toEqual([1, 2, 3]);
     });
   });
 
   describe("move to surface", () => {
-    it("moves the tip and leaves the choice null on an insideMillimeters result", async () => {
+    it("inserts along the chain's depth axis and leaves the choice null on an insideMillimeters result", async () => {
       const findTargets = vi.fn().mockResolvedValue({
         insideMillimeters: [1, 2, 3],
         axisMillimeters: null,
@@ -575,15 +789,24 @@ describe("ProbeInspector", () => {
       await buttonByLabel(wrapper, t.surface).trigger("click");
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([
+      expect(findTargets).toHaveBeenCalledWith(
+        probe,
+        expect.objectContaining({ id: DEFAULT_TRANSFORM_CHAIN_ID }),
+        store.referenceCoordinate,
+        expect.any(AbortSignal)
+      );
+      // The default chain inserts along probe-local AP, so with the probe
+      // unrotated only that one input absorbs the move.
+      expect(probe.transformInputs.localTranslation).toEqual([
         1 - store.referenceCoordinate[0],
-        2 - store.referenceCoordinate[1],
-        3 - store.referenceCoordinate[2]
+        0,
+        0
       ]);
+      expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
 
-    it("sets the pending choice and leaves the tip unchanged when both targets are available", async () => {
+    it("sets the pending choice from a copy of the probe's inputs when both targets are available", async () => {
       const findTargets = vi.fn().mockResolvedValue({
         insideMillimeters: null,
         axisMillimeters: [1, 2, 3],
@@ -591,21 +814,35 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
       const { wrapper, store, probe } = mountInspector(
-        makeProbe({ tipPosition: [7, 8, 9] })
+        makeProbe({
+          transformInputs: makeTransformInputs({ globalTranslation: [7, 8, 9] })
+        })
       );
 
       await buttonByLabel(wrapper, t.surface).trigger("click");
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([7, 8, 9]);
-      expect(store.probeSurfaceChoice).toMatchObject({
+      expect(probe.transformInputs.globalTranslation).toEqual([7, 8, 9]);
+      expect(store.probeSurfaceChoice).toEqual({
         probeId: probe.id,
+        transformInputs: makeTransformInputs({ globalTranslation: [7, 8, 9] }),
+        tipMillimeters: [
+          store.referenceCoordinate[0] + 7,
+          store.referenceCoordinate[1] + 8,
+          store.referenceCoordinate[2] + 9
+        ],
         axisTargetMillimeters: [1, 2, 3],
         dorsoventralTargetMillimeters: [4, 5, 6]
       });
+
+      // The snapshot is a copy: moving the probe afterwards must not rewrite it.
+      probe.transformInputs.globalTranslation[0] = 99;
+      expect(
+        store.probeSurfaceChoice!.transformInputs.globalTranslation[0]
+      ).toBe(7);
     });
 
-    it("moves the tip without setting a choice when only one outside-brain target is available", async () => {
+    it("inserts along the depth axis when only the axis target is available", async () => {
       const findTargets = vi.fn().mockResolvedValue({
         insideMillimeters: null,
         axisMillimeters: [1, 2, 3],
@@ -617,11 +854,61 @@ describe("ProbeInspector", () => {
       await buttonByLabel(wrapper, t.surface).trigger("click");
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([
+      expect(probe.transformInputs.localTranslation).toEqual([
         1 - store.referenceCoordinate[0],
-        2 - store.referenceCoordinate[1],
-        3 - store.referenceCoordinate[2]
+        0,
+        0
       ]);
+      expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
+      expect(store.probeSurfaceChoice).toBeNull();
+    });
+
+    it("moves the tip in world space when only the dorsoventral target is available", async () => {
+      const findTargets = vi.fn().mockResolvedValue({
+        insideMillimeters: null,
+        axisMillimeters: null,
+        dorsoventralMillimeters: [4, 5, 6]
+      } satisfies ProbeSurfaceTargets);
+      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      const { wrapper, store, probe } = mountInspector();
+
+      await buttonByLabel(wrapper, t.surface).trigger("click");
+      await flushPromises();
+
+      // A world-DV move adjusts the chain's first translation, not its depth axis.
+      expect(probe.transformInputs.globalTranslation).toEqual([
+        4 - store.referenceCoordinate[0],
+        5 - store.referenceCoordinate[1],
+        6 - store.referenceCoordinate[2]
+      ]);
+      expect(probe.transformInputs.localTranslation).toEqual([0, 0, 0]);
+      expect(store.probeSurfaceChoice).toBeNull();
+    });
+
+    it("warns and leaves the probe put when its chain offers no depth axis to insert along", async () => {
+      const findTargets = vi.fn().mockResolvedValue({
+        insideMillimeters: null,
+        axisMillimeters: [1, 2, 3],
+        dorsoventralMillimeters: null
+      } satisfies ProbeSurfaceTargets);
+      vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
+      const { wrapper, store, probe } = mountInspector(
+        makeProbe({ transformChainId: TRANSLATION_ONLY_CHAIN.id })
+      );
+      usePreferencesStore().transformChains = [TRANSLATION_ONLY_CHAIN];
+      await wrapper.vm.$nextTick();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+
+      await buttonByLabel(wrapper, t.surface).trigger("click");
+      await flushPromises();
+
+      expect(notifySpy).toHaveBeenCalledWith({
+        message: t.noSurfaceFound,
+        caption: t.noSurfaceFoundCaption,
+        color: "warning",
+        icon: "warning"
+      });
+      expect(probe.transformInputs.globalTranslation).toEqual([0, 0, 0]);
       expect(store.probeSurfaceChoice).toBeNull();
     });
 
@@ -633,7 +920,9 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
       const { wrapper, probe } = mountInspector(
-        makeProbe({ tipPosition: [1, 2, 3] })
+        makeProbe({
+          transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+        })
       );
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
@@ -646,14 +935,16 @@ describe("ProbeInspector", () => {
         color: "warning",
         icon: "warning"
       });
-      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      expect(probe.transformInputs.globalTranslation).toEqual([1, 2, 3]);
     });
 
     it("shows a surface-unavailable warning when findTargets resolves null", async () => {
       const findTargets = vi.fn().mockResolvedValue(null);
       vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
       const { wrapper, probe } = mountInspector(
-        makeProbe({ tipPosition: [1, 2, 3] })
+        makeProbe({
+          transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+        })
       );
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
 
@@ -666,7 +957,7 @@ describe("ProbeInspector", () => {
         color: "warning",
         icon: "warning"
       });
-      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      expect(probe.transformInputs.globalTranslation).toEqual([1, 2, 3]);
     });
 
     it("never shows a toast when cancelled before findTargets resolves", async () => {
@@ -699,6 +990,7 @@ describe("ProbeInspector", () => {
       const findTargets = vi.fn(
         (
           _probe: unknown,
+          _chain: unknown,
           _referenceCoordinate: unknown,
           signal?: AbortSignal
         ) => {
@@ -710,7 +1002,9 @@ describe("ProbeInspector", () => {
       );
       vi.mocked(useProbeSurface).mockReturnValue({ findTargets });
       const { wrapper, probe } = mountInspector(
-        makeProbe({ tipPosition: [1, 2, 3] })
+        makeProbe({
+          transformInputs: makeTransformInputs({ globalTranslation: [1, 2, 3] })
+        })
       );
 
       await buttonByLabel(wrapper, t.surface).trigger("click");
@@ -731,7 +1025,7 @@ describe("ProbeInspector", () => {
       });
       await flushPromises();
 
-      expect(probe.tipPosition).toEqual([1, 2, 3]);
+      expect(probe.transformInputs.globalTranslation).toEqual([1, 2, 3]);
       expect(buttonByLabel(wrapper, t.surface).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "QLinearProgress" }).exists()).toBe(
         false
@@ -742,8 +1036,7 @@ describe("ProbeInspector", () => {
       const { wrapper, store, probe } = mountInspector();
       store.probeSurfaceChoice = {
         probeId: probe.id,
-        tipPosition: [...probe.tipPosition],
-        rotation: [...probe.rotation],
+        transformInputs: makeTransformInputs(),
         tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
@@ -761,8 +1054,7 @@ describe("ProbeInspector", () => {
       const { wrapper, store, probe } = mountInspector();
       store.probeSurfaceChoice = {
         probeId: probe.id,
-        tipPosition: [...probe.tipPosition],
-        rotation: [...probe.rotation],
+        transformInputs: makeTransformInputs(),
         tipMillimeters: [0, 0, 0],
         axisTargetMillimeters: [1, 0, 0],
         dorsoventralTargetMillimeters: [0, 1, 0]
@@ -952,7 +1244,7 @@ describe("ProbeInspector", () => {
       await flushPromises();
 
       const contour = getProbeContour(probeInterfaceProbe)!;
-      expect(probe.bodyModel!.position).toEqual([
+      expect(probe.bodyModel!.transformInputs.globalTranslation).toEqual([
         0,
         0,
         contour.heightMillimeters
@@ -969,15 +1261,15 @@ describe("ProbeInspector", () => {
       expect(probe.bodyModel).toBeNull();
     });
 
-    it("hides the nine pose inputs when no body model is attached", () => {
+    it("renders no body model inspector when no body model is attached", () => {
       const { wrapper } = mountInspector(makeProbe({ bodyModel: null }));
 
-      expect(
-        fieldByLabel(wrapper, bodyModelLabel("bodyModelPosition", axis.x))
-      ).toBeUndefined();
+      expect(wrapper.findComponent(ProbeBodyModelInspector).exists()).toBe(
+        false
+      );
     });
 
-    it("writes Position X, Rotation Y, and Scale Z back to the body model, respecting unit preferences", async () => {
+    it("writes the body model's own transform inputs and scale, respecting unit preferences", async () => {
       const { wrapper, probe } = mountInspector(
         makeProbe({ bodyModel: makeSceneModel() })
       );
@@ -985,36 +1277,76 @@ describe("ProbeInspector", () => {
       preferences.positionUnit = "millimeter";
       preferences.rotationUnit = "degree";
       await wrapper.vm.$nextTick();
+      const names = preferences.transformInputNames;
 
       await editAndBlur(
-        fieldByLabel(wrapper, bodyModelLabel("bodyModelPosition", axis.x)),
+        bodyModelFieldByLabel(wrapper, names.globalTranslation[0]),
         "5"
       );
       await editAndBlur(
-        fieldByLabel(wrapper, bodyModelLabel("bodyModelRotation", axis.y)),
+        bodyModelFieldByLabel(wrapper, names.globalRotation[1]),
         "90"
       );
       await editAndBlur(
-        fieldByLabel(wrapper, bodyModelLabel("bodyModelScale", axis.z)),
+        bodyModelFieldByLabel(
+          wrapper,
+          bodyModelLabel("bodyModelScale", axis.z)
+        ),
         "2"
       );
 
-      expect(probe.bodyModel!.position[0]).toBe(5);
-      expect(probe.bodyModel!.rotation[1]).toBeCloseTo(Math.PI / 2);
+      expect(probe.bodyModel!.transformInputs.globalTranslation[0]).toBe(5);
+      expect(probe.bodyModel!.transformInputs.globalRotation[1]).toBeCloseTo(
+        Math.PI / 2
+      );
       expect(probe.bodyModel!.scale[2]).toBe(2);
+      // The probe's own rows carry the same labels, and must stay untouched.
+      expect(probe.transformInputs.globalTranslation[0]).toBe(0);
     });
 
-    it("disables the nine pose inputs while the probe is locked", () => {
-      const { wrapper } = mountInspector(
-        makeProbe({ bodyModel: makeSceneModel(), lock: true })
+    it("switches the body model's chain from its own chain selector", async () => {
+      const { wrapper, probe } = mountInspector(
+        makeProbe({ bodyModel: makeSceneModel() })
       );
+      usePreferencesStore().transformChains = [TRANSLATION_ONLY_CHAIN];
+      await wrapper.vm.$nextTick();
 
-      expect(
-        fieldByLabel(
-          wrapper,
-          bodyModelLabel("bodyModelPosition", axis.x)
-        ).props("disable")
-      ).toBe(true);
+      const select = wrapper
+        .findAllComponents({ name: "QSelect" })
+        .find(
+          candidate => candidate.props("label") === t.bodyModelTransformChain
+        )!;
+      select.vm.$emit("update:modelValue", TRANSLATION_ONLY_CHAIN.id);
+      await wrapper.vm.$nextTick();
+
+      expect(probe.bodyModel!.transformChainId).toBe(TRANSLATION_ONLY_CHAIN.id);
+      expect(probe.transformChainId).toBe(DEFAULT_TRANSFORM_CHAIN_ID);
+    });
+
+    it("disables the body model's transform inputs while the probe is locked", () => {
+      // The body model reads a chain driving all twelve inputs, so the probe's
+      // lock alone disables them.
+      const { wrapper } = mountInspector(
+        makeProbe({
+          bodyModel: makeSceneModel({
+            transformChainId: ALL_INPUTS_CHAIN.id
+          }),
+          lock: true
+        }),
+        [ALL_INPUTS_CHAIN]
+      );
+      const names = usePreferencesStore().transformInputNames;
+
+      for (const group of TRANSFORM_INPUT_GROUPS) {
+        for (const component of COMPONENTS) {
+          expect(
+            bodyModelFieldByLabel(wrapper, names[group][component]).props(
+              "disable"
+            ),
+            `${group}[${component}] disabled`
+          ).toBe(true);
+        }
+      }
     });
 
     it("toggles the gizmo attachment on the probe's body model", async () => {

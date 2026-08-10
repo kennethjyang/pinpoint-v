@@ -3,8 +3,6 @@ import type {
   DragStartEndEvent,
   GizmoManager,
   IGizmo,
-  IPositionGizmo,
-  IRotationGizmo,
   IScaleGizmo,
   Observer,
   Scene
@@ -20,7 +18,13 @@ import {
 import type { Experiment } from "@/features/experiment";
 import type { Probe } from "@/features/probe";
 import type { SceneModel } from "../models/scene-model.model";
-import type { TransformGizmos } from "../models/gizmo.model";
+import type { TransformChain } from "../models/transform-chain.model";
+import { asrToVector3 } from "./coordinate-transforms.api";
+import {
+  findTransformChain,
+  getTransformChainPose,
+  TRANSFORM_INPUT_GROUPS
+} from "./transform-chain.api";
 import {
   buildCollisionBody,
   buildColliderMesh,
@@ -111,44 +115,6 @@ export function getProbeGizmoNode(
 }
 
 /**
- * Update a probe's body model position from a gizmo drag.
- * @param positionGizmo Position gizmo to track dragging on.
- * @param probes Experiment probes to resolve the attached node against.
- * @param onDrag Callback invoked with the probe id the drag is happening to.
- */
-export function setProbeBodyModelPositionFromGizmoDrag(
-  positionGizmo: IPositionGizmo,
-  probes: Probe[],
-  onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return positionGizmo.onDragObservable.add(() => {
-    const attached = attachedProbeBodyModelFromGizmo(positionGizmo, probes);
-    if (!attached) return;
-    attached.bodyModel.position = vector3ToTriple(attached.node.position);
-    onDrag(attached.probe.id);
-  });
-}
-
-/**
- * Update a probe's body model orientation from a gizmo drag.
- * @param rotationGizmo Rotation gizmo to track dragging on.
- * @param probes Experiment probes to resolve the attached node against.
- * @param onDrag Callback invoked with the probe id the drag is happening to.
- */
-export function setProbeBodyModelRotationFromGizmoDrag(
-  rotationGizmo: IRotationGizmo,
-  probes: Probe[],
-  onDrag: (probeId: string) => void
-): Observer<DragEvent> {
-  return rotationGizmo.onDragObservable.add(() => {
-    const attached = attachedProbeBodyModelFromGizmo(rotationGizmo, probes);
-    if (!attached) return;
-    attached.bodyModel.rotation = vector3ToTriple(attached.node.rotation);
-    onDrag(attached.probe.id);
-  });
-}
-
-/**
  * Update a probe's body model scale from a gizmo drag.
  * @param scaleGizmo Scale gizmo to track dragging on.
  * @param probes Experiment probes to resolve the attached node against.
@@ -168,25 +134,20 @@ export function setProbeBodyModelScaleFromGizmoDrag(
 }
 
 /**
- * Callback filter for when dragging finishes on a probe's body model, from
- * the position, rotation, or scale gizmo.
- * @param gizmos Position, rotation, and scale gizmos to track dragging on.
+ * Callback filter for when a scale drag finishes on a probe's body model. The
+ * transform chain gizmo reports its own drags, so only the scale gizmo is left
+ * on the gizmo manager.
+ * @param scaleGizmo Scale gizmo to track dragging on.
  * @param onDragEnd Callback invoked to confirm the body model drag ended.
  */
 export function endProbeBodyModelGizmoDrag(
-  gizmos: TransformGizmos,
+  scaleGizmo: IScaleGizmo,
   onDragEnd: () => void
-): Observer<DragStartEndEvent>[] {
-  const onEnd = (gizmo: IGizmo) => () => {
-    if (!gizmo.attachedNode?.name.endsWith(BODY_MODEL_NODE_SUFFIX)) return;
+): Observer<DragStartEndEvent> {
+  return scaleGizmo.onDragEndObservable.add(() => {
+    if (!scaleGizmo.attachedNode?.name.endsWith(BODY_MODEL_NODE_SUFFIX)) return;
     onDragEnd();
-  };
-
-  return [
-    gizmos.positionGizmo.onDragEndObservable.add(onEnd(gizmos.positionGizmo)),
-    gizmos.rotationGizmo.onDragEndObservable.add(onEnd(gizmos.rotationGizmo)),
-    gizmos.scaleGizmo.onDragEndObservable.add(onEnd(gizmos.scaleGizmo))
-  ];
+  });
 }
 
 /**
@@ -264,7 +225,11 @@ export async function buildProbeBodyModelNode(
 
 /** Build a pose-identity string, so an unchanged local pose skips re-cooking. */
 function buildBodyModelPoseKey(bodyModel: SceneModel): string {
-  return `${bodyModel.position.join(",")}|${bodyModel.rotation.join(",")}|${bodyModel.scale.join(",")}`;
+  const { transformInputs, scale } = bodyModel;
+  const inputs = TRANSFORM_INPUT_GROUPS.map(group =>
+    transformInputs[group].join(",")
+  ).join("|");
+  return `${bodyModel.transformChainId}|${inputs}|${scale.join(",")}`;
 }
 
 /**
@@ -309,6 +274,7 @@ function buildProbeBodyModelCollisionBody(
  * @param scene Scene holding the probe entities.
  * @param experiment Experiment whose probes to sync.
  * @param gizmoManager Gizmo manager to add fresh body models' meshes to.
+ * @param chains Transform chains the body models' inputs drive.
  * @param state Load bookkeeping, mutated in place.
  * @param draggedProbeId Probe id whose body model is under a gizmo drag, skipped for pose and collider updates.
  * @param loadModel Loader for a stored model file, by model id.
@@ -317,6 +283,7 @@ export async function syncProbeBodyModels(
   scene: Scene,
   experiment: Experiment,
   gizmoManager: GizmoManager,
+  chains: readonly TransformChain[],
   state: ProbeBodyModelSyncState,
   draggedProbeId: string | null,
   loadModel: (modelId: string) => Promise<File | null>
@@ -403,11 +370,13 @@ export async function syncProbeBodyModels(
     // the released pose.
     if (probe.id === draggedProbeId) continue;
 
-    // Applied verbatim, not through `asrToVector3`: these are Babylon local
-    // XYZ relative to the probe node, not ASR. Set before cooking the hull,
+    // The chain resolves the model's pose in the probe node's own frame; the
+    // scale stays verbatim Babylon local XYZ. Set before cooking the hull,
     // which reads world matrices.
-    node.position = new Vector3(...bodyModel.position);
-    node.rotation = new Vector3(...bodyModel.rotation);
+    const chain = findTransformChain(chains, bodyModel.transformChainId);
+    const pose = getTransformChainPose(chain, bodyModel.transformInputs);
+    node.position = asrToVector3(pose.position);
+    node.rotation = asrToVector3(pose.rotation);
     node.scaling = new Vector3(...bodyModel.scale);
 
     const poseKey = buildBodyModelPoseKey(bodyModel);
