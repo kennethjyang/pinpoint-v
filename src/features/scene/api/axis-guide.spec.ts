@@ -468,6 +468,137 @@ describe("buildAxisGuides", () => {
       );
     }
   });
+
+  it("orients each local label per the probe-frame convention: ±X/±Y flat facing +Z, ±Z upright facing +Y", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+    const node = new TransformNode("gizmoNode", scene);
+
+    buildAxisGuides(scene, guides, makeAtlas(), {
+      kind: "local",
+      getNode: () => node
+    });
+
+    const reading = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(1, 0, 0), matrix).normalize();
+    const topEdge = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(0, 1, 0), matrix).normalize();
+    const facing = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(0, 0, -1), matrix).normalize();
+
+    const cases: Array<{
+      paragraph: (typeof renderers.ml.paragraphs)[number];
+      reading: Vector3;
+      topEdge: Vector3;
+      facing: Vector3;
+    }> = [
+      {
+        paragraph: renderers.ml.paragraphs[0]!,
+        reading: new Vector3(0, 1, 0),
+        topEdge: new Vector3(1, 0, 0),
+        facing: new Vector3(0, 0, 1)
+      },
+      {
+        paragraph: renderers.ml.paragraphs[1]!,
+        reading: new Vector3(0, -1, 0),
+        topEdge: new Vector3(-1, 0, 0),
+        facing: new Vector3(0, 0, 1)
+      },
+      {
+        paragraph: renderers.dv.paragraphs[0]!,
+        reading: new Vector3(-1, 0, 0),
+        topEdge: new Vector3(0, 1, 0),
+        facing: new Vector3(0, 0, 1)
+      },
+      {
+        paragraph: renderers.dv.paragraphs[1]!,
+        reading: new Vector3(1, 0, 0),
+        topEdge: new Vector3(0, -1, 0),
+        facing: new Vector3(0, 0, 1)
+      },
+      {
+        paragraph: renderers.ap.paragraphs[0]!,
+        reading: new Vector3(1, 0, 0),
+        topEdge: new Vector3(0, 0, 1),
+        facing: new Vector3(0, 1, 0)
+      },
+      {
+        paragraph: renderers.ap.paragraphs[1]!,
+        reading: new Vector3(1, 0, 0),
+        topEdge: new Vector3(0, 0, 1),
+        facing: new Vector3(0, 1, 0)
+      }
+    ];
+
+    for (const testCase of cases) {
+      expectVectorCloseTo(
+        reading(testCase.paragraph.worldMatrix),
+        testCase.reading
+      );
+      expectVectorCloseTo(
+        topEdge(testCase.paragraph.worldMatrix),
+        testCase.topEdge
+      );
+      expectVectorCloseTo(
+        facing(testCase.paragraph.worldMatrix),
+        testCase.facing
+      );
+    }
+  });
+
+  it("draws the local set at the same em size, arrow geometry, and label distances as the global set", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+    const node = new TransformNode("gizmoNode", scene);
+
+    buildAxisGuides(scene, guides, makeAtlas(), {
+      kind: "local",
+      getNode: () => node
+    });
+
+    const scale = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(1, 0, 0), matrix).length();
+    for (const renderer of Object.values(renderers)) {
+      for (const paragraph of renderer.paragraphs) {
+        expect(scale(paragraph.worldMatrix)).toBeCloseTo(5.7 / 1.52, 4);
+      }
+    }
+
+    const translations: Array<{ text: string; position: Vector3 }> = [
+      { text: "+X", position: new Vector3(14.025, 0, 0) },
+      { text: "-X", position: new Vector3(-14.025, 0, 0) },
+      { text: "+Y", position: new Vector3(0, 10.625, 0) },
+      { text: "-Y", position: new Vector3(0, -10.625, 0) },
+      { text: "+Z", position: new Vector3(0, 0, 15.825) },
+      { text: "-Z", position: new Vector3(0, 0, -15.825) }
+    ];
+    const allParagraphs = Object.values(renderers).flatMap(
+      renderer => renderer.paragraphs
+    );
+    for (const { text, position } of translations) {
+      const paragraph = allParagraphs.find(p => p.text === text)!;
+      expectVectorCloseTo(paragraph.worldMatrix.getTranslation(), position);
+    }
+
+    const shaft = scene.getMeshByName("axisGuideArrow_+X")!;
+    const head = scene.getMeshByName("axisGuideArrow_+X_head")!;
+    expectVectorCloseTo(shaft.position, new Vector3(8.86875, 0, 0));
+    expectVectorCloseTo(head.position, new Vector3(10.74375, 0, 0));
+    expect(shaft.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(
+      1.21875
+    );
+    expect(head.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(
+      0.65625
+    );
+
+    for (const mesh of scene.meshes.filter(mesh =>
+      mesh.name.startsWith("axisGuidePick_")
+    )) {
+      expect(mesh.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(
+        1.875
+      );
+    }
+  });
 });
 
 /**
@@ -495,7 +626,7 @@ function makeRotatedLocalFrameScene(): {
 
   const camera = new ArcRotateCamera(
     "c",
-    -Math.PI / 2,
+    -Math.PI / 3,
     Math.PI / 8,
     50,
     Vector3.Zero(),
@@ -569,6 +700,41 @@ describe("buildAxisGuides local frame tracking", () => {
 
     expect(scene.onBeforeRenderObservable.hasObservers()).toBe(false);
     expect(() => tickScene(scene, 16)).not.toThrow();
+  });
+
+  it("re-points to a newly selected node without disposing the previous one", () => {
+    const scene = makeTestScene();
+    const { guides } = makeTestAxisGuides(scene);
+    const nodeA = new TransformNode("a", scene);
+    const nodeB = new TransformNode("b", scene);
+    nodeB.rotationQuaternion = Quaternion.RotationYawPitchRoll(
+      Math.PI / 2,
+      0,
+      0
+    );
+    let current: TransformNode = nodeA;
+
+    buildAxisGuides(scene, guides, makeAtlas(), {
+      kind: "local",
+      getNode: () => current
+    });
+    const root = scene.getTransformNodeByName("axisGuideRoot_node")!;
+    tickScene(scene, 16);
+    root.computeWorldMatrix(true);
+    expect(
+      root.absoluteRotationQuaternion.equalsWithEpsilon(Quaternion.Identity())
+    ).toBe(true);
+
+    current = nodeB;
+    nodeB.computeWorldMatrix(true);
+    tickScene(scene, 16);
+    root.computeWorldMatrix(true);
+
+    expect(
+      root.absoluteRotationQuaternion.equalsWithEpsilon(
+        nodeB.absoluteRotationQuaternion
+      )
+    ).toBe(true);
   });
 });
 

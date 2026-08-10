@@ -129,45 +129,42 @@ const AXIS_GUIDE_GLOBAL_SPECS: AxisGuideSpec[] = [
 
 /**
  * The six local guides, labelled in Babylon axes and coloured like Babylon's transform gizmos
- * (X red, Y green, Z blue): the ML/DV/AP renderers already carry exactly those three colours, so
- * each local guide reuses its Babylon axis's counterpart renderer and atlas dimension. Positions
- * sit at the Babylon direction matching each label's sign; orientations match the *same-signed*
- * global guide (`+X` reads like `+ML`, `+Z` like `+AP`, and so on). For ML this is also the
- * same-*direction* global guide, since ML's ASR sign carries straight into Babylon's +X; for AP
- * (and, moot, for DV, whose rotation doesn't vary by sign) `asrToBabylon` negates the sign, so
- * `+Z`'s rotation is `+AP`'s, 180° in yaw from `-AP`'s — the guide `+Z`'s Babylon direction
- * happens to share.
+ * (X red, Y green, Z blue): each local guide reuses its Babylon axis's counterpart renderer and
+ * atlas dimension for its gizmo colour (X red = ML, Y green = DV, Z blue = AP). Drawn as the
+ * global convention with +Z as the up axis: `+X`/`-X` and `+Y`/`-Y` lie flat in the local X/Y
+ * plane facing +Z with each top edge radiating outward along its own signed axis; `+Z`/`-Z`
+ * stand upright in the local Z/X plane facing +Y with both top edges toward +Z.
  */
 const AXIS_GUIDE_LOCAL_SPECS: AxisGuideSpec[] = [
   {
     axis: "ml",
     direction: new Vector3(1, 0, 0),
     text: "+X",
-    rotation: { pitch: Math.PI / 2, yaw: Math.PI / 2, roll: 0 }
+    rotation: { pitch: Math.PI, yaw: 0, roll: -Math.PI / 2 }
   },
   {
     axis: "ml",
     direction: new Vector3(-1, 0, 0),
     text: "-X",
-    rotation: { pitch: Math.PI / 2, yaw: -Math.PI / 2, roll: 0 }
+    rotation: { pitch: Math.PI, yaw: 0, roll: Math.PI / 2 }
   },
   {
     axis: "dv",
     direction: new Vector3(0, 1, 0),
     text: "+Y",
-    rotation: { pitch: 0, yaw: 0, roll: 0 }
+    rotation: { pitch: 0, yaw: Math.PI, roll: 0 }
   },
   {
     axis: "dv",
     direction: new Vector3(0, -1, 0),
     text: "-Y",
-    rotation: { pitch: 0, yaw: 0, roll: 0 }
+    rotation: { pitch: Math.PI, yaw: 0, roll: 0 }
   },
   {
     axis: "ap",
     direction: new Vector3(0, 0, 1),
     text: "+Z",
-    rotation: { pitch: Math.PI / 2, yaw: Math.PI, roll: 0 }
+    rotation: { pitch: Math.PI / 2, yaw: 0, roll: 0 }
   },
   {
     axis: "ap",
@@ -177,7 +174,7 @@ const AXIS_GUIDE_LOCAL_SPECS: AxisGuideSpec[] = [
   }
 ];
 
-/** Widest label's width, as a fraction of the atlas's ML length. */
+/** Widest global label's width, as a fraction of the atlas's ML length. */
 const AXIS_GUIDE_WIDTH_ML_FRACTION = 0.5;
 
 const AXIS_GUIDE_PICK_MESH_NAME_PREFIX = "axisGuidePick_";
@@ -294,7 +291,7 @@ export function buildAxisGuides(
   // `setAtlasCenterOffset` keeps the atlas center on the scene origin, so the
   // guides are placed straight in world space around that origin.
   const root = new TransformNode(AXIS_GUIDE_ROOT_NODE_NAME, scene);
-  const fontSize = axisGuideFontSize(mlLength, specs, labelSizes);
+  const fontSize = axisGuideFontSize(mlLength, guides.fontAsset);
   const materials = buildAxisGuideArrowMaterials(scene);
   if (frame.kind === "local")
     trackAxisGuideLocalFrame(scene, root, frame.getNode);
@@ -518,8 +515,8 @@ function buildAxisGuideArrowMaterials(
 }
 
 /**
- * Keep the guide root's rotation on the node the getter resolves, re-resolving after the node is
- * rebuilt, until the root is disposed.
+ * Keep the guide root's rotation on the node the getter resolves, re-resolving every frame,
+ * until the root is disposed.
  * @param scene Scene whose frames drive the tracking.
  * @param root Axis guide root node to rotate.
  * @param getNode Resolves the node whose Babylon axes the guides follow.
@@ -531,9 +528,8 @@ function trackAxisGuideLocalFrame(
 ): void {
   const rotation = new Quaternion();
   root.rotationQuaternion = rotation;
-  let node: TransformNode | null = null;
   const observer = scene.onBeforeRenderObservable.add(() => {
-    if (!node || node.isDisposed()) node = getNode();
+    const node = getNode();
     if (!node) return;
 
     rotation.copyFrom(node.absoluteRotationQuaternion);
@@ -570,17 +566,17 @@ export function pickAxisGuideDirection(
 }
 
 /**
- * Em size in mm making the widest label exactly half the atlas's ML length.
+ * Em size in mm making the widest global label exactly half the atlas's ML length, shared by
+ * both guide sets.
  * @param mlLength Atlas ML extent in mm.
- * @param specs Axis guide specs in use.
- * @param labelSizes Each label's measured size in em, keyed by text.
+ * @param fontAsset Font asset the labels are measured with.
  */
-function axisGuideFontSize(
-  mlLength: number,
-  specs: AxisGuideSpec[],
-  labelSizes: Record<string, { width: number; height: number }>
-): number {
-  const widest = Math.max(...specs.map(spec => labelSizes[spec.text]!.width));
+function axisGuideFontSize(mlLength: number, fontAsset: FontAsset): number {
+  const widest = Math.max(
+    ...AXIS_GUIDE_GLOBAL_SPECS.map(
+      spec => labelSizeEm(spec.text, fontAsset).width
+    )
+  );
   return (mlLength * AXIS_GUIDE_WIDTH_ML_FRACTION) / widest;
 }
 
