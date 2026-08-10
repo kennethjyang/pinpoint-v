@@ -36,6 +36,7 @@ export function buildFixedCoordinateSystemValue(
  * @param rotation Rotation values.
  * @param positionDisplayOrder Mapping from XYZ index to position value index.
  * @param rotationDisplayOrder Mapping from XYZ index to rotation value index.
+ * @param onSurface Whether this node must reside on the surface of the brain.
  */
 export function buildCoordinateSystemNode(
   position: [
@@ -49,9 +50,16 @@ export function buildCoordinateSystemNode(
     CoordinateSystemValue
   ],
   positionDisplayOrder: [number, number, number] = [0, 1, 2],
-  rotationDisplayOrder: [number, number, number] = [0, 1, 2]
+  rotationDisplayOrder: [number, number, number] = [0, 1, 2],
+  onSurface = false
 ): CoordinateSystemNode {
-  return { position, positionDisplayOrder, rotation, rotationDisplayOrder };
+  return {
+    position,
+    positionDisplayOrder,
+    rotation,
+    rotationDisplayOrder,
+    onSurface
+  };
 }
 
 /**

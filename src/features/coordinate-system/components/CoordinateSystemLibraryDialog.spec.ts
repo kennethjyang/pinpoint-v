@@ -65,7 +65,7 @@ describe("CoordinateSystemLibraryDialog", () => {
 
     expect(store.library).toHaveLength(3);
     expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining("CCF") })
+      expect.objectContaining({ message: expect.stringContaining("Default") })
     );
   });
 
@@ -81,7 +81,7 @@ describe("CoordinateSystemLibraryDialog", () => {
     options.actions[1].handler();
 
     expect(store.library).toHaveLength(2);
-    expect(store.library.map(({ name }) => name)).not.toContain("CCF");
+    expect(store.library.map(({ name }) => name)).not.toContain("Default");
   });
 
   it("selects the coordinate system and closes the dialog on row click", async () => {

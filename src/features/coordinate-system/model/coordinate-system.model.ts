@@ -24,6 +24,9 @@ export interface CoordinateSystemNode {
 
   // Mapping from XYZ index to a coordinate system value index.
   rotationDisplayOrder: [number, number, number];
+
+  // If this node is on the surface of the brain.
+  onSurface: boolean;
 }
 
 export interface CoordinateSystem {

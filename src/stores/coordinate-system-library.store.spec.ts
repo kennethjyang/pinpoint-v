@@ -43,8 +43,8 @@ describe("useCoordinateSystemLibraryStore", () => {
       const store = useCoordinateSystemLibraryStore();
 
       expect(store.library.map(({ name }) => name)).toEqual([
-        "CCF",
-        "Sensapex uMp-4 Surface Coordinate & Depth",
+        "Default",
+        "Surface Coordinate & Depth",
         "NewScale MIS"
       ]);
     });
@@ -60,22 +60,22 @@ describe("useCoordinateSystemLibraryStore", () => {
       });
     });
 
-    it("carries the X/Y/Depth position values on the final NewScale MIS node", () => {
+    it("carries the X/Y/Z position values on the pre-depth NewScale MIS node", () => {
       const store = useCoordinateSystemLibraryStore();
       const position = store.library[2]!.chain[2]!.position;
 
-      expect(position.map(({ name }) => name)).toEqual(["X", "Y", "Depth"]);
+      expect(position.map(({ name }) => name)).toEqual(["X", "Y", "Z"]);
       for (const value of position) {
-        expect(value.bounds).toEqual([-7.5, 7.5]);
+        expect(value.fixed).toBe(false);
+        expect(value.bounds).toBeNull();
       }
-      expect(position[2]!.value).toBe(20);
     });
 
-    it("carries the Pitch bounds on the Sensapex chain", () => {
+    it("carries the Pitch bounds on the Surface Coordinate & Depth chain", () => {
       const store = useCoordinateSystemLibraryStore();
 
       expect(store.library[1]!.chain[0]!.rotation[0]!.bounds).toEqual([
-        -Math.PI / 2,
+        0,
         Math.PI / 2
       ]);
     });
@@ -89,6 +89,32 @@ describe("useCoordinateSystemLibraryStore", () => {
           expect(node.rotationDisplayOrder).toEqual([0, 1, 2]);
         }
       }
+    });
+
+    it("marks only the first Surface Coordinate & Depth node onSurface", () => {
+      const store = useCoordinateSystemLibraryStore();
+      const chain = store.library[1]!.chain;
+
+      expect(chain[0]!.onSurface).toBe(true);
+      expect(chain[1]!.onSurface).toBe(false);
+    });
+
+    it("marks only the second-to-last NewScale MIS node onSurface", () => {
+      const store = useCoordinateSystemLibraryStore();
+      const chain = store.library[2]!.chain;
+
+      expect(chain.map(node => node.onSurface)).toEqual([
+        false,
+        false,
+        true,
+        false
+      ]);
+    });
+
+    it("defaults the Default coordinate system's node to off-surface", () => {
+      const store = useCoordinateSystemLibraryStore();
+
+      expect(store.library[0]!.chain[0]!.onSurface).toBe(false);
     });
   });
 });

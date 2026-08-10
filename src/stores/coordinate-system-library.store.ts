@@ -12,7 +12,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
   "coordinate-system-library",
   () => {
     const library = ref<CoordinateSystem[]>([
-      buildCoordinateSystem("CCF", [
+      buildCoordinateSystem("Default", [
         buildCoordinateSystemNode(
           [
             buildCoordinateSystemValue("ML"),
@@ -26,23 +26,26 @@ export const useCoordinateSystemLibraryStore = defineStore(
           ]
         )
       ]),
-      buildCoordinateSystem("Sensapex uMp-4 Surface Coordinate & Depth", [
+      buildCoordinateSystem("Surface Coordinate & Depth", [
         buildCoordinateSystemNode(
           [
-            buildCoordinateSystemValue("ML", [-10, 10]),
-            buildCoordinateSystemValue("DV", [-10, 10]),
-            buildCoordinateSystemValue("AP", [-10, 10])
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
           ],
           [
-            buildCoordinateSystemValue("Pitch", [-Math.PI / 2, Math.PI / 2]),
+            buildCoordinateSystemValue("Pitch", [0, Math.PI / 2]),
             buildCoordinateSystemValue("Yaw", [0, 2 * Math.PI]),
             buildCoordinateSystemValue("Roll", [0, 2 * Math.PI])
-          ]
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
         ),
         buildCoordinateSystemNode(
           [
             buildFixedCoordinateSystemValue(),
-            buildCoordinateSystemValue("Depth", [-10, 10]),
+            buildCoordinateSystemValue("Depth"),
             buildFixedCoordinateSystemValue()
           ],
           [
@@ -60,7 +63,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
             buildFixedCoordinateSystemValue()
           ],
           [
-            buildCoordinateSystemValue("Pitch", [0, Math.PI]),
+            buildCoordinateSystemValue("Arc Angle", [0, Math.PI]),
             buildFixedCoordinateSystemValue(),
             buildFixedCoordinateSystemValue()
           ]
@@ -73,15 +76,33 @@ export const useCoordinateSystemLibraryStore = defineStore(
           ],
           [
             buildFixedCoordinateSystemValue(),
-            buildCoordinateSystemValue("Yaw", [-Math.PI / 4, Math.PI / 4]),
+            buildCoordinateSystemValue("Module Angle", [
+              -Math.PI / 4,
+              Math.PI / 4
+            ]),
             buildFixedCoordinateSystemValue()
           ]
         ),
         buildCoordinateSystemNode(
           [
-            buildCoordinateSystemValue("X", [-7.5, 7.5]),
-            buildCoordinateSystemValue("Y", [-7.5, 7.5]),
-            buildCoordinateSystemValue("Depth", [-7.5, 7.5], 20)
+            buildCoordinateSystemValue("X"),
+            buildCoordinateSystemValue("Y"),
+            buildCoordinateSystemValue("Z")
+          ],
+          [
+            buildFixedCoordinateSystemValue(),
+            buildFixedCoordinateSystemValue(),
+            buildFixedCoordinateSystemValue()
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
+        ),
+        buildCoordinateSystemNode(
+          [
+            buildFixedCoordinateSystemValue(),
+            buildCoordinateSystemValue("Depth"),
+            buildFixedCoordinateSystemValue()
           ],
           [
             buildFixedCoordinateSystemValue(),
