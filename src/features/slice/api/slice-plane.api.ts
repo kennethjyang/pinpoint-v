@@ -1,5 +1,6 @@
 import {
   type Atlas,
+  getAtlasAverageDimensionMillimeters,
   getAtlasLongestDimensionMillimeters
 } from "@/features/atlas";
 import type {
@@ -96,13 +97,25 @@ export function clampSliceExtent(
 }
 
 /**
- * Default slice extent for a probe whose zoom has never been set, in mm.
- * @param range Zoom range to take the middle of, as log2 mm exponents.
+ * Default slice extent for a probe whose zoom has never been set, in mm - a
+ * fraction of the atlas's average dimension, snapped to the nearest whole
+ * zoom exponent (i.e. the nearest slider tick) and clamped into the range.
+ * @param atlas Atlas to size the default against.
+ * @param atlasFraction Fraction of the atlas's average dimension to show.
+ * @param range Zoom range to snap into, as log2 mm exponents.
  */
 export function getDefaultSliceExtentMillimeters(
+  atlas: Atlas,
+  atlasFraction: number,
   range: SliceZoomExponentRange
 ): number {
-  return 2 ** ((range.minimum + range.maximum) / 2);
+  const targetMillimeters =
+    getAtlasAverageDimensionMillimeters(atlas) * atlasFraction;
+  const exponent =
+    targetMillimeters > 0
+      ? Math.round(Math.log2(targetMillimeters))
+      : (range.minimum + range.maximum) / 2;
+  return 2 ** clamp(exponent, range.minimum, range.maximum);
 }
 
 /**

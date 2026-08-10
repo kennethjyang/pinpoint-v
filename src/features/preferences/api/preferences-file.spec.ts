@@ -34,6 +34,7 @@ function makePreferences(overrides: Partial<Preferences> = {}): Preferences {
     probeHeadStageCutDepthMillimeters: 17.5,
     probeRodDiameterMillimeters: 8,
     probeRodLengthMillimeters: 200,
+    sliceDefaultZoomFraction: 1 / 3,
     ...overrides
   };
 }
@@ -53,12 +54,12 @@ describe("serializePreferences", () => {
     );
   });
 
-  it("writes only the twenty-one preference keys", () => {
+  it("writes only the twenty-two preference keys", () => {
     const fixture = { ...makePreferences(), junk: 1 } as Preferences;
 
     const keys = Object.keys(JSON.parse(serializePreferences(fixture)));
 
-    expect(keys).toHaveLength(21);
+    expect(keys).toHaveLength(22);
     expect(keys).not.toContain("junk");
   });
 });
@@ -142,6 +143,12 @@ describe("parsePreferencesFile", () => {
 
   it("returns null for an ssaoRatio above 1", () => {
     const fixture = makePreferences({ ssaoRatio: 1.5 });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a sliceDefaultZoomFraction above 1", () => {
+    const fixture = makePreferences({ sliceDefaultZoomFraction: 2 });
 
     expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
   });

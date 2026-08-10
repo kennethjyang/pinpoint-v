@@ -29,17 +29,23 @@ export interface SliceViewport {
  * @param probe Probe to read and write persisted viewport state on.
  * @param contour Probe's contour, or null when unavailable.
  * @param atlas Current atlas.
+ * @param defaultZoomFraction Fraction of the atlas's average dimension the default zoom shows.
  */
 export function useSliceViewport(
   probe: Ref<Probe>,
   contour: Ref<ProbeContour | null>,
-  atlas: Ref<Atlas>
+  atlas: Ref<Atlas>,
+  defaultZoomFraction: Ref<number>
 ): SliceViewport {
   const zoomRange = computed(() => getSliceZoomExponentRange(atlas.value));
 
   const extentMillimeters = computed(() =>
     probe.value.sliceExtentMillimeters === null
-      ? getDefaultSliceExtentMillimeters(zoomRange.value)
+      ? getDefaultSliceExtentMillimeters(
+          atlas.value,
+          defaultZoomFraction.value,
+          zoomRange.value
+        )
       : clampSliceExtent(probe.value.sliceExtentMillimeters, zoomRange.value)
   );
 

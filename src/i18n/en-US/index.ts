@@ -328,6 +328,10 @@ export default {
     headStageCutDepth: "Headstage Cut Depth",
     rodDiameter: "Rod Diameter",
     rodLength: "Rod Length",
+    sliceView: "Slice View",
+    defaultZoomFractionHint:
+      "How much of the atlas a probe's slice view shows before you set its zoom, as a fraction of the atlas's average size. Rounded to the nearest zoom step.",
+    defaultZoomFraction: "Default Zoom",
 
     exportHint:
       "Download your preferences as a JSON file, or upload one to replace them with its values.",

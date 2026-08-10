@@ -90,4 +90,28 @@ describe("ProbePreferences", () => {
 
     expect(preferences.probeRodLengthMillimeters).toBe(0.5);
   });
+
+  it("typing 0.5 into Default Zoom writes 0.5 to sliceDefaultZoomFraction", async () => {
+    const wrapper = mountWithQuasar(ProbePreferences);
+    const preferences = usePreferencesStore();
+
+    await fieldByLabel(wrapper, t.defaultZoomFraction).vm.$emit(
+      "update:modelValue",
+      "0.5"
+    );
+
+    expect(preferences.sliceDefaultZoomFraction).toBe(0.5);
+  });
+
+  it("typing 0 into Default Zoom clamps to the 0.01 minimum", async () => {
+    const wrapper = mountWithQuasar(ProbePreferences);
+    const preferences = usePreferencesStore();
+
+    await fieldByLabel(wrapper, t.defaultZoomFraction).vm.$emit(
+      "update:modelValue",
+      "0"
+    );
+
+    expect(preferences.sliceDefaultZoomFraction).toBe(0.01);
+  });
 });

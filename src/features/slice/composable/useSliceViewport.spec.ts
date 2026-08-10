@@ -18,15 +18,28 @@ function makeContour() {
 }
 
 describe("useSliceViewport", () => {
-  it("defaults the extent to the middle of the zoom range when unset", () => {
+  it("defaults the extent to a third of the atlas's average size, snapped to a tick", () => {
     const probe = ref(makeProbe({ sliceExtentMillimeters: null }));
     const { extentMillimeters } = useSliceViewport(
       probe,
       ref(null),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
-    expect(extentMillimeters.value).toBe(2);
+    expect(extentMillimeters.value).toBe(4);
+  });
+
+  it("scales the default with the zoom fraction preference", () => {
+    const probe = ref(makeProbe({ sliceExtentMillimeters: null }));
+    const { extentMillimeters } = useSliceViewport(
+      probe,
+      ref(null),
+      ref(makeAtlas()),
+      ref(1)
+    );
+
+    expect(extentMillimeters.value).toBe(8);
   });
 
   it("clamps a persisted extent outside the current atlas's range", () => {
@@ -34,7 +47,8 @@ describe("useSliceViewport", () => {
     const { extentMillimeters } = useSliceViewport(
       probe,
       ref(null),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
     expect(extentMillimeters.value).toBe(2 ** 4);
@@ -45,7 +59,8 @@ describe("useSliceViewport", () => {
     const { zoomExponent } = useSliceViewport(
       probe,
       ref(null),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
     zoomExponent.value = 3;
@@ -58,7 +73,8 @@ describe("useSliceViewport", () => {
     const { centerHeightMillimeters } = useSliceViewport(
       probe,
       ref(makeContour()),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
     expect(centerHeightMillimeters.value).toBe(10);
@@ -69,7 +85,8 @@ describe("useSliceViewport", () => {
     const { centerHeightMillimeters } = useSliceViewport(
       probe,
       ref(makeContour()),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
     centerHeightMillimeters.value = 6;
@@ -84,7 +101,8 @@ describe("useSliceViewport", () => {
     const { extentMillimeters, centerHeightMillimeters } = useSliceViewport(
       probe,
       ref(null),
-      ref(makeAtlas())
+      ref(makeAtlas()),
+      ref(1 / 3)
     );
 
     probe.value = makeProbe({

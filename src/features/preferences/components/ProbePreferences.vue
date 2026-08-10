@@ -55,49 +55,70 @@ const rodLength = useClampedNumberModel(
     millimetersToPositionUnit(millimeters, preferences.positionUnit),
   value => positionUnitToMillimeters(value, preferences.positionUnit)
 );
+const defaultZoomFraction = useClampedNumberModel(
+  toRef(preferences, "sliceDefaultZoomFraction"),
+  0.01,
+  1
+);
 </script>
 
 <template>
-  <div>
-    <div class="text-h6">{{ $t("preferences.probeShape") }}</div>
-    <div class="column q-gutter-y-md">
+  <div class="column q-gutter-y-md">
+    <div>
+      <div class="text-h6">{{ $t("preferences.probeShape") }}</div>
+      <div class="column q-gutter-y-md">
+        <q-input
+          v-model="shankThickness"
+          :label="$t('preferences.shankThickness')"
+          :min="0.001"
+          :suffix="positionSuffix"
+          dense
+          outlined
+        />
+        <q-input
+          v-model="headStageLength"
+          :label="$t('preferences.headStageLength')"
+          :min="0.01"
+          :suffix="positionSuffix"
+          dense
+          outlined
+        />
+        <q-input
+          v-model="headStageCutDepth"
+          :label="$t('preferences.headStageCutDepth')"
+          :min="0"
+          :suffix="positionSuffix"
+          dense
+          outlined
+        />
+        <q-input
+          v-model="rodDiameter"
+          :label="$t('preferences.rodDiameter')"
+          :min="0.01"
+          :suffix="positionSuffix"
+          dense
+          outlined
+        />
+        <q-input
+          v-model="rodLength"
+          :label="$t('preferences.rodLength')"
+          :min="0.01"
+          :suffix="positionSuffix"
+          dense
+          outlined
+        />
+      </div>
+    </div>
+    <q-separator />
+    <div>
+      <div class="text-h6">{{ $t("preferences.sliceView") }}</div>
+      <div class="text-caption q-mt-xs q-mb-sm">
+        {{ $t("preferences.defaultZoomFractionHint") }}
+      </div>
       <q-input
-        v-model="shankThickness"
-        :label="$t('preferences.shankThickness')"
-        :min="0.001"
-        :suffix="positionSuffix"
-        dense
-        outlined
-      />
-      <q-input
-        v-model="headStageLength"
-        :label="$t('preferences.headStageLength')"
+        v-model="defaultZoomFraction"
+        :label="$t('preferences.defaultZoomFraction')"
         :min="0.01"
-        :suffix="positionSuffix"
-        dense
-        outlined
-      />
-      <q-input
-        v-model="headStageCutDepth"
-        :label="$t('preferences.headStageCutDepth')"
-        :min="0"
-        :suffix="positionSuffix"
-        dense
-        outlined
-      />
-      <q-input
-        v-model="rodDiameter"
-        :label="$t('preferences.rodDiameter')"
-        :min="0.01"
-        :suffix="positionSuffix"
-        dense
-        outlined
-      />
-      <q-input
-        v-model="rodLength"
-        :label="$t('preferences.rodLength')"
-        :min="0.01"
-        :suffix="positionSuffix"
         dense
         outlined
       />

@@ -6,6 +6,10 @@ import SliceCanvas from "./SliceCanvas.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
+  usePreferencesStore,
+  type Preferences
+} from "@/stores/preferences.store";
+import {
   makeAtlas,
   makeManifest,
   makeProbe,
@@ -97,12 +101,16 @@ describe("SliceCanvas", () => {
 
   function mountSlice(
     probeOverrides: Parameters<typeof makeProbe>[0] = {},
-    atlasOverride?: Atlas
+    atlasOverride?: Atlas,
+    preferencesOverride?: Partial<Preferences>
   ) {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useCurrentExperimentStore(pinia);
     if (atlasOverride) store.experiment.atlas = atlasOverride;
+    if (preferencesOverride) {
+      Object.assign(usePreferencesStore(pinia), preferencesOverride);
+    }
 
     const probeInterfaceProbe = makeProbeInterfaceProbe({
       si_units: "mm",
@@ -627,18 +635,18 @@ describe("SliceCanvas", () => {
     expect(zoomSlider.props("modelValue")).toBe(2);
   });
 
-  it("defaults a probe whose zoom has never been set to the middle of the mouse-scale range", async () => {
+  it("defaults a probe whose zoom has never been set to a third of the mouse-scale atlas's average size", async () => {
     const { wrapper } = mountSlice({ sliceExtentMillimeters: null });
     await flushPromises();
 
     const sliders = wrapper.findAllComponents({ name: "QSlider" });
     const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
-    // Mouse range is {-2, 4}; its middle, exponent 1, is 2mm - the same
-    // value `buildProbe` used to hardcode.
-    expect(zoomSlider.props("modelValue")).toBe(1);
+    // Average dimension ~10.87mm; a third is ~3.62mm; log2(3.62) ~= 1.86,
+    // which rounds to tick 2 (4mm) - not the range's middle exponent 1 (2mm).
+    expect(zoomSlider.props("modelValue")).toBe(2);
   });
 
-  it("defaults a probe whose zoom has never been set to the middle of a human-scale range", async () => {
+  it("defaults a probe whose zoom has never been set to a third of a human-scale atlas's average size", async () => {
     const { wrapper } = mountSlice(
       { sliceExtentMillimeters: null },
       makeAtlas({
@@ -652,9 +660,23 @@ describe("SliceCanvas", () => {
 
     const sliders = wrapper.findAllComponents({ name: "QSlider" });
     const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
-    // This atlas's range is {2, 8}; its middle, exponent 5, is 32mm - not
-    // pinned to the range's minimum, as a hardcoded 2mm default would be.
-    expect(zoomSlider.props("modelValue")).toBe(5);
+    // Average dimension 197mm; a third is ~65.67mm; log2(65.67) ~= 6.04,
+    // which rounds to tick 6 (64mm) - not the range's middle exponent 5 (32mm).
+    expect(zoomSlider.props("modelValue")).toBe(6);
+  });
+
+  it("follows the sliceDefaultZoomFraction preference for a probe whose zoom has never been set", async () => {
+    const { wrapper } = mountSlice(
+      { sliceExtentMillimeters: null },
+      undefined,
+      { sliceDefaultZoomFraction: 1 }
+    );
+    await flushPromises();
+
+    const sliders = wrapper.findAllComponents({ name: "QSlider" });
+    const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
+    // log2(10.8666...) ~= 3.44, which rounds to tick 3 (8mm).
+    expect(zoomSlider.props("modelValue")).toBe(3);
   });
 
   it("samples at a lower resolution while the probe pose keeps changing, then returns to full resolution once it settles", async () => {
