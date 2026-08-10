@@ -296,9 +296,16 @@ export function buildAxisGuides(
   if (frame.kind === "local")
     trackAxisGuideLocalFrame(scene, root, frame.getNode);
 
+  // Local guides rotate with the probe, so an axis-specific anchor (as global uses) can land
+  // inside the atlas once rotated; anchoring every local guide at the longest atlas dimension
+  // keeps them outside the atlas at any orientation.
+  const localAnchor = Math.max(...dimensions);
   for (const spec of specs) {
     const labelSize = labelSizes[spec.text]!;
-    const anchor = dimensions[AXIS_GUIDE_ASR_INDEX[spec.axis]];
+    const anchor =
+      frame.kind === "local"
+        ? localAnchor
+        : dimensions[AXIS_GUIDE_ASR_INDEX[spec.axis]];
     const labelCenter = spec.direction.scale(
       anchor + (AXIS_GUIDE_ARROW_LABEL_GAP_EM + labelSize.height / 2) * fontSize
     );

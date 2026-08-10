@@ -400,6 +400,7 @@ describe("buildAxisGuides", () => {
     const { renderers, guides } = makeTestAxisGuides(scene);
     const node = new TransformNode("gizmoNode", scene);
     const dimensions = getAtlasDimensionsMillimeters(makeAtlas());
+    const longestDimension = Math.max(...dimensions);
     const scale = (matrix: Matrix) =>
       Vector3.TransformNormal(new Vector3(1, 0, 0), matrix).length();
 
@@ -431,32 +432,32 @@ describe("buildAxisGuides", () => {
     }> = [
       {
         paragraph: renderers.ml.paragraphs[0]!,
-        dimension: dimensions[2],
+        dimension: longestDimension,
         direction: new Vector3(1, 0, 0)
       },
       {
         paragraph: renderers.ml.paragraphs[1]!,
-        dimension: dimensions[2],
+        dimension: longestDimension,
         direction: new Vector3(-1, 0, 0)
       },
       {
         paragraph: renderers.dv.paragraphs[0]!,
-        dimension: dimensions[1],
+        dimension: longestDimension,
         direction: new Vector3(0, 1, 0)
       },
       {
         paragraph: renderers.dv.paragraphs[1]!,
-        dimension: dimensions[1],
+        dimension: longestDimension,
         direction: new Vector3(0, -1, 0)
       },
       {
         paragraph: renderers.ap.paragraphs[0]!,
-        dimension: dimensions[0],
+        dimension: longestDimension,
         direction: new Vector3(0, 0, 1)
       },
       {
         paragraph: renderers.ap.paragraphs[1]!,
-        dimension: dimensions[0],
+        dimension: longestDimension,
         direction: new Vector3(0, 0, -1)
       }
     ];
@@ -546,7 +547,7 @@ describe("buildAxisGuides", () => {
     }
   });
 
-  it("draws the local set at the same em size, arrow geometry, and label distances as the global set", () => {
+  it("draws the local set at the same em size and arrow geometry as the global set, with every label anchored beyond the atlas's longest dimension", () => {
     const scene = makeTestScene();
     const { renderers, guides } = makeTestAxisGuides(scene);
     const node = new TransformNode("gizmoNode", scene);
@@ -564,11 +565,13 @@ describe("buildAxisGuides", () => {
       }
     }
 
+    // Longest atlas dimension (AP, 13.2mm) plus the shared arrow-clearance-and-label-gap term
+    // (2.625mm): every local label anchors the same distance out, regardless of its own axis.
     const translations: Array<{ text: string; position: Vector3 }> = [
-      { text: "+X", position: new Vector3(14.025, 0, 0) },
-      { text: "-X", position: new Vector3(-14.025, 0, 0) },
-      { text: "+Y", position: new Vector3(0, 10.625, 0) },
-      { text: "-Y", position: new Vector3(0, -10.625, 0) },
+      { text: "+X", position: new Vector3(15.825, 0, 0) },
+      { text: "-X", position: new Vector3(-15.825, 0, 0) },
+      { text: "+Y", position: new Vector3(0, 15.825, 0) },
+      { text: "-Y", position: new Vector3(0, -15.825, 0) },
       { text: "+Z", position: new Vector3(0, 0, 15.825) },
       { text: "-Z", position: new Vector3(0, 0, -15.825) }
     ];
@@ -582,8 +585,8 @@ describe("buildAxisGuides", () => {
 
     const shaft = scene.getMeshByName("axisGuideArrow_+X")!;
     const head = scene.getMeshByName("axisGuideArrow_+X_head")!;
-    expectVectorCloseTo(shaft.position, new Vector3(8.86875, 0, 0));
-    expectVectorCloseTo(head.position, new Vector3(10.74375, 0, 0));
+    expectVectorCloseTo(shaft.position, new Vector3(10.66875, 0, 0));
+    expectVectorCloseTo(head.position, new Vector3(12.54375, 0, 0));
     expect(shaft.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(
       1.21875
     );
@@ -597,6 +600,32 @@ describe("buildAxisGuides", () => {
       expect(mesh.getBoundingInfo().boundingBox.extendSize.y).toBeCloseTo(
         1.875
       );
+    }
+  });
+
+  it("anchors every local label at whichever atlas axis is longest, not its own axis", () => {
+    const scene = makeTestScene();
+    const { renderers, guides } = makeTestAxisGuides(scene);
+    const node = new TransformNode("gizmoNode", scene);
+    // DV (500 voxels) is the longest axis here, unlike the default fixture where AP is longest.
+    const atlas = makeAtlas({
+      manifest: makeManifest({ shape: [[100, 500, 100]] })
+    });
+    const longestDimension = Math.max(...getAtlasDimensionsMillimeters(atlas));
+
+    buildAxisGuides(scene, guides, atlas, {
+      kind: "local",
+      getNode: () => node
+    });
+
+    const scale = (matrix: Matrix) =>
+      Vector3.TransformNormal(new Vector3(1, 0, 0), matrix).length();
+    for (const renderer of Object.values(renderers)) {
+      for (const paragraph of renderer.paragraphs) {
+        const labelScale = scale(paragraph.worldMatrix);
+        const distance = paragraph.worldMatrix.getTranslation().length();
+        expect(distance).toBeCloseTo(longestDimension + 0.7 * labelScale, 4);
+      }
     }
   });
 });
