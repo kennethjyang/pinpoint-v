@@ -42,6 +42,7 @@
     "@vueuse/core": "^14.4.0",
     "@vueuse/integrations": "^14.4.0",
     "axios": "^1.19.0",
+    "closed-chain-ik": "github:gkjohnson/closed-chain-ik-js",
     "earcut": "^3.2.3",
     "fflate": "^0.8.3",
     "fuse.js": "^7.5.0",
