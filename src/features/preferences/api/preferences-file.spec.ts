@@ -34,7 +34,7 @@ function makePreferences(overrides: Partial<Preferences> = {}): Preferences {
     probeHeadStageCutDepthMillimeters: 17.5,
     probeRodDiameterMillimeters: 8,
     probeRodLengthMillimeters: 200,
-    sliceDefaultZoomFraction: 1 / 3,
+    sliceDefaultZoomFraction: 0.25,
     ...overrides
   };
 }
@@ -149,6 +149,12 @@ describe("parsePreferencesFile", () => {
 
   it("returns null for a sliceDefaultZoomFraction above 1", () => {
     const fixture = makePreferences({ sliceDefaultZoomFraction: 2 });
+
+    expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
+  });
+
+  it("returns null for a sliceDefaultZoomFraction below 0.125", () => {
+    const fixture = makePreferences({ sliceDefaultZoomFraction: 0.1 });
 
     expect(parsePreferencesFile(JSON.stringify(fixture))).toBeNull();
   });

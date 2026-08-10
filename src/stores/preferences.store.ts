@@ -79,7 +79,7 @@ export const usePreferencesStore = defineStore(
     const probeHeadStageCutDepthMillimeters = ref(17.5);
     const probeRodDiameterMillimeters = ref(8);
     const probeRodLengthMillimeters = ref(200);
-    const sliceDefaultZoomFraction = ref(1 / 3);
+    const sliceDefaultZoomFraction = ref(0.25);
 
     // `satisfies` keeps the store's state and `Preferences` in lockstep: a new
     // preference must appear in both.

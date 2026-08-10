@@ -330,7 +330,7 @@ export default {
     rodLength: "Rod Length",
     sliceView: "Slice View",
     defaultZoomFractionHint:
-      "How much of the atlas a probe's slice view shows before you set its zoom, as a fraction of the atlas's average size. Rounded to the nearest zoom step.",
+      "How much of the atlas a probe's slice view shows before you set its zoom, as a fraction of the atlas's average size. The resulting zoom is rounded to the nearest step.",
     defaultZoomFraction: "Default Zoom",
 
     exportHint:

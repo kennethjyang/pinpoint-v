@@ -55,11 +55,22 @@ const rodLength = useClampedNumberModel(
     millimetersToPositionUnit(millimeters, preferences.positionUnit),
   value => positionUnitToMillimeters(value, preferences.positionUnit)
 );
-const defaultZoomFraction = useClampedNumberModel(
-  toRef(preferences, "sliceDefaultZoomFraction"),
-  0.01,
-  1
-);
+
+const defaultZoomExponent = computed<number>({
+  get: () => Math.log2(preferences.sliceDefaultZoomFraction),
+  set: (value: number) => {
+    preferences.sliceDefaultZoomFraction = 2 ** value;
+  }
+});
+
+/**
+ * Format a default-zoom slider tick as a fraction label, e.g. -3 to "1/8".
+ * @param exponent Slider position, as a log2 fraction exponent.
+ */
+function defaultZoomFractionLabel(exponent: number): string {
+  const denominator = 2 ** -exponent;
+  return denominator === 1 ? "1" : `1/${denominator}`;
+}
 </script>
 
 <template>
@@ -115,12 +126,17 @@ const defaultZoomFraction = useClampedNumberModel(
       <div class="text-caption q-mt-xs q-mb-sm">
         {{ $t("preferences.defaultZoomFractionHint") }}
       </div>
-      <q-input
-        v-model="defaultZoomFraction"
-        :label="$t('preferences.defaultZoomFraction')"
-        :min="0.01"
-        dense
-        outlined
+      <q-slider
+        v-model="defaultZoomExponent"
+        :aria-label="$t('preferences.defaultZoomFraction')"
+        :min="-3"
+        :max="0"
+        :step="1"
+        :markers="1"
+        :marker-labels="defaultZoomFractionLabel"
+        :label-value="defaultZoomFractionLabel(defaultZoomExponent)"
+        label
+        class="q-px-lg"
       />
     </div>
   </div>

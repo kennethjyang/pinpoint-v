@@ -635,18 +635,24 @@ describe("SliceCanvas", () => {
     expect(zoomSlider.props("modelValue")).toBe(2);
   });
 
-  it("defaults a probe whose zoom has never been set to a third of the mouse-scale atlas's average size", async () => {
-    const { wrapper } = mountSlice({ sliceExtentMillimeters: null });
+  it("defaults a probe whose zoom has never been set to a quarter of the mouse-scale atlas's average size", async () => {
+    const { wrapper } = mountSlice(
+      { sliceExtentMillimeters: null },
+      undefined,
+      {
+        sliceDefaultZoomFraction: 0.25
+      }
+    );
     await flushPromises();
 
     const sliders = wrapper.findAllComponents({ name: "QSlider" });
     const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
-    // Average dimension ~10.87mm; a third is ~3.62mm; log2(3.62) ~= 1.86,
-    // which rounds to tick 2 (4mm) - not the range's middle exponent 1 (2mm).
-    expect(zoomSlider.props("modelValue")).toBe(2);
+    // Average dimension ~10.87mm; a quarter is ~2.72mm; log2(2.72) ~= 1.44,
+    // which rounds to tick 1 (2mm).
+    expect(zoomSlider.props("modelValue")).toBe(1);
   });
 
-  it("defaults a probe whose zoom has never been set to a third of a human-scale atlas's average size", async () => {
+  it("defaults a probe whose zoom has never been set to a quarter of a human-scale atlas's average size", async () => {
     const { wrapper } = mountSlice(
       { sliceExtentMillimeters: null },
       makeAtlas({
@@ -654,13 +660,14 @@ describe("SliceCanvas", () => {
           resolutions: [[0.5, 0.5, 0.5]],
           shape: [[394, 394, 394]]
         })
-      })
+      }),
+      { sliceDefaultZoomFraction: 0.25 }
     );
     await flushPromises();
 
     const sliders = wrapper.findAllComponents({ name: "QSlider" });
     const zoomSlider = sliders.find(s => s.props("vertical") !== true)!;
-    // Average dimension 197mm; a third is ~65.67mm; log2(65.67) ~= 6.04,
+    // Average dimension 197mm; a quarter is ~49.25mm; log2(49.25) ~= 5.62,
     // which rounds to tick 6 (64mm) - not the range's middle exponent 5 (32mm).
     expect(zoomSlider.props("modelValue")).toBe(6);
   });

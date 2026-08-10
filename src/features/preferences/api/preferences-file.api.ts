@@ -99,7 +99,7 @@ const NUMERIC_PREFERENCE_RANGES = {
   probeHeadStageCutDepthMillimeters: [0, 1000],
   probeRodDiameterMillimeters: [0.01, 1000],
   probeRodLengthMillimeters: [0.01, 10_000],
-  sliceDefaultZoomFraction: [0.01, 1]
+  sliceDefaultZoomFraction: [0.125, 1]
 } as const satisfies Record<NumericPreferenceKey, readonly [number, number]>;
 
 /**
