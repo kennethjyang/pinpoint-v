@@ -131,7 +131,12 @@ const AXIS_GUIDE_GLOBAL_SPECS: AxisGuideSpec[] = [
  * The six local guides, labelled in Babylon axes and coloured like Babylon's transform gizmos
  * (X red, Y green, Z blue): the ML/DV/AP renderers already carry exactly those three colours, so
  * each local guide reuses its Babylon axis's counterpart renderer and atlas dimension. Positions
- * and orientations match the global guide sharing the same direction.
+ * sit at the Babylon direction matching each label's sign; orientations match the *same-signed*
+ * global guide (`+X` reads like `+ML`, `+Z` like `+AP`, and so on). For ML this is also the
+ * same-*direction* global guide, since ML's ASR sign carries straight into Babylon's +X; for AP
+ * (and, moot, for DV, whose rotation doesn't vary by sign) `asrToBabylon` negates the sign, so
+ * `+Z`'s rotation is `+AP`'s, 180° in yaw from `-AP`'s — the guide `+Z`'s Babylon direction
+ * happens to share.
  */
 const AXIS_GUIDE_LOCAL_SPECS: AxisGuideSpec[] = [
   {
@@ -162,13 +167,13 @@ const AXIS_GUIDE_LOCAL_SPECS: AxisGuideSpec[] = [
     axis: "ap",
     direction: new Vector3(0, 0, 1),
     text: "+Z",
-    rotation: { pitch: Math.PI / 2, yaw: 0, roll: 0 }
+    rotation: { pitch: Math.PI / 2, yaw: Math.PI, roll: 0 }
   },
   {
     axis: "ap",
     direction: new Vector3(0, 0, -1),
     text: "-Z",
-    rotation: { pitch: Math.PI / 2, yaw: Math.PI, roll: 0 }
+    rotation: { pitch: Math.PI / 2, yaw: 0, roll: 0 }
   }
 ];
 
