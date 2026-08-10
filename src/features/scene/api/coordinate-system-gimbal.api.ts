@@ -31,9 +31,9 @@ const GIMBAL_ARROW_HEAD_SUFFIX = "_head";
 /** Gimbal axis length, as a fraction of the atlas's longest dimension. */
 const GIMBAL_AXIS_LENGTH_FRACTION = 0.18;
 /** Origin sphere diameter, as a fraction of the gimbal axis length. */
-const GIMBAL_ORIGIN_DIAMETER_FRACTION = 0.2;
+const GIMBAL_ORIGIN_DIAMETER_FRACTION = 0.3;
 /** Axis cylinder diameter, as a fraction of the gimbal axis length. */
-const GIMBAL_AXIS_DIAMETER_FRACTION = 0.06;
+const GIMBAL_AXIS_DIAMETER_FRACTION = 0.18;
 /** Arrow shaft diameter, as a fraction of the gimbal axis length. */
 const GIMBAL_ARROW_SHAFT_DIAMETER_FRACTION = 0.05;
 /** Arrow cone head base diameter, as a fraction of the gimbal axis length. */

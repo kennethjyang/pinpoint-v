@@ -7,6 +7,8 @@ import {
   buildFixedCoordinateSystemValue,
   getCoordinateSystemAxisValue,
   getCoordinateSystemValueAxis,
+  removeCoordinateSystemTransform,
+  reorderCoordinateSystemTransform,
   reorderCoordinateSystemValue,
   setCoordinateSystemAxisValue,
   setCoordinateSystemSurfaceNode,
@@ -51,6 +53,185 @@ describe("addCoordinateSystemTransform", () => {
     addCoordinateSystemTransform(coordinateSystem, "Tip");
 
     expect(coordinateSystem.chain).toHaveLength(1);
+  });
+});
+
+describe("reorderCoordinateSystemTransform", () => {
+  function makeTwoNodeChain() {
+    return makeCoordinateSystem({
+      chain: [
+        buildCoordinateSystemNode(
+          "First",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ]
+        ),
+        buildCoordinateSystemNode(
+          "Second",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
+        )
+      ]
+    });
+  }
+
+  it("moving index 1 to 0 reverses a two-node chain, keeping the moved node's surface flag", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    reorderCoordinateSystemTransform(coordinateSystem, 1, 0);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "Second",
+      "First"
+    ]);
+    expect(coordinateSystem.chain[0]!.onSurface).toBe(true);
+    expect(coordinateSystem.chain.filter(node => node.onSurface)).toHaveLength(
+      1
+    );
+  });
+
+  it("leaves the chain untouched when the indices are equal", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    reorderCoordinateSystemTransform(coordinateSystem, 0, 0);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "First",
+      "Second"
+    ]);
+  });
+
+  it("leaves the chain untouched when either index is negative", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    reorderCoordinateSystemTransform(coordinateSystem, -1, 0);
+    reorderCoordinateSystemTransform(coordinateSystem, 0, -1);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "First",
+      "Second"
+    ]);
+  });
+
+  it("leaves the chain untouched when either index is out of range", () => {
+    const coordinateSystem = makeTwoNodeChain();
+
+    reorderCoordinateSystemTransform(coordinateSystem, 2, 0);
+    reorderCoordinateSystemTransform(coordinateSystem, 0, 2);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "First",
+      "Second"
+    ]);
+  });
+});
+
+describe("removeCoordinateSystemTransform", () => {
+  function makeThreeNodeChain() {
+    return makeCoordinateSystem({
+      chain: [
+        buildCoordinateSystemNode(
+          "First",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ]
+        ),
+        buildCoordinateSystemNode(
+          "Second",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
+        ),
+        buildCoordinateSystemNode(
+          "Third",
+          [
+            buildCoordinateSystemValue("ML"),
+            buildCoordinateSystemValue("DV"),
+            buildCoordinateSystemValue("AP")
+          ],
+          [
+            buildCoordinateSystemValue("Pitch"),
+            buildCoordinateSystemValue("Yaw"),
+            buildCoordinateSystemValue("Roll")
+          ]
+        )
+      ]
+    });
+  }
+
+  it("removing the middle of a three-node chain keeps the outer two in order", () => {
+    const coordinateSystem = makeThreeNodeChain();
+
+    removeCoordinateSystemTransform(coordinateSystem, 1);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "First",
+      "Third"
+    ]);
+  });
+
+  it("removing the only node leaves an empty chain", () => {
+    const coordinateSystem = makeCoordinateSystem();
+
+    removeCoordinateSystemTransform(coordinateSystem, 0);
+
+    expect(coordinateSystem.chain).toHaveLength(0);
+  });
+
+  it("removing the surface node leaves every remaining node off the surface", () => {
+    const coordinateSystem = makeThreeNodeChain();
+
+    removeCoordinateSystemTransform(coordinateSystem, 1);
+
+    expect(coordinateSystem.chain.every(node => !node.onSurface)).toBe(true);
+  });
+
+  it("leaves the chain untouched when the index is negative or out of range", () => {
+    const coordinateSystem = makeThreeNodeChain();
+
+    removeCoordinateSystemTransform(coordinateSystem, -1);
+    removeCoordinateSystemTransform(coordinateSystem, 3);
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "First",
+      "Second",
+      "Third"
+    ]);
   });
 });
 

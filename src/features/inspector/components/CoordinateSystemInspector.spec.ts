@@ -281,4 +281,64 @@ describe("CoordinateSystemInspector", () => {
 
     expect(currentExperiment.focusedCoordinateSystemNodeIndex).toBeNull();
   });
+
+  it("drag-reorders transforms, dropping the focused-node highlight", async () => {
+    const { wrapper, coordinateSystem } = mountInspector(
+      makeCoordinateSystem({
+        chain: [
+          { ...makeCoordinateSystem().chain[0]!, name: "First" },
+          { ...makeCoordinateSystem().chain[0]!, name: "Second" }
+        ]
+      })
+    );
+    useCurrentExperimentStore().focusedCoordinateSystemNodeIndex = 1;
+
+    await wrapper.findAll(".node-row__handle")[1]!.trigger("dragstart");
+    const nodes = wrapper.findAllComponents(CoordinateSystemNodeInspector);
+    await nodes[0]!.trigger("dragover");
+    await nodes[0]!.trigger("drop");
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual([
+      "Second",
+      "First"
+    ]);
+    expect(
+      useCurrentExperimentStore().focusedCoordinateSystemNodeIndex
+    ).toBeNull();
+  });
+
+  it("clicking a handle does not expand or collapse the item", async () => {
+    const { wrapper } = mountInspector();
+    const nodeInspector = wrapper.findComponent(CoordinateSystemNodeInspector);
+    expect(nodeInspector.classes()).toContain("q-expansion-item--expanded");
+
+    await wrapper.find(".node-row__handle").trigger("click");
+
+    expect(nodeInspector.classes()).toContain("q-expansion-item--expanded");
+  });
+
+  it("clicking a second node's Delete Transform button removes only that node and drops the focus", async () => {
+    const { wrapper, coordinateSystem } = mountInspector(
+      makeCoordinateSystem({
+        chain: [
+          { ...makeCoordinateSystem().chain[0]!, name: "First" },
+          { ...makeCoordinateSystem().chain[0]!, name: "Second" }
+        ]
+      })
+    );
+    useCurrentExperimentStore().focusedCoordinateSystemNodeIndex = 1;
+
+    const secondNode = wrapper.findAllComponents(
+      CoordinateSystemNodeInspector
+    )[1]!;
+    const deleteButton = secondNode
+      .findAllComponents({ name: "QBtn" })
+      .find(button => button.text().includes(t.deleteTransform))!;
+    await deleteButton.trigger("click");
+
+    expect(coordinateSystem.chain.map(node => node.name)).toEqual(["First"]);
+    expect(
+      useCurrentExperimentStore().focusedCoordinateSystemNodeIndex
+    ).toBeNull();
+  });
 });

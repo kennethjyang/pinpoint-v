@@ -4,9 +4,12 @@ import { useI18n } from "vue-i18n";
 import {
   addCoordinateSystemTransform,
   type CoordinateSystem,
+  removeCoordinateSystemTransform,
+  reorderCoordinateSystemTransform,
   setCoordinateSystemSurfaceNode
 } from "@/features/coordinate-system";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { useDragReorder } from "@/composable/useDragReorder";
 import { useValidationRules } from "@/composable/useValidationRules";
 import CommittedInput from "@/components/CommittedInput.vue";
 import CoordinateSystemNodeInspector from "./CoordinateSystemNodeInspector.vue";
@@ -19,11 +22,39 @@ const currentExperiment = useCurrentExperimentStore();
 
 const { requiredName: nameRules } = useValidationRules();
 const { t } = useI18n();
+const {
+  draggedIndex,
+  dropTargetIndex,
+  startDrag,
+  dragOverRow,
+  dropRow,
+  endDrag
+} = useDragReorder(reorderTransform);
 
 const name = computed({
   get: () => coordinateSystem.name,
   set: (value: string) => (coordinateSystem.name = value.trim())
 });
+
+/**
+ * Move a transform within the chain, dropping the focused-node highlight so it never
+ * points at a node that has moved.
+ * @param fromIndex Index of the transform to move.
+ * @param toIndex Index to move it to.
+ */
+function reorderTransform(fromIndex: number, toIndex: number) {
+  reorderCoordinateSystemTransform(coordinateSystem, fromIndex, toIndex);
+  currentExperiment.focusedCoordinateSystemNodeIndex = null;
+}
+
+/**
+ * Remove a transform from the chain, dropping the focused-node highlight.
+ * @param nodeIndex Index of the transform to remove.
+ */
+function removeTransform(nodeIndex: number) {
+  removeCoordinateSystemTransform(coordinateSystem, nodeIndex);
+  currentExperiment.focusedCoordinateSystemNodeIndex = null;
+}
 
 watch(
   () => coordinateSystem.id,
@@ -68,7 +99,17 @@ onUnmounted(() => {
       <CoordinateSystemNodeInspector
         v-for="(node, index) of coordinateSystem.chain"
         :key="index"
+        :class="{
+          'node-row--dragging': draggedIndex === index,
+          'node-row--drop-target':
+            dropTargetIndex === index && draggedIndex !== index
+        }"
         :node="node"
+        @delete="removeTransform(index)"
+        @drag-end="endDrag"
+        @drag-start="startDrag(index, $event)"
+        @dragover="dragOverRow(index, $event)"
+        @drop="dropRow(index)"
         @focus="currentExperiment.focusedCoordinateSystemNodeIndex = index"
         @update:on-surface="
           setCoordinateSystemSurfaceNode(coordinateSystem, index, $event)
@@ -87,4 +128,11 @@ onUnmounted(() => {
   flex-wrap: nowrap
   gap: 16px
   padding: 8px 0
+
+.node-row--dragging
+  opacity: 0.5
+
+.node-row--drop-target
+  outline: 2px solid var(--q-primary)
+  outline-offset: -2px
 </style>

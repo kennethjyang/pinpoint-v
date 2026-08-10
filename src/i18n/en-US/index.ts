@@ -299,7 +299,8 @@ export default {
     bounded: "Bounded",
     minimum: "Minimum",
     maximum: "Maximum",
-    dragToReorder: "Drag to reorder"
+    dragToReorder: "Drag to reorder",
+    deleteTransform: "Delete Transform"
   },
   slice: {
     zoom: "Zoom",

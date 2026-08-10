@@ -15,6 +15,8 @@ export {
   buildFixedCoordinateSystemValue,
   getCoordinateSystemAxisValue,
   getCoordinateSystemValueAxis,
+  removeCoordinateSystemTransform,
+  reorderCoordinateSystemTransform,
   reorderCoordinateSystemValue,
   setCoordinateSystemAxisValue,
   setCoordinateSystemSurfaceNode,

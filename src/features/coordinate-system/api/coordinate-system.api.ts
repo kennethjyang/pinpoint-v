@@ -113,6 +113,45 @@ export function addCoordinateSystemTransform(
 }
 
 /**
+ * Move a transform within a coordinate system's chain.
+ * @param coordinateSystem Coordinate system holding the chain, mutated in place.
+ * @param fromIndex Index of the transform to move.
+ * @param toIndex Index to move it to.
+ */
+export function reorderCoordinateSystemTransform(
+  coordinateSystem: CoordinateSystem,
+  fromIndex: number,
+  toIndex: number
+): void {
+  const { chain } = coordinateSystem;
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= chain.length ||
+    toIndex >= chain.length
+  ) {
+    return;
+  }
+  const [node] = chain.splice(fromIndex, 1);
+  chain.splice(toIndex, 0, node!);
+}
+
+/**
+ * Remove one transform from a coordinate system's chain.
+ * @param coordinateSystem Coordinate system holding the chain, mutated in place.
+ * @param nodeIndex Index of the transform to remove.
+ */
+export function removeCoordinateSystemTransform(
+  coordinateSystem: CoordinateSystem,
+  nodeIndex: number
+): void {
+  const { chain } = coordinateSystem;
+  if (nodeIndex < 0 || nodeIndex >= chain.length) return;
+  chain.splice(nodeIndex, 1);
+}
+
+/**
  * Mark one node of a coordinate system's chain as its surface node, clearing every
  * other node so at most one is ever on the surface.
  * @param coordinateSystem Coordinate system holding the chain, mutated in place.
