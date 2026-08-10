@@ -31,37 +31,41 @@ export const useCoordinateSystemLibraryStore = defineStore(
         ],
         true
       ),
-      buildCoordinateSystem("Surface Coordinate & Depth", [
-        buildCoordinateSystemNode(
-          "Surface Coordinate",
-          [
-            buildCoordinateSystemValue("ML"),
-            buildCoordinateSystemValue("DV"),
-            buildCoordinateSystemValue("AP")
-          ],
-          [
-            buildCoordinateSystemValue("Pitch", [0, Math.PI / 2]),
-            buildCoordinateSystemValue("Yaw", [0, 2 * Math.PI]),
-            buildCoordinateSystemValue("Roll", [0, 2 * Math.PI])
-          ],
-          [0, 1, 2],
-          [0, 1, 2],
-          true
-        ),
-        buildCoordinateSystemNode(
-          "Depth",
-          [
-            buildFixedCoordinateSystemValue(),
-            buildCoordinateSystemValue("Depth"),
-            buildFixedCoordinateSystemValue()
-          ],
-          [
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue()
-          ]
-        )
-      ]),
+      buildCoordinateSystem(
+        "Surface Coordinate & Depth",
+        [
+          buildCoordinateSystemNode(
+            "Surface Coordinate",
+            [
+              buildCoordinateSystemValue("ML"),
+              buildCoordinateSystemValue("DV"),
+              buildCoordinateSystemValue("AP")
+            ],
+            [
+              buildCoordinateSystemValue("Pitch", [0, Math.PI / 2]),
+              buildCoordinateSystemValue("Yaw", [0, 2 * Math.PI]),
+              buildCoordinateSystemValue("Roll", [0, 2 * Math.PI])
+            ],
+            [0, 1, 2],
+            [0, 1, 2],
+            true
+          ),
+          buildCoordinateSystemNode(
+            "Depth",
+            [
+              buildFixedCoordinateSystemValue(),
+              buildCoordinateSystemValue("Depth"),
+              buildFixedCoordinateSystemValue()
+            ],
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ]
+          )
+        ],
+        true
+      ),
       buildCoordinateSystem("NewScale MIS", [
         buildCoordinateSystemNode(
           "Arc",
