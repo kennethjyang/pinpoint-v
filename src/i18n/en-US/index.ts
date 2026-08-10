@@ -232,6 +232,7 @@ export default {
     yaw: "Yaw",
     pitch: "Pitch",
     scaleSuffix: "×",
+    copy: "Duplicate 3D object",
     lock: "Lock 3D object",
     unlock: "Unlock 3D object",
     collisionDetection: "Collision detection"
@@ -255,7 +256,8 @@ export default {
     noPoses: "No saved camera poses yet."
   },
   worldInspector: {
-    backgroundColor: "Background Color",
+    backgroundColorLightMode: "Background Color (Light)",
+    backgroundColorDarkMode: "Background Color (Dark)",
     lightPower: "Light Power",
     specularIntensity: "Specular Intensity",
     specularPower: "Glossiness",

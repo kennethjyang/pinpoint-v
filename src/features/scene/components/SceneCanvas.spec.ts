@@ -10,6 +10,7 @@ import {
 import type { VueWrapper } from "@vue/test-utils";
 import { flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import { Dark } from "quasar";
 import type {
   GizmoManager,
   HavokPlugin,
@@ -600,6 +601,30 @@ describe("SceneCanvas", () => {
     );
   });
 
+  it("scales the camera's clip planes to the atlas and rescales when the atlas changes", async () => {
+    const { runtime } = await mountCanvas();
+
+    // DEFAULT_ATLAS is 13.2 x 8 x 11.4 mm.
+    expect(runtime.camera.value!.minZ).toBeCloseTo(0.132);
+    expect(runtime.camera.value!.maxZ).toBeCloseTo(13200);
+
+    useCurrentExperimentStore().experiment = buildExperiment(
+      "New Experiment",
+      makeAtlas({
+        manifest: makeManifest({
+          resolutions: [[0.02, 0.02, 0.02]],
+          shape: [[100, 100, 100]]
+        })
+      }),
+      [0, 0, 0]
+    );
+    await flushPromises();
+    await flushPromises();
+
+    expect(runtime.camera.value!.minZ).toBeCloseTo(0.02);
+    expect(runtime.camera.value!.maxZ).toBeCloseTo(2000);
+  });
+
   it("re-derives the projection when the camera's view matrix changes", async () => {
     const { runtime } = await mountCanvas();
     vi.mocked(applyCameraProjection).mockClear();
@@ -622,6 +647,33 @@ describe("SceneCanvas", () => {
     ).notifyObservers(undefined);
 
     expect(usePreferencesStore().cameraProjection).toBe("perspective");
+  });
+
+  describe("world background color", () => {
+    afterEach(() => {
+      Dark.set(false);
+    });
+
+    it("clears the scene with the light-mode color while dark mode is off", async () => {
+      Dark.set(false);
+      const { runtime } = await mountCanvas();
+      usePreferencesStore().worldBackgroundColorLightMode = "#ff0000";
+      await flushPromises();
+
+      expect(runtime.scene.value!.clearColor.toHexString()).toBe("#FF0000FF");
+    });
+
+    it("switches to the dark-mode color when dark mode turns on", async () => {
+      Dark.set(false);
+      const { runtime } = await mountCanvas();
+      const preferences = usePreferencesStore();
+      preferences.worldBackgroundColorLightMode = "#ff0000";
+      preferences.worldBackgroundColorDarkMode = "#0000ff";
+      Dark.set(true);
+      await flushPromises();
+
+      expect(runtime.scene.value!.clearColor.toHexString()).toBe("#0000FFFF");
+    });
   });
 
   it("resyncs structures with the new atlas when the experiment's atlas changes", async () => {
