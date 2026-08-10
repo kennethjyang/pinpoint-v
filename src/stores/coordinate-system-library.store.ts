@@ -24,7 +24,10 @@ export const useCoordinateSystemLibraryStore = defineStore(
             buildCoordinateSystemValue("Pitch"),
             buildCoordinateSystemValue("Yaw"),
             buildCoordinateSystemValue("Roll")
-          ]
+          ],
+          [0, 1, 2],
+          [0, 1, 2],
+          true
         )
       ]),
       buildCoordinateSystem("Surface Coordinate & Depth", [
