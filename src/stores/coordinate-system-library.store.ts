@@ -54,8 +54,8 @@ export const useCoordinateSystemLibraryStore = defineStore(
             "Depth",
             [
               buildFixedCoordinateSystemValue(),
-              buildCoordinateSystemValue("Depth"),
-              buildFixedCoordinateSystemValue()
+              buildFixedCoordinateSystemValue(),
+              buildCoordinateSystemValue("Depth")
             ],
             [
               buildFixedCoordinateSystemValue(),
@@ -66,66 +66,83 @@ export const useCoordinateSystemLibraryStore = defineStore(
         ],
         true
       ),
-      buildCoordinateSystem("NewScale MIS", [
-        buildCoordinateSystemNode(
-          "Arc",
-          [
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue()
-          ],
-          [
-            buildCoordinateSystemValue("Arc Angle", [0, Math.PI]),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue()
-          ]
-        ),
-        buildCoordinateSystemNode(
-          "Module",
-          [
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue("Radius", 20)
-          ],
-          [
-            buildFixedCoordinateSystemValue(),
-            buildCoordinateSystemValue("Module Angle", [
-              -Math.PI / 4,
-              Math.PI / 4
-            ]),
-            buildFixedCoordinateSystemValue()
-          ]
-        ),
-        buildCoordinateSystemNode(
-          "Stage",
-          [
-            buildCoordinateSystemValue("X"),
-            buildCoordinateSystemValue("Y"),
-            buildCoordinateSystemValue("Z")
-          ],
-          [
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue()
-          ],
-          [0, 1, 2],
-          [0, 1, 2],
-          true
-        ),
-        buildCoordinateSystemNode(
-          "Depth",
-          [
-            buildFixedCoordinateSystemValue(),
-            buildCoordinateSystemValue("Depth"),
-            buildFixedCoordinateSystemValue()
-          ],
-          [
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue(),
-            buildFixedCoordinateSystemValue()
-          ]
-        )
-      ])
+      buildCoordinateSystem(
+        "NewScale MIS",
+        [
+          buildCoordinateSystemNode(
+            "Arc",
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ],
+            [
+              buildCoordinateSystemValue("Arc Angle", [0, Math.PI]),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ]
+          ),
+          buildCoordinateSystemNode(
+            "Module",
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ],
+            [
+              buildFixedCoordinateSystemValue(),
+              buildCoordinateSystemValue("Module Angle", [
+                -Math.PI / 4,
+                Math.PI / 4
+              ]),
+              buildFixedCoordinateSystemValue()
+            ]
+          ),
+          buildCoordinateSystemNode(
+            "Module Radius",
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue("Radius", 20)
+            ],
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ]
+          ),
+          buildCoordinateSystemNode(
+            "Stage",
+            [
+              buildCoordinateSystemValue("X"),
+              buildCoordinateSystemValue("Y"),
+              buildCoordinateSystemValue("Z")
+            ],
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ],
+            [0, 1, 2],
+            [0, 1, 2],
+            true
+          ),
+          buildCoordinateSystemNode(
+            "Depth",
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildCoordinateSystemValue("Depth")
+            ],
+            [
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue(),
+              buildFixedCoordinateSystemValue()
+            ]
+          )
+        ],
+        true
+      )
     ]);
 
     /**
