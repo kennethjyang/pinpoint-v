@@ -14,10 +14,12 @@ import { pickAxisGuideDirection } from "./axis-guide.api";
 import { orbitCameraTowards } from "./camera.api";
 import { attachProbeSelection, getProbeTransformNode } from "./probe.api";
 import { getProbeGizmoNode } from "./probe-body-model.api";
+import { sceneEntityNameSuffix } from "./scene-entity.api";
 import {
   attachSceneObjectSelection,
   getSceneObjectTransformNode
 } from "./scene-object-node.api";
+import { buildAtlasRootNode } from "./structures.api";
 
 /**
  * Node the gizmo attaches to for an inspectable, or null when it has no gizmo or its node is not
@@ -180,5 +182,23 @@ export function setHemisphericLightIntensity(
 ): void {
   for (const light of scene.lights) {
     if (light instanceof HemisphericLight) light.intensity = intensity;
+  }
+}
+
+/**
+ * Show or hide every probe and scene object, leaving the atlas structures visible.
+ * @param scene Scene whose entities to show or hide.
+ * @param areHidden Whether the entities are hidden.
+ */
+export function setSceneEntitiesHidden(scene: Scene, areHidden: boolean): void {
+  const atlasRootNode = buildAtlasRootNode(scene);
+  const probeNodeSuffix = sceneEntityNameSuffix("probe", "node");
+  const sceneObjectNodeSuffix = sceneEntityNameSuffix("object", "node");
+  for (const node of atlasRootNode.getChildren(
+    child =>
+      child.name.endsWith(probeNodeSuffix) ||
+      child.name.endsWith(sceneObjectNodeSuffix)
+  )) {
+    node.setEnabled(!areHidden);
   }
 }

@@ -19,6 +19,7 @@ import {
 interface AxisOption {
   label: string;
   value: number;
+  toggleColor: string;
   attrs: { "aria-label": string };
 }
 
@@ -67,6 +68,7 @@ const axisOptions = computed<AxisOption[]>(() => [
   {
     label: t("axis.x"),
     value: 0,
+    toggleColor: "red",
     attrs: {
       "aria-label": t("coordinateSystemInspector.mapToAxis", {
         axis: t("axis.x")
@@ -76,6 +78,7 @@ const axisOptions = computed<AxisOption[]>(() => [
   {
     label: t("axis.y"),
     value: 1,
+    toggleColor: "green",
     attrs: {
       "aria-label": t("coordinateSystemInspector.mapToAxis", {
         axis: t("axis.y")
@@ -85,6 +88,7 @@ const axisOptions = computed<AxisOption[]>(() => [
   {
     label: t("axis.z"),
     value: 2,
+    toggleColor: "blue",
     attrs: {
       "aria-label": t("coordinateSystemInspector.mapToAxis", {
         axis: t("axis.z")

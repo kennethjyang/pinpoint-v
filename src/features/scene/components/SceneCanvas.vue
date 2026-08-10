@@ -97,8 +97,10 @@ import {
   orbitCameraFromAxisGuideDoubleTap,
   selectFromSelectedInspectableState,
   setHemisphericLightIntensity,
-  setSceneBackgroundColor
+  setSceneBackgroundColor,
+  setSceneEntitiesHidden
 } from "../api/scene.api";
+import { syncCoordinateSystemGimbals } from "../api/coordinate-system-gimbal.api";
 import {
   attachSsaoPipeline,
   detachSsaoPipeline,
@@ -200,6 +202,13 @@ const probeGeometry = computed<ProbeGeometry>(() => ({
   rodDiameterMillimeters: preferences.probeRodDiameterMillimeters,
   rodLengthMillimeters: preferences.probeRodLengthMillimeters
 }));
+
+/** Selected coordinate system, or null when the selection is something else. */
+const selectedCoordinateSystem = computed(() =>
+  currentExperiment.selectedInspectable?.inspectableKind === "coordinateSystem"
+    ? currentExperiment.selectedInspectable
+    : null
+);
 
 /**
  * Whether the gizmo toolbar is shown: the camera, the world, and a coordinate
@@ -616,6 +625,10 @@ async function syncSceneObjectsFromState() {
       );
     }
   }
+
+  // The node this builds is created after an await, outside the flush the isolation
+  // effect observed, so re-apply isolation here.
+  setSceneEntitiesHidden(scene, selectedCoordinateSystem.value !== null);
 }
 
 // Re-run the sync when the scene/gizmo manager become ready or the dragged
@@ -1003,6 +1016,47 @@ watchEffect(() => {
     selectionOutlineLayer,
     currentExperiment.selectedInspectable,
     currentExperiment.bodyModelGizmoProbeId
+  );
+});
+
+/**
+ * Show only the atlas while a coordinate system's chain is visualized. Hiding is
+ * applied to each entity's own node, which no re-sync writes to.
+ */
+function syncSceneEntityIsolation() {
+  const scene = runtime.scene.value;
+  if (!scene) return;
+
+  setSceneEntitiesHidden(scene, selectedCoordinateSystem.value !== null);
+}
+
+// Split across two watchers for the reason documented at lines 634-640: `deep: true`
+// must never traverse the live `Scene`. The deep watcher catches a probe or object
+// added while a coordinate system is selected -- `currentExperiment.probes` is a
+// computed over an in-place-mutated array, so its reference alone never changes.
+watch([runtime.scene, selectedCoordinateSystem], syncSceneEntityIsolation, {
+  immediate: true
+});
+watch(
+  [() => currentExperiment.probes, () => currentExperiment.sceneObjects],
+  syncSceneEntityIsolation,
+  { deep: true }
+);
+
+// Draw the selected coordinate system's chain. Registered after the selection
+// effect above, so its outline for the focused node is applied last.
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
+  if (!scene || !selectionOutlineLayer) return;
+
+  syncCoordinateSystemGimbals(
+    scene,
+    selectionOutlineLayer,
+    selectedCoordinateSystem.value,
+    currentExperiment.referenceCoordinate,
+    getAtlasLongestDimensionMillimeters(currentExperiment.atlas),
+    currentExperiment.focusedCoordinateSystemNodeIndex
   );
 });
 

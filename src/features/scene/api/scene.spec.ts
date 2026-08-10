@@ -3,6 +3,7 @@ import type { PickingInfo, Scene } from "@babylonjs/core";
 import {
   ArcRotateCamera,
   Matrix,
+  MeshBuilder,
   PointerEventTypes,
   PointerInfo,
   TransformNode,
@@ -41,8 +42,10 @@ import {
   deselectFromPointerDown,
   getSelectedInspectableGizmoNode,
   orbitCameraFromAxisGuideDoubleTap,
-  selectFromSelectedInspectableState
+  selectFromSelectedInspectableState,
+  setSceneEntitiesHidden
 } from "./scene.api";
+import { buildAtlasRootNode } from "./structures.api";
 
 // buildProbe's head stage is CSG2-subtracted.
 beforeAll(async () => {
@@ -499,5 +502,41 @@ describe("getSelectedInspectableGizmoNode", () => {
     const probe = makeProbe({ id: "missing" });
 
     expect(getSelectedInspectableGizmoNode(scene, probe, null)).toBeNull();
+  });
+});
+
+describe("setSceneEntitiesHidden", () => {
+  it("disables the probe's transform node so a re-enabled child mesh still reports isEnabled() false", () => {
+    const { scene, node } = makeProbeInScene();
+
+    setSceneEntitiesHidden(scene, true);
+
+    expect(node.isEnabled()).toBe(false);
+    const mesh = node.getChildMeshes()[0]!;
+    mesh.setEnabled(true);
+    expect(mesh.isEnabled()).toBe(false);
+  });
+
+  it("re-enables the probe's transform node and its meshes when unhidden", () => {
+    const { scene, node } = makeProbeInScene();
+    setSceneEntitiesHidden(scene, true);
+
+    setSceneEntitiesHidden(scene, false);
+
+    expect(node.isEnabled()).toBe(true);
+    for (const mesh of node.getChildMeshes()) {
+      expect(mesh.isEnabled()).toBe(true);
+    }
+  });
+
+  it("leaves atlas structure meshes untouched", () => {
+    const { scene } = makeProbeInScene();
+    const atlasRoot = buildAtlasRootNode(scene);
+    const structureMesh = MeshBuilder.CreateBox("1_structure_mesh", {}, scene);
+    structureMesh.parent = atlasRoot;
+
+    setSceneEntitiesHidden(scene, true);
+
+    expect(structureMesh.isEnabled()).toBe(true);
   });
 });

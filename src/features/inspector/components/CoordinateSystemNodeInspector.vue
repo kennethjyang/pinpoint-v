@@ -10,7 +10,10 @@ const { node } = defineProps<{
   node: CoordinateSystemNode;
 }>();
 
-const emit = defineEmits<{ "update:onSurface": [onSurface: boolean] }>();
+const emit = defineEmits<{
+  "update:onSurface": [onSurface: boolean];
+  focus: [];
+}>();
 
 const { requiredName: nodeNameRules } = useValidationRules();
 const { t } = useI18n();
@@ -33,7 +36,7 @@ const isOnSurface = computed({
     icon="sym_o_transform"
     :label="node.name"
   >
-    <div class="q-py-md">
+    <div class="q-py-md" @click="emit('focus')" @focusin="emit('focus')">
       <div class="column no-wrap q-gutter-y-md">
         <CommittedInput
           v-model="name"

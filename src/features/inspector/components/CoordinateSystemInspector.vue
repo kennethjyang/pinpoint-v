@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   addCoordinateSystemTransform,
   type CoordinateSystem,
   setCoordinateSystemSurfaceNode
 } from "@/features/coordinate-system";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useValidationRules } from "@/composable/useValidationRules";
 import CommittedInput from "@/components/CommittedInput.vue";
 import CoordinateSystemNodeInspector from "./CoordinateSystemNodeInspector.vue";
@@ -14,12 +15,25 @@ const { coordinateSystem } = defineProps<{
   coordinateSystem: CoordinateSystem;
 }>();
 
+const currentExperiment = useCurrentExperimentStore();
+
 const { requiredName: nameRules } = useValidationRules();
 const { t } = useI18n();
 
 const name = computed({
   get: () => coordinateSystem.name,
   set: (value: string) => (coordinateSystem.name = value.trim())
+});
+
+watch(
+  () => coordinateSystem.id,
+  () => {
+    currentExperiment.focusedCoordinateSystemNodeIndex = null;
+  }
+);
+
+onUnmounted(() => {
+  currentExperiment.focusedCoordinateSystemNodeIndex = null;
 });
 </script>
 
@@ -55,6 +69,7 @@ const name = computed({
         v-for="(node, index) of coordinateSystem.chain"
         :key="index"
         :node="node"
+        @focus="currentExperiment.focusedCoordinateSystemNodeIndex = index"
         @update:on-surface="
           setCoordinateSystemSurfaceNode(coordinateSystem, index, $event)
         "

@@ -58,6 +58,9 @@ export const useCurrentExperimentStore = defineStore(
     /** Probe id whose body model currently holds the transform gizmo, or null. */
     const bodyModelGizmoProbeId = ref<string | null>(null);
 
+    /** Chain index of the selected coordinate system's node the user is editing, or null. */
+    const focusedCoordinateSystemNodeIndex = ref<number | null>(null);
+
     /** Is the camera mid-movement, streaming its pose into the experiment. */
     const isCameraMoving = ref(false);
 
@@ -297,7 +300,8 @@ export const useCurrentExperimentStore = defineStore(
       probeSurfaceChoice,
       isTerminologyRowsEvaluating,
       areAxisGuidesVisible,
-      isLoadingRegionCenter
+      isLoadingRegionCenter,
+      focusedCoordinateSystemNodeIndex
     };
     const getters = {
       name,

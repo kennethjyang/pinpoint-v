@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
 import CoordinateSystemInspector from "./CoordinateSystemInspector.vue";
 import CoordinateSystemNodeInspector from "./CoordinateSystemNodeInspector.vue";
@@ -7,7 +7,22 @@ import CoordinateSystemValueList from "./CoordinateSystemValueList.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
 import { makeCoordinateSystem } from "@/test/fixtures";
 import { usePreferencesStore } from "@/stores/preferences.store";
+import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import { getTerminologyRows } from "@/features/atlas";
 import enUS from "@/i18n/en-US";
+
+// `useCurrentExperimentStore` eagerly resolves the default experiment's
+// terminology rows on creation, which would otherwise fire a real network
+// request. Mirrors the mocking approach in Inspector.spec.ts.
+vi.mock("@/features/atlas/api/source.api", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/atlas/api/source.api")
+  >("@/features/atlas/api/source.api");
+  return {
+    ...actual,
+    getTerminologyRows: vi.fn()
+  };
+});
 
 const t = enUS.coordinateSystemInspector;
 const axis = enUS.axis;
@@ -47,6 +62,10 @@ function mountInspector(coordinateSystem = makeCoordinateSystem()) {
 }
 
 describe("CoordinateSystemInspector", () => {
+  beforeEach(() => {
+    vi.mocked(getTerminologyRows).mockResolvedValue([]);
+  });
+
   it("trims whitespace when committing a name", async () => {
     const { wrapper, coordinateSystem } = mountInspector();
 
@@ -235,5 +254,31 @@ describe("CoordinateSystemInspector", () => {
       coordinateSystem.chain[0]!.position.map(value => value.name)
     ).toEqual(["DV", "AP", "ML"]);
     expect(coordinateSystem.chain[0]!.positionDisplayOrder).toEqual([2, 0, 1]);
+  });
+
+  it("clicking a second node's axis button focuses it, and unmounting resets the focus", async () => {
+    const { wrapper } = mountInspector(
+      makeCoordinateSystem({
+        chain: [
+          ...makeCoordinateSystem().chain,
+          ...makeCoordinateSystem().chain
+        ]
+      })
+    );
+    const currentExperiment = useCurrentExperimentStore();
+
+    const secondNode = wrapper.findAllComponents(
+      CoordinateSystemNodeInspector
+    )[1]!;
+    const xButton = secondNode
+      .findAllComponents({ name: "QBtn" })
+      .find(button => button.text() === axis.x)!;
+    await xButton.trigger("click");
+
+    expect(currentExperiment.focusedCoordinateSystemNodeIndex).toBe(1);
+
+    wrapper.unmount();
+
+    expect(currentExperiment.focusedCoordinateSystemNodeIndex).toBeNull();
   });
 });
