@@ -446,10 +446,10 @@ describe("ProbeInspector", () => {
         wrapper
           .findComponent({ name: "ProbeTransformChain" })
           .findAllComponents({ name: "QInput" })
-      ).toHaveLength(9);
+      ).toHaveLength(7);
     });
 
-    it("shows a fixed value as a disabled input labelled by its axis", async () => {
+    it("omits a fixed value instead of showing it as a disabled input", async () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
@@ -460,9 +460,16 @@ describe("ProbeInspector", () => {
       );
       await wrapper.vm.$nextTick();
 
-      expect(fieldByLabel(wrapper, axis.x).props("disable")).toBe(true);
-      expect(fieldByLabel(wrapper, axis.z).props("disable")).toBe(true);
-      expect(fieldByLabel(wrapper, "Depth").props("disable")).toBe(false);
+      const ariaLabels = wrapper
+        .findAllComponents({ name: "QInput" })
+        .map(field => field.find("input").attributes("aria-label"));
+      expect(ariaLabels).not.toContain(
+        t.transformValue.replace("{index}", "2").replace("{name}", axis.x)
+      );
+      expect(ariaLabels).not.toContain(
+        t.transformValue.replace("{index}", "2").replace("{name}", axis.z)
+      );
+      expect(fieldByLabel(wrapper, "Depth").props("disable")).toBeFalsy();
     });
 
     it("writes an out-of-bounds value and shows the bounds error", async () => {

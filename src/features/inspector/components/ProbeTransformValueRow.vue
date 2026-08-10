@@ -24,7 +24,17 @@ const { t } = useI18n();
 const values = computed(() =>
   component === "position" ? node.position : node.rotation
 );
-const isAllFixed = computed(() => values.value.every(({ fixed }) => fixed));
+// Fixed values are never editable, so they are omitted rather than shown
+// disabled. `valueIndex` is kept from the original triple so axis-fallback
+// labelling and bounds stay correct.
+const adjustableValues = computed(() =>
+  values.value
+    .map((coordinateSystemValue, valueIndex) => ({
+      coordinateSystemValue,
+      valueIndex
+    }))
+    .filter(({ coordinateSystemValue }) => !coordinateSystemValue.fixed)
+);
 
 /**
  * Label a node value by its own name, or by its mapped axis letter when unnamed.
@@ -42,11 +52,11 @@ function valueLabel(
 </script>
 
 <template>
-  <div v-if="!isAllFixed">
+  <div v-if="adjustableValues.length">
     <div class="text-body2 q-pb-xs">{{ label }}</div>
     <div class="row q-gutter-x-sm">
       <ProbeTransformValueInput
-        v-for="(coordinateSystemValue, valueIndex) of values"
+        v-for="{ coordinateSystemValue, valueIndex } of adjustableValues"
         :key="valueIndex"
         :ariaLabel="
           t('probeInspector.transformValue', {
@@ -56,7 +66,7 @@ function valueLabel(
         "
         :component="component"
         :coordinate-system-value="coordinateSystemValue"
-        :disable="disable || coordinateSystemValue.fixed"
+        :disable="disable"
         :label="valueLabel(coordinateSystemValue, valueIndex)"
       />
     </div>
