@@ -1,4 +1,4 @@
-import type { Scene } from "@babylonjs/core";
+import type { Mesh, Scene } from "@babylonjs/core";
 import { Color3, MeshBuilder, StandardMaterial } from "@babylonjs/core";
 import type { Probe, ProbeSurfaceMarker } from "@/features/probe";
 import { asrToVector3 } from "./coordinate-transforms.api";
@@ -9,8 +9,8 @@ import { buildAtlasRootNode } from "./structures.api";
 const PROBE_SURFACE_MARKER_MESH_NAME = "probeSurfaceMarker_mesh";
 /** Name of the surface marker's material. */
 const PROBE_SURFACE_MARKER_MATERIAL_NAME = "probeSurfaceMarker_material";
-/** Diameter of the surface marker's sphere, in mm. */
-const PROBE_SURFACE_MARKER_DIAMETER_MILLIMETERS = 1;
+/** Marker diameter as a multiple of the probe shank's thickness, so it reads as a bead on the shank. */
+const PROBE_SURFACE_MARKER_DIAMETER_SHANK_THICKNESSES = 4;
 /** Latitude and longitude segments of the surface marker's sphere. */
 const PROBE_SURFACE_MARKER_SEGMENTS = 12;
 
@@ -19,11 +19,13 @@ const PROBE_SURFACE_MARKER_SEGMENTS = 12;
  * @param scene Scene to draw the marker in.
  * @param marker Marker to draw, or null to remove it.
  * @param probes Probes in the experiment, to resolve the marker's own color and visibility.
+ * @param shankThicknessMillimeters Probe shank thickness the marker's diameter is scaled from.
  */
 export function syncProbeSurfaceMarker(
   scene: Scene,
   marker: ProbeSurfaceMarker | null,
-  probes: Probe[]
+  probes: Probe[],
+  shankThicknessMillimeters: number
 ): void {
   const probe = marker
     ? probes.find(({ id }) => id === marker.probeId)
@@ -33,16 +35,16 @@ export function syncProbeSurfaceMarker(
     return;
   }
 
+  const diameterMillimeters =
+    shankThicknessMillimeters * PROBE_SURFACE_MARKER_DIAMETER_SHANK_THICKNESSES;
+  // A sphere bakes its diameter into its vertices, so a changed shank thickness needs a rebuild.
+  // `metadata` carries the built diameter, mirroring `probeGhost`'s reuse key.
+  const existing = scene.getMeshByName(PROBE_SURFACE_MARKER_MESH_NAME);
+  if (existing && existing.metadata !== diameterMillimeters) existing.dispose();
   const mesh =
-    scene.getMeshByName(PROBE_SURFACE_MARKER_MESH_NAME) ??
-    MeshBuilder.CreateSphere(
-      PROBE_SURFACE_MARKER_MESH_NAME,
-      {
-        diameter: PROBE_SURFACE_MARKER_DIAMETER_MILLIMETERS,
-        segments: PROBE_SURFACE_MARKER_SEGMENTS
-      },
-      scene
-    );
+    existing && existing.metadata === diameterMillimeters
+      ? existing
+      : buildProbeSurfaceMarkerSphere(scene, diameterMillimeters);
   mesh.parent = buildAtlasRootNode(scene);
   mesh.isPickable = false;
 
@@ -60,6 +62,27 @@ export function syncProbeSurfaceMarker(
 function disposeProbeSurfaceMarker(scene: Scene): void {
   scene.getMeshByName(PROBE_SURFACE_MARKER_MESH_NAME)?.dispose();
   scene.getMaterialByName(PROBE_SURFACE_MARKER_MATERIAL_NAME)?.dispose();
+}
+
+/**
+ * Build the marker's sphere, tagging it with the diameter it was built at.
+ * @param scene Scene to build the sphere in.
+ * @param diameterMillimeters Diameter to build the sphere at.
+ */
+function buildProbeSurfaceMarkerSphere(
+  scene: Scene,
+  diameterMillimeters: number
+): Mesh {
+  const mesh = MeshBuilder.CreateSphere(
+    PROBE_SURFACE_MARKER_MESH_NAME,
+    {
+      diameter: diameterMillimeters,
+      segments: PROBE_SURFACE_MARKER_SEGMENTS
+    },
+    scene
+  );
+  mesh.metadata = diameterMillimeters;
+  return mesh;
 }
 
 /**

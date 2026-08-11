@@ -815,7 +815,8 @@ watchEffect(() => {
   syncProbeSurfaceMarker(
     scene,
     currentExperiment.probeSurfaceMarker,
-    currentExperiment.probes
+    currentExperiment.probes,
+    preferences.probeShankThicknessMillimeters
   );
 });
 

@@ -437,10 +437,9 @@ function clearOffSurfaceWarnings(): void {
 }
 
 /**
-/**
- * Re-sample whether the probe crosses the brain, which gates the surface marker. Reads the same
- * `insideMillimeters` target `moveToSurface` drops the tip onto, so the marker disappears exactly
- * when a drop to surface would have nothing to drop onto.
+ * Re-sample whether the probe crosses the brain, which gates the surface marker. Only the
+ * direct-node path calls this: it runs no inverse-kinematics solve, so its sampling blocks nothing.
+ * The solving path sets the gate from the `surfacePosition` it already sampled instead.
  */
 async function sampleSurfaceCoordinate(): Promise<void> {
   if (!hasSurfaceNode.value) {
@@ -483,6 +482,7 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
       }
     }
     if (id !== solveId) return;
+    hasSurfaceCoordinate.value = surfacePosition !== null;
 
     const result = await solveInverseKinematics({
       chain: toRaw(chain.value),
@@ -609,6 +609,7 @@ function seedChain(): void {
   const node = directNode.value;
   if (node) {
     writeProbePoseIntoNode(node);
+    void sampleSurfaceCoordinate();
     void verifySurfaceNodes(solveDirectNode(node), "external");
   } else void runInverseKinematics("external");
 }
@@ -794,6 +795,7 @@ watch(
     if (node) {
       writeProbePoseIntoNode(node);
       clearUnreachable();
+      void sampleSurfaceCoordinate();
       void verifySurfaceNodes(
         solveDirectNode(node),
         currentExperimentStore.draggedProbeId === probe.id
@@ -827,14 +829,6 @@ watch(
     void runInverseKinematics("external");
   },
   { deep: true }
-);
-
-// The probe's surface coordinate depends on its tip and its shank direction, so re-sample on both.
-// A chain edit that has not been committed to the probe cannot change it, so `chain` is not a dep.
-watch(
-  [() => probe.tipPosition, () => probe.rotation, hasSurfaceNode],
-  () => void sampleSurfaceCoordinate(),
-  { deep: true, immediate: true }
 );
 
 // Publish the on-surface node's solved position for the scene's marker sphere. This reads `chain`,

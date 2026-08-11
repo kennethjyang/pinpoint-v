@@ -1632,6 +1632,71 @@ describe("ProbeInspector", () => {
 
         expect(store.probeSurfaceMarker).toBeNull();
       });
+
+      it("adds exactly one findTargets call for the solve itself on an external pose change, not a second gate sampler round-trip", async () => {
+        const findTargets = vi.fn().mockResolvedValue({
+          insideMillimeters: [1, 2, 3],
+          axisMillimeters: null,
+          dorsoventralMillimeters: null
+        });
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets,
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, probe } = mountInspector();
+        await selectMultiNodeSystem(wrapper, pinia);
+        const before = findTargets.mock.calls.length;
+
+        probe.tipPosition = [9, 9, 9];
+        await flushPromises();
+
+        expect(findTargets.mock.calls.length).toBe(before + 1);
+      });
+
+      it("gates the marker on the direct path when the shank crosses the brain", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue({
+            insideMillimeters: [1, 2, 3],
+            axisMillimeters: null,
+            dorsoventralMillimeters: null
+          }),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { store, probe } = mountInspector();
+
+        setProbeCoordinateSystem(
+          store.experiment,
+          probe,
+          makeCoordinateSystem({
+            id: "surface-tip",
+            name: "Surface Tip",
+            chain: [
+              buildCoordinateSystemNode(
+                "Tip",
+                [
+                  buildCoordinateSystemValue("ML"),
+                  buildCoordinateSystemValue("DV"),
+                  buildCoordinateSystemValue("AP")
+                ],
+                [
+                  buildCoordinateSystemValue("Pitch"),
+                  buildCoordinateSystemValue("Yaw"),
+                  buildCoordinateSystemValue("Roll")
+                ],
+                [0, 1, 2],
+                [0, 1, 2],
+                true
+              )
+            ]
+          })
+        );
+        await flushPromises();
+
+        expect(store.probeSurfaceMarker).not.toBeNull();
+        expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+      });
     });
   });
 
