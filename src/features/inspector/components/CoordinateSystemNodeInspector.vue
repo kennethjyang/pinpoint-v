@@ -23,7 +23,7 @@ const { node } = defineProps<{
 
 const emit = defineEmits<{
   "update:onSurface": [onSurface: boolean];
-  focus: [];
+  focus: [component: CoordinateSystemNodeComponent];
   delete: [];
   dragStart: [event: DragEvent];
   dragEnd: [];
@@ -48,31 +48,17 @@ const isOnSurface = computed({
   set: (value: boolean) => emit("update:onSurface", value)
 });
 
-const positionSummary = computed(() =>
-  valueSummary(
-    "position",
-    positionUnits,
-    t("coordinateSystemInspector.position")
-  )
-);
-const rotationSummary = computed(() =>
-  valueSummary(
-    "rotation",
-    rotationUnits,
-    t("coordinateSystemInspector.rotation")
-  )
-);
+const positionSummary = computed(() => valueSummary("position", positionUnits));
+const rotationSummary = computed(() => valueSummary("rotation", rotationUnits));
 
 /**
- * Summary line for one of a node's triples, listing only the values the user can change.
+ * Summary of one of a node's triples, listing only the values the user can change.
  * @param component Whether to summarize the position or rotation triple.
  * @param units Display-unit converters for that component.
- * @param label Localized name of the component.
  */
 function valueSummary(
   component: CoordinateSystemNodeComponent,
-  units: CoordinateSystemUnitModel,
-  label: string
+  units: CoordinateSystemUnitModel
 ): string {
   // Fixed values are rigid constants the user never edits, so they are left out
   // entirely, matching `ProbeTransformValueRow`'s adjustable-slot filter.
@@ -86,12 +72,22 @@ function valueSummary(
           .toFixed(preferences.decimalPrecision)
       })
     );
-  return t("coordinateSystemInspector.valueSummary", {
-    label,
-    values: entries.length
-      ? entries.join(", ")
-      : t("coordinateSystemInspector.valueSummaryAllFixed")
-  });
+  return entries.length
+    ? entries.join("\n")
+    : t("coordinateSystemInspector.valueSummaryAllFixed");
+}
+
+/**
+ * Focus this node with the given triple, and open that triple's value dialog.
+ * @param component Triple whose values to open.
+ */
+function openValues(component: CoordinateSystemNodeComponent): void {
+  emit("focus", component);
+  if (component === "position") {
+    isPositionDialogOpen.value = true;
+    return;
+  }
+  isRotationDialogOpen.value = true;
 }
 </script>
 
@@ -117,7 +113,11 @@ function valueSummary(
         <q-item-label>{{ node.name }}</q-item-label>
       </q-item-section>
     </template>
-    <div class="q-py-md" @click="emit('focus')" @focusin="emit('focus')">
+    <div
+      class="q-py-md"
+      @click="emit('focus', 'position')"
+      @focusin="emit('focus', 'position')"
+    >
       <div class="column no-wrap q-gutter-y-md">
         <CommittedInput
           v-model="name"
@@ -130,22 +130,40 @@ function valueSummary(
           v-model="isOnSurface"
           :label="t('coordinateSystemInspector.surfaceCoordinate')"
         />
-        <q-btn
-          align="left"
-          class="full-width"
-          :label="positionSummary"
-          no-caps
-          outline
-          @click="isPositionDialogOpen = true"
-        />
-        <q-btn
-          align="left"
-          class="full-width"
-          :label="rotationSummary"
-          no-caps
-          outline
-          @click="isRotationDialogOpen = true"
-        />
+        <div class="row items-center no-wrap q-gutter-x-sm">
+          <div class="summary-label text-body2">
+            {{ t("coordinateSystemInspector.position") }}
+          </div>
+          <q-btn
+            align="left"
+            :aria-label="
+              t('coordinateSystemInspector.valuesFor', {
+                label: t('coordinateSystemInspector.position')
+              })
+            "
+            class="col value-summary-btn"
+            :label="positionSummary"
+            no-caps
+            @click.stop="openValues('position')"
+          />
+        </div>
+        <div class="row items-center no-wrap q-gutter-x-sm">
+          <div class="summary-label text-body2">
+            {{ t("coordinateSystemInspector.rotation") }}
+          </div>
+          <q-btn
+            align="left"
+            :aria-label="
+              t('coordinateSystemInspector.valuesFor', {
+                label: t('coordinateSystemInspector.rotation')
+              })
+            "
+            class="col value-summary-btn"
+            :label="rotationSummary"
+            no-caps
+            @click.stop="openValues('rotation')"
+          />
+        </div>
         <CoordinateSystemValueDialog
           v-model="isPositionDialogOpen"
           component="position"
@@ -174,4 +192,10 @@ function valueSummary(
 .node-row__handle
   cursor: grab
   display: flex
+.summary-label
+  flex: 0 0 auto
+  min-width: 5rem
+// Each variable value gets its own row instead of a comma-separated run-on line.
+.value-summary-btn :deep(.block)
+  white-space: pre-line
 </style>

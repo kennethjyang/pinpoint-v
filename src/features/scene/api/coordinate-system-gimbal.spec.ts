@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { StandardMaterial } from "@babylonjs/core";
 import { Color3, Matrix, MeshBuilder, Vector3 } from "@babylonjs/core";
 import {
@@ -8,7 +8,10 @@ import {
   solveCoordinateSystemChain,
   type CoordinateSystemNode
 } from "@/features/coordinate-system";
-import { makeTestSceneWithGizmo } from "@/test/mount-helper";
+import {
+  initializeTestCSG2,
+  makeTestSceneWithGizmo
+} from "@/test/mount-helper";
 import { makeProbeGeometry } from "@/test/fixtures";
 import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildAtlasRootNode } from "./structures.api";
@@ -16,6 +19,12 @@ import { syncCoordinateSystemGimbals } from "./coordinate-system-gimbal.api";
 
 /** Atlas longest-dimension stand-in for every test: an axis length of 18mm. */
 const ATLAS_SCALE_MILLIMETERS = 100;
+
+// The chain-tip marker's head stage is CSG2-subtracted; initialize it once for every test in
+// this file, mirroring what `babylon-runtime.service.ts` does at startup.
+beforeAll(async () => {
+  await initializeTestCSG2();
+});
 
 /**
  * Assert two Babylon vectors are componentwise close, tolerating float
@@ -122,7 +131,7 @@ describe("syncCoordinateSystemGimbals", () => {
     );
   });
 
-  it("colours the probe marker's shank and head stage with the shared pink material", () => {
+  it("colours the probe marker's shank and head stage with the shared pink lit material", () => {
     const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
 
     syncCoordinateSystemGimbals(
@@ -145,9 +154,85 @@ describe("syncCoordinateSystemGimbals", () => {
 
     expect(shank.material).toBe(material);
     expect(headStage.material).toBe(material);
-    expect(material.emissiveColor.equals(Color3.FromHexString("#e91e63"))).toBe(
+    expect(material.diffuseColor.equals(Color3.FromHexString("#e91e63"))).toBe(
       true
     );
+    expect(material.disableLighting).toBe(false);
+  });
+
+  it("cuts the head-stage notch on the shank's -Y (contact) face", () => {
+    const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", [makeNode("Node")]),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null,
+      makeProbeGeometry()
+    );
+
+    const headStage = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStage_mesh"
+    )!;
+    const positions = headStage.getVerticesData("position")!;
+    const ys: number[] = [];
+    for (let i = 1; i < positions.length; i += 3) ys.push(positions[i]!);
+
+    expect(
+      ys.filter(y => Math.abs(y - -0.025) < 1e-6).length
+    ).toBeGreaterThanOrEqual(3);
+    expect(ys.some(y => Math.abs(y - 0.025) < 1e-6)).toBe(false);
+  });
+
+  it("cuts the head stage template once per geometry, not once per sync", () => {
+    const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
+    const geometry = makeProbeGeometry();
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", [makeNode("Node")]),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null,
+      geometry
+    );
+    const firstTemplate = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStageTemplate_mesh"
+    )!;
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", [makeNode("Node")]),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null,
+      geometry
+    );
+    const secondTemplate = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStageTemplate_mesh"
+    )!;
+    expect(secondTemplate).toBe(firstTemplate);
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", [makeNode("Node")]),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null,
+      {
+        ...geometry,
+        headStageLengthMillimeters: geometry.headStageLengthMillimeters + 5
+      }
+    );
+    const thirdTemplate = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStageTemplate_mesh"
+    )!;
+    expect(thirdTemplate).not.toBe(secondTemplate);
   });
 
   it("composes pitch and yaw together, not a single-axis approximation of either", () => {
@@ -356,6 +441,9 @@ describe("syncCoordinateSystemGimbals", () => {
 
     expect(
       scene.getTransformNodeByName("coordinateSystemGimbalRoot_node")
+    ).toBeNull();
+    expect(
+      scene.getMeshByName("coordinateSystemGimbalPoseHeadStageTemplate_mesh")
     ).toBeNull();
     expect(selectionOutlineLayer.hasMesh(unrelated)).toBe(true);
   });

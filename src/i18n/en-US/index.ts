@@ -310,8 +310,8 @@ export default {
     modeUser: "User",
     dragToReorder: "Drag to reorder",
     deleteTransform: "Delete Transform",
-    valueSummary: "{label}: {values}",
-    valueSummaryEntry: "{name} = {value}",
+    valuesFor: "{label} values",
+    valueSummaryEntry: "{name} ({value})",
     valueSummaryAllFixed: "all fixed",
     closeValues: "Done"
   },

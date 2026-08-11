@@ -53,6 +53,11 @@ import { applyCameraProjection } from "../api/camera.api";
 import { createAxisGuides } from "../api/axis-guide.api";
 import type * as AxisGuideApi from "../api/axis-guide.api";
 import {
+  buildGimbalAxisLabels,
+  clearGimbalAxisLabels,
+  createGimbalAxisLabels
+} from "../api/gimbal-axis-label.api";
+import {
   DEFAULT_ATLAS,
   getAtlasCenter,
   getTerminologyRows,
@@ -121,6 +126,25 @@ vi.mock("../api/axis-guide.api", async () => {
       fontAsset: makeFontAsset(scene),
       dispose: vi.fn()
     }))
+  };
+});
+
+vi.mock("../api/gimbal-axis-label.api", async () => {
+  const actual = await vi.importActual<
+    typeof import("../api/gimbal-axis-label.api")
+  >("../api/gimbal-axis-label.api");
+  const { makeFakeTextRenderer: makeFake } = await vi.importActual<
+    typeof MountHelper
+  >("@/test/mount-helper");
+
+  return {
+    ...actual,
+    createGimbalAxisLabels: vi.fn(async () => ({
+      renderers: [makeFake(), makeFake(), makeFake()],
+      dispose: vi.fn()
+    })),
+    buildGimbalAxisLabels: vi.fn(actual.buildGimbalAxisLabels),
+    clearGimbalAxisLabels: vi.fn(actual.clearGimbalAxisLabels)
   };
 });
 
@@ -292,6 +316,15 @@ describe("SceneCanvas", () => {
         ml: makeFakeTextRenderer()
       },
       fontAsset: makeTestFontAsset(scene),
+      dispose: vi.fn()
+    }));
+    vi.mocked(createGimbalAxisLabels).mockReset();
+    vi.mocked(createGimbalAxisLabels).mockImplementation(async () => ({
+      renderers: [
+        makeFakeTextRenderer(),
+        makeFakeTextRenderer(),
+        makeFakeTextRenderer()
+      ],
       dispose: vi.fn()
     }));
   });
@@ -1314,6 +1347,44 @@ describe("SceneCanvas", () => {
     await flushPromises();
 
     expect(getProbeTransformNode(scene, probe.id)!.isEnabled()).toBe(false);
+  });
+
+  it("draws the focused node's own value names on its gimbal's axis labels, keyed to the chosen triple", async () => {
+    const { runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    const scene = runtime.scene.value!;
+    /** Gimbal node currently in the scene: the shared watchEffect rebuilds the whole chain on every dependency change, including a triple switch. */
+    const gimbal = () =>
+      scene.getTransformNodeByName("coordinateSystemGimbal_0_node");
+
+    store.selectedInspectable = makeCoordinateSystem();
+    store.focusedCoordinateSystemNodeIndex = 0;
+    await flushPromises();
+
+    expect(vi.mocked(buildGimbalAxisLabels)).toHaveBeenLastCalledWith(
+      expect.anything(),
+      gimbal(),
+      expect.any(Number),
+      ["ML", "DV", "AP"],
+      expect.anything()
+    );
+
+    store.focusedCoordinateSystemComponent = "rotation";
+    await flushPromises();
+
+    expect(vi.mocked(buildGimbalAxisLabels)).toHaveBeenLastCalledWith(
+      expect.anything(),
+      gimbal(),
+      expect.any(Number),
+      ["Pitch", "Yaw", "Roll"],
+      expect.anything()
+    );
+
+    vi.mocked(clearGimbalAxisLabels).mockClear();
+    store.focusedCoordinateSystemNodeIndex = null;
+    await flushPromises();
+
+    expect(clearGimbalAxisLabels).toHaveBeenCalled();
   });
 
   it("draws the ghost node while probeGhost is set and removes it when cleared", async () => {

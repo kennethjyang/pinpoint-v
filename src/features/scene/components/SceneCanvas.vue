@@ -28,6 +28,12 @@ import {
   clearAxisGuides,
   createAxisGuides
 } from "../api/axis-guide.api";
+import type { GimbalAxisLabels } from "../api/gimbal-axis-label.api";
+import {
+  buildGimbalAxisLabels,
+  clearGimbalAxisLabels,
+  createGimbalAxisLabels
+} from "../api/gimbal-axis-label.api";
 import {
   applyCameraProjection,
   scaleCameraClipPlanesToAtlas,
@@ -46,6 +52,7 @@ import {
   getAtlasLongestDimensionMillimeters,
   structureEntitiesFromIdentifiers
 } from "@/features/atlas";
+import { getCoordinateSystemSlots } from "@/features/coordinate-system";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useI18n } from "vue-i18n";
@@ -106,7 +113,11 @@ import {
   setSceneBackgroundColor,
   setSceneEntitiesHidden
 } from "../api/scene.api";
-import { syncCoordinateSystemGimbals } from "../api/coordinate-system-gimbal.api";
+import {
+  getCoordinateSystemGimbalAxisLength,
+  getCoordinateSystemGimbalNode,
+  syncCoordinateSystemGimbals
+} from "../api/coordinate-system-gimbal.api";
 import {
   attachSsaoPipeline,
   detachSsaoPipeline,
@@ -141,6 +152,9 @@ const isLoadingStructures = ref(false);
 
 /** Axis guide text renderers, created for the current scene the first time the guides are shown. */
 const axisGuides = shallowRef<AxisGuides | null>(null);
+
+/** Gimbal axis label text renderers, created for the current scene alongside the axis guides. */
+const gimbalAxisLabels = shallowRef<GimbalAxisLabels | null>(null);
 
 /** SSAO pipeline for the current scene, present while ambient occlusion is on and supported. */
 const ssaoPipeline = shallowRef<SSAO2RenderingPipeline | null>(null);
@@ -239,6 +253,34 @@ const axisGuideLabels = computed<AxisGuideLabels>(() => {
     .map(slot => slot.label) as [string, string, string];
   return { ap, dv, ml, x: t("axis.x"), y: t("axis.y"), z: t("axis.z") };
 });
+
+/**
+ * Label per Babylon axis for the focused node's chosen triple: each value's own name, or that
+ * axis's letter when the value is unnamed, as `buildFixedCoordinateSystemValue` leaves it.
+ */
+const focusedGimbalAxisLabels = computed<[string, string, string] | null>(
+  () => {
+    const coordinateSystem = selectedCoordinateSystem.value;
+    const nodeIndex = currentExperiment.focusedCoordinateSystemNodeIndex;
+    if (!coordinateSystem || nodeIndex === null) return null;
+
+    const node = coordinateSystem.chain[nodeIndex];
+    if (!node) return null;
+
+    const texts: [string, string, string] = [
+      t("axis.x"),
+      t("axis.y"),
+      t("axis.z")
+    ];
+    for (const { axis, value } of getCoordinateSystemSlots(
+      node,
+      currentExperiment.focusedCoordinateSystemComponent
+    )) {
+      if (value.name) texts[axis] = value.name;
+    }
+    return texts;
+  }
+);
 
 /**
  * Whether the gizmo toolbar is shown: the camera, the world, and a coordinate
@@ -363,14 +405,17 @@ watchEffect(() => {
   setAtlasCenterOffset(scene, getAtlasCenter(currentExperiment.atlas));
 });
 
-// Axis guide renderers belong to the scene that created them.
+// Axis guide and gimbal axis label renderers belong to the scene that created them.
 watch(runtime.scene, () => {
+  gimbalAxisLabels.value?.dispose();
+  gimbalAxisLabels.value = null;
   axisGuides.value?.dispose();
   axisGuides.value = null;
 });
 
-// Create the axis guide text renderers the first time they are shown: the
-// MSDF font is fetched remotely, so hidden guides load nothing.
+// Create the axis guide text renderers, and the gimbal axis label renderers that borrow their
+// font asset, the first time the guides are shown: the MSDF font is fetched remotely, so hidden
+// guides load nothing.
 watch(
   [runtime.scene, areAxisGuidesDrawn],
   async ([scene, isVisible]) => {
@@ -378,13 +423,22 @@ watch(
 
     try {
       const guides = await createAxisGuides(scene);
+      let labels: GimbalAxisLabels;
+      try {
+        labels = await createGimbalAxisLabels(scene, guides.fontAsset);
+      } catch (error) {
+        guides.dispose();
+        throw error;
+      }
       // The scene can be replaced, or another creation can win, while the
       // font loads.
       if (runtime.scene.value !== scene || axisGuides.value) {
+        labels.dispose();
         guides.dispose();
         return;
       }
       axisGuides.value = guides;
+      gimbalAxisLabels.value = labels;
     } catch {
       notifyWarning(
         t("sceneCanvas.problemLoadingAxisGuides"),
@@ -1127,6 +1181,29 @@ watchEffect(() => {
     currentExperiment.focusedCoordinateSystemNodeIndex,
     probeGeometry.value
   );
+
+  const guides = axisGuides.value;
+  const labels = gimbalAxisLabels.value;
+  if (!guides || !labels) return;
+
+  const nodeIndex = currentExperiment.focusedCoordinateSystemNodeIndex;
+  const gimbal =
+    nodeIndex === null ? null : getCoordinateSystemGimbalNode(scene, nodeIndex);
+  const texts = focusedGimbalAxisLabels.value;
+  if (!gimbal || !texts) {
+    clearGimbalAxisLabels(labels);
+    return;
+  }
+
+  buildGimbalAxisLabels(
+    labels,
+    gimbal,
+    getCoordinateSystemGimbalAxisLength(
+      getAtlasLongestDimensionMillimeters(currentExperiment.atlas)
+    ),
+    texts,
+    guides.fontAsset
+  );
 });
 
 onMounted(async () => {
@@ -1138,6 +1215,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  gimbalAxisLabels.value?.dispose();
+  gimbalAxisLabels.value = null;
   axisGuides.value?.dispose();
   axisGuides.value = null;
   runtime.dispose();

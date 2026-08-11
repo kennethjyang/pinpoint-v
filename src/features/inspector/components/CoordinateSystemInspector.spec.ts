@@ -67,15 +67,15 @@ async function editAndBlur(field: VueWrapper, value: string) {
  * Click a node inspector's Position or Rotation summary button, opening
  * that value's dialog.
  * @param nodeInspector Node inspector wrapper to open the dialog within.
- * @param label Summary button's label prefix: `t.position` or `t.rotation`.
+ * @param label Summary button's own label: `t.position` or `t.rotation`.
  */
 async function openValueDialog(
   nodeInspector: VueWrapper,
   label: string
 ): Promise<void> {
-  const button = nodeInspector
-    .findAllComponents({ name: "QBtn" })
-    .find(btn => btn.text().startsWith(`${label}:`))!;
+  const button = nodeInspector.find(
+    `[aria-label="${t.valuesFor.replace("{label}", label)}"]`
+  );
   await button.trigger("click");
   await nextTick();
 }
@@ -240,11 +240,12 @@ describe("CoordinateSystemInspector", () => {
       })
     );
 
-    const positionButton = wrapper
-      .findAllComponents({ name: "QBtn" })
-      .find(button => button.text().startsWith(`${t.position}:`))!;
+    const positionButton = wrapper.find(
+      `[aria-label="${t.valuesFor.replace("{label}", t.position)}"]`
+    );
 
-    expect(positionButton.text()).toBe(`${t.position}: ML = 1.000, AP = 3.000`);
+    expect(positionButton.text()).toBe("ML (1.000)\nAP (3.000)");
+    expect(wrapper.text()).toContain(t.position);
   });
 
   it("the Position button reads 'all fixed' when every value is fixed", () => {
@@ -263,13 +264,28 @@ describe("CoordinateSystemInspector", () => {
       })
     );
 
-    const positionButton = wrapper
-      .findAllComponents({ name: "QBtn" })
-      .find(button => button.text().startsWith(`${t.position}:`))!;
-
-    expect(positionButton.text()).toBe(
-      `${t.position}: ${t.valueSummaryAllFixed}`
+    const positionButton = wrapper.find(
+      `[aria-label="${t.valuesFor.replace("{label}", t.position)}"]`
     );
+
+    expect(positionButton.text()).toBe(t.valueSummaryAllFixed);
+    expect(wrapper.text()).toContain(t.position);
+  });
+
+  it("clicking a node's Position or Rotation button focuses that node with the matching triple", async () => {
+    const { wrapper } = mountInspector();
+    const nodeInspector = wrapper.findComponent(CoordinateSystemNodeInspector);
+    const currentExperiment = useCurrentExperimentStore();
+
+    await openValueDialog(nodeInspector, t.rotation);
+
+    expect(currentExperiment.focusedCoordinateSystemNodeIndex).toBe(0);
+    expect(currentExperiment.focusedCoordinateSystemComponent).toBe("rotation");
+
+    await openValueDialog(nodeInspector, t.position);
+
+    expect(currentExperiment.focusedCoordinateSystemNodeIndex).toBe(0);
+    expect(currentExperiment.focusedCoordinateSystemComponent).toBe("position");
   });
 
   it("clicking the Rotation button opens exactly one rotation dialog, and Done closes it", async () => {

@@ -649,7 +649,7 @@ function axisGuideFontSize(
  * @param text Label text to measure.
  * @param fontAsset Font asset the label is laid out with.
  */
-function labelSizeEm(
+export function labelSizeEm(
   text: string,
   fontAsset: FontAsset
 ): { width: number; height: number } {

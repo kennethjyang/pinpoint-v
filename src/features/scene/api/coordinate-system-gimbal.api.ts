@@ -1,6 +1,5 @@
 import {
   Color3,
-  ExtrudePolygon,
   Mesh,
   MeshBuilder,
   Quaternion,
@@ -10,13 +9,18 @@ import {
   type Scene,
   type SelectionOutlineLayer
 } from "@babylonjs/core";
-import earcut from "earcut";
 import {
   type CoordinateSystem,
   getCoordinateSystemAxisValue
 } from "@/features/coordinate-system";
+import type { ProbeContour } from "@/features/probe";
 import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildAtlasRootNode } from "./structures.api";
+import {
+  buildHeadStageMesh,
+  buildShankMesh,
+  isSameProbeGeometry
+} from "./probe.api";
 import type { ProbeGeometry } from "../models/probe-geometry.model";
 
 /** Name of the node the whole chain visualization hangs off. */
@@ -54,13 +58,13 @@ const GIMBAL_AXIS_MESH_SUFFIXES: [string, string, string] = [
   "axisZ"
 ];
 /** Local direction of each gimbal's three axis cylinders: Babylon X, Y, and +Z. */
-const GIMBAL_AXIS_DIRECTIONS: [Vector3, Vector3, Vector3] = [
+export const GIMBAL_AXIS_DIRECTIONS: [Vector3, Vector3, Vector3] = [
   Vector3.Right(),
   Vector3.Up(),
   new Vector3(0, 0, 1)
 ];
 /** Axis colours, indexed by Babylon axis: X red, Y green, Z blue — Quasar's `red`/`green`/`blue`, matching the inspector's axis toggles. */
-const GIMBAL_AXIS_COLORS: [Color3, Color3, Color3] = [
+export const GIMBAL_AXIS_COLORS: [Color3, Color3, Color3] = [
   Color3.FromHexString("#f44336"),
   Color3.FromHexString("#4caf50"),
   Color3.FromHexString("#2196f3")
@@ -89,22 +93,26 @@ const GIMBAL_POSE_HEAD_STAGE_MESH_NAME =
   "coordinateSystemGimbalPoseHeadStage_mesh";
 
 /**
- * imec NP1000 planar contour in probe-local mm, tip on the origin and body along +y: the
+ * imec NP1000 planar contour in probe-local mm, tip on the origin and body up +y: the
  * probeinterface `neuropixels/NP1000` `probe_planar_contour`, scaled and recentred the way
  * `getProbeContour` does. Inlined rather than read from the probe library so the marker is the
  * same reference probe regardless of what the user has installed.
  */
-const GIMBAL_POSE_CONTOUR_POINTS: [number, number][] = [
-  [-0.035, 10.209],
-  [-0.035, 0.209],
-  [0, 0],
-  [0.035, 0.209],
-  [0.035, 10.209]
-];
-/** Full x extent of `GIMBAL_POSE_CONTOUR_POINTS`, in mm. */
-const GIMBAL_POSE_CONTOUR_WIDTH_MILLIMETERS = 0.07;
-/** Tip-to-top height of `GIMBAL_POSE_CONTOUR_POINTS`, in mm. */
-const GIMBAL_POSE_CONTOUR_HEIGHT_MILLIMETERS = 10.209;
+const GIMBAL_POSE_CONTOUR: ProbeContour = {
+  points: [
+    { x: -0.035, y: 10.209 },
+    { x: -0.035, y: 0.209 },
+    { x: 0, y: 0 },
+    { x: 0.035, y: 0.209 },
+    { x: 0.035, y: 10.209 }
+  ],
+  widthMillimeters: 0.07,
+  heightMillimeters: 10.209,
+  origin: { x: 0, y: 0 }
+};
+/** Name of the cached, never-rendered head stage the per-sync marker clones come from. */
+const GIMBAL_POSE_HEAD_STAGE_TEMPLATE_MESH_NAME =
+  "coordinateSystemGimbalPoseHeadStageTemplate_mesh";
 
 /**
  * Rebuild the selected coordinate system's chain gimbals and outline its focused node, or strip
@@ -130,6 +138,7 @@ export function syncCoordinateSystemGimbals(
 
   if (!coordinateSystem) {
     existingRoot?.dispose();
+    scene.getMeshByName(GIMBAL_POSE_HEAD_STAGE_TEMPLATE_MESH_NAME)?.dispose();
     return;
   }
 
@@ -139,7 +148,7 @@ export function syncCoordinateSystemGimbals(
 
   const root = new TransformNode(GIMBAL_ROOT_NODE_NAME, scene);
   root.parent = buildAtlasRootNode(scene);
-  const axisLength = atlasScaleMillimeters * GIMBAL_AXIS_LENGTH_FRACTION;
+  const axisLength = getCoordinateSystemGimbalAxisLength(atlasScaleMillimeters);
 
   if (coordinateSystem.offsetByReferenceCoordinate) {
     root.position = asrToVector3(referenceCoordinateMillimeters);
@@ -245,7 +254,7 @@ export function syncCoordinateSystemGimbals(
     scene,
     parent,
     probeGeometry,
-    buildGimbalMaterial(scene, GIMBAL_POSE_MATERIAL_NAME, GIMBAL_POSE_COLOR)
+    buildGimbalPoseMaterial(scene)
   );
 
   if (focusedNodeIndex !== null) {
@@ -263,6 +272,28 @@ export function syncCoordinateSystemGimbals(
       );
     }
   }
+}
+
+/**
+ * A chain node's gimbal node, or null when that node is not currently drawn.
+ * @param scene Scene the gimbals were built in.
+ * @param nodeIndex Chain index of the node.
+ */
+export function getCoordinateSystemGimbalNode(
+  scene: Scene,
+  nodeIndex: number
+): TransformNode | null {
+  return scene.getTransformNodeByName(`${GIMBAL_NAME_PREFIX}${nodeIndex}_node`);
+}
+
+/**
+ * Length each gimbal's axis cylinders span, in mm — the distance labels sit just beyond.
+ * @param atlasScaleMillimeters Atlas longest dimension in mm.
+ */
+export function getCoordinateSystemGimbalAxisLength(
+  atlasScaleMillimeters: number
+): number {
+  return atlasScaleMillimeters * GIMBAL_AXIS_LENGTH_FRACTION;
 }
 
 /**
@@ -344,7 +375,7 @@ function buildGimbalArrow(
  * @param scene Scene to build the meshes in.
  * @param parent Node the marker's meshes are parented to.
  * @param geometry Probe body geometry the shank thickness and head stage are sized from.
- * @param material Emissive material shared by the shank and the head stage.
+ * @param material Lit material shared by the shank and the head stage.
  */
 function buildGimbalPoseProbe(
   scene: Scene,
@@ -352,41 +383,62 @@ function buildGimbalPoseProbe(
   geometry: ProbeGeometry,
   material: StandardMaterial
 ): void {
-  const shank = ExtrudePolygon(
-    GIMBAL_POSE_MESH_NAME,
-    {
-      shape: GIMBAL_POSE_CONTOUR_POINTS.map(([x, y]) => new Vector3(x, 0, y)),
-      depth: geometry.shankThicknessMillimeters,
-      sideOrientation: Mesh.DOUBLESIDE
-    },
+  const shank = buildShankMesh(
     scene,
-    earcut
+    GIMBAL_POSE_CONTOUR,
+    GIMBAL_POSE_MESH_NAME,
+    geometry
   );
   shank.parent = parent;
   shank.material = material;
-  shank.position = new Vector3(0, geometry.shankThicknessMillimeters / 2, 0);
 
-  // A plain truncated cone, unlike `buildProbe`'s CSG2-cut head stage: the cut only carves the
-  // body-model contact face, and this marker is rebuilt on every value edit.
-  const headStage = MeshBuilder.CreateCylinder(
+  // Cloned, not rebuilt: the notch is a CSG2 subtract and this runs on every value edit.
+  const headStage = buildGimbalPoseHeadStageTemplate(scene, geometry).clone(
     GIMBAL_POSE_HEAD_STAGE_MESH_NAME,
-    {
-      height: geometry.headStageLengthMillimeters,
-      diameterBottom: GIMBAL_POSE_CONTOUR_WIDTH_MILLIMETERS,
-      diameterTop: geometry.rodDiameterMillimeters,
-      tessellation: GIMBAL_TESSELLATION
-    },
-    scene
+    parent
   );
-  headStage.parent = parent;
+  headStage.setEnabled(true);
   headStage.material = material;
-  headStage.rotation = new Vector3(Math.PI / 2, 0, 0);
-  headStage.position = new Vector3(
-    0,
-    0,
-    GIMBAL_POSE_CONTOUR_HEIGHT_MILLIMETERS +
-      geometry.headStageLengthMillimeters / 2
+}
+
+/** Metadata on the cached head-stage template: the geometry its notch was cut for. */
+interface GimbalPoseTemplateMetadata {
+  geometry: ProbeGeometry;
+}
+
+/**
+ * Get or re-cut the never-rendered head stage the chain-tip marker clones, so the CSG2 notch
+ * costs one boolean per geometry instead of one per value edit.
+ * @param scene Scene to cache the template in.
+ * @param geometry Probe body geometry the head stage is sized from.
+ */
+function buildGimbalPoseHeadStageTemplate(
+  scene: Scene,
+  geometry: ProbeGeometry
+): Mesh {
+  const existing = scene.getMeshByName(
+    GIMBAL_POSE_HEAD_STAGE_TEMPLATE_MESH_NAME
   );
+  // Only this function ever writes a mesh under that name, so its metadata is ours.
+  const cached = existing?.metadata as GimbalPoseTemplateMetadata | undefined;
+  if (
+    existing instanceof Mesh &&
+    cached &&
+    isSameProbeGeometry(cached.geometry, geometry)
+  ) {
+    return existing;
+  }
+  existing?.dispose();
+
+  const template = buildHeadStageMesh(
+    scene,
+    GIMBAL_POSE_CONTOUR,
+    GIMBAL_POSE_HEAD_STAGE_TEMPLATE_MESH_NAME,
+    geometry
+  );
+  template.metadata = { geometry } satisfies GimbalPoseTemplateMetadata;
+  template.setEnabled(false);
+  return template;
 }
 
 /**
@@ -408,5 +460,19 @@ function buildGimbalMaterial(
   material.diffuseColor = Color3.Black();
   material.specularColor = Color3.Black();
   material.disableLighting = true;
+  return material;
+}
+
+/**
+ * Get or build the chain-tip marker's lit material, shaded so the head stage's notch reads as a
+ * cut surface instead of a flat silhouette.
+ * @param scene Scene to get the material from.
+ */
+function buildGimbalPoseMaterial(scene: Scene): StandardMaterial {
+  const existing = scene.getMaterialByName(GIMBAL_POSE_MATERIAL_NAME);
+  if (existing instanceof StandardMaterial) return existing;
+
+  const material = new StandardMaterial(GIMBAL_POSE_MATERIAL_NAME, scene);
+  material.diffuseColor = GIMBAL_POSE_COLOR;
   return material;
 }
