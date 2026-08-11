@@ -10,7 +10,7 @@ const PROBE_SURFACE_MARKER_MESH_NAME = "probeSurfaceMarker_mesh";
 /** Name of the surface marker's material. */
 const PROBE_SURFACE_MARKER_MATERIAL_NAME = "probeSurfaceMarker_material";
 /** Marker diameter as a multiple of the probe shank's thickness, so it reads as a bead on the shank. */
-const PROBE_SURFACE_MARKER_DIAMETER_SHANK_THICKNESSES = 4;
+const PROBE_SURFACE_MARKER_DIAMETER_SHANK_THICKNESSES = 10;
 /** Latitude and longitude segments of the surface marker's sphere. */
 const PROBE_SURFACE_MARKER_SEGMENTS = 12;
 

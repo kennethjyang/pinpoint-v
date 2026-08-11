@@ -24,9 +24,9 @@ describe("syncProbeSurfaceMarker", () => {
       asrToVector3(marker.position).asArray()
     );
     const extendSize = mesh.getBoundingInfo().boundingBox.extendSize;
-    expect(extendSize.x).toBeCloseTo(0.1);
-    expect(extendSize.y).toBeCloseTo(0.1);
-    expect(extendSize.z).toBeCloseTo(0.1);
+    expect(extendSize.x).toBeCloseTo(0.25);
+    expect(extendSize.y).toBeCloseTo(0.25);
+    expect(extendSize.z).toBeCloseTo(0.25);
 
     const material = scene.getMaterialByName("probeSurfaceMarker_material");
     expect(material).toBeInstanceOf(StandardMaterial);
@@ -84,7 +84,7 @@ describe("syncProbeSurfaceMarker", () => {
     const secondMesh = scene.getMeshByName("probeSurfaceMarker_mesh")!;
     expect(secondMesh.uniqueId).not.toBe(firstMesh.uniqueId);
     expect(secondMesh.getBoundingInfo().boundingBox.extendSize.x).toBeCloseTo(
-      0.2
+      0.5
     );
 
     syncProbeSurfaceMarker(
