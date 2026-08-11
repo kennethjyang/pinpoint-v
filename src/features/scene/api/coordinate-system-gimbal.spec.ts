@@ -9,6 +9,7 @@ import {
   type CoordinateSystemNode
 } from "@/features/coordinate-system";
 import { makeTestSceneWithGizmo } from "@/test/mount-helper";
+import { makeProbeGeometry } from "@/test/fixtures";
 import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildAtlasRootNode } from "./structures.api";
 import { syncCoordinateSystemGimbals } from "./coordinate-system-gimbal.api";
@@ -73,7 +74,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     const atlasRoot = buildAtlasRootNode(scene);
@@ -90,9 +92,10 @@ describe("syncCoordinateSystemGimbals", () => {
     );
   });
 
-  it("points the probe-shank arrow along the last gimbal's local -Z", () => {
+  it("builds the NP1000 shank standing tip-first with the head stage beyond it", () => {
     const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
     const chain = [makeNode("Parent", [0, 0, 0], [0, Math.PI / 5, 0])];
+    const geometry = makeProbeGeometry();
 
     syncCoordinateSystemGimbals(
       scene,
@@ -100,22 +103,51 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      geometry
     );
 
-    const lastGimbal = scene.getTransformNodeByName(
-      "coordinateSystemGimbal_0_node"
+    const shank = scene.getMeshByName("coordinateSystemGimbalPose_mesh")!;
+    const shankBounds = shank.getBoundingInfo().boundingBox;
+    expect(shankBounds.minimum.z).toBeCloseTo(0);
+    expect(shankBounds.maximum.z).toBeCloseTo(10.209);
+    expect(shankBounds.minimum.x).toBeCloseTo(-0.035);
+    expect(shankBounds.maximum.x).toBeCloseTo(0.035);
+
+    const headStage = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStage_mesh"
     )!;
-    const expectedDirection = Vector3.TransformNormal(
-      new Vector3(0, 0, -1),
-      lastGimbal.computeWorldMatrix(true)
-    ).normalize();
-    const shaft = scene.getMeshByName("coordinateSystemGimbalPose_mesh")!;
-    const shaftDirection = Vector3.TransformNormal(
-      Vector3.Up(),
-      shaft.computeWorldMatrix(true)
-    ).normalize();
-    expectVectorCloseTo(shaftDirection, expectedDirection);
+    expect(headStage.position.z).toBeCloseTo(
+      10.209 + geometry.headStageLengthMillimeters / 2
+    );
+  });
+
+  it("colours the probe marker's shank and head stage with the shared pink material", () => {
+    const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", [makeNode("Node")]),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null,
+      makeProbeGeometry()
+    );
+
+    const shank = scene.getMeshByName("coordinateSystemGimbalPose_mesh")!;
+    const headStage = scene.getMeshByName(
+      "coordinateSystemGimbalPoseHeadStage_mesh"
+    )!;
+    const material = scene.getMaterialByName(
+      "coordinateSystemGimbalPose_material"
+    ) as StandardMaterial;
+
+    expect(shank.material).toBe(material);
+    expect(headStage.material).toBe(material);
+    expect(material.emissiveColor.equals(Color3.FromHexString("#e91e63"))).toBe(
+      true
+    );
   });
 
   it("composes pitch and yaw together, not a single-axis approximation of either", () => {
@@ -130,7 +162,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     const atlasRoot = buildAtlasRootNode(scene);
@@ -163,7 +196,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain, true),
       [1, 2, 3],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     const root = scene.getTransformNodeByName(
@@ -180,7 +214,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain, false),
       [1, 2, 3],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     expect(
@@ -200,7 +235,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", [makeNode("Node")]),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
     expect(scene.getMeshByName("coordinateSystemGimbalLink_0_mesh")).toBeNull();
 
@@ -210,7 +246,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", [makeNode("Node", [2, 0, 0])]),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
     const shaft = scene.getMeshByName("coordinateSystemGimbalLink_0_mesh")!;
     const head = scene.getMeshByName("coordinateSystemGimbalLink_0_mesh_head")!;
@@ -228,7 +265,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", [makeNode("Node")]),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     const expectedColors: [string, Color3][] = [
@@ -254,7 +292,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", chain),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      0
+      0,
+      makeProbeGeometry()
     );
 
     const parentOrigin = scene.getMeshByName(
@@ -283,7 +322,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", [makeNode("Node")]),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      5
+      5,
+      makeProbeGeometry()
     );
 
     const origin = scene.getMeshByName("coordinateSystemGimbal_0_origin_mesh")!;
@@ -298,7 +338,8 @@ describe("syncCoordinateSystemGimbals", () => {
       buildCoordinateSystem("Fixture", [makeNode("Node")]),
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
     const unrelated = MeshBuilder.CreateBox("unrelated", {}, scene);
     selectionOutlineLayer.addSelection([unrelated]);
@@ -309,7 +350,8 @@ describe("syncCoordinateSystemGimbals", () => {
       null,
       [0, 0, 0],
       ATLAS_SCALE_MILLIMETERS,
-      null
+      null,
+      makeProbeGeometry()
     );
 
     expect(

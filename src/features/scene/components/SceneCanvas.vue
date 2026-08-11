@@ -18,7 +18,11 @@ import {
   setStructureInteriorsHidden,
   syncStructuresVisibility
 } from "../api/structures.api";
-import type { AxisGuideFrame, AxisGuides } from "../api/axis-guide.api";
+import type {
+  AxisGuideFrame,
+  AxisGuideLabels,
+  AxisGuides
+} from "../api/axis-guide.api";
 import {
   buildAxisGuides,
   clearAxisGuides,
@@ -45,6 +49,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useI18n } from "vue-i18n";
+import { useAtlasAxes } from "@/composable/useAtlasAxes";
 import type { Mesh, Scene, SSAO2RenderingPipeline } from "@babylonjs/core";
 import {
   endProbeGizmoDrag,
@@ -117,6 +122,7 @@ const { notifyError, notifyWarning } = useNotify();
 const currentExperiment = useCurrentExperimentStore();
 const preferences = usePreferencesStore();
 const runtime = useBabylonRuntimeService();
+const atlasAxes = useAtlasAxes();
 useCameraPoseSync(
   runtime.camera,
   () => currentExperiment.atlas,
@@ -214,6 +220,25 @@ const selectedCoordinateSystem = computed(() =>
     ? currentExperiment.selectedInspectable
     : null
 );
+
+/**
+ * Are the axis guides drawn: the user's own toggle, or forced on while a coordinate system is
+ * selected, since `setSceneEntitiesHidden` strips every other orientation cue from the scene.
+ */
+const areAxisGuidesDrawn = computed(
+  () =>
+    currentExperiment.areAxisGuidesVisible ||
+    selectedCoordinateSystem.value !== null
+);
+
+/** Axis guide label text: the user's atlas axis names, plus the fixed Babylon axis letters. */
+const axisGuideLabels = computed<AxisGuideLabels>(() => {
+  const [ap, dv, ml] = atlasAxes.position.value
+    .slice()
+    .sort((a, b) => a.axis - b.axis)
+    .map(slot => slot.label) as [string, string, string];
+  return { ap, dv, ml, x: t("axis.x"), y: t("axis.y"), z: t("axis.z") };
+});
 
 /**
  * Whether the gizmo toolbar is shown: the camera, the world, and a coordinate
@@ -347,7 +372,7 @@ watch(runtime.scene, () => {
 // Create the axis guide text renderers the first time they are shown: the
 // MSDF font is fetched remotely, so hidden guides load nothing.
 watch(
-  [runtime.scene, () => currentExperiment.areAxisGuidesVisible],
+  [runtime.scene, areAxisGuidesDrawn],
   async ([scene, isVisible]) => {
     if (!scene || !isVisible || axisGuides.value) return;
 
@@ -400,7 +425,7 @@ watchEffect(() => {
   const guides = axisGuides.value;
   if (!scene || !guides) return;
 
-  if (!currentExperiment.areAxisGuidesVisible) {
+  if (!areAxisGuidesDrawn.value) {
     clearAxisGuides(scene, guides);
     return;
   }
@@ -409,7 +434,8 @@ watchEffect(() => {
     scene,
     guides,
     currentExperiment.atlas,
-    axisGuideFrame(scene)
+    axisGuideFrame(scene),
+    axisGuideLabels.value
   );
 });
 
@@ -1098,7 +1124,8 @@ watchEffect(() => {
     selectedCoordinateSystem.value,
     currentExperiment.referenceCoordinate,
     getAtlasLongestDimensionMillimeters(currentExperiment.atlas),
-    currentExperiment.focusedCoordinateSystemNodeIndex
+    currentExperiment.focusedCoordinateSystemNodeIndex,
+    probeGeometry.value
   );
 });
 

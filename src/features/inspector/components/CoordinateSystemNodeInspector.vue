@@ -1,10 +1,21 @@
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { CoordinateSystemNode } from "@/features/coordinate-system";
+import type {
+  CoordinateSystemNode,
+  CoordinateSystemNodeComponent
+} from "@/features/coordinate-system";
+import { getCoordinateSystemSlots } from "@/features/coordinate-system";
 import CommittedInput from "@/components/CommittedInput.vue";
+import {
+  type CoordinateSystemUnitModel,
+  useCoordinateSystemUnits
+} from "../composable/useCoordinateSystemValueModel";
 import { useValidationRules } from "@/composable/useValidationRules";
-import CoordinateSystemValueList from "./CoordinateSystemValueList.vue";
+import { usePreferencesStore } from "@/stores/preferences.store";
+import CoordinateSystemValueDialog from "./CoordinateSystemValueDialog.vue";
+
+const AXIS_MESSAGE_KEYS = ["axis.x", "axis.y", "axis.z"] as const;
 
 const { node } = defineProps<{
   node: CoordinateSystemNode;
@@ -20,6 +31,12 @@ const emit = defineEmits<{
 
 const { requiredName: nodeNameRules } = useValidationRules();
 const { t } = useI18n();
+const preferences = usePreferencesStore();
+const positionUnits = useCoordinateSystemUnits("position");
+const rotationUnits = useCoordinateSystemUnits("rotation");
+
+const isPositionDialogOpen = ref(false);
+const isRotationDialogOpen = ref(false);
 
 const name = computed({
   get: () => node.name,
@@ -30,6 +47,52 @@ const isOnSurface = computed({
   get: () => node.onSurface,
   set: (value: boolean) => emit("update:onSurface", value)
 });
+
+const positionSummary = computed(() =>
+  valueSummary(
+    "position",
+    positionUnits,
+    t("coordinateSystemInspector.position")
+  )
+);
+const rotationSummary = computed(() =>
+  valueSummary(
+    "rotation",
+    rotationUnits,
+    t("coordinateSystemInspector.rotation")
+  )
+);
+
+/**
+ * Summary line for one of a node's triples, listing only the values the user can change.
+ * @param component Whether to summarize the position or rotation triple.
+ * @param units Display-unit converters for that component.
+ * @param label Localized name of the component.
+ */
+function valueSummary(
+  component: CoordinateSystemNodeComponent,
+  units: CoordinateSystemUnitModel,
+  label: string
+): string {
+  // Fixed values are rigid constants the user never edits, so they are left out
+  // entirely, matching `ProbeTransformValueRow`'s adjustable-slot filter.
+  const entries = getCoordinateSystemSlots(node, component)
+    .filter(({ value }) => value.mode !== "fixed")
+    .map(({ axis, value }) =>
+      t("coordinateSystemInspector.valueSummaryEntry", {
+        name: value.name || t(AXIS_MESSAGE_KEYS[axis]),
+        value: units
+          .toDisplay(value.value)
+          .toFixed(preferences.decimalPrecision)
+      })
+    );
+  return t("coordinateSystemInspector.valueSummary", {
+    label,
+    values: entries.length
+      ? entries.join(", ")
+      : t("coordinateSystemInspector.valueSummaryAllFixed")
+  });
+}
 </script>
 
 <template>
@@ -67,12 +130,30 @@ const isOnSurface = computed({
           v-model="isOnSurface"
           :label="t('coordinateSystemInspector.surfaceCoordinate')"
         />
-        <CoordinateSystemValueList
+        <q-btn
+          align="left"
+          class="full-width"
+          :label="positionSummary"
+          no-caps
+          outline
+          @click="isPositionDialogOpen = true"
+        />
+        <q-btn
+          align="left"
+          class="full-width"
+          :label="rotationSummary"
+          no-caps
+          outline
+          @click="isRotationDialogOpen = true"
+        />
+        <CoordinateSystemValueDialog
+          v-model="isPositionDialogOpen"
           component="position"
           :label="t('coordinateSystemInspector.position')"
           :node="node"
         />
-        <CoordinateSystemValueList
+        <CoordinateSystemValueDialog
+          v-model="isRotationDialogOpen"
           component="rotation"
           :label="t('coordinateSystemInspector.rotation')"
           :node="node"

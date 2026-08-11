@@ -1,5 +1,7 @@
 import {
   Color3,
+  ExtrudePolygon,
+  Mesh,
   MeshBuilder,
   Quaternion,
   StandardMaterial,
@@ -8,12 +10,14 @@ import {
   type Scene,
   type SelectionOutlineLayer
 } from "@babylonjs/core";
+import earcut from "earcut";
 import {
   type CoordinateSystem,
   getCoordinateSystemAxisValue
 } from "@/features/coordinate-system";
 import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildAtlasRootNode } from "./structures.api";
+import type { ProbeGeometry } from "../models/probe-geometry.model";
 
 /** Name of the node the whole chain visualization hangs off. */
 const GIMBAL_ROOT_NODE_NAME = "coordinateSystemGimbalRoot_node";
@@ -40,8 +44,6 @@ const GIMBAL_ARROW_SHAFT_DIAMETER_FRACTION = 0.05;
 const GIMBAL_ARROW_HEAD_DIAMETER_FRACTION = 0.18;
 /** Arrow cone head length, as a fraction of the gimbal axis length. */
 const GIMBAL_ARROW_HEAD_LENGTH_FRACTION = 0.35;
-/** Probe-shank arrow length, as a fraction of the gimbal axis length. */
-const GIMBAL_POSE_ARROW_LENGTH_FRACTION = 1.5;
 /** Radial segments of every gimbal cylinder and cone. */
 const GIMBAL_TESSELLATION = 8;
 
@@ -82,6 +84,27 @@ const GIMBAL_REFERENCE_MATERIAL_NAME =
 const GIMBAL_POSE_COLOR = Color3.FromHexString("#e91e63");
 /** Name of the probe-shank arrow's material. */
 const GIMBAL_POSE_MATERIAL_NAME = "coordinateSystemGimbalPose_material";
+/** Name of the probe marker's head stage cone, at the end of the chain. */
+const GIMBAL_POSE_HEAD_STAGE_MESH_NAME =
+  "coordinateSystemGimbalPoseHeadStage_mesh";
+
+/**
+ * imec NP1000 planar contour in probe-local mm, tip on the origin and body along +y: the
+ * probeinterface `neuropixels/NP1000` `probe_planar_contour`, scaled and recentred the way
+ * `getProbeContour` does. Inlined rather than read from the probe library so the marker is the
+ * same reference probe regardless of what the user has installed.
+ */
+const GIMBAL_POSE_CONTOUR_POINTS: [number, number][] = [
+  [-0.035, 10.209],
+  [-0.035, 0.209],
+  [0, 0],
+  [0.035, 0.209],
+  [0.035, 10.209]
+];
+/** Full x extent of `GIMBAL_POSE_CONTOUR_POINTS`, in mm. */
+const GIMBAL_POSE_CONTOUR_WIDTH_MILLIMETERS = 0.07;
+/** Tip-to-top height of `GIMBAL_POSE_CONTOUR_POINTS`, in mm. */
+const GIMBAL_POSE_CONTOUR_HEIGHT_MILLIMETERS = 10.209;
 
 /**
  * Rebuild the selected coordinate system's chain gimbals and outline its focused node, or strip
@@ -92,6 +115,7 @@ const GIMBAL_POSE_MATERIAL_NAME = "coordinateSystemGimbalPose_material";
  * @param referenceCoordinateMillimeters Experiment reference coordinate, in atlas ASR mm.
  * @param atlasScaleMillimeters Atlas's longest dimension in mm, sizing every gimbal part.
  * @param focusedNodeIndex Chain index whose gimbal is outlined, or null for none.
+ * @param probeGeometry Probe body geometry the chain-tip probe marker is sized from.
  */
 export function syncCoordinateSystemGimbals(
   scene: Scene,
@@ -99,7 +123,8 @@ export function syncCoordinateSystemGimbals(
   coordinateSystem: CoordinateSystem | null,
   referenceCoordinateMillimeters: [number, number, number],
   atlasScaleMillimeters: number,
-  focusedNodeIndex: number | null
+  focusedNodeIndex: number | null,
+  probeGeometry: ProbeGeometry
 ): void {
   const existingRoot = scene.getTransformNodeByName(GIMBAL_ROOT_NODE_NAME);
 
@@ -216,13 +241,10 @@ export function syncCoordinateSystemGimbals(
   }
 
   // Lands on the last gimbal, or on `root` for an empty chain.
-  buildGimbalArrow(
+  buildGimbalPoseProbe(
     scene,
     parent,
-    GIMBAL_POSE_MESH_NAME,
-    Vector3.Zero(),
-    new Vector3(0, 0, -axisLength * GIMBAL_POSE_ARROW_LENGTH_FRACTION),
-    axisLength,
+    probeGeometry,
     buildGimbalMaterial(scene, GIMBAL_POSE_MATERIAL_NAME, GIMBAL_POSE_COLOR)
   );
 
@@ -313,6 +335,57 @@ function buildGimbalArrow(
     Vector3.Up(),
     direction,
     new Quaternion()
+  );
+}
+
+/**
+ * Build the chain-tip probe marker: an NP1000 shank extruded from its planar contour plus the
+ * head stage cone above it, tip on the parent's origin and body along its local +Z.
+ * @param scene Scene to build the meshes in.
+ * @param parent Node the marker's meshes are parented to.
+ * @param geometry Probe body geometry the shank thickness and head stage are sized from.
+ * @param material Emissive material shared by the shank and the head stage.
+ */
+function buildGimbalPoseProbe(
+  scene: Scene,
+  parent: TransformNode,
+  geometry: ProbeGeometry,
+  material: StandardMaterial
+): void {
+  const shank = ExtrudePolygon(
+    GIMBAL_POSE_MESH_NAME,
+    {
+      shape: GIMBAL_POSE_CONTOUR_POINTS.map(([x, y]) => new Vector3(x, 0, y)),
+      depth: geometry.shankThicknessMillimeters,
+      sideOrientation: Mesh.DOUBLESIDE
+    },
+    scene,
+    earcut
+  );
+  shank.parent = parent;
+  shank.material = material;
+  shank.position = new Vector3(0, geometry.shankThicknessMillimeters / 2, 0);
+
+  // A plain truncated cone, unlike `buildProbe`'s CSG2-cut head stage: the cut only carves the
+  // body-model contact face, and this marker is rebuilt on every value edit.
+  const headStage = MeshBuilder.CreateCylinder(
+    GIMBAL_POSE_HEAD_STAGE_MESH_NAME,
+    {
+      height: geometry.headStageLengthMillimeters,
+      diameterBottom: GIMBAL_POSE_CONTOUR_WIDTH_MILLIMETERS,
+      diameterTop: geometry.rodDiameterMillimeters,
+      tessellation: GIMBAL_TESSELLATION
+    },
+    scene
+  );
+  headStage.parent = parent;
+  headStage.material = material;
+  headStage.rotation = new Vector3(Math.PI / 2, 0, 0);
+  headStage.position = new Vector3(
+    0,
+    0,
+    GIMBAL_POSE_CONTOUR_HEIGHT_MILLIMETERS +
+      geometry.headStageLengthMillimeters / 2
   );
 }
 

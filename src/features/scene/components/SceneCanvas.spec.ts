@@ -43,6 +43,7 @@ import {
 } from "@/test/mount-helper";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
+import { WORLD_INSPECTABLE } from "../models/inspectable.model";
 import {
   buildAtlasRootNode,
   setAtlasCenterOffset,
@@ -514,6 +515,23 @@ describe("SceneCanvas", () => {
         renderer.paragraphs.map(paragraph => paragraph.text)
       )
     ).toEqual(["+AP", "-AP", "+DV", "-DV", "+ML", "-ML"]);
+  });
+
+  it("forces the axis guides on while a coordinate system is selected, even with the toggle off", async () => {
+    const { runtime } = await mountCanvas();
+    await setAxisGuidesVisible(false);
+    const store = useCurrentExperimentStore();
+
+    store.selectedInspectable = makeCoordinateSystem();
+    await flushPromises();
+
+    expect(createAxisGuides).toHaveBeenCalledTimes(1);
+    expect(axisGuidePickMeshCount(runtime.scene.value!)).toBe(6);
+
+    store.selectedInspectable = WORLD_INSPECTABLE;
+    await flushPromises();
+
+    expect(axisGuidePickMeshCount(runtime.scene.value!)).toBe(0);
   });
 
   it("re-offsets when the experiment's atlas changes", async () => {
