@@ -11,17 +11,10 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useDragSteps } from "@/composable/useDragSteps";
-import { useNumericModel } from "@/composable/useNumericModel";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
-import { useUnitLabels } from "@/composable/useUnitLabels";
 import { useValidationRules } from "@/composable/useValidationRules";
+import AtlasAxisInputs from "@/components/AtlasAxisInputs.vue";
 import CommittedInput from "@/components/CommittedInput.vue";
-import {
-  millimetersToPositionUnit,
-  positionUnitToMillimeters,
-  radiansToRotationUnit,
-  rotationUnitToRadians
-} from "@/utils/math";
 
 const { sceneObject } = defineProps<{
   sceneObject: SceneObject;
@@ -29,25 +22,13 @@ const { sceneObject } = defineProps<{
 
 const currentExperimentStore = useCurrentExperimentStore();
 const preferences = usePreferencesStore();
-const unitLabels = useUnitLabels();
-const { positionStep, rotationStep, unitlessStep } = useDragSteps();
-const {
-  requiredName: nameRules,
-  optionalNumber: numberRules,
-  positiveNumber: scaleRules
-} = useValidationRules();
+const { unitlessStep } = useDragSteps();
+const { requiredName: nameRules, positiveNumber: scaleRules } =
+  useValidationRules();
 const { t } = useI18n();
 
 /** Whether AP/DV/ML fields display the position offset by the reference coordinate. */
 const isPositionRelativeToReference = ref(false);
-
-const positionSuffix = computed(() =>
-  unitLabels.position(preferences.positionUnit)
-);
-
-const rotationSuffix = computed(() =>
-  unitLabels.rotation(preferences.rotationUnit)
-);
 
 const name = computed({
   get: () => sceneObject.name,
@@ -59,56 +40,6 @@ const positionOffset = computed<[number, number, number]>(() =>
   isPositionRelativeToReference.value
     ? currentExperimentStore.referenceCoordinate
     : [0, 0, 0]
-);
-
-const ap = useNumericModel(
-  () => sceneObject.position[0] - positionOffset.value[0],
-  storedValue =>
-    (sceneObject.position[0] = storedValue + positionOffset.value[0]),
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const dv = useNumericModel(
-  () => sceneObject.position[1] - positionOffset.value[1],
-  storedValue =>
-    (sceneObject.position[1] = storedValue + positionOffset.value[1]),
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-const ml = useNumericModel(
-  () => sceneObject.position[2] - positionOffset.value[2],
-  storedValue =>
-    (sceneObject.position[2] = storedValue + positionOffset.value[2]),
-  millimeters =>
-    millimetersToPositionUnit(millimeters, preferences.positionUnit),
-  value => positionUnitToMillimeters(value, preferences.positionUnit),
-  () => preferences.decimalPrecision
-);
-
-const roll = useNumericTupleModel(
-  () => sceneObject.rotation,
-  0,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const yaw = useNumericTupleModel(
-  () => sceneObject.rotation,
-  1,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
-);
-const pitch = useNumericTupleModel(
-  () => sceneObject.rotation,
-  2,
-  radians => radiansToRotationUnit(radians, preferences.rotationUnit),
-  value => rotationUnitToRadians(value, preferences.rotationUnit),
-  () => preferences.decimalPrecision
 );
 
 const scaleZ = useNumericTupleModel(
@@ -183,77 +114,22 @@ const lockLabel = computed(() =>
       :label="t('sceneObjectInspector.relativeToReferenceCoordinate')"
     />
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="ap"
-        :disable="sceneObject.lock"
-        :drag-step="positionStep"
-        :label="t('axis.ap')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="dv"
-        :disable="sceneObject.lock"
-        :drag-step="positionStep"
-        :label="t('axis.dv')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="ml"
-        :disable="sceneObject.lock"
-        :drag-step="positionStep"
-        :label="t('axis.ml')"
-        :rules="numberRules"
-        :suffix="positionSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-    </div>
+    <AtlasAxisInputs
+      :disable="sceneObject.lock"
+      hide-bottom-space
+      kind="position"
+      :offset="positionOffset"
+      outlined
+      :tuple="sceneObject.position"
+    />
 
-    <div class="row q-gutter-x-sm">
-      <CommittedInput
-        v-model="roll"
-        :disable="sceneObject.lock"
-        :drag-step="rotationStep"
-        :label="t('sceneObjectInspector.roll')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="yaw"
-        :disable="sceneObject.lock"
-        :drag-step="rotationStep"
-        :label="t('sceneObjectInspector.yaw')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-      <CommittedInput
-        v-model="pitch"
-        :disable="sceneObject.lock"
-        :drag-step="rotationStep"
-        :label="t('sceneObjectInspector.pitch')"
-        :rules="numberRules"
-        :suffix="rotationSuffix"
-        class="col"
-        hide-bottom-space
-        outlined
-      />
-    </div>
+    <AtlasAxisInputs
+      :disable="sceneObject.lock"
+      hide-bottom-space
+      kind="rotation"
+      outlined
+      :tuple="sceneObject.rotation"
+    />
 
     <div class="row q-gutter-x-sm">
       <CommittedInput
