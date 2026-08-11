@@ -256,7 +256,7 @@ const directNode = computed(() => {
   const [node] = chain.value;
   if (chain.value.length !== 1 || !node) return null;
   return [...node.position, ...node.rotation].some(
-    ({ fixed, bounds }) => fixed || bounds
+    ({ mode }) => mode !== "free"
   )
     ? null
     : node;
@@ -437,6 +437,7 @@ function clearOffSurfaceWarnings(): void {
 }
 
 /**
+/**
  * Re-sample whether the probe crosses the brain, which gates the surface marker. Reads the same
  * `insideMillimeters` target `moveToSurface` drops the tip onto, so the marker disappears exactly
  * when a drop to surface would have nothing to drop onto.
@@ -461,7 +462,7 @@ function clearSurfaceMarker(): void {
 }
 
 /**
- * Solve the working chain's non-fixed values onto the probe's pose, driving or clearing the
+ * Solve the working chain's free values onto the probe's pose, driving or clearing the
  * unreachable-pose ghost and toast based on the result.
  * @param reason Why this solve fired, which sets its restart budget and what it writes.
  */
