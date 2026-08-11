@@ -7,6 +7,7 @@ import {
 } from "@/test/mount-helper";
 import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
+import enUS from "@/i18n/en-US";
 
 // Mock the leaf module (not the `@/features/atlas` barrel) -- the current
 // experiment store's `terminologyRows` is a `computedAsync` and fetches on
@@ -160,5 +161,27 @@ describe("CoordinateSystemLibraryDialog", () => {
     await items[0]!.trigger("drop");
 
     expect(store.library.map(({ name }) => name)).toEqual(before);
+  });
+
+  it("creates a coordinate system with one adjustable transform and opens it", async () => {
+    const wrapper = await mountDialog();
+    const store = useCoordinateSystemLibraryStore();
+    const currentExperimentStore = useCurrentExperimentStore();
+
+    const addButton = wrapper
+      .findAllComponents({ name: "QBtn" })
+      .find(
+        button =>
+          button.props("label") ===
+          enUS.coordinateSystemLibrary.addCoordinateSystem
+      );
+    await addButton!.trigger("click");
+
+    expect(store.library).toHaveLength(4);
+    expect(store.library[3]!.name).toBe("Coordinate System 4");
+    expect(store.library[3]!.chain).toHaveLength(1);
+    expect(store.library[3]!.chain[0]!.position[0]!.fixed).toBe(false);
+    expect(currentExperimentStore.selectedInspectable).toBe(store.library[3]);
+    expect(wrapper.emitted("ok")).toBeTruthy();
   });
 });

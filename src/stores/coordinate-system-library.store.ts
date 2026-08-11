@@ -146,6 +146,15 @@ export const useCoordinateSystemLibraryStore = defineStore(
     ]);
 
     /**
+     * Add a coordinate system to the library. Does nothing if its id is already present.
+     * @param coordinateSystem Coordinate system to add.
+     */
+    function add(coordinateSystem: CoordinateSystem) {
+      if (library.value.some(({ id }) => id === coordinateSystem.id)) return;
+      library.value.push(coordinateSystem);
+    }
+
+    /**
      * Remove a coordinate system from the library by id.
      * @param coordinateSystem Coordinate system to remove.
      */
@@ -178,7 +187,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
     }
 
     const state = { library };
-    const actions = { remove, reorder };
+    const actions = { add, remove, reorder };
     return { ...state, ...actions };
   },
   { persist: true }

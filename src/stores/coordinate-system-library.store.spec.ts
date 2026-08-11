@@ -38,6 +38,27 @@ describe("useCoordinateSystemLibraryStore", () => {
     });
   });
 
+  describe("add", () => {
+    it("appends after the three seeds", () => {
+      const store = useCoordinateSystemLibraryStore();
+      const coordinateSystem = makeCoordinateSystem();
+
+      store.add(coordinateSystem);
+
+      expect(store.library).toHaveLength(4);
+      expect(store.library[3]!.id).toBe(coordinateSystem.id);
+    });
+
+    it("is a no-op when an entry with the same id is already present", () => {
+      const store = useCoordinateSystemLibraryStore();
+      const existingId = store.library[1]!.id;
+
+      store.add(makeCoordinateSystem({ id: existingId }));
+
+      expect(store.library).toHaveLength(3);
+    });
+  });
+
   describe("reorder", () => {
     it("moves a system to a later index, leaving the default first", () => {
       const store = useCoordinateSystemLibraryStore();

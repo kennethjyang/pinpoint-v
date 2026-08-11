@@ -69,7 +69,7 @@ interface CoordinateSystemOption {
   value: string;
 }
 
-/** Why an inverse-kinematics run fired, which sets its solve budget and what it writes. */
+/** Why a solve or surface check fired, which sets a solve's budget and what it writes. */
 type SolveReason = "preview" | "release" | "external";
 
 /** Pose difference, in mm and radians, below which the probe needs no correction. */
@@ -254,6 +254,9 @@ const directNode = computed(() => {
     : node;
 });
 
+/** Does the working chain have any node constrained to the brain surface. */
+const hasSurfaceNode = computed(() => chain.value.some(node => node.onSurface));
+
 /** This probe's interned interface definition, or null when the experiment has none. */
 const probeInterfaceProbe = computed(
   () =>
@@ -400,7 +403,7 @@ function clearUnreachable(): void {
 /** Drop every off-surface warning, its debounce counts, and any in-flight check. */
 function clearOffSurfaceWarnings(): void {
   surfaceCheckId++;
-  offSurfaceNodeIndexes.value = [];
+  if (offSurfaceNodeIndexes.value.length > 0) offSurfaceNodeIndexes.value = [];
   offSurfaceCheckCounts.clear();
 }
 
@@ -419,7 +422,7 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
   try {
     let isTipInsideBrain = false;
     let surfacePosition: [number, number, number] | null = null;
-    if (chain.value.some(node => node.onSurface)) {
+    if (hasSurfaceNode.value) {
       isTipInsideBrain = (await isInsideBrain(probe.tipPosition)) === true;
       if (isTipInsideBrain) {
         surfacePosition = (await findTargets(probe))?.insideMillimeters ?? null;
@@ -494,7 +497,13 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
       }
     }
 
-    void checkSurfaceNodes(solution, reason, isTipInsideBrain);
+    // A preview never writes the probe's pose, so the tip sampled before the solve is still the
+    // final tip. A release or external solve can correct the pose, so re-sample it.
+    if (reason === "preview") {
+      void checkSurfaceNodes(solution, reason, isTipInsideBrain);
+    } else {
+      void verifySurfaceNodes(solution, reason);
+    }
   } finally {
     if (id === solveId) isSolving = false;
   }
@@ -535,8 +544,10 @@ function seedChain(): void {
   // shape needs a solve to describe the probe's current pose instead of showing
   // the library's stored values.
   const node = directNode.value;
-  if (node) writeProbePoseIntoNode(node);
-  else void runInverseKinematics("external");
+  if (node) {
+    writeProbePoseIntoNode(node);
+    void verifySurfaceNodes(solveDirectNode(node), "external");
+  } else void runInverseKinematics("external");
 }
 
 /**
@@ -616,7 +627,7 @@ function onSurfaceClick(): void {
   void moveToSurface();
 }
 
-/** Re-solve the working chain onto the probe, clearing any stale off-surface warning. */
+/** Re-solve the working chain onto the probe and re-check its on-surface nodes. */
 function applySolve(): void {
   const node = directNode.value;
   const solution = node
@@ -629,7 +640,27 @@ function applySolve(): void {
   setProbeTipMillimeters(probe, solution.tipPosition);
   probe.rotation = [...solution.rotation];
   clearUnreachable();
-  clearOffSurfaceWarnings();
+  void verifySurfaceNodes(solution, "external");
+}
+
+/**
+ * Sample whether the probe's committed tip is inside the brain, then check the chain's
+ * on-surface nodes against it.
+ * @param solution Solved chain the node positions come from.
+ * @param reason Why the change that produced this check fired.
+ */
+async function verifySurfaceNodes(
+  solution: CoordinateSystemSolution,
+  reason: SolveReason
+): Promise<void> {
+  if (!hasSurfaceNode.value) {
+    clearOffSurfaceWarnings();
+    return;
+  }
+  const checkId = ++surfaceCheckId;
+  const isTipInsideBrain = (await isInsideBrain(probe.tipPosition)) === true;
+  if (checkId !== surfaceCheckId) return;
+  void checkSurfaceNodes(solution, reason, isTipInsideBrain);
 }
 
 /**
@@ -700,6 +731,12 @@ watch(
     if (node) {
       writeProbePoseIntoNode(node);
       clearUnreachable();
+      void verifySurfaceNodes(
+        solveDirectNode(node),
+        currentExperimentStore.draggedProbeId === probe.id
+          ? "preview"
+          : "external"
+      );
       return;
     }
     if (

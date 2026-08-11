@@ -2,6 +2,10 @@
 import { useDialogPluginComponent, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import type { CoordinateSystem } from "../model/coordinate-system.model";
+import {
+  addCoordinateSystemTransform,
+  buildCoordinateSystem
+} from "../api/coordinate-system.api";
 import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useDragReorder } from "@/composable/useDragReorder";
@@ -40,6 +44,26 @@ function onDragOverRow(index: number, event: DragEvent): void {
 function openInInspector(coordinateSystem: CoordinateSystem) {
   currentExperimentStore.selectedInspectable = coordinateSystem;
   onDialogOK();
+}
+
+/**
+ * Create a coordinate system seeded with one adjustable transform, add it to the library,
+ * and open it in the inspector.
+ */
+function addCoordinateSystem() {
+  const coordinateSystem = buildCoordinateSystem(
+    t("coordinateSystemLibrary.newCoordinateSystemName", {
+      index: coordinateSystemLibraryStore.library.length + 1
+    }),
+    [],
+    true
+  );
+  addCoordinateSystemTransform(
+    coordinateSystem,
+    t("coordinateSystemInspector.newTransformName", { index: 1 })
+  );
+  coordinateSystemLibraryStore.add(coordinateSystem);
+  openInInspector(coordinateSystem);
 }
 
 /**
@@ -85,6 +109,15 @@ function confirmRemove(coordinateSystem: CoordinateSystem) {
         <div class="text-caption">
           {{ $t("coordinateSystemLibrary.clickToInspectHint") }}
         </div>
+      </q-card-section>
+      <q-card-section>
+        <q-btn
+          class="full-width"
+          color="primary"
+          icon="add"
+          :label="$t('coordinateSystemLibrary.addCoordinateSystem')"
+          @click="addCoordinateSystem"
+        />
       </q-card-section>
       <q-card-section>
         <q-list class="dynamic-dialog-list" separator>

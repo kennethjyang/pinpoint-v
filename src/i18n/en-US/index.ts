@@ -169,6 +169,8 @@ export default {
     close: "Close"
   },
   coordinateSystemLibrary: {
+    addCoordinateSystem: "Add Coordinate System",
+    newCoordinateSystemName: "Coordinate System {index}",
     title: "Coordinate System Library",
     clickToInspectHint:
       "Click a coordinate system to open it in the inspector.",

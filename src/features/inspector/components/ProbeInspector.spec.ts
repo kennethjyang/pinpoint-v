@@ -11,6 +11,7 @@ import { usePreferencesStore } from "@/stores/preferences.store";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
 import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import {
+  makeCoordinateSystem,
   makeProbe,
   makeProbeInterfaceProbe,
   makeSceneModel
@@ -930,7 +931,7 @@ describe("ProbeInspector", () => {
       ).toHaveLength(1);
     });
 
-    it("clears the warning on a commit without sampling", async () => {
+    it("re-verifies on a commit inside the brain, keeping the warning", async () => {
       const isOnSurface = vi.fn().mockResolvedValue(false);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets: vi.fn(),
@@ -947,6 +948,43 @@ describe("ProbeInspector", () => {
       ).toHaveLength(1);
       const callCountBeforeCommit = isOnSurface.mock.calls.length;
 
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
+      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+      expect(isOnSurface.mock.calls.length).toBeGreaterThan(
+        callCountBeforeCommit
+      );
+    });
+
+    it("clears the warning on a commit once the tip leaves the brain, without sampling", async () => {
+      let insideBrain = true;
+      const isOnSurface = vi.fn().mockResolvedValue(false);
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn(async () => insideBrain),
+        isOnSurface
+      });
+      const { wrapper, pinia } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+      const callCountBeforeCommit = isOnSurface.mock.calls.length;
+
+      insideBrain = false;
       const surfaceAndDepth =
         useCoordinateSystemLibraryStore(pinia).library[1]!;
       const depthValueName = surfaceAndDepth.chain[1]!.position.find(
@@ -1201,6 +1239,115 @@ describe("ProbeInspector", () => {
           1e-3
         )
       ).toBe(true);
+    });
+  });
+
+  describe("direct chain surface warning", () => {
+    /** A single all-adjustable node marked onSurface, so `directNode` stays non-null. */
+    function buildSurfaceTip() {
+      return makeCoordinateSystem({
+        id: "surface-tip",
+        name: "Surface Tip",
+        chain: [
+          buildCoordinateSystemNode(
+            "Tip",
+            [
+              buildCoordinateSystemValue("ML"),
+              buildCoordinateSystemValue("DV"),
+              buildCoordinateSystemValue("AP")
+            ],
+            [
+              buildCoordinateSystemValue("Pitch"),
+              buildCoordinateSystemValue("Yaw"),
+              buildCoordinateSystemValue("Roll")
+            ],
+            [0, 1, 2],
+            [0, 1, 2],
+            true
+          )
+        ]
+      });
+    }
+
+    it("warns at once when selected inside the brain", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn().mockResolvedValue(false)
+      });
+      const { wrapper, store, probe } = mountInspector();
+
+      setProbeCoordinateSystem(store.experiment, probe, buildSurfaceTip());
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+    });
+
+    it("never samples the surface outside the brain across drag frames", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(false),
+        isOnSurface
+      });
+      const { wrapper, store, probe } = mountInspector();
+
+      setProbeCoordinateSystem(store.experiment, probe, buildSurfaceTip());
+      await flushPromises();
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.1];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+      expect(isOnSurface).not.toHaveBeenCalled();
+    });
+
+    it("debounces a preview warning across drag frames on the direct path", async () => {
+      let onSurface: boolean | null = true;
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn(async () => onSurface)
+      });
+      const { wrapper, store, probe } = mountInspector();
+
+      setProbeCoordinateSystem(store.experiment, probe, buildSurfaceTip());
+      await flushPromises();
+
+      onSurface = false;
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.1];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
     });
   });
 
