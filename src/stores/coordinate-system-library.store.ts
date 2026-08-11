@@ -42,9 +42,13 @@ export const useCoordinateSystemLibraryStore = defineStore(
               buildCoordinateSystemValue("AP")
             ],
             [
-              buildCoordinateSystemValue("Pitch", [0, Math.PI / 2]),
-              buildCoordinateSystemValue("Yaw", [0, 2 * Math.PI]),
-              buildCoordinateSystemValue("Roll", [0, 2 * Math.PI])
+              // A bound is a hard wall on this value's own signed radians -- the solver never
+              // treats a rotation as periodic, and it locks a DoF that lands exactly on a wall
+              // for the rest of that solve. So a bound must contain the neutral pose strictly
+              // inside it, and a full turn is spelled `null`, never `[0, 2 * Math.PI]`.
+              buildCoordinateSystemValue("Pitch"),
+              buildCoordinateSystemValue("Yaw"),
+              buildCoordinateSystemValue("Roll")
             ],
             [0, 1, 2],
             [0, 1, 2],

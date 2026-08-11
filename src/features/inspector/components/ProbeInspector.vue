@@ -80,11 +80,10 @@ const POSE_MATCH_TOLERANCE = 1e-4;
 
 const SOLVE_FAILURE_CAPTION_KEYS = {
   stalled: "probeInspector.inverseKinematicsStalled",
-  diverged: "probeInspector.inverseKinematicsDiverged",
   timeout: "probeInspector.inverseKinematicsTimeout",
   noFreeValues: "probeInspector.inverseKinematicsNoFreeValues"
 } as const satisfies Record<
-  Exclude<CoordinateSystemSolveStatus, "converged">,
+  Exclude<CoordinateSystemSolveStatus, "converged" | "diverged">,
   string
 >;
 
@@ -406,7 +405,15 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
       referenceOffset.value
     );
 
-    if (status !== "converged" && !hasNotifiedNonConvergence) {
+    // A drag reports nothing: the ghost drawn at the best-effort pose is the only cue that
+    // the target is out of the chain's reach. `diverged` never reports either -- the solve
+    // still yields the closest reachable pose, which is what the ghost shows.
+    if (
+      reason !== "preview" &&
+      status !== "converged" &&
+      status !== "diverged" &&
+      !hasNotifiedNonConvergence
+    ) {
       hasNotifiedNonConvergence = true;
       notifyError(
         t("probeInspector.inverseKinematicsFailed"),

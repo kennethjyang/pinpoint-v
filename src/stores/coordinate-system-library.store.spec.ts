@@ -145,13 +145,12 @@ describe("useCoordinateSystemLibraryStore", () => {
       }
     });
 
-    it("carries the Pitch bounds on the Surface Coordinate & Depth chain", () => {
+    it("leaves the Surface Coordinate & Depth rotations unbounded", () => {
       const store = useCoordinateSystemLibraryStore();
 
-      expect(store.library[1]!.chain[0]!.rotation[0]!.bounds).toEqual([
-        0,
-        Math.PI / 2
-      ]);
+      for (const value of store.library[1]!.chain[0]!.rotation) {
+        expect(value.bounds).toBeNull();
+      }
     });
 
     it("defaults every node's display orders to identity", () => {

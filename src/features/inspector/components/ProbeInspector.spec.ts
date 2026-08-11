@@ -22,7 +22,8 @@ import {
   buildFixedCoordinateSystemValue,
   type CoordinateSystemSolution,
   isCoordinateSystemSolutionAtPose,
-  solveCoordinateSystemChain
+  solveCoordinateSystemChain,
+  solveCoordinateSystemChainInverse
 } from "@/features/coordinate-system";
 import { getTerminologyRows } from "@/features/atlas";
 import {
@@ -103,6 +104,25 @@ vi.mock("@/features/scene/api/scene-model.api", async importOriginal => {
     putSceneModel: vi.fn()
   };
 });
+
+// The solver's status for a given pose is emergent, so the reporting-policy tests
+// script it. Defaults to the real implementation so every other IK test here still
+// exercises a genuine solve.
+vi.mock(
+  "@/features/coordinate-system/api/inverse-kinematics.api",
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import("@/features/coordinate-system/api/inverse-kinematics.api")
+      >();
+    return {
+      ...actual,
+      solveCoordinateSystemChainInverse: vi.fn(
+        actual.solveCoordinateSystemChainInverse
+      )
+    };
+  }
+);
 
 // `useFileDialog`'s input is never attached to the DOM, so it can't be
 // driven through a queryable `<input type="file">`. Replace it with a fake
@@ -550,6 +570,8 @@ describe("ProbeInspector", () => {
       const surfaceAndDepth = store.library[1]!;
       const pitchName = surfaceAndDepth.chain[0]!.rotation[0]!.name;
 
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
         surfaceAndDepth.id
@@ -870,6 +892,11 @@ describe("ProbeInspector", () => {
 
     it("draws a ghost at the closest reachable pose while an unreachable drag is out of bounds, and clears it once the drag is back in reach", async () => {
       const { wrapper, store, pinia, probe } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+      surfaceAndDepth.chain[0]!.rotation[1]!.bounds = [-0.01, 0.01];
+      surfaceAndDepth.chain[0]!.rotation[2]!.bounds = [-0.01, 0.01];
       await selectMultiNodeSystem(wrapper, pinia);
 
       store.draggedProbeId = probe.id;
@@ -889,6 +916,11 @@ describe("ProbeInspector", () => {
 
     it("snaps the probe onto the ghost's pose and clears the ghost when an unreachable drag is released", async () => {
       const { wrapper, store, pinia, probe } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+      surfaceAndDepth.chain[0]!.rotation[1]!.bounds = [-0.01, 0.01];
+      surfaceAndDepth.chain[0]!.rotation[2]!.bounds = [-0.01, 0.01];
       await selectMultiNodeSystem(wrapper, pinia);
 
       store.draggedProbeId = probe.id;
@@ -911,7 +943,23 @@ describe("ProbeInspector", () => {
       ).toBe(true);
     });
 
-    it("shows the failure toast once per excursion out of reach", async () => {
+    it("reports nothing while a drag cannot be solved, leaving the ghost as the only cue", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "timeout"
+      );
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+
+      expect(store.probeGhost).not.toBeNull();
+      expect(notifySpy).not.toHaveBeenCalled();
+    });
+
+    it("reports nothing when a released drag diverged", async () => {
       const { wrapper, store, pinia, probe } = mountInspector();
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await selectMultiNodeSystem(wrapper, pinia);
@@ -919,19 +967,76 @@ describe("ProbeInspector", () => {
       store.draggedProbeId = probe.id;
       probe.rotation = [0, 0, 2];
       await flushPromises();
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "diverged"
+      );
+      store.draggedProbeId = null;
+      await flushPromises();
+
+      expect(notifySpy).not.toHaveBeenCalled();
+    });
+
+    it("reports a released drag that timed out", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "timeout"
+      );
+      store.draggedProbeId = null;
+      await flushPromises();
+
       expect(notifySpy).toHaveBeenCalledTimes(1);
-      await waitOutPreviewThrottle();
+      expect(notifySpy).toHaveBeenCalledWith({
+        message: t.inverseKinematicsFailed,
+        caption: t.inverseKinematicsTimeout,
+        type: "negative"
+      });
+    });
+
+    it("reports a non-drag solve with no adjustable values", async () => {
+      const { wrapper, pinia, probe } = mountInspector();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "noFreeValues"
+      );
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+      expect(notifySpy).toHaveBeenCalledWith({
+        message: t.inverseKinematicsFailed,
+        caption: t.inverseKinematicsNoFreeValues,
+        type: "negative"
+      });
+    });
+
+    it("reports a repeated failure only once per excursion out of reach", async () => {
+      const { wrapper, pinia, probe } = mountInspector();
+      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "timeout"
+      );
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
+        "timeout"
+      );
       probe.rotation = [0, 0, 2.1];
       await flushPromises();
       expect(notifySpy).toHaveBeenCalledTimes(1);
-      await waitOutPreviewThrottle();
-      probe.rotation = [0, 0, 0.3];
-      await flushPromises();
-      expect(notifySpy).toHaveBeenCalledTimes(1);
-      await waitOutPreviewThrottle();
-      probe.rotation = [0, 0, 2];
-      await flushPromises();
-      expect(notifySpy).toHaveBeenCalledTimes(2);
     });
   });
 

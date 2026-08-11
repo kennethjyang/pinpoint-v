@@ -244,8 +244,6 @@ export default {
     inverseKinematicsFailed: "Probe is out of reach for this coordinate system",
     inverseKinematicsStalled:
       "The solver stopped making progress. The outline shows the closest pose it reached.",
-    inverseKinematicsDiverged:
-      "The solver moved away from the probe. The outline shows the closest pose it reached.",
     inverseKinematicsTimeout:
       "This coordinate system's adjustable values cannot reach the probe. The outline shows the closest pose.",
     inverseKinematicsNoFreeValues:
