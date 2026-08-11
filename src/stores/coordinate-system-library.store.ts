@@ -125,7 +125,7 @@ export const useCoordinateSystemLibraryStore = defineStore(
             [
               buildFixedCoordinateSystemValue(),
               buildFixedCoordinateSystemValue(),
-              buildFixedCoordinateSystemValue()
+              buildCoordinateSystemValue("Roll")
             ],
             [0, 1, 2],
             [0, 1, 2],
