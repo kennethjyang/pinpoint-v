@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   copySceneObject,
@@ -11,6 +11,7 @@ import {
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { usePreferencesStore } from "@/stores/preferences.store";
 import { useDragSteps } from "@/composable/useDragSteps";
+import { useNumericModel } from "@/composable/useNumericModel";
 import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
 import { useUnitLabels } from "@/composable/useUnitLabels";
 import { useValidationRules } from "@/composable/useValidationRules";
@@ -37,6 +38,9 @@ const {
 } = useValidationRules();
 const { t } = useI18n();
 
+/** Whether AP/DV/ML fields display the position offset by the reference coordinate. */
+const isPositionRelativeToReference = ref(false);
+
 const positionSuffix = computed(() =>
   unitLabels.position(preferences.positionUnit)
 );
@@ -50,25 +54,35 @@ const name = computed({
   set: (value: string) => (sceneObject.name = value.trim())
 });
 
-const ap = useNumericTupleModel(
-  () => sceneObject.position,
-  0,
+/** Reference coordinate to subtract from/add back to AP/DV/ML when the toggle is on, else zero. */
+const positionOffset = computed<[number, number, number]>(() =>
+  isPositionRelativeToReference.value
+    ? currentExperimentStore.referenceCoordinate
+    : [0, 0, 0]
+);
+
+const ap = useNumericModel(
+  () => sceneObject.position[0] - positionOffset.value[0],
+  storedValue =>
+    (sceneObject.position[0] = storedValue + positionOffset.value[0]),
   millimeters =>
     millimetersToPositionUnit(millimeters, preferences.positionUnit),
   value => positionUnitToMillimeters(value, preferences.positionUnit),
   () => preferences.decimalPrecision
 );
-const dv = useNumericTupleModel(
-  () => sceneObject.position,
-  1,
+const dv = useNumericModel(
+  () => sceneObject.position[1] - positionOffset.value[1],
+  storedValue =>
+    (sceneObject.position[1] = storedValue + positionOffset.value[1]),
   millimeters =>
     millimetersToPositionUnit(millimeters, preferences.positionUnit),
   value => positionUnitToMillimeters(value, preferences.positionUnit),
   () => preferences.decimalPrecision
 );
-const ml = useNumericTupleModel(
-  () => sceneObject.position,
-  2,
+const ml = useNumericModel(
+  () => sceneObject.position[2] - positionOffset.value[2],
+  storedValue =>
+    (sceneObject.position[2] = storedValue + positionOffset.value[2]),
   millimeters =>
     millimetersToPositionUnit(millimeters, preferences.positionUnit),
   value => positionUnitToMillimeters(value, preferences.positionUnit),
@@ -162,6 +176,11 @@ const lockLabel = computed(() =>
       hide-bottom-space
       outlined
       :rules="nameRules"
+    />
+
+    <q-toggle
+      v-model="isPositionRelativeToReference"
+      :label="t('sceneObjectInspector.relativeToReferenceCoordinate')"
     />
 
     <div class="row q-gutter-x-sm">
