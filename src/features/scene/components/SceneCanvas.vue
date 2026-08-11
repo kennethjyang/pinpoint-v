@@ -890,10 +890,12 @@ watchEffect(() => {
 // Draw the sphere at the inspected probe's solved on-surface node, or strip it once cleared.
 watchEffect(() => {
   const scene = runtime.scene.value;
-  if (!scene) return;
+  const selectionOutlineLayer = runtime.selectionOutlineLayer.value;
+  if (!scene || !selectionOutlineLayer) return;
 
   syncProbeSurfaceMarker(
     scene,
+    selectionOutlineLayer,
     currentExperiment.probeSurfaceMarker,
     currentExperiment.probes,
     preferences.probeShankThicknessMillimeters

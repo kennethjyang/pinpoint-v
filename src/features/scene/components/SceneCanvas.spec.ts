@@ -1435,7 +1435,9 @@ describe("SceneCanvas", () => {
     await flushPromises();
 
     const scene = runtime.scene.value!;
-    expect(scene.getMeshByName("probeSurfaceMarker_mesh")).toBeTruthy();
+    const mesh = scene.getMeshByName("probeSurfaceMarker_mesh")!;
+    expect(mesh).toBeTruthy();
+    expect(runtime.selectionOutlineLayer.value!.hasMesh(mesh)).toBe(true);
 
     store.probeSurfaceMarker = null;
     await flushPromises();
