@@ -10,10 +10,7 @@ export {
   isCoordinateSystemSolutionAtPose,
   solveCoordinateSystemChain
 } from "./api/forward-kinematics.api";
-export type {
-  CoordinateSystemSolveStatus,
-  CoordinateSystemTarget
-} from "./api/inverse-kinematics.api";
+export type { CoordinateSystemSolveStatus } from "./api/inverse-kinematics.api";
 export {
   PREVIEW_SOLVE_STARTS,
   SETTLED_SOLVE_STARTS,
@@ -39,8 +36,5 @@ export {
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
 } from "./api/coordinate-system.api";
-export type {
-  InverseKinematicsSolveRequest,
-  InverseKinematicsSolveResult
-} from "./composable/useInverseKinematicsSolver";
+export type { InverseKinematicsSolveRequest } from "./composable/useInverseKinematicsSolver";
 export { useInverseKinematicsSolver } from "./composable/useInverseKinematicsSolver";

@@ -74,7 +74,9 @@ export function cloneExperiment(experiment: Experiment): Experiment {
 
 /**
  * Commit edited properties onto an experiment in place, re-seeding the shown
- * structures when the atlas changed since their identifiers are atlas-specific.
+ * structures when the atlas changed since their identifiers are atlas-specific,
+ * and, on an atlas change, rebasing probes/scene objects/camera target onto the
+ * new atlas origin and re-framing the camera for the new atlas.
  * @param experiment Experiment to update.
  * @param properties Name, atlas, reference coordinate, and default structure
  * identifiers to commit.
@@ -366,8 +368,8 @@ export function addProbe(experiment: Experiment, probe: Probe) {
 }
 
 /**
- * Remove a probe from the experiment, dropping its interface definition if
- * no other probe references it.
+ * Remove a probe from the experiment, dropping its interface definition and
+ * interned coordinate system if no other probe references them.
  * @param experiment Experiment to remove this probe from.
  * @param probe Probe to remove.
  */

@@ -21,12 +21,22 @@ describe("useCoordinateSystemLibraryStore", () => {
 
     it("matches by id, not object identity", () => {
       const store = useCoordinateSystemLibraryStore();
-      const target = store.library[0]!;
+      const target = store.library[1]!;
 
       store.remove({ ...target, name: "Renamed" });
 
       expect(store.library).toHaveLength(2);
       expect(store.library).not.toContain(target);
+    });
+
+    it("does not remove the pinned default", () => {
+      const store = useCoordinateSystemLibraryStore();
+      const originalLibrary = [...store.library];
+
+      store.remove(store.library[0]!);
+
+      expect(store.library).toHaveLength(3);
+      expect(store.library).toEqual(originalLibrary);
     });
 
     it("is a no-op for an unknown id", () => {

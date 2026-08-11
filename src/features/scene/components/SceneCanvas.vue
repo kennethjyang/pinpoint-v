@@ -592,6 +592,10 @@ watchEffect(() => {
     currentExperiment.probes,
     rebuiltProbeIds
   );
+
+  // A rebuilt probe node starts enabled, so isolation has to be re-applied here: a
+  // geometry-preference change rebuilds probes without touching probe state.
+  setSceneEntitiesHidden(scene, selectedCoordinateSystem.value !== null);
 });
 
 /**
@@ -1071,18 +1075,11 @@ function syncSceneEntityIsolation() {
   setSceneEntitiesHidden(scene, selectedCoordinateSystem.value !== null);
 }
 
-// Split across two watchers for the reason documented at lines 634-640: `deep: true`
-// must never traverse the live `Scene`. The deep watcher catches a probe or object
-// added while a coordinate system is selected -- `currentExperiment.probes` is a
-// computed over an in-place-mutated array, so its reference alone never changes.
+// The probes-sync effect and `syncSceneObjectsFromState` re-apply isolation on their own
+// rebuilds, so only the scene/selection change needs its own watcher here.
 watch([runtime.scene, selectedCoordinateSystem], syncSceneEntityIsolation, {
   immediate: true
 });
-watch(
-  [() => currentExperiment.probes, () => currentExperiment.sceneObjects],
-  syncSceneEntityIsolation,
-  { deep: true }
-);
 
 // Draw the selected coordinate system's chain. Registered after the selection
 // effect above, so its outline for the focused node is applied last.

@@ -282,10 +282,26 @@ describe("zipExperiment / unzipExperiment", () => {
   it("returns null when a coordinate system entry's key does not match its definition's id", () => {
     const experiment = makeFullExperiment();
     const identifier = Object.keys(experiment.coordinateSystems)[0]!;
-    const definition = experiment.coordinateSystems[identifier]!;
-    delete experiment.coordinateSystems[identifier];
-    experiment.coordinateSystems["wrong identifier"] = definition;
+    const coordinateSystem = experiment.coordinateSystems[identifier]!;
+    experiment.coordinateSystems[identifier] = {
+      ...coordinateSystem,
+      id: "wrong identifier"
+    };
 
+    expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
+  });
+
+  it("returns null when coordinateSystems is missing", () => {
+    const { coordinateSystems: _coordinateSystems, ...rest } =
+      makeFullExperiment();
+    expect(unzipExperiment(zipRawExperiment(rest))).toBeNull();
+  });
+
+  it("returns null when coordinateSystems is empty", () => {
+    const experiment = {
+      ...makeFullExperiment(),
+      coordinateSystems: {} as Experiment["coordinateSystems"]
+    };
     expect(unzipExperiment(zipRawExperiment(experiment))).toBeNull();
   });
 

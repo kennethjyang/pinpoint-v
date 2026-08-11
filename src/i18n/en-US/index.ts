@@ -29,7 +29,9 @@ export default {
   validation: {
     nameRequired: "Name is required.",
     mustBeNumber: "Must be a number.",
-    mustBePositiveNumber: "Must be greater than zero."
+    mustBePositiveNumber: "Must be greater than zero.",
+    mustBeLessThanMaximum: "Must be less than the maximum.",
+    mustBeGreaterThanMinimum: "Must be greater than the minimum."
   },
   axis: {
     ap: "AP",

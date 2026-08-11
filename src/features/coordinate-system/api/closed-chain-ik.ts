@@ -2,10 +2,8 @@ import * as closedChainIk from "closed-chain-ik/src/core/index.js";
 
 /** A position and orientation frame in the solver's tree. */
 interface IkFrame {
-  readonly matrixWorld: Float32Array;
   setPosition(x: number, y: number, z: number): void;
   setQuaternion(x: number, y: number, z: number, w: number): void;
-  updateMatrixWorld(updateChildren?: boolean): void;
 }
 
 /** A rigid connection between two joints. */
@@ -34,13 +32,10 @@ export interface IkSolver {
   useSVD: boolean;
   maxIterations: number;
   stallThreshold: number;
-  dampingFactor: number;
   divergeThreshold: number;
   restPoseFactor: number;
   translationConvergeThreshold: number;
   rotationConvergeThreshold: number;
-  translationErrorClamp: number;
-  rotationErrorClamp: number;
   solve(): number[];
 }
 

@@ -1,8 +1,4 @@
-// Deep-import from `@babylonjs/core`'s math module rather than the package root: the root
-// barrel is side-effectful (listed in `sideEffects`), so importing it would drag the whole
-// Babylon engine into this solver's worker chunk. `@babylonjs/core/Maths/math.vector`
-// re-exports `math.vector.pure` and runs the same `RegisterMathVector()` the root barrel
-// does, so `Matrix`/`Quaternion` behave identically.
+// Deep-import to avoid the side-effectful root barrel, which would drag the whole Babylon engine into this solver's worker chunk.
 import { Matrix, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import {
   DOF,
@@ -80,6 +76,12 @@ const ROTATION_DOF = [DOF.EX, DOF.EY, DOF.EZ];
 /** `solve()` calls per start; each call clears the solver's per-solve DOF locks. */
 const SOLVE_CALLS_PER_START = 50;
 
+/** Spread of the random restart seed for an unbounded position value, in millimeters. */
+const UNBOUNDED_POSITION_SEED_SPREAD_MILLIMETERS = 10;
+
+/** Spread of the random restart seed for an unbounded rotation value, in radians. */
+const UNBOUNDED_ROTATION_SEED_SPREAD_RADIANS = Math.PI;
+
 /** Linear-congruential seeding constants, so a failed solve is reproducible. */
 const SEED_INITIAL = 0x9e3779b9;
 const SEED_MULTIPLIER = 1664525;
@@ -124,12 +126,21 @@ export function solveCoordinateSystemChainInverse(
   );
 
   const seedRandom = createSeedRandom();
-  let bestValues: number[] | null = null;
+  // The incoming values are the fallback best, so a solve with no starts -- or one whose every
+  // error evaluation is NaN -- still writes back a well-defined chain.
+  const incomingValues = bindings.map(binding =>
+    getCoordinateSystemAxisValue(
+      chain[binding.nodeIndex]!,
+      binding.component,
+      binding.axis
+    )
+  );
+  let bestValues = [...incomingValues];
   let bestError = Infinity;
-  let lastStatuses: number[] = [];
+  let bestStatuses: number[] = [];
 
   for (let start = 0; start < maximumStarts; start++) {
-    seedFreeValues(chain, bindings, start, seedRandom);
+    seedFreeValues(chain, bindings, start, seedRandom, incomingValues);
 
     const tree = buildSolverTree(chain, referenceOffsetMillimeters);
 
@@ -164,7 +175,8 @@ export function solveCoordinateSystemChainInverse(
       chain,
       target,
       referenceOffsetMillimeters,
-      surfaceIndex
+      surfaceIndex,
+      goalQuaternion
     );
     if (seedError < bestError) {
       bestError = seedError;
@@ -187,16 +199,17 @@ export function solveCoordinateSystemChainInverse(
           binding.joint.getDoFValue(binding.dof)
         );
       }
-      lastStatuses = statuses;
 
       const error = getTargetError(
         chain,
         target,
         referenceOffsetMillimeters,
-        surfaceIndex
+        surfaceIndex,
+        goalQuaternion
       );
       if (error < bestError) {
         bestError = error;
+        bestStatuses = statuses;
         bestValues = bindings.map(binding =>
           getCoordinateSystemAxisValue(
             chain[binding.nodeIndex]!,
@@ -218,10 +231,10 @@ export function solveCoordinateSystemChainInverse(
       chain[binding.nodeIndex]!,
       binding.component,
       binding.axis,
-      bestValues![index]!
+      bestValues[index]!
     );
   }
-  return mapSolveStatuses(lastStatuses);
+  return mapSolveStatuses(bestStatuses);
 }
 
 /**
@@ -246,34 +259,46 @@ function collectFreeValueBindings(
 }
 
 /**
- * Seed a chain's free values for one solve start: the incoming values, each bound's midpoint (or
- * zero when unbounded), or a random in-bounds value (or zero when unbounded).
+ * Seed a chain's free values for one solve start: the incoming values restored, each bound's
+ * midpoint (or zero when unbounded), or a random in-bounds value (or a random value centered on
+ * the incoming one, scaled by a fixed spread, when unbounded).
  * @param chain Transform chain to seed, mutated in place.
  * @param bindings Free value bindings to seed.
  * @param start Index of the solve start, selecting the seeding strategy.
  * @param random Seeded random source for restarts beyond the midpoint start.
+ * @param incomingValues Each binding's value before this solve began, restored at `start === 0`
+ * and used as the unbounded restart center from `start >= 2`.
  */
 function seedFreeValues(
   chain: CoordinateSystemNode[],
   bindings: FreeValueBinding[],
   start: number,
-  random: () => number
+  random: () => number,
+  incomingValues: number[]
 ): void {
-  if (start === 0) {
-    return;
-  }
-  for (const binding of bindings) {
+  for (let index = 0; index < bindings.length; index++) {
+    const binding = bindings[index]!;
     const node = chain[binding.nodeIndex]!;
     const entry = getCoordinateSystemAxisEntry(
       node,
       binding.component,
       binding.axis
     );
-    let value = 0;
-    if (entry.bounds) {
+    let value: number;
+    if (start === 0) {
+      value = incomingValues[index]!;
+    } else if (entry.bounds) {
       const [lower, upper] = entry.bounds;
       value =
         start === 1 ? (lower + upper) / 2 : lower + random() * (upper - lower);
+    } else if (start === 1) {
+      value = 0;
+    } else {
+      const spread =
+        binding.component === "position"
+          ? UNBOUNDED_POSITION_SEED_SPREAD_MILLIMETERS
+          : UNBOUNDED_ROTATION_SEED_SPREAD_RADIANS;
+      value = incomingValues[index]! + (random() * 2 - 1) * spread;
     }
     setCoordinateSystemAxisValue(node, binding.component, binding.axis, value);
   }
@@ -405,12 +430,14 @@ function buildSolverTree(
  * @param target Pose being solved for.
  * @param referenceOffsetMillimeters Root translation in atlas ASR mm, or null for the atlas origin.
  * @param surfaceIndex Index of the chain's surface node, or -1 when there is none.
+ * @param targetRotation Target pose's rotation as a quaternion, precomputed once per solve.
  */
 function getTargetError(
   chain: CoordinateSystemNode[],
   target: CoordinateSystemTarget,
   referenceOffsetMillimeters: [number, number, number] | null,
-  surfaceIndex: number
+  surfaceIndex: number,
+  targetRotation: Quaternion
 ): number {
   const solution = solveCoordinateSystemChain(
     chain,
@@ -419,13 +446,6 @@ function getTargetError(
 
   let error = getAsrDistance(solution.tipPosition, target.tipPosition);
 
-  const targetRotation = Quaternion.FromRotationMatrix(
-    Matrix.RotationYawPitchRoll(
-      target.rotation[1],
-      target.rotation[2],
-      target.rotation[0]
-    )
-  );
   const solvedRotation = Quaternion.FromRotationMatrix(
     Matrix.RotationYawPitchRoll(
       solution.rotation[1],

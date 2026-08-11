@@ -1,8 +1,4 @@
-// Deep-import from `@babylonjs/core`'s math module rather than the package root: the root
-// barrel is side-effectful (listed in `sideEffects`), so importing it would drag the whole
-// Babylon engine into this solver's worker chunk. `@babylonjs/core/Maths/math.vector`
-// re-exports `math.vector.pure` and runs the same `RegisterMathVector()` the root barrel
-// does, so `Matrix`/`Quaternion` behave identically.
+// Deep-import to avoid the side-effectful root barrel, which would drag the whole Babylon engine into this solver's worker chunk.
 import { Matrix, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { getCoordinateSystemAxisValue } from "./coordinate-system.api";
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";

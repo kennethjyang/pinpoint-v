@@ -268,7 +268,7 @@ function buildGimbalArrow(
   if (length === 0) return;
 
   const direction = span.normalize();
-  const orientation = Quaternion.FromUnitVectorsToRef(
+  const shaftOrientation = Quaternion.FromUnitVectorsToRef(
     Vector3.Up(),
     direction,
     new Quaternion()
@@ -293,7 +293,7 @@ function buildGimbalArrow(
     shaft.parent = parent;
     shaft.material = material;
     shaft.position = from.add(direction.scale(shaftLength / 2));
-    shaft.rotationQuaternion = orientation;
+    shaft.rotationQuaternion = shaftOrientation;
   }
 
   const head = MeshBuilder.CreateCylinder(
@@ -309,7 +309,11 @@ function buildGimbalArrow(
   head.parent = parent;
   head.material = material;
   head.position = from.add(direction.scale(length - headLength / 2));
-  head.rotationQuaternion = orientation;
+  head.rotationQuaternion = Quaternion.FromUnitVectorsToRef(
+    Vector3.Up(),
+    direction,
+    new Quaternion()
+  );
 }
 
 /**

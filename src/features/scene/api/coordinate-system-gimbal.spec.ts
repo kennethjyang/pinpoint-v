@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StandardMaterial } from "@babylonjs/core";
-import { Color3, MeshBuilder, Vector3 } from "@babylonjs/core";
+import { Color3, Matrix, MeshBuilder, Vector3 } from "@babylonjs/core";
 import {
   buildCoordinateSystem,
   buildCoordinateSystemNode,
@@ -13,7 +13,7 @@ import { asrToVector3 } from "./coordinate-transforms.api";
 import { buildAtlasRootNode } from "./structures.api";
 import { syncCoordinateSystemGimbals } from "./coordinate-system-gimbal.api";
 
-/** Atlas longest-dimension stand-in for every test: an axis length of 6mm. */
+/** Atlas longest-dimension stand-in for every test: an axis length of 18mm. */
 const ATLAS_SCALE_MILLIMETERS = 100;
 
 /**
@@ -116,6 +116,41 @@ describe("syncCoordinateSystemGimbals", () => {
       shaft.computeWorldMatrix(true)
     ).normalize();
     expectVectorCloseTo(shaftDirection, expectedDirection);
+  });
+
+  it("composes pitch and yaw together, not a single-axis approximation of either", () => {
+    const { scene, selectionOutlineLayer } = makeTestSceneWithGizmo();
+    const pitch = Math.PI / 6;
+    const yaw = Math.PI / 4;
+    const chain = [makeNode("Node", [0, 0, 0], [pitch, yaw, 0])];
+
+    syncCoordinateSystemGimbals(
+      scene,
+      selectionOutlineLayer,
+      buildCoordinateSystem("Fixture", chain),
+      [0, 0, 0],
+      ATLAS_SCALE_MILLIMETERS,
+      null
+    );
+
+    const atlasRoot = buildAtlasRootNode(scene);
+    const gimbal = scene.getTransformNodeByName(
+      "coordinateSystemGimbal_0_node"
+    )!;
+    const probeLocalDirection = new Vector3(1, 0, 0);
+    const expectedLocalDirection = Vector3.TransformNormal(
+      probeLocalDirection,
+      Matrix.RotationYawPitchRoll(yaw, pitch, 0)
+    );
+    const expectedDirection = Vector3.TransformNormal(
+      expectedLocalDirection,
+      atlasRoot.computeWorldMatrix(true)
+    );
+    const actualDirection = Vector3.TransformNormal(
+      probeLocalDirection,
+      gimbal.computeWorldMatrix(true)
+    );
+    expectVectorCloseTo(actualDirection, expectedDirection);
   });
 
   it("offsets the root to the reference coordinate and draws the reference arrow only when enabled", () => {

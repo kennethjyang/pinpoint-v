@@ -17,12 +17,12 @@ import { useDragReorder } from "@/composable/useDragReorder";
 import {
   addProbe,
   addSceneObject,
-  internCoordinateSystem,
   internProbeInterfaceProbe,
   removeProbe,
   removeSceneObject,
   reorderProbe,
-  reorderSceneObject
+  reorderSceneObject,
+  setProbeCoordinateSystem
 } from "@/features/experiment";
 import {
   buildSceneObject,
@@ -86,13 +86,17 @@ const SCENE_OBJECT_VISIBILITY_ICONS: Record<SceneObjectVisibility, string> = {
 function addProbeAndSelect(probeInterfaceProbe: ProbeInterfaceProbe) {
   internProbeInterfaceProbe(currentExperiment.experiment, probeInterfaceProbe);
   const coordinateSystem = coordinateSystemLibrary.library[0]!;
-  internCoordinateSystem(currentExperiment.experiment, coordinateSystem);
   const probe = buildProbe(
     probeInterfaceProbe,
     currentExperiment.referenceCoordinate,
     coordinateSystem
   );
   addProbe(currentExperiment.experiment, probe);
+  setProbeCoordinateSystem(
+    currentExperiment.experiment,
+    probe,
+    coordinateSystem
+  );
   currentExperiment.selectedInspectable = probe;
 }
 

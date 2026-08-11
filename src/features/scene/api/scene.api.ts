@@ -21,6 +21,12 @@ import {
 } from "./scene-object-node.api";
 import { buildAtlasRootNode } from "./structures.api";
 
+/** Suffix applied to a probe's id to name its parenting transform node. */
+const PROBE_NODE_SUFFIX = sceneEntityNameSuffix("probe", "node");
+
+/** Suffix applied to a scene object's id to name its parenting transform node. */
+const SCENE_OBJECT_NODE_SUFFIX = sceneEntityNameSuffix("object", "node");
+
 /**
  * Node the gizmo attaches to for an inspectable, or null when it has no gizmo or its node is not
  * in the scene.
@@ -192,12 +198,10 @@ export function setHemisphericLightIntensity(
  */
 export function setSceneEntitiesHidden(scene: Scene, areHidden: boolean): void {
   const atlasRootNode = buildAtlasRootNode(scene);
-  const probeNodeSuffix = sceneEntityNameSuffix("probe", "node");
-  const sceneObjectNodeSuffix = sceneEntityNameSuffix("object", "node");
   for (const node of atlasRootNode.getChildren(
     child =>
-      child.name.endsWith(probeNodeSuffix) ||
-      child.name.endsWith(sceneObjectNodeSuffix)
+      child.name.endsWith(PROBE_NODE_SUFFIX) ||
+      child.name.endsWith(SCENE_OBJECT_NODE_SUFFIX)
   )) {
     node.setEnabled(!areHidden);
   }

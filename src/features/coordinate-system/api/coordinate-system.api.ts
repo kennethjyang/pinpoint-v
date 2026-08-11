@@ -357,8 +357,11 @@ export function setCoordinateSystemValueFixed(
   if (fixed) coordinateSystemValue.bounds = null;
 }
 
+/** Half-width of the range a newly bounded value is seeded with, in its stored unit (mm or radians). */
+const BOUNDS_SEED_HALF_WIDTH = 1;
+
 /**
- * Bound or unbound a coordinate system value, seeding a new bound at zero.
+ * Bound or unbound a coordinate system value, seeding a new bound that brackets its current value.
  * @param coordinateSystemValue Coordinate system value to update.
  * @param bounded Whether the value should be bounded.
  */
@@ -366,7 +369,12 @@ export function setCoordinateSystemValueBounded(
   coordinateSystemValue: CoordinateSystemValue,
   bounded: boolean
 ): void {
-  coordinateSystemValue.bounds = bounded ? [0, 0] : null;
+  coordinateSystemValue.bounds = bounded
+    ? [
+        coordinateSystemValue.value - BOUNDS_SEED_HALF_WIDTH,
+        coordinateSystemValue.value + BOUNDS_SEED_HALF_WIDTH
+      ]
+    : null;
 }
 
 /**

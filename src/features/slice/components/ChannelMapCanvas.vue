@@ -10,7 +10,6 @@ import {
 import { useDevicePixelRatio, useElementSize } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import type { Probe, ProbeShank } from "@/features/probe";
-import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   getChannelMapLabels,
   getStructureLabelRuns
@@ -63,7 +62,6 @@ const emit = defineEmits<{
   hover: [hover: ChannelMapHover | null];
 }>();
 
-const currentExperiment = useCurrentExperimentStore();
 const { t } = useI18n();
 
 const root = useTemplateRef<HTMLDivElement>("root");

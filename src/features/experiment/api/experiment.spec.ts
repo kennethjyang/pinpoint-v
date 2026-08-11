@@ -54,6 +54,7 @@ describe("buildExperiment", () => {
     expect(experiment.referenceCoordinate).toEqual([1, 2, 3]);
     expect(experiment.visibleStructures).toEqual([]);
     expect(experiment.probeInterfaceProbes).toEqual({});
+    expect(experiment.coordinateSystems).toEqual({});
     expect(experiment.probes).toEqual([]);
     expect(experiment.cameraPoses).toEqual([]);
   });
@@ -1039,7 +1040,9 @@ describe("setExperimentProperties", () => {
     addProbe(experiment, probe);
     const sceneObject = makeSceneObject({ position: [1, 1, 1] });
     addSceneObject(experiment, sceneObject);
-    const originalTarget = experiment.cameraPose.target;
+    const originalTarget: [number, number, number] = [
+      ...experiment.cameraPose.target
+    ];
 
     setExperimentProperties(experiment, {
       name: experiment.name,

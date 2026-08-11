@@ -89,6 +89,22 @@ describe("CoordinateSystemLibraryDialog", () => {
     expect(store.library.map(({ name }) => name)).toContain("Default");
   });
 
+  it("clears the selection when the currently selected coordinate system is deleted", async () => {
+    const wrapper = await mountDialog();
+    const store = useCoordinateSystemLibraryStore();
+    const currentExperimentStore = useCurrentExperimentStore();
+    const notify = vi.fn();
+    wrapper.vm.$q.notify = notify;
+    currentExperimentStore.selectedInspectable = store.library[1]!;
+
+    const targetItem = wrapper.findAllComponents({ name: "QItem" })[1]!;
+    await targetItem.findComponent({ name: "QBtn" }).trigger("click");
+    const options = notify.mock.calls[0]![0];
+    options.actions[1].handler();
+
+    expect(currentExperimentStore.selectedInspectable).toBeNull();
+  });
+
   it("selects the coordinate system and closes the dialog on row click", async () => {
     const wrapper = await mountDialog();
     const store = useCoordinateSystemLibraryStore();

@@ -17,7 +17,8 @@ const visibleNodes = computed(() =>
   chain
     .map((node, index) => ({ node, index }))
     .filter(
-      ({ node }) =>
+      ({ node, index }) =>
+        offSurfaceNodeIndexes.includes(index) ||
         node.position.some(({ fixed }) => !fixed) ||
         node.rotation.some(({ fixed }) => !fixed)
     )
@@ -41,7 +42,6 @@ const visibleNodes = computed(() =>
             :disable="disable"
             :label="t('probeInspector.position')"
             :node="node"
-            :node-name="node.name"
             @commit="emit('commit')"
           />
           <ProbeTransformValueRow
@@ -49,7 +49,6 @@ const visibleNodes = computed(() =>
             :disable="disable"
             :label="t('probeInspector.rotation')"
             :node="node"
-            :node-name="node.name"
             @commit="emit('commit')"
           />
         </div>

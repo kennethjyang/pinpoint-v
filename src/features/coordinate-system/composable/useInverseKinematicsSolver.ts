@@ -17,6 +17,7 @@ export interface InverseKinematicsWorker {
   onmessage:
     | ((event: MessageEvent<OutboundInverseKinematicsMessage>) => void)
     | null;
+  onerror: ((event: ErrorEvent) => void) | null;
   terminate(): void;
 }
 
@@ -69,6 +70,11 @@ export function createInverseKinematicsSolver(
     settle: (result: InverseKinematicsSolveResult | null) => void;
   } | null = null;
 
+  /**
+   * Send one solve request to the worker.
+   * @param requestId Id assigned to this request, so its reply can be matched.
+   * @param request Solve request to send.
+   */
   function post(
     requestId: number,
     request: InverseKinematicsSolveRequest
@@ -80,44 +86,62 @@ export function createInverseKinematicsSolver(
     });
   }
 
-  worker.onmessage = event => {
-    const current = inFlight;
-    if (!current || event.data.requestId !== current.requestId) return;
-
-    const { status, chain, solution } = event.data;
-    current.settle({ status, chain, solution });
+  function finishInFlight(result: InverseKinematicsSolveResult | null): void {
+    inFlight?.settle(result);
     inFlight = null;
-
-    if (queued) {
-      const requestId = nextRequestId++;
-      inFlight = { requestId, settle: queued.settle };
-      post(requestId, queued.request);
-      queued = null;
-    }
-  };
-
-  function solve(
-    request: InverseKinematicsSolveRequest
-  ): Promise<InverseKinematicsSolveResult | null> {
-    return new Promise(resolve => {
-      if (inFlight === null) {
-        const requestId = nextRequestId++;
-        inFlight = { requestId, settle: resolve };
-        post(requestId, request);
-        return;
-      }
-
-      queued?.settle(null);
-      queued = { request, settle: resolve };
-    });
+    if (!queued) return;
+    const requestId = nextRequestId++;
+    inFlight = { requestId, settle: queued.settle };
+    post(requestId, queued.request);
+    queued = null;
   }
 
-  onScopeDispose(() => {
-    worker.terminate();
+  worker.onmessage = event => {
+    if (!inFlight || event.data.requestId !== inFlight.requestId) return;
+    if (event.data.type === "failedInverseKinematics") {
+      finishInFlight(null);
+      return;
+    }
+    const { status, chain, solution } = event.data;
+    finishInFlight({ status, chain, solution });
+  };
+
+  let isStopped = false;
+
+  function stop(): void {
+    isStopped = true;
     inFlight?.settle(null);
     inFlight = null;
     queued?.settle(null);
     queued = null;
+  }
+
+  /**
+   * Queue one chain-onto-pose solve, resolving `null` when a newer request supersedes it or the
+   * solver has stopped.
+   * @param request Solve request to send.
+   */
+  function solve(
+    request: InverseKinematicsSolveRequest
+  ): Promise<InverseKinematicsSolveResult | null> {
+    if (isStopped) return Promise.resolve(null);
+    const { promise, resolve } =
+      Promise.withResolvers<InverseKinematicsSolveResult | null>();
+    if (inFlight === null) {
+      const requestId = nextRequestId++;
+      inFlight = { requestId, settle: resolve };
+      post(requestId, request);
+    } else {
+      queued?.settle(null);
+      queued = { request, settle: resolve };
+    }
+    return promise;
+  }
+
+  worker.onerror = stop;
+  onScopeDispose(() => {
+    worker.terminate();
+    stop();
   });
 
   return { solve };

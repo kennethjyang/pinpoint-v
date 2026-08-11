@@ -202,11 +202,16 @@ describe("useCurrentExperimentStore", () => {
       expect(store.atlas).toEqual(makeAtlas({ name: "allen_human" }));
     });
 
-    it("clears the selected inspectable, dragged probe id, and camera-move flag", () => {
+    it("clears the selected inspectable, dragged probe id, camera-move flag, and probe ghost", () => {
       const store = useCurrentExperimentStore();
       store.selectedInspectable = makeProbe();
       store.draggedProbeId = "some-id";
       store.isCameraMoving = true;
+      store.probeGhost = {
+        probeId: "some-id",
+        tipPosition: [1, 2, 3],
+        rotation: [0, 0, 0]
+      };
 
       store.loadExperiment(
         buildExperiment("Loaded Experiment", makeAtlas(), [0, 0, 0])
@@ -215,6 +220,7 @@ describe("useCurrentExperimentStore", () => {
       expect(store.selectedInspectable).toBeNull();
       expect(store.draggedProbeId).toBeNull();
       expect(store.isCameraMoving).toBe(false);
+      expect(store.probeGhost).toBeNull();
     });
 
     it("detaches the loaded experiment's probe interface definitions from reactivity", () => {

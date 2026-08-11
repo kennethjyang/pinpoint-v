@@ -42,7 +42,7 @@ importers:
         specifier: ^1.19.0
         version: 1.19.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1)
       closed-chain-ik:
-        specifier: github:gkjohnson/closed-chain-ik-js
+        specifier: github:gkjohnson/closed-chain-ik-js#8308c47ac9452c7069cac1ced92d5af1df760d7d
         version: https://codeload.github.com/gkjohnson/closed-chain-ik-js/tar.gz/8308c47ac9452c7069cac1ced92d5af1df760d7d(three@0.185.1)(urdf-loader@0.13.1(three@0.185.1))
       earcut:
         specifier: ^3.2.3

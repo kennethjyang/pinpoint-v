@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
@@ -8,9 +8,33 @@ import {
   isCoordinateSystemSolutionAtPose,
   solveCoordinateSystemChain
 } from "../api/forward-kinematics.api";
-import { SETTLED_SOLVE_STARTS } from "../api/inverse-kinematics.api";
+import {
+  SETTLED_SOLVE_STARTS,
+  solveCoordinateSystemChainInverse
+} from "../api/inverse-kinematics.api";
 import { handleInverseKinematicsMessage } from "./inverse-kinematics-handler";
 import type { CoordinateSystemNode } from "../model/coordinate-system.model";
+
+// Spy on both solves the handler forwards `referenceOffsetMillimeters` to, while still calling
+// through to the real implementation.
+vi.mock("../api/forward-kinematics.api", async importOriginal => {
+  const actual =
+    await importOriginal<typeof import("../api/forward-kinematics.api")>();
+  return {
+    ...actual,
+    solveCoordinateSystemChain: vi.fn(actual.solveCoordinateSystemChain)
+  };
+});
+vi.mock("../api/inverse-kinematics.api", async importOriginal => {
+  const actual =
+    await importOriginal<typeof import("../api/inverse-kinematics.api")>();
+  return {
+    ...actual,
+    solveCoordinateSystemChainInverse: vi.fn(
+      actual.solveCoordinateSystemChainInverse
+    )
+  };
+});
 
 /** Reset every non-fixed value in a chain to zero, mutating it in place. */
 function resetFreeValues(chain: CoordinateSystemNode[]): void {
@@ -90,5 +114,40 @@ describe("handleInverseKinematicsMessage", () => {
         1e-4
       )
     ).toBe(true);
+  });
+
+  it("forwards a non-null reference offset to both the inverse and forward solves", () => {
+    const chain = [buildFreeNode(), buildPartlyFreeNode()];
+    const referenceOffsetMillimeters: [number, number, number] = [1, 2, 3];
+    const solved = solveCoordinateSystemChain(
+      chain,
+      referenceOffsetMillimeters
+    );
+    const target = {
+      tipPosition: solved.tipPosition,
+      rotation: solved.rotation,
+      surfacePosition: null
+    };
+    resetFreeValues(chain);
+
+    handleInverseKinematicsMessage({
+      type: "solveInverseKinematics",
+      requestId: 11,
+      chain,
+      target,
+      referenceOffsetMillimeters,
+      maximumStarts: SETTLED_SOLVE_STARTS
+    });
+
+    expect(solveCoordinateSystemChainInverse).toHaveBeenLastCalledWith(
+      chain,
+      target,
+      referenceOffsetMillimeters,
+      SETTLED_SOLVE_STARTS
+    );
+    expect(solveCoordinateSystemChain).toHaveBeenLastCalledWith(
+      chain,
+      referenceOffsetMillimeters
+    );
   });
 });

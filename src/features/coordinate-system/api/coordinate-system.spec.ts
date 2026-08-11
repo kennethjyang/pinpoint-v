@@ -613,6 +613,22 @@ describe("reorderCoordinateSystemValue", () => {
     expect(node.position.map(value => value.name)).toEqual(["ML", "DV", "AP"]);
     expect(node.positionDisplayOrder).toEqual([0, 1, 2]);
   });
+
+  it("re-maps a non-identity display order, keeping every axis mapped to the same value", () => {
+    const node = makeNode();
+    node.positionDisplayOrder = [2, 0, 1];
+    const nameByAxisBefore = [0, 1, 2].map(
+      axis => node.position[node.positionDisplayOrder[axis]!]!.name
+    );
+
+    reorderCoordinateSystemValue(node, "position", 0, 2);
+
+    expect(node.positionDisplayOrder).toEqual([1, 2, 0]);
+    const nameByAxisAfter = [0, 1, 2].map(
+      axis => node.position[node.positionDisplayOrder[axis]!]!.name
+    );
+    expect(nameByAxisAfter).toEqual(nameByAxisBefore);
+  });
 });
 
 describe("setCoordinateSystemValueFixed", () => {
@@ -636,12 +652,20 @@ describe("setCoordinateSystemValueFixed", () => {
 });
 
 describe("setCoordinateSystemValueBounded", () => {
-  it("bounds an unbounded value at zero", () => {
+  it("bounds a zero value with a range bracketing it", () => {
     const value = buildCoordinateSystemValue("ML");
 
     setCoordinateSystemValueBounded(value, true);
 
-    expect(value.bounds).toEqual([0, 0]);
+    expect(value.bounds).toEqual([-1, 1]);
+  });
+
+  it("bounds a non-zero value with a range bracketing it", () => {
+    const value = buildCoordinateSystemValue("ML", null, 5);
+
+    setCoordinateSystemValueBounded(value, true);
+
+    expect(value.bounds).toEqual([4, 6]);
   });
 
   it("unbounds a bounded value", () => {

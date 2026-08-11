@@ -155,14 +155,15 @@ export const useCoordinateSystemLibraryStore = defineStore(
     }
 
     /**
-     * Remove a coordinate system from the library by id.
+     * Remove a coordinate system from the library by id. Index 0 is the pinned default and is
+     * never removed.
      * @param coordinateSystem Coordinate system to remove.
      */
     function remove(coordinateSystem: CoordinateSystem) {
       const index = library.value.findIndex(
         ({ id }) => id === coordinateSystem.id
       );
-      if (index === -1) return;
+      if (index < 1) return;
       library.value.splice(index, 1);
     }
 

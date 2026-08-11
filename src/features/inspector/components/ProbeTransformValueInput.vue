@@ -38,7 +38,7 @@ const isOutOfBounds = computed(() => {
 });
 const boundsMessage = computed(() => {
   const bounds = coordinateSystemValue.bounds;
-  return bounds === null
+  return bounds === null || !isOutOfBounds.value
     ? ""
     : t("probeInspector.outOfBounds", {
         minimum: formatBound(bounds[0]),
@@ -56,13 +56,14 @@ function formatBound(storedValue: number): string {
 }
 
 /**
- * Write a committed field value through to the coordinate system value, then
- * report the edit so the chain can be re-solved.
+ * Write a committed field value through to the coordinate system value, then report the edit
+ * so the chain can be re-solved, unless the write left the value unchanged.
  * @param next Committed value, in the display unit.
  */
 function onCommit(next: string): void {
+  const previous = coordinateSystemValue.value;
   value.value = next;
-  emit("commit");
+  if (coordinateSystemValue.value !== previous) emit("commit");
 }
 </script>
 

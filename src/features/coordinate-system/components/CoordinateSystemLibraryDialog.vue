@@ -94,7 +94,12 @@ function confirmRemove(coordinateSystem: CoordinateSystem) {
       {
         label: t("coordinateSystemLibrary.delete"),
         color: "white",
-        handler: () => coordinateSystemLibraryStore.remove(coordinateSystem)
+        handler: () => {
+          if (currentExperimentStore.isInspectableSelected(coordinateSystem)) {
+            currentExperimentStore.selectedInspectable = null;
+          }
+          coordinateSystemLibraryStore.remove(coordinateSystem);
+        }
       }
     ]
   });

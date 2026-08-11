@@ -37,6 +37,7 @@ function makeFakeWorker(): FakeWorker {
   return {
     posted: [],
     onmessage: null,
+    onerror: null,
     postMessage(message) {
       this.posted.push(message);
     },
@@ -169,5 +170,65 @@ describe("createInverseKinematicsSolver", () => {
 
     await expect(promise).resolves.toBeNull();
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles a solve with null when the worker replies with a failure, and still posts the next queued request", async () => {
+    const scope = effectScope();
+    const worker = makeFakeWorker();
+    const solver = scope.run(() =>
+      createInverseKinematicsSolver(() => worker)
+    )!;
+
+    const first = solver.solve(makeRequest(1));
+    const second = solver.solve(makeRequest(2));
+
+    worker.onmessage?.({
+      data: { type: "failedInverseKinematics", requestId: 1 }
+    } as unknown as MessageEvent<OutboundInverseKinematicsMessage>);
+
+    await expect(first).resolves.toBeNull();
+    expect(worker.posted).toEqual([
+      { type: "solveInverseKinematics", requestId: 1, ...makeRequest(1) },
+      { type: "solveInverseKinematics", requestId: 2, ...makeRequest(2) }
+    ]);
+
+    const solution = makeSolution(2);
+    reply(worker, 2, solution);
+    await expect(second).resolves.toEqual({
+      status: "converged",
+      chain: [],
+      solution
+    });
+    scope.stop();
+  });
+
+  it("settles the in-flight and queued solves with null when the worker errors, and never hangs again", async () => {
+    const scope = effectScope();
+    const worker = makeFakeWorker();
+    const solver = scope.run(() =>
+      createInverseKinematicsSolver(() => worker)
+    )!;
+
+    const inFlight = solver.solve(makeRequest(1));
+    const queued = solver.solve(makeRequest(2));
+
+    worker.onerror?.({} as ErrorEvent);
+
+    await expect(inFlight).resolves.toBeNull();
+    await expect(queued).resolves.toBeNull();
+    await expect(solver.solve(makeRequest(3))).resolves.toBeNull();
+    scope.stop();
+  });
+
+  it("resolves null without posting when solve is called after the scope has stopped", async () => {
+    const scope = effectScope();
+    const worker = makeFakeWorker();
+    const solver = scope.run(() =>
+      createInverseKinematicsSolver(() => worker)
+    )!;
+    scope.stop();
+
+    await expect(solver.solve(makeRequest(1))).resolves.toBeNull();
+    expect(worker.posted).toEqual([]);
   });
 });

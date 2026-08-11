@@ -381,6 +381,48 @@ describe("isOnAnnotationSurface", () => {
     expect(result).toBe(false);
   });
 
+  it("is false for a background voxel diagonal to the center, which touches no face", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(
+      level,
+      (ap, dv, ml) => !(ap === 3 && dv === 3 && ml === 3)
+    );
+    const point: [number, number, number] = [
+      voxelCenter(level, 0, 2),
+      voxelCenter(level, 1, 3),
+      voxelCenter(level, 2, 2)
+    ];
+
+    const result = await isOnAnnotationSurface(
+      level,
+      point,
+      makeSampleRay(level, grid)
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it("is true for an annotated voxel with a background +DV face neighbor (index 4)", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(
+      level,
+      (ap, dv, ml) => !(ap === 2 && dv === 4 && ml === 2)
+    );
+    const point: [number, number, number] = [
+      voxelCenter(level, 0, 2),
+      voxelCenter(level, 1, 3),
+      voxelCenter(level, 2, 2)
+    ];
+
+    const result = await isOnAnnotationSurface(
+      level,
+      point,
+      makeSampleRay(level, grid)
+    );
+
+    expect(result).toBe(true);
+  });
+
   it("is false for a point outside the volume, whose samples stay background", async () => {
     const level = makeLevel();
     const grid = makeGrid(level, () => true);
@@ -450,6 +492,26 @@ describe("isInAnnotation", () => {
     );
 
     expect(result).toBe(false);
+  });
+
+  it("samples a single 1x1 voxel geometry, not the 3x3x3 neighborhood", async () => {
+    const level = makeLevel();
+    const grid = makeGrid(level, () => true);
+    const point: [number, number, number] = [
+      voxelCenter(level, 0, 2),
+      voxelCenter(level, 1, 3),
+      voxelCenter(level, 2, 2)
+    ];
+    const sampleVoxel = vi.fn(makeSampleRay(level, grid));
+
+    const result = await isInAnnotation(level, point, sampleVoxel);
+
+    expect(result).toBe(true);
+    expect(sampleVoxel).toHaveBeenCalledTimes(1);
+    const geometry = sampleVoxel.mock.calls[0]![0];
+    expect(geometry.heightPixels).toBe(1);
+    expect(geometry.bands).toHaveLength(1);
+    expect(geometry.bands[0]!.columnCount).toBe(1);
   });
 
   it("is null when the sampler can't be read", async () => {

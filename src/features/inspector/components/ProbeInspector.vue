@@ -249,7 +249,9 @@ const referenceOffset = computed(() =>
 const directNode = computed(() => {
   const [node] = chain.value;
   if (chain.value.length !== 1 || !node) return null;
-  return [...node.position, ...node.rotation].some(({ fixed }) => fixed)
+  return [...node.position, ...node.rotation].some(
+    ({ fixed, bounds }) => fixed || bounds
+  )
     ? null
     : node;
 });
@@ -509,6 +511,10 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
   }
 }
 
+/**
+ * Run one drag frame through the inverse-kinematics preview solve, re-arming
+ * itself if another frame lands while this one is still solving.
+ */
 // The gizmo streams a pose every frame. Instead of a fixed cadence, previews run back to back:
 // each iteration reads the probe's live pose, and a frame landing mid-solve just re-arms the loop,
 // so the inputs follow the drag as fast as the solver sustains. This cannot livelock -- a preview
@@ -532,6 +538,11 @@ async function previewInverseKinematics(): Promise<void> {
 
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
+  // A solve still in flight was started for the previous probe or chain: retire its id so its
+  // reply is dropped, and clear the flags its own `finally` can no longer reset.
+  solveId++;
+  isSolving = false;
+  hasPendingPreview = false;
   chain.value = selectedCoordinateSystem.value
     ? structuredClone(toRaw(selectedCoordinateSystem.value)).chain
     : [];
@@ -748,6 +759,7 @@ watch(
         (value, index) => value === probe.rotation[index]
       )
     ) {
+      appliedPose = null;
       return;
     }
     if (currentExperimentStore.draggedProbeId === probe.id) {

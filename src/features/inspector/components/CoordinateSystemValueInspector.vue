@@ -64,6 +64,20 @@ const maximumBound = useNumericModel(
   () => preferences.decimalPrecision
 );
 const isBounded = computed(() => coordinateSystemValue.bounds !== null);
+const minimumRules = computed<ValidationRule<string>[]>(() => [
+  validateRequiredNumber,
+  value =>
+    fromDisplay(Number(value)) <
+      (coordinateSystemValue.bounds?.[1] ?? Infinity) ||
+    t("validation.mustBeLessThanMaximum")
+]);
+const maximumRules = computed<ValidationRule<string>[]>(() => [
+  validateRequiredNumber,
+  value =>
+    fromDisplay(Number(value)) >
+      (coordinateSystemValue.bounds?.[0] ?? -Infinity) ||
+    t("validation.mustBeGreaterThanMinimum")
+]);
 const axisOptions = computed<AxisOption[]>(() => [
   {
     label: t("axis.x"),
@@ -96,6 +110,17 @@ const axisOptions = computed<AxisOption[]>(() => [
     }
   }
 ]);
+
+/**
+ * Is a committed bound a finite number; a bound is required once a value is bounded.
+ * @param value Committed field text.
+ */
+function validateRequiredNumber(value: string): true | string {
+  return (
+    (value.trim().length > 0 && Number.isFinite(Number(value))) ||
+    t("validation.mustBeNumber")
+  );
+}
 </script>
 
 <template>
@@ -154,7 +179,7 @@ const axisOptions = computed<AxisOption[]>(() => [
           hide-bottom-space
           :label="t('coordinateSystemInspector.minimum')"
           outlined
-          :rules="numberRules"
+          :rules="minimumRules"
           :suffix="suffix"
         />
         <CommittedInput
@@ -163,7 +188,7 @@ const axisOptions = computed<AxisOption[]>(() => [
           hide-bottom-space
           :label="t('coordinateSystemInspector.maximum')"
           outlined
-          :rules="numberRules"
+          :rules="maximumRules"
           :suffix="suffix"
         />
       </div>

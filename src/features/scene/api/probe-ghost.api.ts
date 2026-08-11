@@ -45,16 +45,16 @@ export function syncProbeGhost(
   }
 
   const existing = scene.getTransformNodeByName(PROBE_GHOST_NODE_NAME);
+  const reuseKey = `${ghost.probeId}:${probe.visibility}`;
   const canReuse =
-    existing?.metadata === ghost.probeId &&
-    !rebuiltProbeIds.includes(ghost.probeId);
+    existing?.metadata === reuseKey && !rebuiltProbeIds.includes(ghost.probeId);
 
   let node = existing;
   if (!canReuse) {
     disposeProbeGhost(scene);
     node = source.clone(PROBE_GHOST_NODE_NAME, source.parent);
     if (!node) return;
-    node.metadata = ghost.probeId;
+    node.metadata = reuseKey;
   }
   if (!node) return;
 

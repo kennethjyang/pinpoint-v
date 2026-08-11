@@ -1263,6 +1263,77 @@ describe("SceneCanvas", () => {
     expect(modeToggle.props("modelValue")).toBe("position");
   });
 
+  it("keeps a rebuilt probe hidden while a coordinate system is selected", async () => {
+    const { runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+    const preferences = usePreferencesStore();
+
+    const probeInterfaceProbe = makeProbeInterfaceProbe({
+      probe_planar_contour: [
+        [-11, 9989],
+        [-11, -11],
+        [24, -220],
+        [59, -11],
+        [59, 9989]
+      ]
+    });
+    internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
+    const builtProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+    });
+    addProbe(store.experiment, builtProbe);
+    await flushPromises();
+    const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
+
+    store.selectedInspectable = makeCoordinateSystem();
+    await flushPromises();
+
+    const scene = runtime.scene.value!;
+    expect(getProbeTransformNode(scene, probe.id)!.isEnabled()).toBe(false);
+
+    preferences.probeRodLengthMillimeters = 250;
+    await flushPromises();
+
+    expect(getProbeTransformNode(scene, probe.id)!.isEnabled()).toBe(false);
+  });
+
+  it("draws the ghost node while probeGhost is set and removes it when cleared", async () => {
+    const { runtime } = await mountCanvas();
+    const store = useCurrentExperimentStore();
+
+    const probeInterfaceProbe = makeProbeInterfaceProbe({
+      probe_planar_contour: [
+        [-11, 9989],
+        [-11, -11],
+        [24, -220],
+        [59, -11],
+        [59, 9989]
+      ]
+    });
+    internProbeInterfaceProbe(store.experiment, probeInterfaceProbe);
+    const builtProbe = makeProbe({
+      probeInterfaceIdentifier: getProbeInterfaceIdentifier(probeInterfaceProbe)
+    });
+    addProbe(store.experiment, builtProbe);
+    await flushPromises();
+    const probe = store.experiment.probes.find(p => p.id === builtProbe.id)!;
+
+    store.probeGhost = {
+      probeId: probe.id,
+      tipPosition: [5, 3, 5],
+      rotation: [0.1, 0.2, 0.3]
+    };
+    await flushPromises();
+
+    const scene = runtime.scene.value!;
+    expect(scene.getTransformNodeByName("probeGhost_node")).toBeTruthy();
+
+    store.probeGhost = null;
+    await flushPromises();
+
+    expect(scene.getTransformNodeByName("probeGhost_node")).toBeNull();
+  });
+
   describe("move to surface", () => {
     /** Add a probe with a real contour, so `syncProbes` builds its shank meshes. */
     async function addTestProbe(

@@ -27,5 +27,13 @@ export interface SolvedInverseKinematicsMessage {
   solution: CoordinateSystemSolution;
 }
 
+/** One solve that threw inside the worker, so the request yields no result. */
+export interface FailedInverseKinematicsMessage {
+  type: "failedInverseKinematics";
+  requestId: number;
+}
+
 /** Messages an inverse-kinematics worker sends to the main thread. */
-export type OutboundInverseKinematicsMessage = SolvedInverseKinematicsMessage;
+export type OutboundInverseKinematicsMessage =
+  | SolvedInverseKinematicsMessage
+  | FailedInverseKinematicsMessage;

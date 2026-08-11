@@ -1240,6 +1240,247 @@ describe("ProbeInspector", () => {
         )
       ).toBe(true);
     });
+
+    it("drops a solve reply superseded by a probe swap instead of applying it to the newly seeded probe", async () => {
+      const pinia = createPinia();
+      setActivePinia(pinia);
+      useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
+      const store = useCurrentExperimentStore(pinia);
+      const a = makeProbe({ name: "A" });
+      const b = makeProbe({ name: "B" });
+      store.experiment.probes = [a, b];
+      const coordinateSystemLibrary = useCoordinateSystemLibraryStore(pinia);
+      setProbeCoordinateSystem(
+        store.experiment,
+        a,
+        coordinateSystemLibrary.library[1]!
+      );
+      setProbeCoordinateSystem(
+        store.experiment,
+        b,
+        coordinateSystemLibrary.library[0]!
+      );
+
+      const openGates: Array<() => void> = [];
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: () => {
+          const { promise, resolve } = Promise.withResolvers<boolean | null>();
+          openGates.push(() => resolve(false));
+          return promise;
+        },
+        isOnSurface: vi.fn()
+      });
+
+      const wrapper = mountWithQuasar(ProbeInspector, {
+        pinia,
+        props: { probe: a },
+        global: { provide: babylonRuntimeProvide }
+      });
+      // Drain A's initial external solve from seeding.
+      openGates.forEach(open => open());
+      await flushPromises();
+      openGates.length = 0;
+
+      // Drag-then-release A: the release solve's surface check gate is held open below.
+      store.draggedProbeId = a.id;
+      await flushPromises();
+      openGates[0]!();
+      await flushPromises();
+      openGates.length = 0;
+      store.draggedProbeId = null;
+      await flushPromises();
+      expect(openGates).toHaveLength(1);
+
+      const bTipPositionBeforeSwap = [...b.tipPosition];
+      const bRotationBeforeSwap = [...b.rotation];
+
+      // Selecting probe B without unmounting reuses this instance, exactly as
+      // `Inspector.vue`'s unkeyed `v-if` does.
+      await wrapper.setProps({ probe: b } as Record<string, unknown>);
+
+      const solveCallsBeforeRelease = vi.mocked(
+        solveCoordinateSystemChainInverse
+      ).mock.calls.length;
+      vi.mocked(solveCoordinateSystemChainInverse).mockImplementationOnce(
+        chain => {
+          chain[0]!.position[0]!.value = 999;
+          chain[0]!.position[1]!.value = 999;
+          chain[0]!.position[2]!.value = 999;
+          return "stalled";
+        }
+      );
+
+      openGates[0]!();
+      await flushPromises();
+
+      expect(
+        vi.mocked(solveCoordinateSystemChainInverse).mock.calls.length
+      ).toBe(solveCallsBeforeRelease);
+      expect(b.tipPosition).toEqual(bTipPositionBeforeSwap);
+      expect(b.rotation).toEqual(bRotationBeforeSwap);
+      expect(
+        wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
+      ).toEqual([coordinateSystemLibrary.library[0]!.chain[0]!.name]);
+    });
+
+    it("re-solves when the probe returns to the exact pose this inspector's own correction wrote", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+      surfaceAndDepth.chain[0]!.rotation[1]!.bounds = [-0.01, 0.01];
+      surfaceAndDepth.chain[0]!.rotation[2]!.bounds = [-0.01, 0.01];
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.01];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.02];
+      await flushPromises();
+
+      store.draggedProbeId = null;
+      await flushPromises();
+      const correctedRotation: [number, number, number] = [...probe.rotation];
+
+      probe.rotation = [0, 0, 0];
+      await flushPromises();
+
+      const solveCallsBeforeReturn = vi.mocked(
+        solveCoordinateSystemChainInverse
+      ).mock.calls.length;
+      probe.rotation = correctedRotation;
+      await flushPromises();
+
+      expect(
+        vi.mocked(solveCoordinateSystemChainInverse).mock.calls.length
+      ).toBeGreaterThan(solveCallsBeforeReturn);
+    });
+
+    it("routes a bounded single-node chain through the solver instead of the direct fast path", async () => {
+      const { store, probe } = mountInspector();
+      const bounded = makeCoordinateSystem({
+        id: "bounded-tip",
+        name: "Bounded Tip",
+        chain: [
+          buildCoordinateSystemNode(
+            "Tip",
+            [
+              buildCoordinateSystemValue("ML", [-1, 1]),
+              buildCoordinateSystemValue("DV"),
+              buildCoordinateSystemValue("AP")
+            ],
+            [
+              buildCoordinateSystemValue("Pitch"),
+              buildCoordinateSystemValue("Yaw"),
+              buildCoordinateSystemValue("Roll")
+            ],
+            [0, 1, 2],
+            [0, 1, 2]
+          )
+        ]
+      });
+      setProbeCoordinateSystem(store.experiment, probe, bounded);
+      await flushPromises();
+
+      store.draggedProbeId = probe.id;
+      probe.tipPosition = [0, 0, 300];
+      await flushPromises();
+      expect(store.probeGhost).toBeNull();
+      probe.tipPosition = [0, 0, 300.01];
+      await flushPromises();
+      probe.tipPosition = [0, 0, 300.02];
+      await flushPromises();
+
+      expect(store.probeGhost).not.toBeNull();
+      expect(store.probeGhost?.probeId).toBe(probe.id);
+      expect(probe.tipPosition).toEqual([0, 0, 300.02]);
+    });
+
+    it("does not rewrite the probe pose or drop the ghost when a field is re-committed with a different-text same-value edit", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+      surfaceAndDepth.chain[0]!.rotation[1]!.bounds = [-0.01, 0.01];
+      surfaceAndDepth.chain[0]!.rotation[2]!.bounds = [-0.01, 0.01];
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+      expect(store.probeGhost?.probeId).toBe(probe.id);
+      const rotationBeforeRecommit = [...probe.rotation];
+
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
+      const field = fieldByLabel(wrapper, depthValueName);
+      const currentText = field.props("modelValue") as string;
+      // A different display string that parses to the identical numeric value: this is the
+      // case Vue's `defineModel` equality check cannot gate, since the committed text differs
+      // from the field's current text even though the underlying value does not change.
+      const sameValueDifferentText = `${currentText}0`;
+
+      await editAndBlur(field, sameValueDifferentText);
+
+      expect(store.probeGhost?.probeId).toBe(probe.id);
+      expect(probe.rotation).toEqual(rotationBeforeRecommit);
+    });
+
+    it("keeps the off-surface warning visible for a surface node whose values are all fixed", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn().mockResolvedValue(false)
+      });
+      const { wrapper, store, probe } = mountInspector();
+      const fixedSurfaceNode = buildCoordinateSystemNode(
+        "Fixed Surface",
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ],
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ],
+        [0, 1, 2],
+        [0, 1, 2],
+        true
+      );
+      const adjustableNode = buildCoordinateSystemNode(
+        "Adjustable",
+        [
+          buildCoordinateSystemValue("X"),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ],
+        [
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue(),
+          buildFixedCoordinateSystemValue()
+        ]
+      );
+      const custom = buildCoordinateSystem("Fixed On Surface", [
+        fixedSurfaceNode,
+        adjustableNode
+      ]);
+      setProbeCoordinateSystem(store.experiment, probe, custom);
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+      expect(
+        wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
+      ).toEqual(["Fixed Surface", "Adjustable"]);
+    });
   });
 
   describe("direct chain surface warning", () => {

@@ -4,7 +4,6 @@ import { createPinia, setActivePinia } from "pinia";
 import { flushPromises } from "@vue/test-utils";
 import ChannelMapCanvas from "./ChannelMapCanvas.vue";
 import { mountWithQuasar } from "@/test/mount-helper";
-import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import {
   makeProbe,
   makeProbeInterfaceProbe,
@@ -111,7 +110,6 @@ describe("ChannelMapCanvas", () => {
 
     const pinia = createPinia();
     setActivePinia(pinia);
-    const store = useCurrentExperimentStore(pinia);
 
     const probeInterfaceProbe = makeProbeInterfaceProbe({
       si_units: "mm",
@@ -144,7 +142,7 @@ describe("ChannelMapCanvas", () => {
         alignmentOffsetMillimeters: 0
       }
     });
-    return { wrapper, store, probe, shanks, contour };
+    return { wrapper, probe, shanks, contour };
   }
 
   it("hands the sampler a geometry covering every shank's full extent at the measured size", () => {

@@ -33,11 +33,7 @@ const isOnSurface = computed({
 </script>
 
 <template>
-  <q-expansion-item
-    default-opened
-    header-class="text-weight-bold"
-    :label="node.name"
-  >
+  <q-expansion-item default-opened header-class="text-weight-bold">
     <template #header>
       <q-item-section side>
         <div

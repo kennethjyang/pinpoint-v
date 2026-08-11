@@ -182,6 +182,16 @@ describe("homeProbe", () => {
     expect(probe.tipPosition).toEqual([7, 8, 9]);
     expect(probe.rotation).toEqual([0.1, 0.2, 0.3]);
   });
+
+  it("does not alias the reference coordinate array into the probe's tip position", () => {
+    const probe = makeProbe({ tipPosition: [1, 2, 3] });
+    const referenceCoordinate: [number, number, number] = [7, 8, 9];
+
+    homeProbe(probe, referenceCoordinate);
+    probe.tipPosition[0] = 100;
+
+    expect(referenceCoordinate).toEqual([7, 8, 9]);
+  });
 });
 
 describe("copyProbe", () => {
@@ -416,6 +426,12 @@ describe("isProbe", () => {
   it("rejects a probe missing lock", () => {
     const probe = makeProbe();
     delete (probe as Partial<Probe>).lock;
+    expect(isProbe(probe)).toBe(false);
+  });
+
+  it("rejects a probe missing coordinateSystemIdentifier", () => {
+    const probe = makeProbe();
+    delete (probe as Partial<Probe>).coordinateSystemIdentifier;
     expect(isProbe(probe)).toBe(false);
   });
 
