@@ -18,7 +18,8 @@ import {
 import {
   detachProbeInterfaceProbes,
   type ProbeGhost,
-  type ProbeSurfaceChoice
+  type ProbeSurfaceChoice,
+  type ProbeSurfaceMarker
 } from "@/features/probe";
 import type { CoordinateSystemNodeComponent } from "@/features/coordinate-system";
 import type { Inspectable } from "@/features/scene";
@@ -78,6 +79,9 @@ export const useCurrentExperimentStore = defineStore(
 
     /** Translucent clone drawn at the closest reachable pose while a drag can't be solved, or null. */
     const probeGhost = ref<ProbeGhost | null>(null);
+
+    /** Sphere drawn where the inspected probe's chain solves its on-surface node, or null. */
+    const probeSurfaceMarker = ref<ProbeSurfaceMarker | null>(null);
 
     /** Are the atlas axis guides shown in the scene. */
     const areAxisGuidesVisible = ref(false);
@@ -306,6 +310,7 @@ export const useCurrentExperimentStore = defineStore(
       selectedInspectable.value = null;
       draggedProbeId.value = null;
       probeGhost.value = null;
+      probeSurfaceMarker.value = null;
       draggedSceneObjectId.value = null;
       bodyModelGizmoProbeId.value = null;
       isCameraMoving.value = false;
@@ -332,6 +337,7 @@ export const useCurrentExperimentStore = defineStore(
       isCameraMoving,
       probeSurfaceChoice,
       probeGhost,
+      probeSurfaceMarker,
       isTerminologyRowsEvaluating,
       areAxisGuidesVisible,
       isLoadingRegionCenter,
