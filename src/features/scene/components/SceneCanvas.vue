@@ -88,6 +88,7 @@ import {
   disposeProbeSurfacePaths,
   pickProbeSurfacePathOnTap
 } from "../api/probe-surface-path.api";
+import { syncProbeSurfaceMarker } from "../api/probe-surface-marker.api";
 import {
   isProbeSurfaceChoiceCurrent,
   setProbeTipMillimeters
@@ -800,6 +801,18 @@ watchEffect(() => {
     return;
   }
   buildProbeSurfacePaths(scene, choice);
+});
+
+// Draw the sphere at the inspected probe's solved on-surface node, or strip it once cleared.
+watchEffect(() => {
+  const scene = runtime.scene.value;
+  if (!scene) return;
+
+  syncProbeSurfaceMarker(
+    scene,
+    currentExperiment.probeSurfaceMarker,
+    currentExperiment.probes
+  );
 });
 
 // Drop a pending surface-move choice once its probe moves or disappears -

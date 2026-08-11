@@ -1481,6 +1481,130 @@ describe("ProbeInspector", () => {
         wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
       ).toEqual(["Fixed Surface", "Adjustable"]);
     });
+
+    describe("surface marker", () => {
+      it("publishes the surface node's solved position after selecting a multi-node system", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue({
+            insideMillimeters: [1, 2, 3],
+            axisMillimeters: null,
+            dorsoventralMillimeters: null
+          }),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store, probe } = mountInspector();
+
+        await selectMultiNodeSystem(wrapper, pinia);
+
+        const solution = solveDisplayedChain(wrapper, pinia);
+        expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+        store.probeSurfaceMarker!.position.forEach((value, index) => {
+          expect(value).toBeCloseTo(solution.nodePositions[0]![index]!);
+        });
+      });
+
+      it("moves the marker's position when the surface node's AP field is edited, keeping the probeId", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue({
+            insideMillimeters: [1, 2, 3],
+            axisMillimeters: null,
+            dorsoventralMillimeters: null
+          }),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store, probe } = mountInspector();
+        await selectMultiNodeSystem(wrapper, pinia);
+        const before = [...store.probeSurfaceMarker!.position];
+
+        await editAndBlur(fieldByLabel(wrapper, "AP"), "2");
+
+        expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+        expect(store.probeSurfaceMarker?.position).not.toEqual(before);
+      });
+
+      it("keeps the marker null when the probe does not cross the brain", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue({
+            insideMillimeters: null,
+            axisMillimeters: [1, 2, 3],
+            dorsoventralMillimeters: null
+          }),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store } = mountInspector();
+
+        await selectMultiNodeSystem(wrapper, pinia);
+
+        expect(store.probeSurfaceMarker).toBeNull();
+      });
+
+      it("clears a visible marker once the probe stops crossing the brain", async () => {
+        const findTargets = vi.fn().mockResolvedValue({
+          insideMillimeters: [1, 2, 3],
+          axisMillimeters: null,
+          dorsoventralMillimeters: null
+        });
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets,
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store, probe } = mountInspector();
+        await selectMultiNodeSystem(wrapper, pinia);
+        expect(store.probeSurfaceMarker).not.toBeNull();
+
+        findTargets.mockResolvedValue({
+          insideMillimeters: null,
+          axisMillimeters: [1, 2, 3],
+          dorsoventralMillimeters: null
+        });
+        probe.tipPosition = [9, 9, 9];
+        await flushPromises();
+
+        expect(store.probeSurfaceMarker).toBeNull();
+      });
+
+      it("keeps the marker null when findTargets resolves null (annotation volume unavailable)", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue(null),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store } = mountInspector();
+
+        await selectMultiNodeSystem(wrapper, pinia);
+
+        expect(store.probeSurfaceMarker).toBeNull();
+      });
+
+      it("leaves the marker null for the default system, which has no onSurface node", () => {
+        const { store } = mountInspector();
+
+        expect(store.probeSurfaceMarker).toBeNull();
+      });
+
+      it("clears the marker on unmount", async () => {
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn().mockResolvedValue({
+            insideMillimeters: [1, 2, 3],
+            axisMillimeters: null,
+            dorsoventralMillimeters: null
+          }),
+          isInsideBrain: vi.fn().mockResolvedValue(true),
+          isOnSurface: vi.fn().mockResolvedValue(true)
+        });
+        const { wrapper, pinia, store } = mountInspector();
+        await selectMultiNodeSystem(wrapper, pinia);
+        expect(store.probeSurfaceMarker).not.toBeNull();
+
+        wrapper.unmount();
+
+        expect(store.probeSurfaceMarker).toBeNull();
+      });
+    });
   });
 
   describe("direct chain surface warning", () => {

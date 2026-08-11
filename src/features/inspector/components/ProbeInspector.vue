@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, toRaw, watch } from "vue";
+import { computed, onUnmounted, ref, toRaw, watch, watchEffect } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -113,6 +113,9 @@ const { solve: solveInverseKinematics } = useInverseKinematicsSolver();
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
 
+/** Does the probe still cross the brain, so its chain has a surface coordinate to mark. */
+const hasSurfaceCoordinate = ref(false);
+
 /**
  * Working copy of the selected coordinate system's chain. Detached from the library so
  * editing a value here never rewrites the shared definition.
@@ -139,6 +142,9 @@ const offSurfaceCheckCounts = new Map<number, number>();
  * `let`, not a ref: nothing renders it.
  */
 let surfaceCheckId = 0;
+
+/** Guards a surface-coordinate sample against a superseded pose. Deliberately not a ref. */
+let surfaceCoordinateId = 0;
 
 /** Probe pose this inspector last wrote, so its own correction does not retrigger a solve. */
 let appliedPose: {
@@ -256,8 +262,29 @@ const directNode = computed(() => {
     : node;
 });
 
+/** Chain index of the node constrained to the brain surface, or null when the chain has none. */
+const surfaceNodeIndex = computed(() => {
+  const index = chain.value.findIndex(node => node.onSurface);
+  return index === -1 ? null : index;
+});
+
 /** Does the working chain have any node constrained to the brain surface. */
-const hasSurfaceNode = computed(() => chain.value.some(node => node.onSurface));
+const hasSurfaceNode = computed(() => surfaceNodeIndex.value !== null);
+
+/**
+ * Forward-kinematics position of the chain's on-surface node, in atlas ASR mm, or null when the
+ * chain has none.
+ */
+const surfaceNodePosition = computed<[number, number, number] | null>(() => {
+  const index = surfaceNodeIndex.value;
+  if (index === null) return null;
+
+  const node = directNode.value;
+  const solution = node
+    ? solveDirectNode(node)
+    : solveCoordinateSystemChain(chain.value, referenceOffset.value);
+  return solution.nodePositions[index] ?? null;
+});
 
 /** This probe's interned interface definition, or null when the experiment has none. */
 const probeInterfaceProbe = computed(
@@ -407,6 +434,30 @@ function clearOffSurfaceWarnings(): void {
   surfaceCheckId++;
   if (offSurfaceNodeIndexes.value.length > 0) offSurfaceNodeIndexes.value = [];
   offSurfaceCheckCounts.clear();
+}
+
+/**
+ * Re-sample whether the probe crosses the brain, which gates the surface marker. Reads the same
+ * `insideMillimeters` target `moveToSurface` drops the tip onto, so the marker disappears exactly
+ * when a drop to surface would have nothing to drop onto.
+ */
+async function sampleSurfaceCoordinate(): Promise<void> {
+  if (!hasSurfaceNode.value) {
+    surfaceCoordinateId++;
+    hasSurfaceCoordinate.value = false;
+    return;
+  }
+  const id = ++surfaceCoordinateId;
+  const targets = await findTargets(probe);
+  if (id !== surfaceCoordinateId) return;
+  hasSurfaceCoordinate.value = targets?.insideMillimeters != null;
+}
+
+/** Drop this probe's surface marker, leaving another probe's alone. */
+function clearSurfaceMarker(): void {
+  if (currentExperimentStore.probeSurfaceMarker?.probeId === probe.id) {
+    currentExperimentStore.probeSurfaceMarker = null;
+  }
 }
 
 /**
@@ -777,9 +828,34 @@ watch(
   { deep: true }
 );
 
+// The probe's surface coordinate depends on its tip and its shank direction, so re-sample on both.
+// A chain edit that has not been committed to the probe cannot change it, so `chain` is not a dep.
+watch(
+  [() => probe.tipPosition, () => probe.rotation, hasSurfaceNode],
+  () => void sampleSurfaceCoordinate(),
+  { deep: true, immediate: true }
+);
+
+// Publish the on-surface node's solved position for the scene's marker sphere. This reads `chain`,
+// so a manual edit moves the ball through forward kinematics, and a drag moves it to wherever the
+// inverse-kinematics solve put the surface node. A probe that no longer crosses the brain has no
+// surface coordinate to mark, so the ball goes away.
+watchEffect(() => {
+  const position = surfaceNodePosition.value;
+  if (!position || !hasSurfaceCoordinate.value) {
+    clearSurfaceMarker();
+    return;
+  }
+  currentExperimentStore.probeSurfaceMarker = {
+    probeId: probe.id,
+    position: [...position]
+  };
+});
+
 onUnmounted(() => {
   cancelMoveToSurface();
   clearUnreachable();
+  clearSurfaceMarker();
 });
 </script>
 
