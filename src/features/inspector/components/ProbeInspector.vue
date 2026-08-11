@@ -598,6 +598,12 @@ function seedChain(): void {
     ? structuredClone(toRaw(selectedCoordinateSystem.value)).chain
     : [];
   clearOffSurfaceWarnings();
+  // A new probe or chain has not been marched yet. Drop the marker outright rather than through
+  // `clearSurfaceMarker`, whose ownership guard no longer matches after a probe swap --
+  // `Inspector.vue`'s unkeyed `v-if` reuses this instance, so no unmount clears it.
+  surfaceCoordinateId++;
+  hasSurfaceCoordinate.value = false;
+  currentExperimentStore.probeSurfaceMarker = null;
   appliedPose = null;
   clearUnreachable();
 

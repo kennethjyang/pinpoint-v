@@ -1505,13 +1505,8 @@ describe("ProbeInspector", () => {
     describe("surface marker", () => {
       it("publishes the surface node's solved position after selecting a multi-node system", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue({
-            insideMillimeters: [1, 2, 3],
-            axisMillimeters: null,
-            dorsoventralMillimeters: null
-          }),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
         });
         const { wrapper, pinia, store, probe } = mountInspector();
 
@@ -1526,13 +1521,8 @@ describe("ProbeInspector", () => {
 
       it("moves the marker's position when the surface node's AP field is edited, keeping the probeId", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue({
-            insideMillimeters: [1, 2, 3],
-            axisMillimeters: null,
-            dorsoventralMillimeters: null
-          }),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
         });
         const { wrapper, pinia, store, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
@@ -1546,13 +1536,8 @@ describe("ProbeInspector", () => {
 
       it("keeps the marker null when the probe does not cross the brain", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue({
-            insideMillimeters: null,
-            axisMillimeters: [1, 2, 3],
-            dorsoventralMillimeters: null
-          }),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue(null)
         });
         const { wrapper, pinia, store } = mountInspector();
 
@@ -1562,36 +1547,26 @@ describe("ProbeInspector", () => {
       });
 
       it("clears a visible marker once the probe stops crossing the brain", async () => {
-        const findTargets = vi.fn().mockResolvedValue({
-          insideMillimeters: [1, 2, 3],
-          axisMillimeters: null,
-          dorsoventralMillimeters: null
-        });
+        const findSurfaceEntry = vi.fn().mockResolvedValue([1, 2, 3]);
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets,
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry
         });
         const { wrapper, pinia, store, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
         expect(store.probeSurfaceMarker).not.toBeNull();
 
-        findTargets.mockResolvedValue({
-          insideMillimeters: null,
-          axisMillimeters: [1, 2, 3],
-          dorsoventralMillimeters: null
-        });
+        findSurfaceEntry.mockResolvedValue(null);
         probe.tipPosition = [9, 9, 9];
         await flushPromises();
 
         expect(store.probeSurfaceMarker).toBeNull();
       });
 
-      it("keeps the marker null when findTargets resolves null (annotation volume unavailable)", async () => {
+      it("keeps the marker null when findSurfaceEntry resolves null (annotation volume unavailable)", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue(null),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue(null)
         });
         const { wrapper, pinia, store } = mountInspector();
 
@@ -1608,13 +1583,8 @@ describe("ProbeInspector", () => {
 
       it("clears the marker on unmount", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue({
-            insideMillimeters: [1, 2, 3],
-            axisMillimeters: null,
-            dorsoventralMillimeters: null
-          }),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
         });
         const { wrapper, pinia, store } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
@@ -1625,25 +1595,20 @@ describe("ProbeInspector", () => {
         expect(store.probeSurfaceMarker).toBeNull();
       });
 
-      it("adds exactly one findTargets call for the solve itself on an external pose change, not a second gate sampler round-trip", async () => {
-        const findTargets = vi.fn().mockResolvedValue({
-          insideMillimeters: [1, 2, 3],
-          axisMillimeters: null,
-          dorsoventralMillimeters: null
-        });
+      it("marches once for the solve and once for the commit re-check on an external pose change", async () => {
+        const findSurfaceEntry = vi.fn().mockResolvedValue([1, 2, 3]);
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets,
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findTargets: vi.fn(),
+          findSurfaceEntry
         });
         const { wrapper, pinia, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
-        const before = findTargets.mock.calls.length;
+        const before = findSurfaceEntry.mock.calls.length;
 
         probe.tipPosition = [9, 9, 9];
         await flushPromises();
 
-        expect(findTargets.mock.calls.length).toBe(before + 1);
+        expect(findSurfaceEntry.mock.calls.length).toBe(before + 2);
       });
 
       it("gates the marker on the direct path when the shank crosses the brain", async () => {
@@ -1653,8 +1618,7 @@ describe("ProbeInspector", () => {
             axisMillimeters: null,
             dorsoventralMillimeters: null
           }),
-          isInsideBrain: vi.fn().mockResolvedValue(true),
-          isOnSurface: vi.fn().mockResolvedValue(true)
+          findSurfaceEntry: vi.fn()
         });
         const { store, probe } = mountInspector();
 
@@ -1688,6 +1652,49 @@ describe("ProbeInspector", () => {
 
         expect(store.probeSurfaceMarker).not.toBeNull();
         expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+      });
+
+      it("hides a stale marker immediately on a probe swap, before the new probe has marched", async () => {
+        const pinia = createPinia();
+        setActivePinia(pinia);
+        useProbeLibraryStore(pinia).add(makeProbeInterfaceProbe());
+        const store = useCurrentExperimentStore(pinia);
+        const a = makeProbe({ name: "A" });
+        const b = makeProbe({ name: "B" });
+        store.experiment.probes = [a, b];
+        const coordinateSystemLibrary = useCoordinateSystemLibraryStore(pinia);
+        setProbeCoordinateSystem(
+          store.experiment,
+          a,
+          coordinateSystemLibrary.library[1]!
+        );
+        setProbeCoordinateSystem(
+          store.experiment,
+          b,
+          coordinateSystemLibrary.library[1]!
+        );
+        vi.mocked(useProbeSurface).mockReturnValue({
+          findTargets: vi.fn(),
+          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+        });
+
+        const wrapper = mountWithQuasar(ProbeInspector, {
+          pinia,
+          props: { probe: a },
+          global: { provide: babylonRuntimeProvide }
+        });
+        await flushPromises();
+        expect(store.probeSurfaceMarker?.probeId).toBe(a.id);
+
+        // Selecting probe B without unmounting reuses this instance, exactly as
+        // `Inspector.vue`'s unkeyed `v-if` does.
+        await wrapper.setProps({ probe: b } as Record<string, unknown>);
+
+        // B has not marched yet, so A's stale marker must not linger at B's unsolved position.
+        expect(store.probeSurfaceMarker).toBeNull();
+
+        await flushPromises();
+        expect(store.probeSurfaceMarker?.probeId).toBe(b.id);
       });
     });
   });
