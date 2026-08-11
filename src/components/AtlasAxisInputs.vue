@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { AtlasAxisKind } from "@/composable/useAtlasAxes";
 import { useAtlasAxes } from "@/composable/useAtlasAxes";
 import { useDragSteps } from "@/composable/useDragSteps";
-import { useNumericTupleModel } from "@/composable/useNumericTupleModel";
+import { useNumericModel } from "@/composable/useNumericModel";
 import { useUnitLabels } from "@/composable/useUnitLabels";
 import { useValidationRules } from "@/composable/useValidationRules";
 import { usePreferencesStore } from "@/stores/preferences.store";
@@ -22,7 +22,7 @@ const { tuple, kind, offset } = defineProps<{
   tuple: [number, number, number];
   /** Which atlas triple this row edits, selecting its unit and default labels. */
   kind: AtlasAxisKind;
-  /** Origin the displayed values are relative to, in the stored unit; omitted means the atlas origin. */
+  /** Subtracted from each displayed value and added back on write; omit for none. */
   offset?: [number, number, number];
 }>();
 
@@ -33,20 +33,16 @@ const { positionStep, rotationStep } = useDragSteps();
 const { optionalNumber: numberRules } = useValidationRules();
 
 const models = ([0, 1, 2] as const).map(axis =>
-  useNumericTupleModel(
-    () => tuple,
-    axis,
+  useNumericModel(
+    () => tuple[axis] - (offset?.[axis] ?? 0),
+    storedValue => (tuple[axis] = storedValue + (offset?.[axis] ?? 0)),
     stored =>
       kind === "position"
-        ? millimetersToPositionUnit(
-            stored - (offset?.[axis] ?? 0),
-            preferences.positionUnit
-          )
+        ? millimetersToPositionUnit(stored, preferences.positionUnit)
         : radiansToRotationUnit(stored, preferences.rotationUnit),
     display =>
       kind === "position"
-        ? positionUnitToMillimeters(display, preferences.positionUnit) +
-          (offset?.[axis] ?? 0)
+        ? positionUnitToMillimeters(display, preferences.positionUnit)
         : rotationUnitToRadians(display, preferences.rotationUnit),
     () => preferences.decimalPrecision
   )
