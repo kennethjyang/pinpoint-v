@@ -23,7 +23,7 @@ const emit = defineEmits<{ commit: [] }>();
 const preferences = usePreferencesStore();
 const { optionalNumber: numberRules } = useValidationRules();
 const { t } = useI18n();
-const { value, suffix, toDisplay } = useCoordinateSystemValueModel(
+const { value, suffix, toDisplay, dragStep } = useCoordinateSystemValueModel(
   () => coordinateSystemValue,
   component
 );
@@ -74,6 +74,7 @@ function onCommit(next: string): void {
     :aria-label="ariaLabel"
     class="col"
     :disable="disable"
+    :drag-step="dragStep"
     :error="isOutOfBounds"
     :error-message="boundsMessage"
     hide-bottom-space

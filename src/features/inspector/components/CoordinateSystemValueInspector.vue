@@ -36,10 +36,8 @@ const axisIndex = defineModel<number>("axisIndex", { required: true });
 const preferences = usePreferencesStore();
 const { optionalNumber: numberRules } = useValidationRules();
 const { t } = useI18n();
-const { value, suffix, toDisplay, fromDisplay } = useCoordinateSystemValueModel(
-  () => coordinateSystemValue,
-  component
-);
+const { value, suffix, toDisplay, fromDisplay, dragStep } =
+  useCoordinateSystemValueModel(() => coordinateSystemValue, component);
 
 const name = computed({
   get: () => coordinateSystemValue.name,
@@ -146,6 +144,7 @@ function validateRequiredNumber(value: string): true | string {
       />
       <CommittedInput
         v-model="value"
+        :drag-step="dragStep"
         hide-bottom-space
         :label="t('coordinateSystemInspector.value')"
         outlined
@@ -176,6 +175,7 @@ function validateRequiredNumber(value: string): true | string {
         <CommittedInput
           v-model="minimumBound"
           class="col"
+          :drag-step="dragStep"
           hide-bottom-space
           :label="t('coordinateSystemInspector.minimum')"
           outlined
@@ -185,6 +185,7 @@ function validateRequiredNumber(value: string): true | string {
         <CommittedInput
           v-model="maximumBound"
           class="col"
+          :drag-step="dragStep"
           hide-bottom-space
           :label="t('coordinateSystemInspector.maximum')"
           outlined
