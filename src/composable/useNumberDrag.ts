@@ -1,4 +1,4 @@
-import { onScopeDispose } from "vue";
+import { computed, onScopeDispose, shallowRef, type ComputedRef } from "vue";
 import { useEventListener } from "@vueuse/core";
 import type { QInput } from "quasar";
 
@@ -7,6 +7,17 @@ const DRAG_THRESHOLD_PIXELS = 3;
 
 /** Body class that holds the resize cursor while a drag runs outside its field. */
 const DRAGGING_BODY_CLASS = "drag-number--active";
+
+/** Numeric inputs currently being scrubbed by a pointer drag. */
+const activeDragCount = shallowRef(0);
+
+/**
+ * Whether any numeric input is currently being scrubbed, for callers that must
+ * apply a scrubbed value immediately instead of animating to it.
+ */
+export const isNumberDragActive: ComputedRef<boolean> = computed(
+  () => activeDragCount.value > 0
+);
 
 /** Value and per-pixel sensitivity a drag starts with. */
 export interface NumberDragOrigin {
@@ -75,11 +86,21 @@ export function useNumberDrag(
     if (!isDragging) {
       if (Math.abs(deltaX) < DRAG_THRESHOLD_PIXELS) return;
       isDragging = true;
+      activeDragCount.value++;
       document.body.classList.add(DRAGGING_BODY_CLASS);
     }
     options.setValue(
       roundToStepPrecision(origin.value + deltaX * origin.step, origin.step)
     );
+  }
+
+  /** Release the global scrub state this field's drag holds, if it holds any. */
+  function clearDrag(): void {
+    if (!isDragging) return;
+
+    isDragging = false;
+    activeDragCount.value--;
+    document.body.classList.remove(DRAGGING_BODY_CLASS);
   }
 
   /**
@@ -94,19 +115,15 @@ export function useNumberDrag(
     }
     startX = null;
     origin = null;
-    if (isDragging) {
-      isDragging = false;
-      document.body.classList.remove(DRAGGING_BODY_CLASS);
-    } else getField()?.focus();
+    if (isDragging) clearDrag();
+    else getField()?.focus();
   }
 
   useEventListener(getElement, "pointerdown", onPointerDown);
   useEventListener(getElement, "pointermove", onPointerMove);
   useEventListener(getElement, ["pointerup", "pointercancel"], onPointerUp);
 
-  onScopeDispose(() => {
-    document.body.classList.remove(DRAGGING_BODY_CLASS);
-  });
+  onScopeDispose(clearDrag);
 }
 
 /**

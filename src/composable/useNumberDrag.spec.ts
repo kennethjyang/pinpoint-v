@@ -1,7 +1,11 @@
 import { defineComponent, h, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import { QInput } from "quasar";
-import { useNumberDrag, type NumberDragOrigin } from "./useNumberDrag";
+import {
+  isNumberDragActive,
+  useNumberDrag,
+  type NumberDragOrigin
+} from "./useNumberDrag";
 import { createWrapperRegistry, mountWithQuasar } from "@/test/mount-helper";
 
 const wrappers = createWrapperRegistry<ReturnType<typeof mountWithQuasar>>();
@@ -212,5 +216,56 @@ describe("useNumberDrag", () => {
 
     await wrapper.trigger("pointerup", { pointerId: 1 });
     expect(document.body.classList.contains("drag-number--active")).toBe(false);
+  });
+
+  describe("isNumberDragActive", () => {
+    it("is false before any drag, stays false below the threshold, and toggles true/false around a drag", async () => {
+      const { wrapper } = await mountDragHost();
+      expect(isNumberDragActive.value).toBe(false);
+
+      await wrapper.trigger("pointerdown", {
+        clientX: 0,
+        pointerId: 1,
+        button: 0
+      });
+      await wrapper.trigger("pointermove", { clientX: 2, pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(false);
+
+      await wrapper.trigger("pointermove", { clientX: 100, pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(true);
+
+      await wrapper.trigger("pointerup", { pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(false);
+    });
+
+    it("clears after a pointercancel", async () => {
+      const { wrapper } = await mountDragHost();
+
+      await wrapper.trigger("pointerdown", {
+        clientX: 0,
+        pointerId: 1,
+        button: 0
+      });
+      await wrapper.trigger("pointermove", { clientX: 100, pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(true);
+
+      await wrapper.trigger("pointercancel", { pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(false);
+    });
+
+    it("clears when the host unmounts mid-drag", async () => {
+      const { wrapper } = await mountDragHost();
+
+      await wrapper.trigger("pointerdown", {
+        clientX: 0,
+        pointerId: 1,
+        button: 0
+      });
+      await wrapper.trigger("pointermove", { clientX: 100, pointerId: 1 });
+      expect(isNumberDragActive.value).toBe(true);
+
+      wrapper.unmount();
+      expect(isNumberDragActive.value).toBe(false);
+    });
   });
 });
