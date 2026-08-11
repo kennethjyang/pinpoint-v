@@ -10,6 +10,7 @@ export {
   buildCameraPose,
   copyCameraPose,
   isCameraPose,
+  resetCameraPose,
   setCameraPose
 } from "./api/camera-pose.api";
 export { ALLEN_MOUSE_REFERENCE_COORDINATE } from "./api/reference-coordinate.api";

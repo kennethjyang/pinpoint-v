@@ -35,7 +35,7 @@ describe("getProbeFrame", () => {
     // +AP, so the tip axis (-up) is -AP.
     const probe = makeProbe({ tipPosition: [0, 0, 0], rotation: [0, 0, 0] });
 
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const frame = getProbeFrame(probe);
 
     expect(frame.rightMillimeters[0]).toBeCloseTo(0, 6);
     expect(frame.rightMillimeters[1]).toBeCloseTo(0, 6);

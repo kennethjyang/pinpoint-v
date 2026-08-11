@@ -4,6 +4,7 @@ import {
   copyCameraPose,
   getAtlasFramingRadiusMillimeters,
   isCameraPose,
+  resetCameraPose,
   setCameraPose
 } from "./camera-pose.api";
 import {
@@ -63,6 +64,35 @@ describe("buildCameraPose", () => {
 
     expect(a.alpha).toBe(b.alpha);
     expect(a.beta).toBe(b.beta);
+  });
+});
+
+describe("resetCameraPose", () => {
+  it("restores the initialized orbit and reframes on the atlas", () => {
+    const atlas = makeAtlas();
+    const pose = makeCameraPose({
+      alpha: 1,
+      beta: 2,
+      radius: 3,
+      target: [9, 9, 9]
+    });
+
+    resetCameraPose(pose, atlas);
+
+    const initialized = buildCameraPose(atlas);
+    expect(pose.alpha).toBe(initialized.alpha);
+    expect(pose.beta).toBe(initialized.beta);
+    expect(pose.radius).toBe(initialized.radius);
+    expect(pose.target).toEqual(initialized.target);
+  });
+
+  it("keeps the pose's id and name", () => {
+    const pose = makeCameraPose({ id: "kept-id", name: "Kept" });
+
+    resetCameraPose(pose, makeAtlas());
+
+    expect(pose.id).toBe("kept-id");
+    expect(pose.name).toBe("Kept");
   });
 });
 

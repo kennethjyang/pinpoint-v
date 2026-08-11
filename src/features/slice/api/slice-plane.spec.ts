@@ -92,7 +92,7 @@ describe("getProbeSlicePlane", () => {
 
   it("mirrors the image so its left edge is the probe's greatest-x edge", () => {
     const probe = makeProbe({ rotation: [0, 0, Math.PI / 2] });
-    const frame = getProbeFrame(probe, [0, 0, 0]);
+    const frame = getProbeFrame(probe);
     const centerHeightMillimeters = 3;
     const extentMillimeters = 4;
     const halfWidth = extentMillimeters / 2;

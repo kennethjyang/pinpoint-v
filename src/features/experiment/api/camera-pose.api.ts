@@ -30,15 +30,29 @@ export function getAtlasFramingRadiusMillimeters(atlas: Atlas): number {
  * @param atlas Atlas to frame the pose on.
  */
 export function buildCameraPose(atlas: Atlas): CameraPose {
-  return {
+  const pose: CameraPose = {
     inspectableKind: "camera",
     id: crypto.randomUUID(),
     name: "",
-    alpha: INITIAL_ALPHA,
-    beta: INITIAL_BETA,
-    radius: getAtlasFramingRadiusMillimeters(atlas),
-    target: getAtlasCenter(atlas)
+    alpha: 0,
+    beta: 0,
+    radius: 0,
+    target: [0, 0, 0]
   };
+  resetCameraPose(pose, atlas);
+  return pose;
+}
+
+/**
+ * Reset a camera pose to an atlas's default view: the initial orbit angles, framed on the atlas.
+ * @param pose Camera pose to reset in place.
+ * @param atlas Atlas to frame the pose on.
+ */
+export function resetCameraPose(pose: CameraPose, atlas: Atlas): void {
+  pose.alpha = INITIAL_ALPHA;
+  pose.beta = INITIAL_BETA;
+  pose.radius = getAtlasFramingRadiusMillimeters(atlas);
+  pose.target = getAtlasCenter(atlas);
 }
 
 /**
