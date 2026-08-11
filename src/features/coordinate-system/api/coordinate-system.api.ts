@@ -245,6 +245,26 @@ export function setCoordinateSystemAxisValue(
 }
 
 /**
+ * Copy a solved chain's values into a chain of the same shape, in place.
+ * @param chain Chain to write, mutated in place.
+ * @param solved Chain to read values from, index-aligned with `chain`.
+ */
+export function applyCoordinateSystemChainValues(
+  chain: CoordinateSystemNode[],
+  solved: CoordinateSystemNode[]
+): void {
+  for (let index = 0; index < chain.length; index++) {
+    const node = chain[index]!;
+    const solvedNode = solved[index];
+    if (!solvedNode) return;
+    for (let valueIndex = 0; valueIndex < 3; valueIndex++) {
+      node.position[valueIndex]!.value = solvedNode.position[valueIndex]!.value;
+      node.rotation[valueIndex]!.value = solvedNode.rotation[valueIndex]!.value;
+    }
+  }
+}
+
+/**
  * Resolve a node's values array and display order for the given component.
  * @param node Coordinate system node holding the component.
  * @param component Whether to resolve the position or rotation pair.

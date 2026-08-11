@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addCoordinateSystemTransform,
+  applyCoordinateSystemChainValues,
   buildCoordinateSystem,
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
@@ -708,5 +709,47 @@ describe("setCoordinateSystemAxisValue", () => {
     expect(node.position[0]!.value).toBe(1);
     expect(node.position[1]!.value).toBe(2);
     expect(getCoordinateSystemAxisValue(node, "position", 0)).toBe(100);
+  });
+});
+
+describe("applyCoordinateSystemChainValues", () => {
+  function makeNode(mlValue: number, pitchValue: number) {
+    return buildCoordinateSystemNode(
+      "Tip",
+      [
+        buildCoordinateSystemValue("ML", null, mlValue),
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ],
+      [
+        buildCoordinateSystemValue("Pitch", null, pitchValue),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ]
+    );
+  }
+
+  it("copies every node's position and rotation values in place, keeping node identity", () => {
+    const chain = [makeNode(0, 0), makeNode(0, 0)];
+    const solved = [makeNode(1, 0.5), makeNode(2, 0.75)];
+    const [firstNode, secondNode] = chain;
+
+    applyCoordinateSystemChainValues(chain, solved);
+
+    expect(chain[0]).toBe(firstNode);
+    expect(chain[1]).toBe(secondNode);
+    expect(chain[0]!.position[0]!.value).toBe(1);
+    expect(chain[0]!.rotation[0]!.value).toBe(0.5);
+    expect(chain[1]!.position[0]!.value).toBe(2);
+    expect(chain[1]!.rotation[0]!.value).toBe(0.75);
+  });
+
+  it("stops early without throwing when the solved chain is shorter than the chain", () => {
+    const chain = [makeNode(0, 0), makeNode(0, 0)];
+    const solved = [makeNode(9, 1.5)];
+
+    expect(() => applyCoordinateSystemChainValues(chain, solved)).not.toThrow();
+    expect(chain[0]!.position[0]!.value).toBe(9);
+    expect(chain[1]!.position[0]!.value).toBe(0);
   });
 });

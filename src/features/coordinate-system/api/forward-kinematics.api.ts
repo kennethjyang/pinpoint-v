@@ -1,6 +1,11 @@
-import { Matrix, Quaternion, Vector3 } from "@babylonjs/core";
-import { asrToVector3, vector3ToAsr } from "@/features/scene";
+// Deep-import from `@babylonjs/core`'s math module rather than the package root: the root
+// barrel is side-effectful (listed in `sideEffects`), so importing it would drag the whole
+// Babylon engine into this solver's worker chunk. `@babylonjs/core/Maths/math.vector`
+// re-exports `math.vector.pure` and runs the same `RegisterMathVector()` the root barrel
+// does, so `Matrix`/`Quaternion` behave identically.
+import { Matrix, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { getCoordinateSystemAxisValue } from "./coordinate-system.api";
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { CoordinateSystemNode } from "../model/coordinate-system.model";
 
 /** A solved coordinate system chain, in atlas ASR millimeters and radians. */
@@ -22,10 +27,10 @@ export function solveCoordinateSystemChain(
   chain: CoordinateSystemNode[],
   referenceOffsetMillimeters: [number, number, number] | null
 ): CoordinateSystemSolution {
-  const offset = referenceOffsetMillimeters
-    ? asrToVector3(referenceOffsetMillimeters)
-    : Vector3.Zero();
-  let frame = Matrix.Translation(offset.x, offset.y, offset.z);
+  const [offsetAp, offsetDv, offsetMl] = referenceOffsetMillimeters ?? [
+    0, 0, 0
+  ];
+  let frame = Matrix.Translation(offsetMl, offsetDv, offsetAp);
   const nodePositions: [number, number, number][] = [];
 
   for (const node of chain) {
@@ -91,4 +96,12 @@ export function isCoordinateSystemSolutionAtPose(
     (value, index) =>
       Math.abs(value - solutionRotationMatrix.m[index]!) <= tolerance
   );
+}
+
+/**
+ * Axis swap a Babylon vector (ML, DV, AP) back into an atlas ASR triple.
+ * @param vector Babylon vector to convert.
+ */
+function vector3ToAsr(vector: Vector3): [number, number, number] {
+  return [vector.z, vector.y, vector.x];
 }

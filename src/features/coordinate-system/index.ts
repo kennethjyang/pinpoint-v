@@ -21,6 +21,7 @@ export {
 } from "./api/inverse-kinematics.api";
 export {
   addCoordinateSystemTransform,
+  applyCoordinateSystemChainValues,
   buildCoordinateSystem,
   buildCoordinateSystemNode,
   buildCoordinateSystemValue,
@@ -38,3 +39,8 @@ export {
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
 } from "./api/coordinate-system.api";
+export type {
+  InverseKinematicsSolveRequest,
+  InverseKinematicsSolveResult
+} from "./composable/useInverseKinematicsSolver";
+export { useInverseKinematicsSolver } from "./composable/useInverseKinematicsSolver";

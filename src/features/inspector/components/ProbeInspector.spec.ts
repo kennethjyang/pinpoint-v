@@ -25,6 +25,7 @@ import {
   solveCoordinateSystemChain,
   solveCoordinateSystemChainInverse
 } from "@/features/coordinate-system";
+import type { InverseKinematicsSolveRequest } from "@/features/coordinate-system";
 import { getTerminologyRows } from "@/features/atlas";
 import {
   ALLEN_MOUSE_REFERENCE_COORDINATE,
@@ -124,6 +125,33 @@ vi.mock(
   }
 );
 
+// The solve now runs in a worker, and happy-dom provides no `Worker`. Route the composable
+// through the same two calls the worker's handler makes -- cloning the request the way
+// `postMessage` would -- so every test below still exercises a genuine solve and the
+// `inverse-kinematics.api` mock above still scripts its status.
+vi.mock(
+  "@/features/coordinate-system/composable/useInverseKinematicsSolver",
+  () => ({
+    useInverseKinematicsSolver: () => ({
+      solve: (request: InverseKinematicsSolveRequest) => {
+        const { chain, target, referenceOffsetMillimeters, maximumStarts } =
+          structuredClone(request);
+        const status = solveCoordinateSystemChainInverse(
+          chain,
+          target,
+          referenceOffsetMillimeters,
+          maximumStarts
+        );
+        const solution = solveCoordinateSystemChain(
+          chain,
+          referenceOffsetMillimeters
+        );
+        return Promise.resolve({ status, chain, solution });
+      }
+    })
+  })
+);
+
 // `useFileDialog`'s input is never attached to the DOM, so it can't be
 // driven through a queryable `<input type="file">`. Replace it with a fake
 // that records the registered `onChange` callback and an `open` spy,
@@ -205,6 +233,7 @@ async function editAndEnter(field: VueWrapper, value: string) {
 describe("ProbeInspector", () => {
   beforeEach(() => {
     vi.mocked(getTerminologyRows).mockResolvedValue([]);
+    vi.mocked(solveCoordinateSystemChainInverse).mockReset();
     vi.mocked(useProbeSurface).mockReturnValue({
       findTargets: vi.fn(),
       isInsideBrain: vi.fn(),
@@ -860,16 +889,6 @@ describe("ProbeInspector", () => {
       await flushPromises();
     }
 
-    /**
-     * Wait past the live-preview throttle window, so the next drag-frame pose change fires
-     * its own solve instead of being dropped by the leading-edge-only throttle.
-     */
-    function waitOutPreviewThrottle(): Promise<void> {
-      const { promise, resolve } = Promise.withResolvers<void>();
-      setTimeout(resolve, 150);
-      return promise;
-    }
-
     it("reproduces an external pose change in the chain's inputs and leaves the ghost null", async () => {
       const { wrapper, pinia, probe } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
@@ -904,10 +923,18 @@ describe("ProbeInspector", () => {
       probe.rotation = [0, 0, 2];
       await flushPromises();
 
+      // A single warm-seed miss must not flash the ghost.
+      expect(store.probeGhost).toBeNull();
+
+      probe.rotation = [0, 0, 2.01];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.02];
+      await flushPromises();
+
       expect(store.probeGhost).not.toBeNull();
       expect(store.probeGhost?.probeId).toBe(probe.id);
       expect(probe.tipPosition).toEqual([1, 2, 3]);
-      await waitOutPreviewThrottle();
+
       probe.rotation = [0, 0, 0.3];
       await flushPromises();
 
@@ -925,6 +952,10 @@ describe("ProbeInspector", () => {
 
       store.draggedProbeId = probe.id;
       probe.rotation = [0, 0, 2];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.01];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.02];
       await flushPromises();
       expect(store.probeGhost).not.toBeNull();
 
@@ -948,11 +979,13 @@ describe("ProbeInspector", () => {
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await selectMultiNodeSystem(wrapper, pinia);
 
-      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValueOnce(
-        "timeout"
-      );
+      vi.mocked(solveCoordinateSystemChainInverse).mockReturnValue("timeout");
       store.draggedProbeId = probe.id;
       probe.rotation = [0, 0, 2];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.01];
+      await flushPromises();
+      probe.rotation = [0, 0, 2.02];
       await flushPromises();
 
       expect(store.probeGhost).not.toBeNull();
@@ -1037,6 +1070,63 @@ describe("ProbeInspector", () => {
       probe.rotation = [0, 0, 2.1];
       await flushPromises();
       expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("draws the ghost on the first unreachable external change, which has no next solve to wait for", async () => {
+      const { wrapper, store, pinia, probe } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      surfaceAndDepth.chain[0]!.rotation[0]!.bounds = [0, Math.PI / 2];
+      surfaceAndDepth.chain[0]!.rotation[1]!.bounds = [-0.01, 0.01];
+      surfaceAndDepth.chain[0]!.rotation[2]!.bounds = [-0.01, 0.01];
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      probe.rotation = [0, 0, 2];
+      await flushPromises();
+
+      expect(store.probeGhost?.probeId).toBe(probe.id);
+    });
+
+    it("re-runs the preview solve for the newest pose when a drag frame lands mid-solve", async () => {
+      const openGates: Array<() => void> = [];
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: () => {
+          const { promise, resolve } = Promise.withResolvers<boolean | null>();
+          openGates.push(() => resolve(false));
+          return promise;
+        },
+        isOnSurface: vi.fn()
+      });
+      const { wrapper, store, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+      // Drain the gate the initial external solve opened.
+      openGates.forEach(open => open());
+      await flushPromises();
+      openGates.length = 0;
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.4];
+      await flushPromises();
+      expect(openGates).toHaveLength(1);
+
+      openGates[0]!();
+      await flushPromises();
+      expect(openGates).toHaveLength(2);
+
+      openGates[1]!();
+      await flushPromises();
+      const solution = solveDisplayedChain(wrapper, pinia);
+      expect(
+        isCoordinateSystemSolutionAtPose(
+          solution,
+          probe.tipPosition,
+          probe.rotation,
+          1e-3
+        )
+      ).toBe(true);
     });
   });
 

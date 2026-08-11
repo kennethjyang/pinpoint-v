@@ -1,5 +1,9 @@
-import { Matrix, Quaternion, Vector3 } from "@babylonjs/core";
-import { asrToVector3 } from "@/features/scene";
+// Deep-import from `@babylonjs/core`'s math module rather than the package root: the root
+// barrel is side-effectful (listed in `sideEffects`), so importing it would drag the whole
+// Babylon engine into this solver's worker chunk. `@babylonjs/core/Maths/math.vector`
+// re-exports `math.vector.pure` and runs the same `RegisterMathVector()` the root barrel
+// does, so `Matrix`/`Quaternion` behave identically.
+import { Matrix, Quaternion } from "@babylonjs/core/Maths/math.vector";
 import {
   DOF,
   Goal,
@@ -110,7 +114,7 @@ export function solveCoordinateSystemChainInverse(
   const surfaceIndex = chain.findIndex(node => node.onSurface);
   const useSurfaceGoal = surfaceIndex !== -1 && target.surfacePosition !== null;
 
-  const goalPosition = asrToVector3(target.tipPosition);
+  const [targetAp, targetDv, targetMl] = target.tipPosition;
   const goalQuaternion = Quaternion.FromRotationMatrix(
     Matrix.RotationYawPitchRoll(
       target.rotation[1],
@@ -130,7 +134,7 @@ export function solveCoordinateSystemChainInverse(
     const tree = buildSolverTree(chain, referenceOffsetMillimeters);
 
     const goal: IkGoal = new Goal();
-    goal.setPosition(goalPosition.x, goalPosition.y, goalPosition.z);
+    goal.setPosition(targetMl, targetDv, targetAp);
     goal.setQuaternion(
       goalQuaternion.x,
       goalQuaternion.y,
@@ -142,12 +146,8 @@ export function solveCoordinateSystemChainInverse(
     if (useSurfaceGoal) {
       const surfaceGoal: IkGoal = new Goal();
       surfaceGoal.setGoalDoF(DOF.X, DOF.Y, DOF.Z);
-      const surfacePosition = asrToVector3(target.surfacePosition!);
-      surfaceGoal.setPosition(
-        surfacePosition.x,
-        surfacePosition.y,
-        surfacePosition.z
-      );
+      const [surfaceAp, surfaceDv, surfaceMl] = target.surfacePosition!;
+      surfaceGoal.setPosition(surfaceMl, surfaceDv, surfaceAp);
       surfaceGoal.makeClosure(tree.nodeLinks[surfaceIndex]!);
     }
 
@@ -305,8 +305,8 @@ function buildSolverTree(
 ): SolverTree {
   const root: IkLink = new Link();
   if (referenceOffsetMillimeters) {
-    const offset = asrToVector3(referenceOffsetMillimeters);
-    root.setPosition(offset.x, offset.y, offset.z);
+    const [offsetAp, offsetDv, offsetMl] = referenceOffsetMillimeters;
+    root.setPosition(offsetMl, offsetDv, offsetAp);
   }
 
   const nodeLinks: IkLink[] = [];
@@ -417,10 +417,7 @@ function getTargetError(
     referenceOffsetMillimeters
   );
 
-  let error = Vector3.Distance(
-    asrToVector3(solution.tipPosition),
-    asrToVector3(target.tipPosition)
-  );
+  let error = getAsrDistance(solution.tipPosition, target.tipPosition);
 
   const targetRotation = Quaternion.FromRotationMatrix(
     Matrix.RotationYawPitchRoll(
@@ -443,9 +440,9 @@ function getTargetError(
     );
 
   if (surfaceIndex !== -1 && target.surfacePosition !== null) {
-    error += Vector3.Distance(
-      asrToVector3(solution.nodePositions[surfaceIndex]!),
-      asrToVector3(target.surfacePosition)
+    error += getAsrDistance(
+      solution.nodePositions[surfaceIndex]!,
+      target.surfacePosition
     );
   }
 
@@ -461,4 +458,19 @@ function createSeedRandom(): () => number {
     state = (Math.imul(state, SEED_MULTIPLIER) + SEED_INCREMENT) >>> 0;
     return state / 0x100000000;
   };
+}
+
+/**
+ * Euclidean distance between two atlas ASR millimeter triples.
+ * @param a First triple, as [ap, dv, ml].
+ * @param b Second triple, as [ap, dv, ml].
+ */
+function getAsrDistance(
+  a: [number, number, number],
+  b: [number, number, number]
+): number {
+  const deltaAp = a[0] - b[0];
+  const deltaDv = a[1] - b[1];
+  const deltaMl = a[2] - b[2];
+  return Math.sqrt(deltaMl * deltaMl + deltaDv * deltaDv + deltaAp * deltaAp);
 }

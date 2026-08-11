@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { computed, onUnmounted, ref, toRaw, watch } from "vue";
-import { useThrottleFn } from "@vueuse/core";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -22,6 +21,7 @@ import {
 } from "@/features/scene";
 import { SliceCanvas, useProbeSurface } from "@/features/slice";
 import {
+  applyCoordinateSystemChainValues,
   type CoordinateSystemNode,
   type CoordinateSystemSolution,
   type CoordinateSystemSolveStatus,
@@ -31,7 +31,7 @@ import {
   setCoordinateSystemAxisValue,
   SETTLED_SOLVE_STARTS,
   solveCoordinateSystemChain,
-  solveCoordinateSystemChainInverse
+  useInverseKinematicsSolver
 } from "@/features/coordinate-system";
 import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import ProbeTransformChain from "./ProbeTransformChain.vue";
@@ -72,11 +72,14 @@ interface CoordinateSystemOption {
 /** Why an inverse-kinematics run fired, which sets its solve budget and what it writes. */
 type SolveReason = "preview" | "release" | "external";
 
-/** Milliseconds between live solves while the gizmo is dragging - 10 Hz. */
-const PREVIEW_SOLVE_INTERVAL_MILLISECONDS = 100;
-
 /** Pose difference, in mm and radians, below which the probe needs no correction. */
 const POSE_MATCH_TOLERANCE = 1e-4;
+
+/**
+ * Consecutive non-converged preview solves before the unreachable ghost is drawn, so one
+ * spurious warm-seed miss during a drag does not flash it.
+ */
+const SUSTAINED_UNREACHABLE_SOLVES = 3;
 
 const SOLVE_FAILURE_CAPTION_KEYS = {
   stalled: "probeInspector.inverseKinematicsStalled",
@@ -99,6 +102,7 @@ const { requiredName: nameRules } = useValidationRules();
 const { t } = useI18n();
 const { notifyError, notifyWarning } = useNotify();
 const { findTargets, isInsideBrain, isOnSurface } = useProbeSurface();
+const { solve: solveInverseKinematics } = useInverseKinematicsSolver();
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
@@ -136,8 +140,17 @@ let hasNotifiedNonConvergence = false;
 /** Was this probe being dragged, so the next non-drag run is the drag's release solve. */
 let wasDragging = false;
 
-/** Is a solve in flight, so live previews do not queue up behind each other. */
+/** Is a solve in flight, so a preview never preempts a release or external solve. */
 let isSolving = false;
+
+/** Is the preview loop running, so drag frames re-arm it instead of queueing their own solves. */
+let isPreviewLoopRunning = false;
+
+/** Did a drag frame land while a preview solve was in flight, so the loop must run again. */
+let hasPendingPreview = false;
+
+/** Consecutive non-converged solves since the chain last reached the probe. */
+let unreachableSolveCount = 0;
 
 /** Guards a solve against a superseded pose change. */
 let solveId = 0;
@@ -366,6 +379,7 @@ function solveDirectNode(node: CoordinateSystemNode): CoordinateSystemSolution {
  */
 function clearUnreachable(): void {
   hasNotifiedNonConvergence = false;
+  unreachableSolveCount = 0;
   if (currentExperimentStore.probeGhost?.probeId === probe.id) {
     currentExperimentStore.probeGhost = null;
   }
@@ -378,6 +392,9 @@ function clearUnreachable(): void {
  */
 async function runInverseKinematics(reason: SolveReason): Promise<void> {
   if (reason === "preview" && isSolving) return;
+  // A settled solve supersedes any drag frame still waiting on the preview loop, so the loop
+  // never re-runs a stale preview on top of the release solve's result.
+  if (reason !== "preview") hasPendingPreview = false;
   const id = ++solveId;
   isSolving = true;
   try {
@@ -390,20 +407,21 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
     }
     if (id !== solveId) return;
 
-    const status = solveCoordinateSystemChainInverse(
-      chain.value,
-      {
+    const result = await solveInverseKinematics({
+      chain: toRaw(chain.value),
+      target: {
         tipPosition: [...probe.tipPosition],
         rotation: [...probe.rotation],
         surfacePosition
       },
-      referenceOffset.value,
-      reason === "preview" ? PREVIEW_SOLVE_STARTS : SETTLED_SOLVE_STARTS
-    );
-    const solution = solveCoordinateSystemChain(
-      chain.value,
-      referenceOffset.value
-    );
+      referenceOffsetMillimeters: toRaw(referenceOffset.value),
+      maximumStarts:
+        reason === "preview" ? PREVIEW_SOLVE_STARTS : SETTLED_SOLVE_STARTS
+    });
+    if (id !== solveId || !result) return;
+
+    applyCoordinateSystemChainValues(chain.value, result.chain);
+    const { solution, status } = result;
 
     // A drag reports nothing: the ghost drawn at the best-effort pose is the only cue that
     // the target is out of the chain's reach. `diverged` never reports either -- the solve
@@ -441,11 +459,19 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
       }
       clearUnreachable();
     } else {
-      currentExperimentStore.probeGhost = {
-        probeId: probe.id,
-        tipPosition: [...solution.tipPosition],
-        rotation: [...solution.rotation]
-      };
+      // A drag can miss one solve and reach the next, so a preview must miss repeatedly before
+      // the ghost appears. A one-shot external change has no next iteration to wait for.
+      unreachableSolveCount++;
+      if (
+        reason !== "preview" ||
+        unreachableSolveCount >= SUSTAINED_UNREACHABLE_SOLVES
+      ) {
+        currentExperimentStore.probeGhost = {
+          probeId: probe.id,
+          tipPosition: [...solution.tipPosition],
+          rotation: [...solution.rotation]
+        };
+      }
     }
 
     void checkSurfaceNodes(solution);
@@ -454,13 +480,26 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
   }
 }
 
-// The gizmo streams a pose every frame; solve at 10 Hz so the inputs follow the drag without
-// queueing a solve per frame. Leading edge and no trailing call, so the release run below is
-// always the final compute.
-const previewInverseKinematics = useThrottleFn(
-  () => runInverseKinematics("preview"),
-  PREVIEW_SOLVE_INTERVAL_MILLISECONDS
-);
+// The gizmo streams a pose every frame. Instead of a fixed cadence, previews run back to back:
+// each iteration reads the probe's live pose, and a frame landing mid-solve just re-arms the loop,
+// so the inputs follow the drag as fast as the solver sustains. This cannot livelock -- a preview
+// writes only `chain`, `probeGhost`, and `offSurfaceNodeIndexes`, none of which the pose watcher
+// below depends on, so nothing but a real drag frame ever sets `hasPendingPreview`.
+async function previewInverseKinematics(): Promise<void> {
+  if (isPreviewLoopRunning) {
+    hasPendingPreview = true;
+    return;
+  }
+  isPreviewLoopRunning = true;
+  try {
+    do {
+      hasPendingPreview = false;
+      await runInverseKinematics("preview");
+    } while (hasPendingPreview);
+  } finally {
+    isPreviewLoopRunning = false;
+  }
+}
 
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
