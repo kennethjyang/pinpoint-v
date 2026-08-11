@@ -99,19 +99,6 @@ export const useCoordinateSystemLibraryStore = defineStore(
             ]
           ),
           buildCoordinateSystemNode(
-            "Module Radius",
-            [
-              buildFixedCoordinateSystemValue(),
-              buildFixedCoordinateSystemValue(),
-              buildFixedCoordinateSystemValue("Radius", 20)
-            ],
-            [
-              buildFixedCoordinateSystemValue(),
-              buildFixedCoordinateSystemValue(),
-              buildFixedCoordinateSystemValue()
-            ]
-          ),
-          buildCoordinateSystemNode(
             "Stage",
             [
               buildCoordinateSystemValue("X", [-7.5, 7.5]),
