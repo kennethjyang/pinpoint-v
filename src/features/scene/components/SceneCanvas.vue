@@ -586,7 +586,12 @@ watchEffect(() => {
     }
   }
 
-  syncProbeGhost(scene, currentExperiment.probeGhost, rebuiltProbeIds);
+  syncProbeGhost(
+    scene,
+    currentExperiment.probeGhost,
+    currentExperiment.probes,
+    rebuiltProbeIds
+  );
 });
 
 /**

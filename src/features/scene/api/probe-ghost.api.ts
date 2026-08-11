@@ -1,7 +1,8 @@
 import type { Scene } from "@babylonjs/core";
 import { Color3, StandardMaterial } from "@babylonjs/core";
-import type { ProbeGhost } from "@/features/probe";
+import type { Probe, ProbeGhost } from "@/features/probe";
 import { asrToVector3 } from "./coordinate-transforms.api";
+import { setMaterialDiffuseColor } from "./material.api";
 import { getProbeTransformNode } from "./probe.api";
 
 /** Name of the transform node the ghost's cloned meshes hang off. */
@@ -17,14 +18,22 @@ const PROBE_GHOST_ALPHA = 0.35;
  * Draw or move the translucent probe clone, or strip it when there is no ghost.
  * @param scene Scene holding the probes.
  * @param ghost Ghost to draw, or null to remove it.
+ * @param probes Probes in the experiment, to resolve the ghost's own color.
  * @param rebuiltProbeIds Probe ids rebuilt this pass, whose ghost must be re-cloned.
  */
 export function syncProbeGhost(
   scene: Scene,
   ghost: ProbeGhost | null,
+  probes: Probe[],
   rebuiltProbeIds: string[]
 ): void {
   if (!ghost) {
+    disposeProbeGhost(scene);
+    return;
+  }
+
+  const probe = probes.find(({ id }) => id === ghost.probeId);
+  if (!probe) {
     disposeProbeGhost(scene);
     return;
   }
@@ -45,16 +54,19 @@ export function syncProbeGhost(
     disposeProbeGhost(scene);
     node = source.clone(PROBE_GHOST_NODE_NAME, source.parent);
     if (!node) return;
-
     node.metadata = ghost.probeId;
-    const material = buildProbeGhostMaterial(scene);
+  }
+  if (!node) return;
+
+  const material = buildProbeGhostMaterial(scene);
+  setMaterialDiffuseColor(material, Color3.FromHexString(probe.color));
+  if (!canReuse) {
     for (const mesh of node.getChildMeshes()) {
       mesh.material = material;
       mesh.isPickable = false;
       mesh.metadata = null;
     }
   }
-  if (!node) return;
 
   node.position = asrToVector3(ghost.tipPosition);
   node.rotation = asrToVector3(ghost.rotation);
@@ -78,7 +90,6 @@ function buildProbeGhostMaterial(scene: Scene): StandardMaterial {
   if (existing instanceof StandardMaterial) return existing;
 
   const material = new StandardMaterial(PROBE_GHOST_MATERIAL_NAME, scene);
-  material.diffuseColor = Color3.White();
   material.specularColor = Color3.Black();
   material.alpha = PROBE_GHOST_ALPHA;
   material.backFaceCulling = false;

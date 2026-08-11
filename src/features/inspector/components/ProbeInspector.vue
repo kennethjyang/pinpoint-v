@@ -81,6 +81,12 @@ const POSE_MATCH_TOLERANCE = 1e-4;
  */
 const SUSTAINED_UNREACHABLE_SOLVES = 3;
 
+/**
+ * Consecutive off-surface readings before a preview run warns, so one transient miss during a
+ * drag does not flash the warning.
+ */
+const SUSTAINED_OFF_SURFACE_CHECKS = 3;
+
 const SOLVE_FAILURE_CAPTION_KEYS = {
   stalled: "probeInspector.inverseKinematicsStalled",
   timeout: "probeInspector.inverseKinematicsTimeout",
@@ -113,7 +119,7 @@ const isFindingSurface = ref(false);
  */
 const chain = ref<CoordinateSystemNode[]>([]);
 
-/** Indexes into `chain` of `onSurface` nodes the atlas rejects as off-surface. */
+/** Indexes into `chain` of `onSurface` nodes whose off-surface reading has been sustained. */
 const offSurfaceNodeIndexes = ref<number[]>([]);
 
 /**
@@ -121,6 +127,12 @@ const offSurfaceNodeIndexes = ref<number[]>([]);
  * nothing renders it and replacing it must not retrigger effects.
  */
 let surfaceAbortController: AbortController | null = null;
+
+/**
+ * Consecutive off-surface readings per `chain` index. Deliberately not a ref: nothing renders it
+ * and mutating it must not retrigger effects.
+ */
+const offSurfaceCheckCounts = new Map<number, number>();
 
 /**
  * Guards a surface check against a superseded commit. Deliberately a plain
@@ -385,6 +397,13 @@ function clearUnreachable(): void {
   }
 }
 
+/** Drop every off-surface warning, its debounce counts, and any in-flight check. */
+function clearOffSurfaceWarnings(): void {
+  surfaceCheckId++;
+  offSurfaceNodeIndexes.value = [];
+  offSurfaceCheckCounts.clear();
+}
+
 /**
  * Solve the working chain's non-fixed values onto the probe's pose, driving or clearing the
  * unreachable-pose ghost and toast based on the result.
@@ -398,10 +417,11 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
   const id = ++solveId;
   isSolving = true;
   try {
+    let isTipInsideBrain = false;
     let surfacePosition: [number, number, number] | null = null;
     if (chain.value.some(node => node.onSurface)) {
-      const inside = await isInsideBrain(probe.tipPosition);
-      if (inside) {
+      isTipInsideBrain = (await isInsideBrain(probe.tipPosition)) === true;
+      if (isTipInsideBrain) {
         surfacePosition = (await findTargets(probe))?.insideMillimeters ?? null;
       }
     }
@@ -474,7 +494,7 @@ async function runInverseKinematics(reason: SolveReason): Promise<void> {
       }
     }
 
-    void checkSurfaceNodes(solution);
+    void checkSurfaceNodes(solution, reason, isTipInsideBrain);
   } finally {
     if (id === solveId) isSolving = false;
   }
@@ -506,7 +526,7 @@ function seedChain(): void {
   chain.value = selectedCoordinateSystem.value
     ? structuredClone(toRaw(selectedCoordinateSystem.value)).chain
     : [];
-  offSurfaceNodeIndexes.value = [];
+  clearOffSurfaceWarnings();
   appliedPose = null;
   clearUnreachable();
 
@@ -596,7 +616,7 @@ function onSurfaceClick(): void {
   void moveToSurface();
 }
 
-/** Re-solve the working chain onto the probe and recheck its surface nodes. */
+/** Re-solve the working chain onto the probe, clearing any stale off-surface warning. */
 function applySolve(): void {
   const node = directNode.value;
   const solution = node
@@ -609,31 +629,53 @@ function applySolve(): void {
   setProbeTipMillimeters(probe, solution.tipPosition);
   probe.rotation = [...solution.rotation];
   clearUnreachable();
-  void checkSurfaceNodes(solution);
+  clearOffSurfaceWarnings();
 }
 
 /**
- * Replace the off-surface warnings with the on-surface nodes the atlas rejects.
+ * Replace the off-surface warnings with the on-surface nodes the atlas rejects, once a preview's
+ * rejection has held for `SUSTAINED_OFF_SURFACE_CHECKS` consecutive checks.
  * @param solution Solved chain the node positions come from.
+ * @param reason Why the solve that produced this check fired.
+ * @param isTipInsideBrain Was the probe's tip inside the brain for this solve.
  */
 async function checkSurfaceNodes(
-  solution: CoordinateSystemSolution
+  solution: CoordinateSystemSolution,
+  reason: SolveReason,
+  isTipInsideBrain: boolean
 ): Promise<void> {
-  const checkId = ++surfaceCheckId;
   const indexes = chain.value.flatMap((node, index) =>
     node.onSurface ? [index] : []
   );
-  if (indexes.length === 0) {
-    offSurfaceNodeIndexes.value = [];
+  // Outside the brain the solver never got a surface goal, so there is nothing to verify.
+  if (!isTipInsideBrain || indexes.length === 0) {
+    clearOffSurfaceWarnings();
     return;
   }
+
+  const checkId = ++surfaceCheckId;
   const results = await Promise.all(
     indexes.map(index => isOnSurface(solution.nodePositions[index]!))
   );
   if (checkId !== surfaceCheckId) return;
-  offSurfaceNodeIndexes.value = indexes.filter(
-    (_, position) => results[position] === false
-  );
+
+  const warned: number[] = [];
+  indexes.forEach((index, position) => {
+    if (results[position] !== false) {
+      offSurfaceCheckCounts.delete(index);
+      return;
+    }
+    // A one-shot solve has no next check to wait for, so it warns at once and holds the warning
+    // through the previews of any later drag.
+    const next = (offSurfaceCheckCounts.get(index) ?? 0) + 1;
+    const count =
+      reason === "preview"
+        ? next
+        : Math.max(next, SUSTAINED_OFF_SURFACE_CHECKS);
+    offSurfaceCheckCounts.set(index, count);
+    if (count >= SUSTAINED_OFF_SURFACE_CHECKS) warned.push(index);
+  });
+  offSurfaceNodeIndexes.value = warned;
 }
 
 // A different probe or a different coordinate system starts from the library's values.

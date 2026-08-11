@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { Mesh } from "@babylonjs/core";
+import { Color3, Mesh, StandardMaterial } from "@babylonjs/core";
 import type { Experiment } from "@/features/experiment";
 import {
   addProbe,
@@ -83,7 +83,7 @@ describe("syncProbeGhost", () => {
     )!;
     const ghost = makeGhost({ probeId: probe.id });
 
-    syncProbeGhost(scene, ghost, []);
+    syncProbeGhost(scene, ghost, experiment.probes, []);
 
     const ghostNode = scene.getTransformNodeByName("probeGhost_node")!;
     expect(ghostNode).toBeTruthy();
@@ -109,7 +109,12 @@ describe("syncProbeGhost", () => {
     const { experiment, probe } = makeExperimentWithProbe();
     buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
 
-    syncProbeGhost(scene, makeGhost({ probeId: probe.id }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
 
     const shankMesh = getProbeShankMesh(scene, probe.id);
     expect(shankMesh).toBeTruthy();
@@ -121,12 +126,18 @@ describe("syncProbeGhost", () => {
     const { experiment, probe } = makeExperimentWithProbe();
     buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
 
-    syncProbeGhost(scene, makeGhost({ probeId: probe.id }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
     const firstNode = scene.getTransformNodeByName("probeGhost_node")!;
 
     syncProbeGhost(
       scene,
       makeGhost({ probeId: probe.id, tipPosition: [1, 2, 3] }),
+      experiment.probes,
       []
     );
     const secondNode = scene.getTransformNodeByName("probeGhost_node")!;
@@ -139,6 +150,7 @@ describe("syncProbeGhost", () => {
     syncProbeGhost(
       scene,
       makeGhost({ probeId: probe.id, tipPosition: [4, 5, 6] }),
+      experiment.probes,
       [probe.id]
     );
     const thirdNode = scene.getTransformNodeByName("probeGhost_node")!;
@@ -150,9 +162,14 @@ describe("syncProbeGhost", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
     buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
-    syncProbeGhost(scene, makeGhost({ probeId: probe.id }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
 
-    syncProbeGhost(scene, null, []);
+    syncProbeGhost(scene, null, experiment.probes, []);
 
     expect(scene.getTransformNodeByName("probeGhost_node")).toBeNull();
     expect(scene.getMaterialByName("probeGhost_material")).toBeNull();
@@ -162,12 +179,75 @@ describe("syncProbeGhost", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
     buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
-    syncProbeGhost(scene, makeGhost({ probeId: probe.id }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
 
-    syncProbeGhost(scene, makeGhost({ probeId: "missing-probe" }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: "missing-probe" }),
+      [...experiment.probes, makeProbe({ id: "missing-probe" })],
+      []
+    );
 
     expect(scene.getTransformNodeByName("probeGhost_node")).toBeNull();
     expect(scene.getMaterialByName("probeGhost_material")).toBeNull();
+  });
+
+  it("colors the ghost material with the probe's own color", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#ff0000"
+    });
+    buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
+
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
+
+    const material = scene.getMaterialByName("probeGhost_material");
+    expect(material).toBeInstanceOf(StandardMaterial);
+    expect(
+      (material as StandardMaterial).diffuseColor.equals(
+        Color3.FromHexString("#ff0000")
+      )
+    ).toBe(true);
+    expect((material as StandardMaterial).alpha).toBe(0.35);
+  });
+
+  it("recolors a live ghost when the probe's color changes", () => {
+    const { scene, gizmoManager } = makeTestSceneWithGizmo();
+    const { experiment, probe } = makeExperimentWithProbe({
+      color: "#ff0000"
+    });
+    buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
+
+    probe.color = "#00ff00";
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
+
+    const material = scene.getMaterialByName(
+      "probeGhost_material"
+    ) as StandardMaterial;
+    expect(material.diffuseColor.equals(Color3.FromHexString("#00ff00"))).toBe(
+      true
+    );
   });
 });
 
@@ -176,7 +256,12 @@ describe("disposeProbeGhost", () => {
     const { scene, gizmoManager } = makeTestSceneWithGizmo();
     const { experiment, probe } = makeExperimentWithProbe();
     buildProbe(scene, probe, experiment, gizmoManager, makeProbeGeometry());
-    syncProbeGhost(scene, makeGhost({ probeId: probe.id }), []);
+    syncProbeGhost(
+      scene,
+      makeGhost({ probeId: probe.id }),
+      experiment.probes,
+      []
+    );
 
     disposeProbeGhost(scene);
 

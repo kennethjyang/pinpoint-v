@@ -787,58 +787,6 @@ describe("ProbeInspector", () => {
       expect(probe.tipPosition).toEqual([7, 8, 9]);
       expect(probe.rotation).toEqual([0.1, 0.2, 0.3]);
     });
-
-    it("shows the off-surface warning once when isOnSurface resolves false after a commit", async () => {
-      vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        isInsideBrain: vi.fn(),
-        isOnSurface: vi.fn().mockResolvedValue(false)
-      });
-      const { wrapper, pinia } = mountInspector();
-      const store = useCoordinateSystemLibraryStore(pinia);
-      const surfaceAndDepth = store.library[1]!;
-      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
-        ({ fixed }) => !fixed
-      )!.name;
-
-      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
-        "update:modelValue",
-        surfaceAndDepth.id
-      );
-      await wrapper.vm.$nextTick();
-      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
-      await flushPromises();
-
-      expect(
-        wrapper
-          .findAll(".text-warning")
-          .filter(node => node.text() === t.offSurface)
-      ).toHaveLength(1);
-    });
-
-    it("shows no off-surface warning when isOnSurface resolves null after a commit", async () => {
-      vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        isInsideBrain: vi.fn(),
-        isOnSurface: vi.fn().mockResolvedValue(null)
-      });
-      const { wrapper, pinia } = mountInspector();
-      const store = useCoordinateSystemLibraryStore(pinia);
-      const surfaceAndDepth = store.library[1]!;
-      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
-        ({ fixed }) => !fixed
-      )!.name;
-
-      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
-        "update:modelValue",
-        surfaceAndDepth.id
-      );
-      await wrapper.vm.$nextTick();
-      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
-      await flushPromises();
-
-      expect(wrapper.findAll(".text-warning")).toHaveLength(0);
-    });
   });
 
   describe("inverse kinematics", () => {
@@ -888,6 +836,132 @@ describe("ProbeInspector", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
     }
+
+    it("warns immediately on a one-shot solve when the tip is inside the brain", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn().mockResolvedValue(false)
+      });
+      const { wrapper, pinia } = mountInspector();
+
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+    });
+
+    it("shows no warning when isOnSurface resolves null", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn().mockResolvedValue(null)
+      });
+      const { wrapper, pinia } = mountInspector();
+
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+    });
+
+    it("never verifies the surface outside the brain", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(false),
+        isOnSurface
+      });
+      const { wrapper, store, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.1];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+      expect(isOnSurface).not.toHaveBeenCalled();
+    });
+
+    it("debounces a preview warning across drag frames", async () => {
+      let onSurface: boolean | null = true;
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface: vi.fn(async () => onSurface)
+      });
+      const { wrapper, store, pinia, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      onSurface = false;
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.1];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+    });
+
+    it("clears the warning on a commit without sampling", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: vi.fn(),
+        isInsideBrain: vi.fn().mockResolvedValue(true),
+        isOnSurface
+      });
+      const { wrapper, pinia } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
+      const callCountBeforeCommit = isOnSurface.mock.calls.length;
+
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
+      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(0);
+      expect(isOnSurface).toHaveBeenCalledTimes(callCountBeforeCommit);
+    });
 
     it("reproduces an external pose change in the chain's inputs and leaves the ghost null", async () => {
       const { wrapper, pinia, probe } = mountInspector();
