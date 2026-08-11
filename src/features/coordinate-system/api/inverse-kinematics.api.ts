@@ -15,6 +15,7 @@ import {
 } from "./coordinate-system.api";
 import { solveCoordinateSystemChain } from "./forward-kinematics.api";
 import type { IkGoal, IkJoint, IkLink } from "./closed-chain-ik";
+import type { CoordinateSystemSolution } from "./forward-kinematics.api";
 import type {
   CoordinateSystemNode,
   CoordinateSystemNodeComponent
@@ -75,8 +76,8 @@ interface SolvePassOptions {
   goalQuaternion: Quaternion;
   surfaceIndex: number;
   useSurfaceGoal: boolean;
-  /** Highest node index whose free values may move; free values past it are held at zero. */
-  activeNodeLimit: number;
+  /** Free values this pass may move; every binding outside this set is held at zero. */
+  activeBindings: FreeValueBinding[];
   maximumStarts: number;
   solveCalls: number;
   best: SolvePassBest;
@@ -100,8 +101,11 @@ const SOLVE_CALLS_PER_START = 50;
 /** `solve()` calls one earlier-node stage gets before the full-chain pass takes over. */
 const STAGE_SOLVE_CALLS = 5;
 
-/** Degrees of freedom the tip goal constrains, so the fewest a stage needs to pose a chain alone. */
-const POSE_GOAL_DOF_COUNT = 6;
+/** Central-difference step for the pose Jacobian, in millimeters and radians. */
+const JACOBIAN_STEP = 0.01;
+
+/** Residual fraction of a Jacobian column's own length below which it counts as spanned. */
+const JACOBIAN_RANK_TOLERANCE = 1e-3;
 
 /** Spread of the random restart seed for a position value, in millimeters. */
 const POSITION_SEED_SPREAD_MILLIMETERS = 10;
@@ -158,17 +162,28 @@ export function solveCoordinateSystemChainInverse(
     statuses: []
   };
 
-  // A pinned surface node leaves the nodes past it as the only way to reach the tip, so there is no
-  // redundancy to hand back to the earlier ones.
-  const stageLimits = useSurfaceGoal ? [] : collectStageNodeLimits(bindings);
-  for (const activeNodeLimit of stageLimits) {
+  // A pinned surface node leaves the values past it as the only way to reach the tip, so there is
+  // no redundancy to hand back to the earlier ones.
+  const zeroableBindings = useSurfaceGoal
+    ? []
+    : collectZeroableBindings(
+        buildPoseJacobianColumns(chain, referenceOffsetMillimeters, bindings),
+        bindings
+      );
+  // Every value zeroable at once would leave the solver no DoF to move at all.
+  if (
+    zeroableBindings.length > 0 &&
+    zeroableBindings.length < bindings.length
+  ) {
     const staged = runSolvePass(chain, target, referenceOffsetMillimeters, {
       bindings,
+      activeBindings: bindings.filter(
+        binding => !zeroableBindings.includes(binding)
+      ),
       incomingValues,
       goalQuaternion,
       surfaceIndex,
       useSurfaceGoal,
-      activeNodeLimit,
       maximumStarts: 1,
       solveCalls: STAGE_SOLVE_CALLS,
       best
@@ -182,7 +197,7 @@ export function solveCoordinateSystemChainInverse(
     goalQuaternion,
     surfaceIndex,
     useSurfaceGoal,
-    activeNodeLimit: chain.length - 1,
+    activeBindings: bindings,
     maximumStarts,
     solveCalls: SOLVE_CALLS_PER_START,
     best
@@ -220,7 +235,7 @@ function runSolvePass(
     goalQuaternion,
     surfaceIndex,
     useSurfaceGoal,
-    activeNodeLimit,
+    activeBindings,
     best
   } = options;
   const [targetAp, targetDv, targetMl] = target.tipPosition;
@@ -233,13 +248,13 @@ function runSolvePass(
       start,
       seedRandom,
       incomingValues,
-      activeNodeLimit
+      activeBindings
     );
 
     const tree = buildSolverTree(
       chain,
       referenceOffsetMillimeters,
-      activeNodeLimit
+      activeBindings
     );
 
     const goal: IkGoal = new Goal();
@@ -337,18 +352,134 @@ function collectFreeValueBindings(
 }
 
 /**
- * Node indices to stage a solve at: the last node of each chain prefix holding enough free values
- * to pose the chain alone. The final node never qualifies, since the full-chain pass covers it.
- * @param bindings Free value bindings, grouped by ascending node index.
+ * A solved chain's orientation as a quaternion, rebuilt from its Euler triple so equivalent Euler
+ * branches compare equal.
+ * @param solution Solved chain to convert.
  */
-function collectStageNodeLimits(bindings: FreeValueBinding[]): number[] {
-  const limits: number[] = [];
-  for (let index = 0; index < bindings.length - 1; index++) {
-    if (bindings[index]!.nodeIndex === bindings[index + 1]!.nodeIndex) continue;
-    if (index + 1 >= POSE_GOAL_DOF_COUNT)
-      limits.push(bindings[index]!.nodeIndex);
+function getSolutionQuaternion(solution: CoordinateSystemSolution): Quaternion {
+  return Quaternion.FromRotationMatrix(
+    Matrix.RotationYawPitchRoll(
+      solution.rotation[1],
+      solution.rotation[2],
+      solution.rotation[0]
+    )
+  );
+}
+
+/**
+ * Pose Jacobian of a chain at its current values, one column per free value: the tip position and
+ * orientation rate, by central difference through forward kinematics.
+ * @param chain Transform chain to differentiate, restored to its current values before returning.
+ * @param referenceOffsetMillimeters Root translation in atlas ASR mm, or null for the atlas origin.
+ * @param bindings Free value bindings to differentiate against.
+ */
+function buildPoseJacobianColumns(
+  chain: CoordinateSystemNode[],
+  referenceOffsetMillimeters: [number, number, number] | null,
+  bindings: FreeValueBinding[]
+): number[][] {
+  return bindings.map(binding => {
+    const node = chain[binding.nodeIndex]!;
+    const value = getCoordinateSystemAxisValue(
+      node,
+      binding.component,
+      binding.axis
+    );
+
+    setCoordinateSystemAxisValue(
+      node,
+      binding.component,
+      binding.axis,
+      value + JACOBIAN_STEP
+    );
+    const plus = solveCoordinateSystemChain(chain, referenceOffsetMillimeters);
+    setCoordinateSystemAxisValue(
+      node,
+      binding.component,
+      binding.axis,
+      value - JACOBIAN_STEP
+    );
+    const minus = solveCoordinateSystemChain(chain, referenceOffsetMillimeters);
+    setCoordinateSystemAxisValue(node, binding.component, binding.axis, value);
+
+    const plusRotation = getSolutionQuaternion(plus);
+    const minusRotation = getSolutionQuaternion(minus);
+    // Two nearby poses can rebuild as q and -q, which would read as a half turn instead of a
+    // small step, so align the pair before differencing them.
+    if (Quaternion.Dot(plusRotation, minusRotation) < 0) {
+      plusRotation.scaleInPlace(-1);
+    }
+    const step = plusRotation.multiply(minusRotation.conjugate());
+
+    // A small rotation's vector part is half its rotation vector, so the halves cancel the 2 in
+    // the central-difference denominator.
+    return [
+      (plus.tipPosition[0] - minus.tipPosition[0]) / (2 * JACOBIAN_STEP),
+      (plus.tipPosition[1] - minus.tipPosition[1]) / (2 * JACOBIAN_STEP),
+      (plus.tipPosition[2] - minus.tipPosition[2]) / (2 * JACOBIAN_STEP),
+      step.x / JACOBIAN_STEP,
+      step.y / JACOBIAN_STEP,
+      step.z / JACOBIAN_STEP
+    ];
+  });
+}
+
+/**
+ * Free values a solve may hold at zero: scanning from the chain's last value backwards, every value
+ * whose removal leaves the pose Jacobian's rank unchanged, so the values before it absorb its motion.
+ * @param columns Pose Jacobian columns, index-aligned with `bindings`.
+ * @param bindings Free value bindings the columns were built from.
+ */
+function collectZeroableBindings(
+  columns: number[][],
+  bindings: FreeValueBinding[]
+): FreeValueBinding[] {
+  const kept = bindings.map(() => true);
+  const fullRank = getColumnRank(columns);
+  const zeroable: FreeValueBinding[] = [];
+  for (let index = bindings.length - 1; index >= 0; index--) {
+    kept[index] = false;
+    const remaining = columns.filter((_, column) => kept[column] === true);
+    if (getColumnRank(remaining) === fullRank) {
+      zeroable.push(bindings[index]!);
+    } else {
+      kept[index] = true;
+    }
   }
-  return limits;
+  return zeroable;
+}
+
+/**
+ * Rank of a set of column vectors by modified Gram-Schmidt, treating a column as dependent when its
+ * residual shrinks below `JACOBIAN_RANK_TOLERANCE` of its own length.
+ * @param columns Column vectors, all the same length.
+ */
+function getColumnRank(columns: number[][]): number {
+  const basis: number[][] = [];
+  for (const column of columns) {
+    let length = 0;
+    for (const entry of column) length += entry * entry;
+    length = Math.sqrt(length);
+    if (length === 0) continue;
+
+    const residual = [...column];
+    for (const basisVector of basis) {
+      let projection = 0;
+      for (let row = 0; row < residual.length; row++) {
+        projection += residual[row]! * basisVector[row]!;
+      }
+      for (let row = 0; row < residual.length; row++) {
+        residual[row] = residual[row]! - projection * basisVector[row]!;
+      }
+    }
+
+    let residualLength = 0;
+    for (const entry of residual) residualLength += entry * entry;
+    residualLength = Math.sqrt(residualLength);
+    if (residualLength <= JACOBIAN_RANK_TOLERANCE * length) continue;
+    basis.push(residual.map(entry => entry / residualLength));
+  }
+  return basis.length;
 }
 
 /**
@@ -378,8 +509,7 @@ function snapshotFreeValues(
  * @param random Seeded random source for restarts beyond the zero start.
  * @param incomingValues Each binding's value before this solve began, restored at `start === 0`
  * and used as the restart center from `start >= 2`.
- * @param activeNodeLimit Highest node index whose free values may move; free values past it are
- * seeded to zero.
+ * @param activeBindings Bindings this seed may move; every other binding is seeded to zero.
  */
 function seedFreeValues(
   chain: CoordinateSystemNode[],
@@ -387,13 +517,13 @@ function seedFreeValues(
   start: number,
   random: () => number,
   incomingValues: number[],
-  activeNodeLimit: number
+  activeBindings: FreeValueBinding[]
 ): void {
   for (let index = 0; index < bindings.length; index++) {
     const binding = bindings[index]!;
     const node = chain[binding.nodeIndex]!;
     let value: number;
-    if (binding.nodeIndex > activeNodeLimit) {
+    if (!activeBindings.includes(binding)) {
       value = 0;
     } else if (start === 0) {
       value = incomingValues[index]!;
@@ -429,13 +559,12 @@ function mapSolveStatuses(statuses: number[]): CoordinateSystemSolveStatus {
  * single-axis rotation joint per axis in Y, X, Z order, per node.
  * @param chain Transform chain to mirror.
  * @param referenceOffsetMillimeters Root translation in atlas ASR mm, or null for the atlas origin.
- * @param activeNodeLimit Highest node index whose free values may move; free values past it are
- * baked as fixed.
+ * @param activeBindings Free values that get a solver DoF; every other free value is baked as fixed.
  */
 function buildSolverTree(
   chain: CoordinateSystemNode[],
   referenceOffsetMillimeters: [number, number, number] | null,
-  activeNodeLimit: number
+  activeBindings: FreeValueBinding[]
 ): SolverTree {
   const root: IkLink = new Link();
   if (referenceOffsetMillimeters) {
@@ -449,15 +578,20 @@ function buildSolverTree(
 
   for (let nodeIndex = 0; nodeIndex < chain.length; nodeIndex++) {
     const node = chain[nodeIndex]!;
-    // An inactive free value was seeded to zero, so baking its current value freezes it there.
-    const isNodeActive = nodeIndex <= activeNodeLimit;
 
     const translationJoint: IkJoint = new Joint();
     const freeTranslationAxes: number[] = [];
     const fixedPosition: [number, number, number] = [0, 0, 0];
     for (let axis = 0; axis < 3; axis++) {
       const entry = getCoordinateSystemAxisEntry(node, "position", axis);
-      if (entry.mode === "free" && isNodeActive) {
+      // A value held at zero was seeded to zero, so baking its current value freezes it there.
+      const isActive = activeBindings.some(
+        active =>
+          active.nodeIndex === nodeIndex &&
+          active.component === "position" &&
+          active.axis === axis
+      );
+      if (entry.mode === "free" && isActive) {
         freeTranslationAxes.push(axis);
       } else {
         fixedPosition[axis] = entry.value;
@@ -487,8 +621,14 @@ function buildSolverTree(
 
     for (const axis of ROTATION_AXIS_ORDER) {
       const entry = getCoordinateSystemAxisEntry(node, "rotation", axis);
+      const isActive = activeBindings.some(
+        active =>
+          active.nodeIndex === nodeIndex &&
+          active.component === "rotation" &&
+          active.axis === axis
+      );
       const rotationJoint: IkJoint = new Joint();
-      if (entry.mode !== "free" || !isNodeActive) {
+      if (entry.mode !== "free" || !isActive) {
         const half = entry.value / 2;
         const quaternion: [number, number, number, number] = [
           0,
@@ -548,13 +688,7 @@ function getTargetError(
 
   let error = getAsrDistance(solution.tipPosition, target.tipPosition);
 
-  const solvedRotation = Quaternion.FromRotationMatrix(
-    Matrix.RotationYawPitchRoll(
-      solution.rotation[1],
-      solution.rotation[2],
-      solution.rotation[0]
-    )
-  );
+  const solvedRotation = getSolutionQuaternion(solution);
   error +=
     2 *
     Math.acos(
