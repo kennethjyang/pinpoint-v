@@ -17,11 +17,13 @@ import CommittedInput from "./CommittedInput.vue";
 
 defineOptions({ inheritAttrs: false });
 
-const { tuple, kind } = defineProps<{
+const { tuple, kind, offset } = defineProps<{
   /** Triple to edit in place, in internal [AP, DV, ML] or [roll, yaw, pitch] order. */
   tuple: [number, number, number];
   /** Which atlas triple this row edits, selecting its unit and default labels. */
   kind: AtlasAxisKind;
+  /** Origin the displayed values are relative to, in the stored unit; omitted means the atlas origin. */
+  offset?: [number, number, number];
 }>();
 
 const preferences = usePreferencesStore();
@@ -36,11 +38,15 @@ const models = ([0, 1, 2] as const).map(axis =>
     axis,
     stored =>
       kind === "position"
-        ? millimetersToPositionUnit(stored, preferences.positionUnit)
+        ? millimetersToPositionUnit(
+            stored - (offset?.[axis] ?? 0),
+            preferences.positionUnit
+          )
         : radiansToRotationUnit(stored, preferences.rotationUnit),
     display =>
       kind === "position"
-        ? positionUnitToMillimeters(display, preferences.positionUnit)
+        ? positionUnitToMillimeters(display, preferences.positionUnit) +
+          (offset?.[axis] ?? 0)
         : rotationUnitToRadians(display, preferences.rotationUnit),
     () => preferences.decimalPrecision
   )

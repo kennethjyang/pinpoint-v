@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { VueWrapper } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 import AtlasAxisInputs from "./AtlasAxisInputs.vue";
 import { flushMicrotasks, mountWithQuasar } from "@/test/mount-helper";
 import { usePreferencesStore } from "@/stores/preferences.store";
@@ -107,5 +108,44 @@ describe("AtlasAxisInputs", () => {
       expect(field.props("disable")).toBe(true);
       expect(field.props("outlined")).toBe(true);
     }
+  });
+
+  it("displays position values relative to the given offset", () => {
+    const wrapper = mountWithQuasar(AtlasAxisInputs, {
+      props: { tuple: [10, 20, 30], kind: "position", offset: [1, 2, 3] }
+    });
+
+    expect(fields(wrapper).map(field => field.props("modelValue"))).toEqual([
+      "9.000",
+      "18.000",
+      "27.000"
+    ]);
+  });
+
+  it("writes an edit on an offset field back to the offset stored value", async () => {
+    const tuple: [number, number, number] = [10, 20, 30];
+    const wrapper = mountWithQuasar(AtlasAxisInputs, {
+      props: { tuple, kind: "position", offset: [1, 2, 3] }
+    });
+
+    await editAndBlur(fields(wrapper)[0]!, "5");
+
+    expect(tuple[0]).toBe(6);
+  });
+
+  it("ignores the offset for rotation values", () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    usePreferencesStore().rotationUnit = "radian";
+    const wrapper = mountWithQuasar(AtlasAxisInputs, {
+      pinia,
+      props: { tuple: [1, 2, 3], kind: "rotation", offset: [1, 2, 3] }
+    });
+
+    expect(fields(wrapper).map(field => field.props("modelValue"))).toEqual([
+      "1.000",
+      "2.000",
+      "3.000"
+    ]);
   });
 });
