@@ -61,6 +61,27 @@ interface SolverTree {
   bindings: SolverBinding[];
 }
 
+/** Closest pose one solve has reached, shared across its passes. */
+interface SolvePassBest {
+  error: number;
+  values: number[];
+  statuses: number[];
+}
+
+/** One solver pass over a chain: which nodes may move, its budget, and the shared best pose. */
+interface SolvePassOptions {
+  bindings: FreeValueBinding[];
+  incomingValues: number[];
+  goalQuaternion: Quaternion;
+  surfaceIndex: number;
+  useSurfaceGoal: boolean;
+  /** Highest node index whose free values may move; free values past it are held at zero. */
+  activeNodeLimit: number;
+  maximumStarts: number;
+  solveCalls: number;
+  best: SolvePassBest;
+}
+
 /** Restarts for a live solve: the warm seed only, so an unreachable pose stays responsive. */
 export const PREVIEW_SOLVE_STARTS = 1;
 
@@ -75,6 +96,12 @@ const ROTATION_DOF = [DOF.EX, DOF.EY, DOF.EZ];
 
 /** `solve()` calls per start; each call clears the solver's per-solve DOF locks. */
 const SOLVE_CALLS_PER_START = 50;
+
+/** `solve()` calls one earlier-node stage gets before the full-chain pass takes over. */
+const STAGE_SOLVE_CALLS = 5;
+
+/** Degrees of freedom the tip goal constrains, so the fewest a stage needs to pose a chain alone. */
+const POSE_GOAL_DOF_COUNT = 6;
 
 /** Spread of the random restart seed for a position value, in millimeters. */
 const POSITION_SEED_SPREAD_MILLIMETERS = 10;
@@ -95,7 +122,7 @@ const FAILURE_STATUS_NAMES: Record<number, CoordinateSystemSolveStatus> = {
 };
 
 /**
- * Solve a transform chain's free values so forward kinematics reproduces a target pose.
+ * Solve a transform chain's free values so forward kinematics reproduces a target pose, preferring the earliest nodes that can reach it alone and leaving the free values past them at zero.
  * @param chain Transform chain to solve, mutated in place with the closest result the solver
  * reached even when it does not converge.
  * @param target Pose to solve for.
@@ -115,8 +142,6 @@ export function solveCoordinateSystemChainInverse(
 
   const surfaceIndex = chain.findIndex(node => node.onSurface);
   const useSurfaceGoal = surfaceIndex !== -1 && target.surfacePosition !== null;
-
-  const [targetAp, targetDv, targetMl] = target.tipPosition;
   const goalQuaternion = Quaternion.FromRotationMatrix(
     Matrix.RotationYawPitchRoll(
       target.rotation[1],
@@ -124,25 +149,98 @@ export function solveCoordinateSystemChainInverse(
       target.rotation[0]
     )
   );
-
-  const seedRandom = createSeedRandom();
   // The incoming values are the fallback best, so a solve with no starts -- or one whose every
   // error evaluation is NaN -- still writes back a well-defined chain.
-  const incomingValues = bindings.map(binding =>
-    getCoordinateSystemAxisValue(
+  const incomingValues = snapshotFreeValues(chain, bindings);
+  const best: SolvePassBest = {
+    error: Infinity,
+    values: [...incomingValues],
+    statuses: []
+  };
+
+  // A pinned surface node leaves the nodes past it as the only way to reach the tip, so there is no
+  // redundancy to hand back to the earlier ones.
+  const stageLimits = useSurfaceGoal ? [] : collectStageNodeLimits(bindings);
+  for (const activeNodeLimit of stageLimits) {
+    const staged = runSolvePass(chain, target, referenceOffsetMillimeters, {
+      bindings,
+      incomingValues,
+      goalQuaternion,
+      surfaceIndex,
+      useSurfaceGoal,
+      activeNodeLimit,
+      maximumStarts: 1,
+      solveCalls: STAGE_SOLVE_CALLS,
+      best
+    });
+    if (staged === "converged") return "converged";
+  }
+
+  const status = runSolvePass(chain, target, referenceOffsetMillimeters, {
+    bindings,
+    incomingValues,
+    goalQuaternion,
+    surfaceIndex,
+    useSurfaceGoal,
+    activeNodeLimit: chain.length - 1,
+    maximumStarts,
+    solveCalls: SOLVE_CALLS_PER_START,
+    best
+  });
+  if (status === "converged") return "converged";
+
+  for (let index = 0; index < bindings.length; index++) {
+    const binding = bindings[index]!;
+    setCoordinateSystemAxisValue(
       chain[binding.nodeIndex]!,
       binding.component,
-      binding.axis
-    )
-  );
-  let bestValues = [...incomingValues];
-  let bestError = Infinity;
-  let bestStatuses: number[] = [];
+      binding.axis,
+      best.values[index]!
+    );
+  }
+  return mapSolveStatuses(best.statuses);
+}
 
-  for (let start = 0; start < maximumStarts; start++) {
-    seedFreeValues(chain, bindings, start, seedRandom, incomingValues);
+/**
+ * Run one solver pass over a chain, keeping the closest pose it reaches in `options.best`.
+ * @param chain Transform chain to solve, mutated in place.
+ * @param target Pose to solve for.
+ * @param referenceOffsetMillimeters Root translation in atlas ASR mm, or null for the atlas origin.
+ * @param options Which nodes may move, the pass's budget, and the shared best pose.
+ */
+function runSolvePass(
+  chain: CoordinateSystemNode[],
+  target: CoordinateSystemTarget,
+  referenceOffsetMillimeters: [number, number, number] | null,
+  options: SolvePassOptions
+): "converged" | null {
+  const {
+    bindings,
+    incomingValues,
+    goalQuaternion,
+    surfaceIndex,
+    useSurfaceGoal,
+    activeNodeLimit,
+    best
+  } = options;
+  const [targetAp, targetDv, targetMl] = target.tipPosition;
+  const seedRandom = createSeedRandom();
 
-    const tree = buildSolverTree(chain, referenceOffsetMillimeters);
+  for (let start = 0; start < options.maximumStarts; start++) {
+    seedFreeValues(
+      chain,
+      bindings,
+      start,
+      seedRandom,
+      incomingValues,
+      activeNodeLimit
+    );
+
+    const tree = buildSolverTree(
+      chain,
+      referenceOffsetMillimeters,
+      activeNodeLimit
+    );
 
     const goal: IkGoal = new Goal();
     goal.setPosition(targetMl, targetDv, targetAp);
@@ -178,18 +276,12 @@ export function solveCoordinateSystemChainInverse(
       surfaceIndex,
       goalQuaternion
     );
-    if (seedError < bestError) {
-      bestError = seedError;
-      bestValues = bindings.map(binding =>
-        getCoordinateSystemAxisValue(
-          chain[binding.nodeIndex]!,
-          binding.component,
-          binding.axis
-        )
-      );
+    if (seedError < best.error) {
+      best.error = seedError;
+      best.values = snapshotFreeValues(chain, bindings);
     }
 
-    for (let call = 0; call < SOLVE_CALLS_PER_START; call++) {
+    for (let call = 0; call < options.solveCalls; call++) {
       const statuses = solver.solve();
       for (const binding of tree.bindings) {
         setCoordinateSystemAxisValue(
@@ -207,16 +299,10 @@ export function solveCoordinateSystemChainInverse(
         surfaceIndex,
         goalQuaternion
       );
-      if (error < bestError) {
-        bestError = error;
-        bestStatuses = statuses;
-        bestValues = bindings.map(binding =>
-          getCoordinateSystemAxisValue(
-            chain[binding.nodeIndex]!,
-            binding.component,
-            binding.axis
-          )
-        );
+      if (error < best.error) {
+        best.error = error;
+        best.statuses = statuses;
+        best.values = snapshotFreeValues(chain, bindings);
       }
 
       if (statuses.every(status => status === SOLVE_STATUS.CONVERGED)) {
@@ -224,17 +310,7 @@ export function solveCoordinateSystemChainInverse(
       }
     }
   }
-
-  for (let index = 0; index < bindings.length; index++) {
-    const binding = bindings[index]!;
-    setCoordinateSystemAxisValue(
-      chain[binding.nodeIndex]!,
-      binding.component,
-      binding.axis,
-      bestValues[index]!
-    );
-  }
-  return mapSolveStatuses(bestStatuses);
+  return null;
 }
 
 /**
@@ -261,6 +337,39 @@ function collectFreeValueBindings(
 }
 
 /**
+ * Node indices to stage a solve at: the last node of each chain prefix holding enough free values
+ * to pose the chain alone. The final node never qualifies, since the full-chain pass covers it.
+ * @param bindings Free value bindings, grouped by ascending node index.
+ */
+function collectStageNodeLimits(bindings: FreeValueBinding[]): number[] {
+  const limits: number[] = [];
+  for (let index = 0; index < bindings.length - 1; index++) {
+    if (bindings[index]!.nodeIndex === bindings[index + 1]!.nodeIndex) continue;
+    if (index + 1 >= POSE_GOAL_DOF_COUNT)
+      limits.push(bindings[index]!.nodeIndex);
+  }
+  return limits;
+}
+
+/**
+ * Read every free value a chain's bindings address, index-aligned with them.
+ * @param chain Transform chain to read.
+ * @param bindings Free value bindings to read.
+ */
+function snapshotFreeValues(
+  chain: CoordinateSystemNode[],
+  bindings: FreeValueBinding[]
+): number[] {
+  return bindings.map(binding =>
+    getCoordinateSystemAxisValue(
+      chain[binding.nodeIndex]!,
+      binding.component,
+      binding.axis
+    )
+  );
+}
+
+/**
  * Seed a chain's free values for one solve start: the incoming values restored, zero, or a
  * random value centered on the incoming one.
  * @param chain Transform chain to seed, mutated in place.
@@ -269,19 +378,24 @@ function collectFreeValueBindings(
  * @param random Seeded random source for restarts beyond the zero start.
  * @param incomingValues Each binding's value before this solve began, restored at `start === 0`
  * and used as the restart center from `start >= 2`.
+ * @param activeNodeLimit Highest node index whose free values may move; free values past it are
+ * seeded to zero.
  */
 function seedFreeValues(
   chain: CoordinateSystemNode[],
   bindings: FreeValueBinding[],
   start: number,
   random: () => number,
-  incomingValues: number[]
+  incomingValues: number[],
+  activeNodeLimit: number
 ): void {
   for (let index = 0; index < bindings.length; index++) {
     const binding = bindings[index]!;
     const node = chain[binding.nodeIndex]!;
     let value: number;
-    if (start === 0) {
+    if (binding.nodeIndex > activeNodeLimit) {
+      value = 0;
+    } else if (start === 0) {
       value = incomingValues[index]!;
     } else if (start === 1) {
       value = 0;
@@ -315,10 +429,13 @@ function mapSolveStatuses(statuses: number[]): CoordinateSystemSolveStatus {
  * single-axis rotation joint per axis in Y, X, Z order, per node.
  * @param chain Transform chain to mirror.
  * @param referenceOffsetMillimeters Root translation in atlas ASR mm, or null for the atlas origin.
+ * @param activeNodeLimit Highest node index whose free values may move; free values past it are
+ * baked as fixed.
  */
 function buildSolverTree(
   chain: CoordinateSystemNode[],
-  referenceOffsetMillimeters: [number, number, number] | null
+  referenceOffsetMillimeters: [number, number, number] | null,
+  activeNodeLimit: number
 ): SolverTree {
   const root: IkLink = new Link();
   if (referenceOffsetMillimeters) {
@@ -332,13 +449,15 @@ function buildSolverTree(
 
   for (let nodeIndex = 0; nodeIndex < chain.length; nodeIndex++) {
     const node = chain[nodeIndex]!;
+    // An inactive free value was seeded to zero, so baking its current value freezes it there.
+    const isNodeActive = nodeIndex <= activeNodeLimit;
 
     const translationJoint: IkJoint = new Joint();
     const freeTranslationAxes: number[] = [];
     const fixedPosition: [number, number, number] = [0, 0, 0];
     for (let axis = 0; axis < 3; axis++) {
       const entry = getCoordinateSystemAxisEntry(node, "position", axis);
-      if (entry.mode === "free") {
+      if (entry.mode === "free" && isNodeActive) {
         freeTranslationAxes.push(axis);
       } else {
         fixedPosition[axis] = entry.value;
@@ -369,7 +488,7 @@ function buildSolverTree(
     for (const axis of ROTATION_AXIS_ORDER) {
       const entry = getCoordinateSystemAxisEntry(node, "rotation", axis);
       const rotationJoint: IkJoint = new Joint();
-      if (entry.mode !== "free") {
+      if (entry.mode !== "free" || !isNodeActive) {
         const half = entry.value / 2;
         const quaternion: [number, number, number, number] = [
           0,
