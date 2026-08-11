@@ -477,6 +477,15 @@ describe("isCoordinateSystem", () => {
 
     expect(isCoordinateSystem(coordinateSystem)).toBe(false);
   });
+
+  it("rejects an id that could pollute a prototype chain", () => {
+    const coordinateSystem = {
+      ...buildCoordinateSystem("CCF", [makeNode()]),
+      id: "__proto__"
+    };
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(false);
+  });
 });
 
 describe("getCoordinateSystemValueAxis", () => {

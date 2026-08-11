@@ -4,7 +4,7 @@ import type {
   CoordinateSystemNodeComponent,
   CoordinateSystemValue
 } from "../model/coordinate-system.model";
-import { isFiniteNumber, isRecord } from "@/utils/type-guards";
+import { isFiniteNumber, isRecord, isSafeObjectKey } from "@/utils/type-guards";
 
 /**
  * Build an adjustable coordinate system value.
@@ -380,6 +380,7 @@ export function isCoordinateSystem(value: unknown): value is CoordinateSystem {
     value.inspectableKind === "coordinateSystem" &&
     typeof value.id === "string" &&
     value.id.length > 0 &&
+    isSafeObjectKey(value.id) &&
     typeof value.name === "string" &&
     typeof value.offsetByReferenceCoordinate === "boolean" &&
     Array.isArray(value.chain) &&

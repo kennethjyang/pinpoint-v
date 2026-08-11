@@ -21,7 +21,12 @@ const DEFAULT_REFERENCE_COORDINATE_OVERRIDES: Record<
 export function buildInitialReferenceCoordinate(
   atlas: Atlas
 ): [number, number, number] {
-  const override = DEFAULT_REFERENCE_COORDINATE_OVERRIDES[atlas.name];
+  const override = Object.hasOwn(
+    DEFAULT_REFERENCE_COORDINATE_OVERRIDES,
+    atlas.name
+  )
+    ? DEFAULT_REFERENCE_COORDINATE_OVERRIDES[atlas.name]
+    : undefined;
   if (override) return [...override];
 
   const [ap, , ml] = getAtlasCenter(atlas);
