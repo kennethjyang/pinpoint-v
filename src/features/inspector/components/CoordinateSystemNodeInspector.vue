@@ -195,7 +195,9 @@ function openValues(component: CoordinateSystemNodeComponent): void {
 .summary-label
   flex: 0 0 auto
   min-width: 5rem
-// Each variable value gets its own row instead of a comma-separated run-on line.
+// Each variable value gets its own row instead of a comma-separated run-on line, tightened so
+// the line break doesn't read as a blank line.
 .value-summary-btn :deep(.block)
+  line-height: 1.2
   white-space: pre-line
 </style>
