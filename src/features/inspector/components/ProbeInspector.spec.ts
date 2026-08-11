@@ -36,7 +36,8 @@ import {
 import {
   getProbeContour,
   getProbeInterfaceDisplayName,
-  getProbeInterfaceIdentifier
+  getProbeInterfaceIdentifier,
+  type Probe
 } from "@/features/probe";
 import { useProbeSurface, type ProbeSurfaceTargets } from "@/features/slice";
 import { canLoadModelFile, putSceneModel } from "@/features/scene";
@@ -188,6 +189,26 @@ function makeFileList(file: File): FileList {
   return { 0: file, length: 1, item: () => file } as unknown as FileList;
 }
 
+/** `findTargets` resolving an entry point: the probe's shank crosses the brain. */
+function findTargetsCrossingBrain(
+  insideMillimeters: [number, number, number] = [1, 2, 3]
+) {
+  return vi.fn().mockResolvedValue({
+    insideMillimeters,
+    axisMillimeters: null,
+    dorsoventralMillimeters: null
+  } satisfies ProbeSurfaceTargets);
+}
+
+/** `findTargets` resolving no entry point: the probe's shank misses the brain. */
+function findTargetsMissingBrain() {
+  return vi.fn().mockResolvedValue({
+    insideMillimeters: null,
+    axisMillimeters: [1, 2, 3],
+    dorsoventralMillimeters: null
+  } satisfies ProbeSurfaceTargets);
+}
+
 function fieldByLabel(wrapper: VueWrapper, label: string) {
   return wrapper
     .findAllComponents({ name: "QInput" })
@@ -237,7 +258,7 @@ describe("ProbeInspector", () => {
     vi.mocked(solveCoordinateSystemChainInverse).mockReset();
     vi.mocked(useProbeSurface).mockReturnValue({
       findTargets: vi.fn(),
-      findSurfaceEntry: vi.fn().mockResolvedValue(null)
+      isOnSurface: vi.fn()
     });
     openModelFileDialogSpy.mockReset();
     capturedOnModelFileChange = null;
@@ -852,10 +873,94 @@ describe("ProbeInspector", () => {
       await flushPromises();
     }
 
-    it("warns on a one-shot solve when the chain cannot put the surface node at the entry point", async () => {
+    it("solves a drag frame against the pose its surface sample was taken from", async () => {
+      let reactiveProbe: Probe | null = null;
+      let activePinia: Pinia | null = null;
+      let sampledTip: [number, number, number] = [0, 0, 0];
+      // The mutation fires once: it simulates a single drag frame landing while the first
+      // sampling is in flight, not a fresh drag frame on every subsequent march.
+      let hasLanded = false;
+      const findTargets = vi.fn(async () => {
+        if (!hasLanded) {
+          hasLanded = true;
+          sampledTip = [...reactiveProbe!.tipPosition];
+          // A drag frame landing while this sampling is in flight.
+          useCurrentExperimentStore(activePinia!).draggedProbeId =
+            reactiveProbe!.id;
+          reactiveProbe!.tipPosition = [9, 9, 9];
+        }
+        return {
+          insideMillimeters: [1, 2, 3],
+          axisMillimeters: null,
+          dorsoventralMillimeters: null
+        } satisfies ProbeSurfaceTargets;
+      });
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+        findTargets,
+        isOnSurface: vi.fn().mockResolvedValue(true)
+      });
+      const mounted = mountInspector();
+      reactiveProbe = mounted.probe;
+      activePinia = mounted.pinia;
+
+      await selectMultiNodeSystem(mounted.wrapper, mounted.pinia);
+
+      expect(reactiveProbe.tipPosition).toEqual([9, 9, 9]);
+      expect(
+        vi.mocked(solveCoordinateSystemChainInverse).mock.calls[0]![1]
+          .tipPosition
+      ).toEqual(sampledTip);
+    });
+
+    it("pins the surface node to the marched entry point with the tip pushed past it, and draws no ghost", async () => {
+      const findTargets = vi.fn().mockResolvedValue(null);
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets,
+        isOnSurface: vi.fn().mockResolvedValue(true)
+      });
+      const { wrapper, pinia, store, probe } = mountInspector();
+      await selectMultiNodeSystem(wrapper, pinia);
+      // No entry point yet, so nothing is pinned and nothing is marked.
+      expect(store.probeSurfaceMarker).toBeNull();
+
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ mode }) => mode !== "fixed"
+      )!.name;
+      await editAndBlur(fieldByLabel(wrapper, depthValueName), "5");
+      await flushPromises();
+
+      // This chain always solves its surface node onto the probe's axis, 5 mm up the shank, so its
+      // current position is the kind of point the entry-point march returns.
+      const entryPoint = solveDisplayedChain(wrapper, pinia).nodePositions[0]!;
+      findTargets.mockResolvedValue({
+        insideMillimeters: entryPoint,
+        axisMillimeters: null,
+        dorsoventralMillimeters: null
+      } satisfies ProbeSurfaceTargets);
+      // Drive the tip 10 mm further along the shank, past the entry point's far side: the old
+      // in-brain gate dropped the goal here, while the entry point above the tip stays reachable.
+      probe.tipPosition = probe.tipPosition.map(
+        (value, index) => 3 * value - 2 * entryPoint[index]!
+      ) as [number, number, number];
+      await flushPromises();
+
+      expect(
+        vi.mocked(solveCoordinateSystemChainInverse).mock.calls.at(-1)![1]
+          .surfacePosition
+      ).toEqual(entryPoint);
+      expect(store.probeGhost).toBeNull();
+      expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+      store.probeSurfaceMarker!.position.forEach((value, index) => {
+        expect(value).toBeCloseTo(entryPoint[index]!, 3);
+      });
+    });
+
+    it("warns immediately on a one-shot solve when the probe crosses the brain", async () => {
+      vi.mocked(useProbeSurface).mockReturnValue({
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn().mockResolvedValue(false)
       });
       const { wrapper, pinia } = mountInspector();
 
@@ -868,10 +973,10 @@ describe("ProbeInspector", () => {
       ).toHaveLength(1);
     });
 
-    it("shows no warning when the probe has no entry point", async () => {
+    it("shows no warning when isOnSurface resolves null", async () => {
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn().mockResolvedValue(null)
       });
       const { wrapper, pinia } = mountInspector();
 
@@ -884,11 +989,11 @@ describe("ProbeInspector", () => {
       ).toHaveLength(0);
     });
 
-    it("leaves the IK surface goal null and never warns when the probe has no entry point", async () => {
-      const findSurfaceEntry = vi.fn().mockResolvedValue(null);
+    it("never verifies the surface when the probe misses the brain", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry
+        findTargets: findTargetsMissingBrain(),
+        isOnSurface
       });
       const { wrapper, store, pinia, probe } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
@@ -906,47 +1011,46 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(0);
-      expect(
-        vi
-          .mocked(solveCoordinateSystemChainInverse)
-          .mock.calls.every(([, target]) => target.surfacePosition === null)
-      ).toBe(true);
+      expect(isOnSurface).not.toHaveBeenCalled();
     });
 
-    it("hands the entry point to the solver as its surface goal", async () => {
+    it("debounces a preview warning across drag frames", async () => {
+      let onSurface: boolean | null = true;
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([1, 0, 0])
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn(async () => onSurface)
       });
-      const { wrapper, pinia } = mountInspector();
-
+      const { wrapper, store, pinia, probe } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
 
-      const calls = vi.mocked(solveCoordinateSystemChainInverse).mock.calls;
-      expect(calls.at(-1)![1].surfacePosition).toEqual([1, 0, 0]);
-    });
-
-    it("raises no warning once the solve reaches the entry point", async () => {
-      vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([1, 0, 0])
-      });
-      const { wrapper, pinia } = mountInspector();
-
-      await selectMultiNodeSystem(wrapper, pinia);
+      onSurface = false;
+      store.draggedProbeId = probe.id;
+      probe.rotation = [0, 0, 0.1];
+      await flushPromises();
+      probe.rotation = [0, 0, 0.2];
+      await flushPromises();
 
       expect(
         wrapper
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(0);
+
+      probe.rotation = [0, 0, 0.3];
+      await flushPromises();
+
+      expect(
+        wrapper
+          .findAll(".text-warning")
+          .filter(node => node.text() === t.offSurface)
+      ).toHaveLength(1);
     });
 
-    it("re-verifies on a commit, keeping the warning when the entry point stays unreachable", async () => {
-      const findSurfaceEntry = vi.fn().mockResolvedValue([1, 2, 3]);
+    it("re-verifies on a commit while the probe crosses the brain, keeping the warning", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface
       });
       const { wrapper, pinia } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
@@ -956,7 +1060,7 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(1);
-      const callCountBeforeCommit = findSurfaceEntry.mock.calls.length;
+      const callCountBeforeCommit = isOnSurface.mock.calls.length;
 
       const surfaceAndDepth =
         useCoordinateSystemLibraryStore(pinia).library[1]!;
@@ -971,16 +1075,17 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(1);
-      expect(findSurfaceEntry.mock.calls.length).toBeGreaterThan(
+      expect(isOnSurface.mock.calls.length).toBeGreaterThan(
         callCountBeforeCommit
       );
     });
 
-    it("clears the warning on a commit once the probe has no entry point", async () => {
-      let entry: [number, number, number] | null = [1, 2, 3];
+    it("clears the warning on a commit once the probe stops crossing the brain, without sampling", async () => {
+      const findTargets = findTargetsCrossingBrain();
+      const isOnSurface = vi.fn().mockResolvedValue(false);
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn(async () => entry)
+        findTargets,
+        isOnSurface
       });
       const { wrapper, pinia } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
@@ -990,8 +1095,13 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(1);
+      const callCountBeforeCommit = isOnSurface.mock.calls.length;
 
-      entry = null;
+      findTargets.mockResolvedValue({
+        insideMillimeters: null,
+        axisMillimeters: [1, 2, 3],
+        dorsoventralMillimeters: null
+      });
       const surfaceAndDepth =
         useCoordinateSystemLibraryStore(pinia).library[1]!;
       const depthValueName = surfaceAndDepth.chain[1]!.position.find(
@@ -1005,6 +1115,7 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(0);
+      expect(isOnSurface).toHaveBeenCalledTimes(callCountBeforeCommit);
     });
 
     it("reproduces an external pose change in the chain's inputs and leaves the ghost null", async () => {
@@ -1214,14 +1325,13 @@ describe("ProbeInspector", () => {
     it("re-runs the preview solve for the newest pose when a drag frame lands mid-solve", async () => {
       const openGates: Array<() => void> = [];
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: () => {
-          const { promise, resolve } = Promise.withResolvers<
-            [number, number, number] | null
-          >();
+        findTargets: () => {
+          const { promise, resolve } =
+            Promise.withResolvers<ProbeSurfaceTargets | null>();
           openGates.push(() => resolve(null));
           return promise;
-        }
+        },
+        isOnSurface: vi.fn()
       });
       const { wrapper, store, pinia, probe } = mountInspector();
       await selectMultiNodeSystem(wrapper, pinia);
@@ -1276,14 +1386,13 @@ describe("ProbeInspector", () => {
 
       const openGates: Array<() => void> = [];
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: () => {
-          const { promise, resolve } = Promise.withResolvers<
-            [number, number, number] | null
-          >();
+        findTargets: () => {
+          const { promise, resolve } =
+            Promise.withResolvers<ProbeSurfaceTargets | null>();
           openGates.push(() => resolve(null));
           return promise;
-        }
+        },
+        isOnSurface: vi.fn()
       });
 
       const wrapper = mountWithQuasar(ProbeInspector, {
@@ -1452,8 +1561,8 @@ describe("ProbeInspector", () => {
 
     it("keeps the off-surface warning visible for a surface node whose values are all fixed", async () => {
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn().mockResolvedValue(false)
       });
       const { wrapper, store, probe } = mountInspector();
       const fixedSurfaceNode = buildCoordinateSystemNode(
@@ -1505,8 +1614,8 @@ describe("ProbeInspector", () => {
     describe("surface marker", () => {
       it("publishes the surface node's solved position after selecting a multi-node system", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+          findTargets: findTargetsCrossingBrain(),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store, probe } = mountInspector();
 
@@ -1519,10 +1628,10 @@ describe("ProbeInspector", () => {
         });
       });
 
-      it("moves the marker's position when the surface node's AP field is edited, keeping the probeId", async () => {
+      it("moves the marker through a forward-kinematics edit of the surface node's AP field, keeping the probeId", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+          findTargets: findTargetsCrossingBrain(),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
@@ -1534,10 +1643,10 @@ describe("ProbeInspector", () => {
         expect(store.probeSurfaceMarker?.position).not.toEqual(before);
       });
 
-      it("keeps the marker null when the probe does not cross the brain", async () => {
+      it("hides the marker when the probe does not cross the brain", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue(null)
+          findTargets: findTargetsMissingBrain(),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store } = mountInspector();
 
@@ -1546,27 +1655,31 @@ describe("ProbeInspector", () => {
         expect(store.probeSurfaceMarker).toBeNull();
       });
 
-      it("clears a visible marker once the probe stops crossing the brain", async () => {
-        const findSurfaceEntry = vi.fn().mockResolvedValue([1, 2, 3]);
+      it("hides the marker once the probe stops crossing the brain", async () => {
+        const findTargets = findTargetsCrossingBrain();
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry
+          findTargets,
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
         expect(store.probeSurfaceMarker).not.toBeNull();
 
-        findSurfaceEntry.mockResolvedValue(null);
+        findTargets.mockResolvedValue({
+          insideMillimeters: null,
+          axisMillimeters: [1, 2, 3],
+          dorsoventralMillimeters: null
+        });
         probe.tipPosition = [9, 9, 9];
         await flushPromises();
 
         expect(store.probeSurfaceMarker).toBeNull();
       });
 
-      it("keeps the marker null when findSurfaceEntry resolves null (annotation volume unavailable)", async () => {
+      it("leaves the marker null when the annotation volume is unavailable", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue(null)
+          findTargets: vi.fn().mockResolvedValue(null),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store } = mountInspector();
 
@@ -1583,8 +1696,8 @@ describe("ProbeInspector", () => {
 
       it("clears the marker on unmount", async () => {
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+          findTargets: findTargetsCrossingBrain(),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, store } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
@@ -1596,29 +1709,30 @@ describe("ProbeInspector", () => {
       });
 
       it("marches once for the solve and once for the commit re-check on an external pose change", async () => {
-        const findSurfaceEntry = vi.fn().mockResolvedValue([1, 2, 3]);
+        const findTargets = findTargetsCrossingBrain();
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry
+          findTargets,
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { wrapper, pinia, probe } = mountInspector();
         await selectMultiNodeSystem(wrapper, pinia);
-        const before = findSurfaceEntry.mock.calls.length;
+        const before = findTargets.mock.calls.length;
 
         probe.tipPosition = [9, 9, 9];
         await flushPromises();
 
-        expect(findSurfaceEntry.mock.calls.length).toBe(before + 2);
+        expect(findTargets.mock.calls.length).toBe(before + 2);
       });
 
-      it("gates the marker on the direct path when the shank crosses the brain", async () => {
+      it("publishes the marker on the direct path after one surface march", async () => {
+        const findTargets = vi.fn().mockResolvedValue({
+          insideMillimeters: [1, 2, 3],
+          axisMillimeters: null,
+          dorsoventralMillimeters: null
+        });
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn().mockResolvedValue({
-            insideMillimeters: [1, 2, 3],
-            axisMillimeters: null,
-            dorsoventralMillimeters: null
-          }),
-          findSurfaceEntry: vi.fn()
+          findTargets,
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
         const { store, probe } = mountInspector();
 
@@ -1626,6 +1740,7 @@ describe("ProbeInspector", () => {
           store.experiment,
           probe,
           makeCoordinateSystem({
+            offsetByReferenceCoordinate: true,
             id: "surface-tip",
             name: "Surface Tip",
             chain: [
@@ -1652,6 +1767,7 @@ describe("ProbeInspector", () => {
 
         expect(store.probeSurfaceMarker).not.toBeNull();
         expect(store.probeSurfaceMarker?.probeId).toBe(probe.id);
+        expect(findTargets).toHaveBeenCalledTimes(1);
       });
 
       it("hides a stale marker immediately on a probe swap, before the new probe has marched", async () => {
@@ -1674,8 +1790,8 @@ describe("ProbeInspector", () => {
           coordinateSystemLibrary.library[1]!
         );
         vi.mocked(useProbeSurface).mockReturnValue({
-          findTargets: vi.fn(),
-          findSurfaceEntry: vi.fn().mockResolvedValue([1, 2, 3])
+          findTargets: findTargetsCrossingBrain(),
+          isOnSurface: vi.fn().mockResolvedValue(true)
         });
 
         const wrapper = mountWithQuasar(ProbeInspector, {
@@ -1726,10 +1842,10 @@ describe("ProbeInspector", () => {
       });
     }
 
-    it("warns at once when the tip is not at the entry point", async () => {
+    it("warns at once when selected while the probe crosses the brain", async () => {
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([1, 0, 0])
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn().mockResolvedValue(false)
       });
       const { wrapper, store, probe } = mountInspector();
 
@@ -1743,27 +1859,11 @@ describe("ProbeInspector", () => {
       ).toHaveLength(1);
     });
 
-    it("shows no warning when the tip is the entry point", async () => {
+    it("never samples the surface when the probe misses the brain across drag frames", async () => {
+      const isOnSurface = vi.fn().mockResolvedValue(false);
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue([0, 0, 0])
-      });
-      const { wrapper, store, probe } = mountInspector();
-
-      setProbeCoordinateSystem(store.experiment, probe, buildSurfaceTip());
-      await flushPromises();
-
-      expect(
-        wrapper
-          .findAll(".text-warning")
-          .filter(node => node.text() === t.offSurface)
-      ).toHaveLength(0);
-    });
-
-    it("never warns across drag frames when the probe has no entry point", async () => {
-      vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        findTargets: findTargetsMissingBrain(),
+        isOnSurface
       });
       const { wrapper, store, probe } = mountInspector();
 
@@ -1783,20 +1883,21 @@ describe("ProbeInspector", () => {
           .findAll(".text-warning")
           .filter(node => node.text() === t.offSurface)
       ).toHaveLength(0);
+      expect(isOnSurface).not.toHaveBeenCalled();
     });
 
     it("debounces a preview warning across drag frames on the direct path", async () => {
-      let entry: [number, number, number] | null = [0, 0, 0];
+      let onSurface: boolean | null = true;
       vi.mocked(useProbeSurface).mockReturnValue({
-        findTargets: vi.fn(),
-        findSurfaceEntry: vi.fn(async () => entry)
+        findTargets: findTargetsCrossingBrain(),
+        isOnSurface: vi.fn(async () => onSurface)
       });
       const { wrapper, store, probe } = mountInspector();
 
       setProbeCoordinateSystem(store.experiment, probe, buildSurfaceTip());
       await flushPromises();
 
-      entry = [1, 0, 0];
+      onSurface = false;
       store.draggedProbeId = probe.id;
       probe.rotation = [0, 0, 0.1];
       await flushPromises();
@@ -2014,7 +2115,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector();
 
@@ -2033,7 +2134,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector(
         makeProbe({ tipPosition: [7, 8, 9] })
@@ -2058,7 +2159,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, store, probe } = mountInspector();
 
@@ -2077,7 +2178,7 @@ describe("ProbeInspector", () => {
       } satisfies ProbeSurfaceTargets);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
@@ -2099,7 +2200,7 @@ describe("ProbeInspector", () => {
       const findTargets = vi.fn().mockResolvedValue(null);
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
@@ -2127,7 +2228,7 @@ describe("ProbeInspector", () => {
       );
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper } = mountInspector();
       const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
@@ -2155,7 +2256,7 @@ describe("ProbeInspector", () => {
       });
       vi.mocked(useProbeSurface).mockReturnValue({
         findTargets,
-        findSurfaceEntry: vi.fn().mockResolvedValue(null)
+        isOnSurface: vi.fn()
       });
       const { wrapper, probe } = mountInspector(
         makeProbe({ tipPosition: [1, 2, 3] })
