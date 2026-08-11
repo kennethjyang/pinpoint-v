@@ -134,14 +134,14 @@ describe("useCoordinateSystemLibraryStore", () => {
       });
     });
 
-    it("carries the X/Y/Z position values on the pre-depth NewScale MIS node", () => {
+    it("bounds the X/Y/Z position values on the pre-depth NewScale MIS node to -7.5 to 7.5", () => {
       const store = useCoordinateSystemLibraryStore();
       const position = store.library[2]!.chain[3]!.position;
 
       expect(position.map(({ name }) => name)).toEqual(["X", "Y", "Z"]);
       for (const value of position) {
         expect(value.fixed).toBe(false);
-        expect(value.bounds).toBeNull();
+        expect(value.bounds).toEqual([-7.5, 7.5]);
       }
     });
 
