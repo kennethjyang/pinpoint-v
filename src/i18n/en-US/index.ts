@@ -180,11 +180,9 @@ export default {
     deleteCoordinateSystem: 'Delete "{name}"',
     confirmDelete: 'Are you sure you wish to delete "{name}"?',
     delete: "Delete",
-    cancel: "Cancel",
     close: "Close",
     dragToReorder: "Drag to reorder",
-    defaultPinned:
-      "The default coordinate system always stays first and cannot be edited or deleted."
+    confirmDeleteTitle: "Delete Coordinate System"
   },
   modelFile: {
     invalidModelFile: "Unable to import that 3D model.",
@@ -213,6 +211,7 @@ export default {
     name: "Name",
     probeType: "Probe Type",
     coordinateSystem: "Coordinate System",
+    defaultCoordinateSystem: "Default",
     transformValue: "{transform} {name}",
     offSurface: "Not on the brain surface.",
     position: "Position",
@@ -260,7 +259,8 @@ export default {
     copy: "Duplicate 3D object",
     lock: "Lock 3D object",
     unlock: "Unlock 3D object",
-    collisionDetection: "Collision detection"
+    collisionDetection: "Collision detection",
+    relativeToReferenceCoordinate: "Relative to reference coordinate"
   },
   cameraInspector: {
     poseName: "Pose name",

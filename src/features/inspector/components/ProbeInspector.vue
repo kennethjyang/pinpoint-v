@@ -1,5 +1,13 @@
 <script lang="ts" setup>
-import { computed, onUnmounted, ref, toRaw, watch, watchEffect } from "vue";
+import {
+  computed,
+  nextTick,
+  onUnmounted,
+  ref,
+  toRaw,
+  watch,
+  watchEffect
+} from "vue";
 import { useI18n } from "vue-i18n";
 import {
   copyProbe,
@@ -45,6 +53,7 @@ import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-libr
 import { useValidationRules } from "@/composable/useValidationRules";
 import { useNotify } from "@/composable/useNotify";
 import CommittedInput from "@/components/CommittedInput.vue";
+import AtlasAxisInputs from "@/components/AtlasAxisInputs.vue";
 
 // A library probe's identifier paired with its display label. `emit-value`
 // keeps the model the identifier, which `findProbeInterfaceProbeByIdentifier`
@@ -62,11 +71,11 @@ interface ShankAlignmentOption {
   attrs: { "aria-label": string };
 }
 
-// A library coordinate system's id paired with its name. `emit-value` keeps the
-// model the id.
+// A library coordinate system's id paired with its name, or null for the
+// Default option. `emit-value` keeps the model the id.
 interface CoordinateSystemOption {
   label: string;
-  value: string;
+  value: string | null;
 }
 
 /** Why a solve or surface check fired, which sets a solve's budget and what it writes. */
@@ -207,11 +216,14 @@ const probeTypeOptions = computed<ProbeTypeOption[]>(() =>
  */
 const coordinateSystemIdentifier = computed({
   get: () => probe.coordinateSystemIdentifier,
-  set: (value: string) => {
-    const coordinateSystem = coordinateSystemLibraryStore.library.find(
-      ({ id }) => id === value
-    );
-    if (!coordinateSystem) return;
+  set: (value: string | null) => {
+    const coordinateSystem =
+      value === null
+        ? null
+        : (coordinateSystemLibraryStore.library.find(
+            ({ id }) => id === value
+          ) ?? null);
+    if (value !== null && !coordinateSystem) return;
 
     setProbeCoordinateSystem(
       currentExperimentStore.experiment,
@@ -221,19 +233,23 @@ const coordinateSystemIdentifier = computed({
   }
 });
 
-/** Coordinate system the transform inputs edit, or null when the experiment has none. */
-const selectedCoordinateSystem = computed(
-  () =>
-    currentExperimentStore.coordinateSystems[
-      probe.coordinateSystemIdentifier
-    ] ?? null
+/** Coordinate system the transform inputs edit, or null when the probe has none. */
+const selectedCoordinateSystem = computed(() =>
+  probe.coordinateSystemIdentifier
+    ? (currentExperimentStore.coordinateSystems[
+        probe.coordinateSystemIdentifier
+      ] ?? null)
+    : null
 );
 
 const coordinateSystemOptions = computed<CoordinateSystemOption[]>(() => {
-  const options = coordinateSystemLibraryStore.library.map(({ id, name }) => ({
-    label: name,
-    value: id
-  }));
+  const options: CoordinateSystemOption[] = [
+    { label: t("probeInspector.defaultCoordinateSystem"), value: null },
+    ...coordinateSystemLibraryStore.library.map(({ id, name }) => ({
+      label: name,
+      value: id
+    }))
+  ];
   const selected = selectedCoordinateSystem.value;
   if (selected && !options.some(({ value }) => value === selected.id)) {
     options.push({ label: selected.name, value: selected.id });
@@ -246,6 +262,11 @@ const referenceOffset = computed(() =>
   selectedCoordinateSystem.value?.offsetByReferenceCoordinate
     ? currentExperimentStore.referenceCoordinate
     : null
+);
+
+/** Origin the Default option's position inputs are relative to, in atlas ASR mm. */
+const defaultPositionOffset = computed(
+  () => currentExperimentStore.referenceCoordinate
 );
 
 /**
@@ -585,6 +606,9 @@ async function previewInverseKinematics(): Promise<void> {
   }
 }
 
+/** Set by `seedChain` so the pose watcher below skips the redundant march its own reseed already ran, when a coordinate-system switch changes `referenceOffset` in the same tick. */
+let chainJustSeeded = false;
+
 /** Re-clone the selected library coordinate system's chain into the working copy. */
 function seedChain(): void {
   // A solve still in flight was started for the previous probe or chain: retire its id so its
@@ -603,9 +627,14 @@ function seedChain(): void {
   currentExperimentStore.probeSurfaceMarker = null;
   appliedPose = null;
   clearUnreachable();
+  chainJustSeeded = true;
+  void nextTick(() => {
+    chainJustSeeded = false;
+  });
+  if (!selectedCoordinateSystem.value) return;
 
   // A single all-adjustable node is exactly invertible from the probe's pose, so
-  // the default coordinate system reads and writes live state. Any other chain
+  // a single-node chain reads and writes live state. Any other chain
   // shape needs a solve to describe the probe's current pose instead of showing
   // the library's stored values.
   const node = directNode.value;
@@ -784,7 +813,8 @@ watch([() => probe.id, () => probe.coordinateSystemIdentifier], seedChain, {
 // chain mirrors it live and needs no solve. Any other chain solves for it: at 10 Hz while
 // dragging, once more when `endProbeDrag` nulls `draggedProbeId` (the release run), and once
 // for an external change such as undo, Home, or Move to surface. Nothing is committed to
-// history until that release run.
+// history until that release run. With no coordinate system selected, the inputs are the
+// state directly, so the watcher below returns immediately.
 watch(
   [
     () => probe.tipPosition,
@@ -793,6 +823,11 @@ watch(
     () => currentExperimentStore.draggedProbeId
   ],
   () => {
+    if (chainJustSeeded) {
+      chainJustSeeded = false;
+      return;
+    }
+    if (!selectedCoordinateSystem.value) return;
     const node = directNode.value;
     if (node) {
       writeProbePoseIntoNode(node);
@@ -965,11 +1000,39 @@ onUnmounted(() => {
           />
 
           <ProbeTransformChain
+            v-if="selectedCoordinateSystem"
             :chain="chain"
             :disable="probe.lock"
             :off-surface-node-indexes="offSurfaceNodeIndexes"
             @commit="applySolve"
           />
+          <template v-else>
+            <div>
+              <div class="text-body2 q-pb-xs">{{
+                t("probeInspector.position")
+              }}</div>
+              <AtlasAxisInputs
+                :disable="probe.lock"
+                hide-bottom-space
+                kind="position"
+                :offset="defaultPositionOffset"
+                outlined
+                :tuple="probe.tipPosition"
+              />
+            </div>
+            <div>
+              <div class="text-body2 q-pb-xs">{{
+                t("probeInspector.rotation")
+              }}</div>
+              <AtlasAxisInputs
+                :disable="probe.lock"
+                hide-bottom-space
+                kind="rotation"
+                outlined
+                :tuple="probe.rotation"
+              />
+            </div>
+          </template>
 
           <div>
             <q-color
