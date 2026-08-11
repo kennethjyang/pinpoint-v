@@ -1,4 +1,5 @@
 import type { Atlas } from "@/features/atlas";
+import type { CoordinateSystem } from "@/features/coordinate-system";
 import type { CameraPose } from "./camera-pose.model";
 import type { VisibleStructure } from "./visible-structure.model";
 import type { Probe, ProbeInterfaceProbe } from "@/features/probe";
@@ -33,6 +34,13 @@ export interface Experiment {
    * probe identifier and referenced from `Probe.probeIdentifier`.
    */
   probeInterfaceProbes: Record<string, ProbeInterfaceProbe>;
+
+  /**
+   * Coordinate system definitions used by this experiment's probes, keyed by
+   * coordinate system identifier and referenced from
+   * `Probe.coordinateSystemIdentifier`.
+   */
+  coordinateSystems: Record<string, CoordinateSystem>;
 
   probes: Probe[];
 

@@ -4,6 +4,7 @@ import type {
   CoordinateSystemNodeComponent,
   CoordinateSystemValue
 } from "../model/coordinate-system.model";
+import { isFiniteNumber, isRecord } from "@/utils/type-guards";
 
 /**
  * Build an adjustable coordinate system value.
@@ -84,6 +85,16 @@ export function buildCoordinateSystem(
     offsetByReferenceCoordinate,
     chain
   };
+}
+
+/**
+ * Identifier a coordinate system is interned and referenced under.
+ * @param coordinateSystem Coordinate system to identify.
+ */
+export function getCoordinateSystemIdentifier(
+  coordinateSystem: CoordinateSystem
+): string {
+  return coordinateSystem.id;
 }
 
 /**
@@ -336,4 +347,84 @@ export function setCoordinateSystemValueBounded(
   bounded: boolean
 ): void {
   coordinateSystemValue.bounds = bounded ? [0, 0] : null;
+}
+
+/**
+ * Check that a value has the shape of a `CoordinateSystem`.
+ * @param value Value to check.
+ */
+export function isCoordinateSystem(value: unknown): value is CoordinateSystem {
+  if (!isRecord(value)) return false;
+
+  return (
+    value.inspectableKind === "coordinateSystem" &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    typeof value.name === "string" &&
+    typeof value.offsetByReferenceCoordinate === "boolean" &&
+    Array.isArray(value.chain) &&
+    value.chain.every(isCoordinateSystemNode)
+  );
+}
+
+/**
+ * Check that a value has the shape of a `CoordinateSystemNode`.
+ * @param value Value to check.
+ */
+function isCoordinateSystemNode(value: unknown): value is CoordinateSystemNode {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.name === "string" &&
+    isCoordinateSystemValueTriple(value.position) &&
+    isCoordinateSystemValueTriple(value.rotation) &&
+    isAxisOrder(value.positionDisplayOrder) &&
+    isAxisOrder(value.rotationDisplayOrder) &&
+    typeof value.onSurface === "boolean"
+  );
+}
+
+/**
+ * Check that a value is a triple of coordinate system values.
+ * @param value Value to check.
+ */
+function isCoordinateSystemValueTriple(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every(isCoordinateSystemValue)
+  );
+}
+
+/**
+ * Check that a value has the shape of a `CoordinateSystemValue`.
+ * @param value Value to check.
+ */
+function isCoordinateSystemValue(
+  value: unknown
+): value is CoordinateSystemValue {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.name === "string" &&
+    isFiniteNumber(value.value) &&
+    typeof value.fixed === "boolean" &&
+    (value.bounds === null ||
+      (Array.isArray(value.bounds) &&
+        value.bounds.length === 2 &&
+        value.bounds.every(isFiniteNumber)))
+  );
+}
+
+/**
+ * Check that a value is a permutation of the three axis indexes, which every
+ * axis lookup indexes blindly.
+ * @param value Value to check.
+ */
+function isAxisOrder(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    [0, 1, 2].every(index => value.includes(index))
+  );
 }

@@ -164,6 +164,14 @@ export const useCurrentExperimentStore = defineStore(
       () => experiment.value.probeInterfaceProbes
     );
 
+    /**
+     * Coordinate system definitions used by this experiment's probes, keyed by
+     * coordinate system identifier.
+     */
+    const coordinateSystems = computed(
+      () => experiment.value.coordinateSystems
+    );
+
     /** Probes in the current experiment. */
     const probes = computed(() => experiment.value.probes);
 
@@ -316,6 +324,7 @@ export const useCurrentExperimentStore = defineStore(
       referenceCoordinate,
       visibleStructures,
       probeInterfaceProbes,
+      coordinateSystems,
       probes,
       sceneObjects,
       cameraPose,

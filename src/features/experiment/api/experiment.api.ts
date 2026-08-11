@@ -1,6 +1,8 @@
 import { toRaw } from "vue";
 import type { Atlas } from "@/features/atlas";
 import { getAtlasCenter, isSameAtlas } from "@/features/atlas";
+import type { CoordinateSystem } from "@/features/coordinate-system";
+import { getCoordinateSystemIdentifier } from "@/features/coordinate-system";
 import type { CameraPose } from "../models/camera-pose.model";
 import {
   buildCameraPose,
@@ -51,6 +53,7 @@ export function buildExperiment(
       defaultStructureIdentifiers
     ),
     probeInterfaceProbes: {},
+    coordinateSystems: {},
     probes: [],
     sceneObjects: [],
     cameraPose: buildCameraPose(atlas),
@@ -277,6 +280,66 @@ export function setProbeInterface(
 }
 
 /**
+ * Intern a coordinate system into the experiment, keeping the existing
+ * definition if one is already interned under that identifier.
+ * @param experiment Experiment to intern a coordinate system into.
+ * @param coordinateSystem Coordinate system to intern.
+ */
+export function internCoordinateSystem(
+  experiment: Experiment,
+  coordinateSystem: CoordinateSystem
+) {
+  const identifier = getCoordinateSystemIdentifier(coordinateSystem);
+  if (!experiment.coordinateSystems[identifier]) {
+    experiment.coordinateSystems[identifier] = structuredClone(
+      toRaw(coordinateSystem)
+    );
+  }
+}
+
+/**
+ * Remove an interned coordinate system by identifier, unless another probe
+ * still references it.
+ * @param experiment Experiment to remove an interned coordinate system from.
+ * @param coordinateSystemIdentifier Coordinate system identifier.
+ */
+export function removeInternCoordinateSystem(
+  experiment: Experiment,
+  coordinateSystemIdentifier: string
+) {
+  const stillReferenced = experiment.probes.some(
+    experimentProbe =>
+      experimentProbe.coordinateSystemIdentifier === coordinateSystemIdentifier
+  );
+  if (stillReferenced) return;
+
+  delete experiment.coordinateSystems[coordinateSystemIdentifier];
+}
+
+/**
+ * Repoint a probe at a coordinate system, re-interning the passed definition so
+ * the probe follows the library's current chain, and dropping the old one if
+ * nothing else uses it.
+ * @param experiment Experiment the probe and definitions belong to.
+ * @param probe Probe to repoint.
+ * @param coordinateSystem New coordinate system for the probe.
+ */
+export function setProbeCoordinateSystem(
+  experiment: Experiment,
+  probe: Probe,
+  coordinateSystem: CoordinateSystem
+) {
+  const oldIdentifier = probe.coordinateSystemIdentifier;
+  const newIdentifier = getCoordinateSystemIdentifier(coordinateSystem);
+
+  experiment.coordinateSystems[newIdentifier] = structuredClone(
+    toRaw(coordinateSystem)
+  );
+  probe.coordinateSystemIdentifier = newIdentifier;
+  removeInternCoordinateSystem(experiment, oldIdentifier);
+}
+
+/**
  * Resolve a probe's interface definition, or null if it isn't interned.
  * @param experiment Experiment to extract the probe interface definition from.
  * @param probe Probe to resolve the definition of.
@@ -319,6 +382,7 @@ export function removeProbe(experiment: Experiment, probe: Probe) {
     experiment,
     removed!.probeInterfaceIdentifier
   );
+  removeInternCoordinateSystem(experiment, removed!.coordinateSystemIdentifier);
 }
 
 /**

@@ -27,7 +27,8 @@ import {
 import { getTerminologyRows } from "@/features/atlas";
 import {
   ALLEN_MOUSE_REFERENCE_COORDINATE,
-  internProbeInterfaceProbe
+  internProbeInterfaceProbe,
+  setProbeCoordinateSystem
 } from "@/features/experiment";
 import {
   getProbeContour,
@@ -202,6 +203,12 @@ describe("ProbeInspector", () => {
     probeLibrary.add(makeProbeInterfaceProbe());
     const store = useCurrentExperimentStore(pinia);
     store.experiment.probes = [probe];
+    const coordinateSystemLibrary = useCoordinateSystemLibraryStore(pinia);
+    setProbeCoordinateSystem(
+      store.experiment,
+      store.experiment.probes[0]!,
+      coordinateSystemLibrary.library[0]!
+    );
 
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
@@ -385,14 +392,15 @@ describe("ProbeInspector", () => {
     const a = makeProbe({ name: "A" });
     const b = makeProbe({ name: "B" });
     store.experiment.probes = [a, b];
+    const coordinateSystem = useCoordinateSystemLibraryStore(pinia).library[0]!;
+    setProbeCoordinateSystem(store.experiment, a, coordinateSystem);
+    setProbeCoordinateSystem(store.experiment, b, coordinateSystem);
     const wrapper = mountWithQuasar(ProbeInspector, {
       pinia,
       props: { probe: a },
       global: { provide: babylonRuntimeProvide }
     });
-    const ml =
-      useCoordinateSystemLibraryStore(pinia).library[0]!.chain[0]!.position[0]!
-        .name;
+    const ml = coordinateSystem.chain[0]!.position[0]!.name;
 
     await editAndBlur(fieldByLabel(wrapper, ml), "1");
     // Cast: `setProps`'s generic doesn't narrow to the SFC's declared props.
@@ -422,7 +430,7 @@ describe("ProbeInspector", () => {
       const surfaceAndDepth = store.library[1]!;
 
       expect(
-        wrapper.findAll(".text-overline").map(node => node.text())
+        wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
       ).toEqual([store.library[0]!.chain[0]!.name]);
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
@@ -432,7 +440,49 @@ describe("ProbeInspector", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper.findAll(".text-overline").map(node => node.text())
+        wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
+      ).toEqual(surfaceAndDepth.chain.map(node => node.name));
+    });
+
+    it("writes the probe's coordinateSystemIdentifier and interns the picked definition", async () => {
+      const { wrapper, store, probe, pinia } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(probe.coordinateSystemIdentifier).toBe(surfaceAndDepth.id);
+      expect(store.experiment.coordinateSystems[surfaceAndDepth.id]).toEqual(
+        surfaceAndDepth
+      );
+    });
+
+    it("restores the previously selected coordinate system after unmounting and remounting", async () => {
+      const { wrapper, probe, pinia } = mountInspector();
+      const surfaceAndDepth =
+        useCoordinateSystemLibraryStore(pinia).library[1]!;
+
+      selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
+        "update:modelValue",
+        surfaceAndDepth.id
+      );
+      await wrapper.vm.$nextTick();
+      wrapper.unmount();
+
+      const remounted = mountWithQuasar(ProbeInspector, {
+        pinia,
+        props: { probe },
+        global: { provide: babylonRuntimeProvide }
+      });
+
+      expect(
+        remounted
+          .findAll(".text-body2.text-weight-bold")
+          .map(node => node.text())
       ).toEqual(surfaceAndDepth.chain.map(node => node.name));
     });
 
@@ -441,7 +491,9 @@ describe("ProbeInspector", () => {
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
       const depthNodeName = surfaceAndDepth.chain[1]!.name;
-      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
@@ -557,7 +609,7 @@ describe("ProbeInspector", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper.findAll(".text-overline").map(node => node.text())
+        wrapper.findAll(".text-body2.text-weight-bold").map(node => node.text())
       ).toEqual(["Adjustable"]);
     });
 
@@ -694,7 +746,9 @@ describe("ProbeInspector", () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
-      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",
@@ -720,7 +774,9 @@ describe("ProbeInspector", () => {
       const { wrapper, pinia } = mountInspector();
       const store = useCoordinateSystemLibraryStore(pinia);
       const surfaceAndDepth = store.library[1]!;
-      const depthValueName = surfaceAndDepth.chain[1]!.position[1]!.name;
+      const depthValueName = surfaceAndDepth.chain[1]!.position.find(
+        ({ fixed }) => !fixed
+      )!.name;
 
       selectByLabel(wrapper, t.coordinateSystem).vm.$emit(
         "update:modelValue",

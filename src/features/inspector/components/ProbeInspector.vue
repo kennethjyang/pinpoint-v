@@ -36,7 +36,10 @@ import {
 import ProbeBodyModelInspector from "./ProbeBodyModelInspector.vue";
 import ProbeTransformChain from "./ProbeTransformChain.vue";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
-import { setProbeInterface } from "@/features/experiment";
+import {
+  setProbeCoordinateSystem,
+  setProbeInterface
+} from "@/features/experiment";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useValidationRules } from "@/composable/useValidationRules";
@@ -100,11 +103,6 @@ const { findTargets, isInsideBrain, isOnSurface } = useProbeSurface();
 
 /** Is the surface sampling pass currently running. */
 const isFindingSurface = ref(false);
-
-/** Id of the library coordinate system whose chain the transform inputs edit. */
-const coordinateSystemId = ref(
-  coordinateSystemLibraryStore.library[0]?.id ?? ""
-);
 
 /**
  * Working copy of the selected coordinate system's chain. Detached from the library so
@@ -173,20 +171,45 @@ const probeTypeOptions = computed<ProbeTypeOption[]>(() =>
   }))
 );
 
-const coordinateSystemOptions = computed<CoordinateSystemOption[]>(() =>
-  coordinateSystemLibraryStore.library.map(({ id, name }) => ({
-    label: name,
-    value: id
-  }))
-);
+/**
+ * Link to the probe's coordinate system identifier that also interns the picked
+ * library definition into the experiment.
+ */
+const coordinateSystemIdentifier = computed({
+  get: () => probe.coordinateSystemIdentifier,
+  set: (value: string) => {
+    const coordinateSystem = coordinateSystemLibraryStore.library.find(
+      ({ id }) => id === value
+    );
+    if (!coordinateSystem) return;
 
-/** Library coordinate system the transform inputs edit, or null when it is gone. */
+    setProbeCoordinateSystem(
+      currentExperimentStore.experiment,
+      probe,
+      coordinateSystem
+    );
+  }
+});
+
+/** Coordinate system the transform inputs edit, or null when the experiment has none. */
 const selectedCoordinateSystem = computed(
   () =>
-    coordinateSystemLibraryStore.library.find(
-      ({ id }) => id === coordinateSystemId.value
-    ) ?? null
+    currentExperimentStore.coordinateSystems[
+      probe.coordinateSystemIdentifier
+    ] ?? null
 );
+
+const coordinateSystemOptions = computed<CoordinateSystemOption[]>(() => {
+  const options = coordinateSystemLibraryStore.library.map(({ id, name }) => ({
+    label: name,
+    value: id
+  }));
+  const selected = selectedCoordinateSystem.value;
+  if (selected && !options.some(({ value }) => value === selected.id)) {
+    options.push({ label: selected.name, value: selected.id });
+  }
+  return options;
+});
 
 /** Root translation the chain hangs off, in atlas ASR mm, or null for the atlas origin. */
 const referenceOffset = computed(() =>
@@ -568,7 +591,9 @@ async function checkSurfaceNodes(
 }
 
 // A different probe or a different coordinate system starts from the library's values.
-watch([() => probe.id, coordinateSystemId], seedChain, { immediate: true });
+watch([() => probe.id, () => probe.coordinateSystemIdentifier], seedChain, {
+  immediate: true
+});
 
 // The scene writes the probe's pose straight into state on every gizmo drag frame. A direct
 // chain mirrors it live and needs no solve. Any other chain solves for it: at 10 Hz while
@@ -721,7 +746,7 @@ onUnmounted(() => {
           </div>
 
           <q-select
-            v-model="coordinateSystemId"
+            v-model="coordinateSystemIdentifier"
             emit-value
             :label="t('probeInspector.coordinateSystem')"
             map-options

@@ -24,6 +24,8 @@ export {
   resetStructureVisibility,
   internProbeInterfaceProbe,
   getInternedProbeInterfaceProbe,
+  internCoordinateSystem,
+  setProbeCoordinateSystem,
   addProbe,
   removeProbe,
   reorderProbe,

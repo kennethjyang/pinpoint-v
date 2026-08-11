@@ -29,7 +29,7 @@ const visibleNodes = computed(() =>
     <q-item v-for="{ node, index } of visibleNodes" :key="index">
       <q-item-section>
         <div class="column no-wrap q-gutter-y-sm">
-          <div class="text-overline">{{ node.name }}</div>
+          <div class="text-body2 text-weight-bold">{{ node.name }}</div>
           <div
             v-if="offSurfaceNodeIndexes.includes(index)"
             class="text-caption text-warning"

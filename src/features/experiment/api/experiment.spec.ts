@@ -9,15 +9,18 @@ import {
   getExperimentModelIds,
   getInternedProbeInterfaceProbe,
   getVisibleStructure,
+  internCoordinateSystem,
   internProbeInterfaceProbe,
   isStructureVisible,
   removeCameraPose,
+  removeInternCoordinateSystem,
   removeInternProbeInterfaceProbe,
   removeProbe,
   reorderCameraPose,
   reorderProbe,
   resetStructureVisibility,
   setExperimentProperties,
+  setProbeCoordinateSystem,
   setProbeInterface,
   setStructureVisibility
 } from "./experiment.api";
@@ -28,9 +31,11 @@ import {
 import type { Experiment } from "../models/experiment.model";
 import { buildProbe, getProbeInterfaceIdentifier } from "@/features/probe";
 import { getAtlasCenter } from "@/features/atlas";
+import { getCoordinateSystemIdentifier } from "@/features/coordinate-system";
 import {
   makeAtlas,
   makeCameraPose,
+  makeCoordinateSystem,
   makeManifest,
   makeProbe,
   makeProbeInterfaceProbe,
@@ -448,12 +453,143 @@ describe("setProbeInterface", () => {
   });
 });
 
+describe("internCoordinateSystem", () => {
+  it("stores the definition under the coordinate system's id", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const coordinateSystem = makeCoordinateSystem();
+
+    internCoordinateSystem(experiment, coordinateSystem);
+
+    expect(experiment.coordinateSystems).toEqual({
+      [coordinateSystem.id]: coordinateSystem
+    });
+  });
+
+  it("keeps the first-interned object when the same identifier is interned twice", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const identifier = getCoordinateSystemIdentifier(makeCoordinateSystem());
+
+    internCoordinateSystem(experiment, makeCoordinateSystem({ name: "First" }));
+    const first = experiment.coordinateSystems[identifier];
+    internCoordinateSystem(
+      experiment,
+      makeCoordinateSystem({ name: "Second" })
+    );
+
+    expect(experiment.coordinateSystems[identifier]).toBe(first);
+    expect(Object.keys(experiment.coordinateSystems)).toHaveLength(1);
+  });
+
+  it("does not alias the source coordinate system", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const source = makeCoordinateSystem();
+
+    internCoordinateSystem(experiment, source);
+    source.chain[0]!.name = "Mutated";
+
+    expect(experiment.coordinateSystems[source.id]!.chain[0]!.name).toBe("Tip");
+  });
+});
+
+describe("removeInternCoordinateSystem", () => {
+  it("removes the definition when no probe references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const coordinateSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, coordinateSystem);
+
+    removeInternCoordinateSystem(experiment, coordinateSystem.id);
+
+    expect(experiment.coordinateSystems).toEqual({});
+  });
+
+  it("keeps the definition while a probe still references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const coordinateSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, coordinateSystem);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    removeInternCoordinateSystem(experiment, probe.coordinateSystemIdentifier);
+
+    expect(
+      experiment.coordinateSystems[probe.coordinateSystemIdentifier]
+    ).toEqual(coordinateSystem);
+  });
+
+  it("is a no-op when the identifier isn't interned", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    internCoordinateSystem(experiment, makeCoordinateSystem());
+
+    removeInternCoordinateSystem(experiment, "missing-id");
+
+    expect(Object.keys(experiment.coordinateSystems)).toEqual([
+      "coordinate-system-id"
+    ]);
+  });
+});
+
+describe("setProbeCoordinateSystem", () => {
+  it("repoints the probe to the new coordinate system's identifier", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, oldSystem);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    const newSystem = makeCoordinateSystem({ id: "other-id", name: "Other" });
+    setProbeCoordinateSystem(experiment, probe, newSystem);
+
+    expect(probe.coordinateSystemIdentifier).toBe("other-id");
+  });
+
+  it("overwrites the entry with the passed definition", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, oldSystem);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    const newSystem = makeCoordinateSystem({ id: "other-id", name: "Other" });
+    setProbeCoordinateSystem(experiment, probe, newSystem);
+
+    expect(experiment.coordinateSystems["other-id"]).toEqual(newSystem);
+  });
+
+  it("drops the old entry once nothing else references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, oldSystem);
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    const newSystem = makeCoordinateSystem({ id: "other-id", name: "Other" });
+    setProbeCoordinateSystem(experiment, probe, newSystem);
+
+    expect(experiment.coordinateSystems[oldSystem.id]).toBeUndefined();
+  });
+
+  it("keeps the old entry if another probe still references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    const oldSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, oldSystem);
+    const probe = makeProbe({ id: "A" });
+    const otherProbe = makeProbe({ id: "B" });
+    addProbe(experiment, probe);
+    addProbe(experiment, otherProbe);
+
+    const newSystem = makeCoordinateSystem({ id: "other-id", name: "Other" });
+    setProbeCoordinateSystem(experiment, probe, newSystem);
+
+    expect(experiment.coordinateSystems[oldSystem.id]).toEqual(oldSystem);
+  });
+});
+
 describe("getInternedProbeInterfaceProbe", () => {
   it("resolves a probe's interned definition", () => {
     const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
     const spec = makeProbeInterfaceProbe({ si_units: "mm" });
     internProbeInterfaceProbe(experiment, spec);
-    const probe = buildProbe(spec, [0, 0, 0]);
+    const probe = buildProbe(spec, [0, 0, 0], makeCoordinateSystem());
 
     expect(getInternedProbeInterfaceProbe(experiment, probe)).toEqual(spec);
   });
@@ -532,6 +668,35 @@ describe("removeProbe", () => {
     removeProbe(experiment, probe);
 
     expect(experiment.probeInterfaceProbes).toEqual({});
+  });
+
+  it("drops the probe's coordinate system once no probe references it anymore", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    internCoordinateSystem(experiment, makeCoordinateSystem());
+    const probe = makeProbe();
+    addProbe(experiment, probe);
+
+    removeProbe(experiment, probe);
+
+    expect(experiment.coordinateSystems).toEqual({});
+  });
+
+  it("keeps the coordinate system while another probe still references it", () => {
+    const experiment = buildExperiment("Exp", makeAtlas(), [0, 0, 0]);
+    internProbeInterfaceProbe(experiment, makeProbeInterfaceProbe());
+    const coordinateSystem = makeCoordinateSystem();
+    internCoordinateSystem(experiment, coordinateSystem);
+    const probe = makeProbe({ id: "A" });
+    const otherProbe = makeProbe({ id: "B" });
+    addProbe(experiment, probe);
+    addProbe(experiment, otherProbe);
+
+    removeProbe(experiment, probe);
+
+    expect(experiment.coordinateSystems).toEqual({
+      [coordinateSystem.id]: coordinateSystem
+    });
   });
 });
 
@@ -830,7 +995,11 @@ describe("setExperimentProperties", () => {
   it("shifts every probe tip, scene-object position, and camera pose target by the atlas center delta", () => {
     const atlas = makeAtlas();
     const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
-    const probe = buildProbe(makeProbeInterfaceProbe(), [0, 0, 0]);
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      [0, 0, 0],
+      makeCoordinateSystem()
+    );
     probe.tipPosition = [2, 0, 0];
     addProbe(experiment, probe);
     const sceneObject = makeSceneObject({ position: [1, 1, 1] });
@@ -861,7 +1030,11 @@ describe("setExperimentProperties", () => {
   it("leaves probe tips, scene-object positions, and the camera target byte-identical on a reference-coordinate-only change", () => {
     const atlas = makeAtlas();
     const experiment = buildExperiment("Exp", atlas, [0, 0, 0]);
-    const probe = buildProbe(makeProbeInterfaceProbe(), [0, 0, 0]);
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      [0, 0, 0],
+      makeCoordinateSystem()
+    );
     probe.tipPosition = [2, 0, 0];
     addProbe(experiment, probe);
     const sceneObject = makeSceneObject({ position: [1, 1, 1] });

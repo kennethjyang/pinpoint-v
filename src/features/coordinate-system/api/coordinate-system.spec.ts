@@ -7,6 +7,7 @@ import {
   buildFixedCoordinateSystemValue,
   getCoordinateSystemAxisValue,
   getCoordinateSystemValueAxis,
+  isCoordinateSystem,
   removeCoordinateSystemTransform,
   reorderCoordinateSystemTransform,
   reorderCoordinateSystemValue,
@@ -16,6 +17,7 @@ import {
   setCoordinateSystemValueBounded,
   setCoordinateSystemValueFixed
 } from "./coordinate-system.api";
+import type { CoordinateSystemValue } from "../model/coordinate-system.model";
 import { makeCoordinateSystem } from "@/test/fixtures";
 
 describe("addCoordinateSystemTransform", () => {
@@ -397,6 +399,82 @@ describe("buildCoordinateSystem", () => {
     expect(buildCoordinateSystem("CCF", []).id).not.toBe(
       buildCoordinateSystem("CCF", []).id
     );
+  });
+});
+
+describe("isCoordinateSystem", () => {
+  function makeNode(
+    position: [
+      CoordinateSystemValue,
+      CoordinateSystemValue,
+      CoordinateSystemValue
+    ] = [
+      buildCoordinateSystemValue("ML"),
+      buildCoordinateSystemValue("DV"),
+      buildCoordinateSystemValue("AP")
+    ],
+    positionDisplayOrder: [number, number, number] = [0, 1, 2]
+  ) {
+    return buildCoordinateSystemNode(
+      "Tip",
+      position,
+      [
+        buildCoordinateSystemValue("Pitch"),
+        buildCoordinateSystemValue("Yaw"),
+        buildCoordinateSystemValue("Roll")
+      ],
+      positionDisplayOrder
+    );
+  }
+
+  it("accepts a buildCoordinateSystem result", () => {
+    const coordinateSystem = buildCoordinateSystem("CCF", [makeNode()]);
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(true);
+  });
+
+  it("rejects a wrong inspectableKind", () => {
+    const coordinateSystem = {
+      ...buildCoordinateSystem("CCF", [makeNode()]),
+      inspectableKind: "probe"
+    };
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(false);
+  });
+
+  it("rejects a non-permutation display order", () => {
+    const coordinateSystem = buildCoordinateSystem("CCF", [
+      makeNode(undefined, [0, 0, 1])
+    ]);
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(false);
+  });
+
+  it("rejects a non-finite value", () => {
+    const coordinateSystem = buildCoordinateSystem("CCF", [
+      makeNode([
+        { ...buildCoordinateSystemValue("ML"), value: NaN },
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ])
+    ]);
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(false);
+  });
+
+  it("rejects a bounds array of length 3", () => {
+    const coordinateSystem = buildCoordinateSystem("CCF", [
+      makeNode([
+        {
+          ...buildCoordinateSystemValue("ML"),
+          bounds: [0, 1, 2] as unknown as [number, number]
+        },
+        buildCoordinateSystemValue("DV"),
+        buildCoordinateSystemValue("AP")
+      ])
+    ]);
+
+    expect(isCoordinateSystem(coordinateSystem)).toBe(false);
   });
 });
 

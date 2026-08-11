@@ -20,6 +20,7 @@ import {
 import { addProbe, buildExperiment } from "@/features/experiment";
 import {
   makeAtlas,
+  makeCoordinateSystem,
   makeProbe,
   makeProbeInterfaceProbe,
   makeSceneModel
@@ -30,12 +31,16 @@ describe("buildProbe", () => {
     const spec = makeProbeInterfaceProbe({
       annotations: { manufacturer: "imec", model_name: "np1" }
     });
-    const probe = buildProbe(spec, [0, 0, 0]);
+    const probe = buildProbe(spec, [0, 0, 0], makeCoordinateSystem());
     expect(probe.probeInterfaceIdentifier).toBe("imec np1");
   });
 
   it("builds a probe with sensible defaults, starting pitched inferiorly", () => {
-    const probe = buildProbe(makeProbeInterfaceProbe(), [1, 2, 3]);
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      [1, 2, 3],
+      makeCoordinateSystem()
+    );
 
     expect(probe.inspectableKind).toBe("probe");
     expect(probe.visibility).toBe("visible");
@@ -60,16 +65,38 @@ describe("buildProbe", () => {
   it("does not alias the given tip position array", () => {
     const tipPosition: [number, number, number] = [1, 2, 3];
 
-    const probe = buildProbe(makeProbeInterfaceProbe(), tipPosition);
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      tipPosition,
+      makeCoordinateSystem()
+    );
     tipPosition[0] = 99;
 
     expect(probe.tipPosition).toEqual([1, 2, 3]);
   });
 
   it("gives each probe a unique id", () => {
-    const a = buildProbe(makeProbeInterfaceProbe(), [0, 0, 0]);
-    const b = buildProbe(makeProbeInterfaceProbe(), [0, 0, 0]);
+    const a = buildProbe(
+      makeProbeInterfaceProbe(),
+      [0, 0, 0],
+      makeCoordinateSystem()
+    );
+    const b = buildProbe(
+      makeProbeInterfaceProbe(),
+      [0, 0, 0],
+      makeCoordinateSystem()
+    );
     expect(a.id).not.toBe(b.id);
+  });
+
+  it("references the given coordinate system's identifier", () => {
+    const coordinateSystem = makeCoordinateSystem();
+    const probe = buildProbe(
+      makeProbeInterfaceProbe(),
+      [0, 0, 0],
+      coordinateSystem
+    );
+    expect(probe.coordinateSystemIdentifier).toBe(coordinateSystem.id);
   });
 });
 

@@ -11,11 +11,13 @@ import {
   rotateProbeVisibility
 } from "@/features/probe";
 import { useProbeLibraryStore } from "@/stores/probe-library.store";
+import { useCoordinateSystemLibraryStore } from "@/stores/coordinate-system-library.store";
 import { useCurrentExperimentStore } from "@/stores/current-experiment.store";
 import { useDragReorder } from "@/composable/useDragReorder";
 import {
   addProbe,
   addSceneObject,
+  internCoordinateSystem,
   internProbeInterfaceProbe,
   removeProbe,
   removeSceneObject,
@@ -32,6 +34,7 @@ import type { SceneObjectVisibility } from "../models/scene-object-visibility.mo
 
 const $q = useQuasar();
 const probeLibrary = useProbeLibraryStore();
+const coordinateSystemLibrary = useCoordinateSystemLibraryStore();
 const currentExperiment = useCurrentExperimentStore();
 
 const {
@@ -82,9 +85,12 @@ const SCENE_OBJECT_VISIBILITY_ICONS: Record<SceneObjectVisibility, string> = {
  */
 function addProbeAndSelect(probeInterfaceProbe: ProbeInterfaceProbe) {
   internProbeInterfaceProbe(currentExperiment.experiment, probeInterfaceProbe);
+  const coordinateSystem = coordinateSystemLibrary.library[0]!;
+  internCoordinateSystem(currentExperiment.experiment, coordinateSystem);
   const probe = buildProbe(
     probeInterfaceProbe,
-    currentExperiment.referenceCoordinate
+    currentExperiment.referenceCoordinate,
+    coordinateSystem
   );
   addProbe(currentExperiment.experiment, probe);
   currentExperiment.selectedInspectable = probe;
